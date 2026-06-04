@@ -1,0 +1,8 @@
+{
+  "/courses/page": "app/courses/page.js",
+  "/discovery/page": "app/discovery/page.js",
+  "/profile/me/page": "app/profile/me/page.js",
+  "/feed/page": "app/feed/page.js",
+  "/page": "app/page.js",
+  "/settings/page": "app/settings/page.js"
+}
