@@ -6,7 +6,6 @@ const nextConfig = {
     }
     return config
   },
-  webSocketServer: false,
 }
 
 module.exports = nextConfig
