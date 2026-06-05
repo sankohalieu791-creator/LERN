@@ -5,17 +5,10 @@
 /* ── Native app feel ──────────────────────────────────────── */
 *, *::before, *::after {
   -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 *::-webkit-scrollbar { display: none; }
-
-html, body {
-  overscroll-behavior: none;
-  overscroll-behavior-y: none;
-  -webkit-overflow-scrolling: touch;
-}
 
 /* ── Theme tokens ─────────────────────────────────────────── */
 :root {
