@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { addFeedback } from '@/lib/supabase'
+import { addFeedback, createNotification } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import { Star } from 'lucide-react'
 
@@ -21,8 +21,10 @@ export default function LeaveFeedbackPage() {
 
     setLoading(true)
     try {
+      const senderName = (user as any).username ?? user.email?.split('@')[0]
       await addFeedback(userId as string, user.id, rating, feedback)
-      sendPush(userId as string, '⭐ New feedback', `${user.email?.split('@')[0]} left you ${rating}-star feedback`, `/profile/${userId}/feedback`)
+      sendPush(userId as string, '⭐ New feedback', `${senderName} gave you ${rating}-star feedback`, `/profile/${userId}`)
+      createNotification(userId as string, 'feedback', '⭐ New feedback', `${senderName} gave you ${rating}-star feedback`, `/profile/${userId}`)
       setSubmitted(true)
       setRating(0)
       setFeedback('')

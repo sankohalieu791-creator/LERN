@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import {
-  getProjectsByUser, getCertificatesByUser, getFeedback,
+  getProjectsByUser, getCertificatesByUser, getFeedback, getFeedbackGiven,
   getUserVideos, addCertificate, deleteVideo, deleteProject, deleteCertificate,
   getInstructorCourses, getInstructorRequests, updateRequestStatus,
   supabase,
@@ -106,7 +106,7 @@ export default function ProfileMePage() {
       if (user.account_type === 'instructor') {
         const [v, f, c, r] = await Promise.all([
           getUserVideos(user.id),
-          getFeedback(user.id),
+          getFeedbackGiven(user.id),  // instructors see feedback they GAVE
           getInstructorCourses(user.id),
           getInstructorRequests(user.id),
         ])
@@ -597,33 +597,43 @@ export default function ProfileMePage() {
         {activeTab === 'feedback' && (
           dataLoading ? <LoadingSpinner /> :
           feedback.length === 0 ? (
-            <div>
-              <div className="bg-[#1a1a1a] theme-card border border-[rgba(255,255,255,0.06)] theme-border rounded-2xl p-4 mb-4">
-                <p className="text-[#555] theme-text-2 text-sm text-center leading-relaxed">
-                  Only employers can leave feedback. Employers who have reviewed your profile can rate your skills here.
-                </p>
-              </div>
-              <div className="text-center py-8">
-                <p className="text-[#444] text-sm">No feedback yet</p>
-              </div>
+            <div className="text-center py-16">
+              <MessageSquare className="w-10 h-10 text-[#2a2a2a] mx-auto mb-3" />
+              <p className="text-[#444] text-sm">
+                {isInstructor ? 'No feedback given yet' : 'No feedback yet'}
+              </p>
+              <p className="text-[#333] text-xs mt-1">
+                {isInstructor ? 'Visit a student profile to leave feedback' : 'Employers and instructors can leave feedback on your profile'}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
-              {feedback.map((f: any) => (
-                <div key={f.id} className="bg-[#1a1a1a] theme-card border border-[rgba(255,255,255,0.06)] theme-border rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                        {f.users?.username?.[0]?.toUpperCase() ?? 'E'}
+              {feedback.map((f: any) => {
+                // instructors: show who they gave feedback to (recipient); students: show reviewer
+                const displayUser = isInstructor ? f.recipient : f.users
+                const label = isInstructor ? 'To' : 'From'
+                return (
+                  <div key={f.id} className="bg-[#1a1a1a] theme-card border border-[rgba(255,255,255,0.06)] theme-border rounded-2xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
+                          {displayUser?.avatar_url
+                            ? <img src={displayUser.avatar_url} className="w-full h-full object-cover" />
+                            : displayUser?.username?.[0]?.toUpperCase() ?? '?'
+                          }
+                        </div>
+                        <div>
+                          <p className="text-[#555] text-[10px]">{label}</p>
+                          <p className="text-white theme-text-1 text-sm font-semibold">{displayUser?.username ?? 'User'}</p>
+                        </div>
                       </div>
-                      <p className="text-white theme-text-1 text-sm font-semibold">{f.users?.username ?? 'Employer'}</p>
+                      <Stars rating={f.rating} />
                     </div>
-                    <Stars rating={f.rating} />
+                    <p className="text-[#777] theme-text-2 text-sm leading-relaxed">{f.feedback_text}</p>
+                    <p className="text-[#444] text-xs mt-2">{new Date(f.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                   </div>
-                  <p className="text-[#777] theme-text-2 text-sm leading-relaxed">{f.feedback_text}</p>
-                  <p className="text-[#444] text-xs mt-2">{new Date(f.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )
         )}

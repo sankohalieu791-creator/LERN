@@ -13,8 +13,7 @@ interface CreateCourseProps {
 const inputCls = 'w-full bg-[#1e1e1e] border border-[rgba(255,255,255,0.08)] rounded-2xl px-4 py-3.5 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.2)] transition'
 const labelCls = 'block text-[#888] text-[11px] font-bold uppercase tracking-wider mb-2'
 
-const SUBJECTS = ['TYPESCRIPT','JAVASCRIPT','REACT','PYTHON','FITNESS','MUSIC','BUSINESS','EXAM PREP','SPANISH']
-const LEVELS   = ['beginner','intermediate','advanced']
+const LEVELS = ['beginner','intermediate','advanced']
 
 export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
   const { user } = useAuth()
@@ -118,17 +117,15 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
             <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What will learners gain?" rows={3} className={`${inputCls} resize-none`} />
           </div>
 
-          {/* Subject pills */}
+          {/* Subject — free text input */}
           <div>
             <label className={labelCls}>Subject</label>
-            <div className="flex flex-wrap gap-2">
-              {SUBJECTS.map(s => (
-                <button key={s} type="button" onClick={() => setSubject(s)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition ${subject === s ? 'bg-white text-black' : 'bg-[#252525] text-[#888] border border-[rgba(255,255,255,0.07)]'}`}>
-                  {s}
-                </button>
-              ))}
-            </div>
+            <input
+              value={subject}
+              onChange={e => setSubject(e.target.value.toUpperCase())}
+              placeholder="e.g. PYTHON, FITNESS, MUSIC…"
+              className={inputCls}
+            />
           </div>
 
           {/* Level pills */}

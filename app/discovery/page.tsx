@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Search, MapPin, Users, X, Mail, Phone,
-  Check, Loader2, Send,
+  Check, Loader2, Send, ExternalLink,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useRouter } from 'next/navigation'
 import {
   getInstructors, getFollowingIds,
   followUser, unfollowUser,
@@ -279,6 +280,7 @@ function ContactSheet({
   isFollowed: boolean
   onFollow: () => void
 }) {
+  const router = useRouter()
   const u = app.users
   const badge = getBadge(u?.followers_count ?? 0)
   const [copied, setCopied] = useState<string | null>(null)
@@ -332,14 +334,25 @@ function ContactSheet({
                 <span>followers</span>
               </div>
             </div>
-            <button
-              onClick={onFollow}
-              className={`w-full py-3 rounded-full text-sm font-bold mb-5 transition ${
-                isFollowed ? 'bg-[#2a2a2a] text-[#888] border border-[rgba(255,255,255,0.1)]' : 'bg-white text-black'
-              }`}
-            >
-              {isFollowed ? 'Following' : 'Follow'}
-            </button>
+            <div className="flex gap-2 mb-5">
+              <button
+                onClick={onFollow}
+                className={`flex-1 py-3 rounded-full text-sm font-bold transition ${
+                  isFollowed ? 'bg-[#2a2a2a] text-[#888] border border-[rgba(255,255,255,0.1)]' : 'bg-white text-black'
+                }`}
+              >
+                {isFollowed ? 'Following' : 'Follow'}
+              </button>
+              {app.user_id && (
+                <button
+                  onClick={() => { onClose(); router.push(`/profile/${app.user_id}`) }}
+                  className="flex items-center gap-1.5 bg-[#1e1e1e] border border-[rgba(255,255,255,0.1)] text-white px-4 py-3 rounded-full text-sm font-bold"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Profile
+                </button>
+              )}
+            </div>
             {(app.contact_email || app.contact_phone) ? (
               <div>
                 <p className="text-[#555] text-[11px] font-bold uppercase tracking-widest mb-3">Contact</p>

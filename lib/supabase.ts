@@ -470,3 +470,58 @@ export const getUserCourseRating = async (courseId: string, userId: string) => {
     .single()
   return { data, error }
 }
+
+// Delete own comment
+export const deleteComment = async (commentId: string, userId: string) => {
+  const { error } = await supabase
+    .from('comments')
+    .delete()
+    .eq('id', commentId)
+    .eq('user_id', userId)
+  return { error }
+}
+
+// Workshop enrollments
+export const joinWorkshop = async (workshopId: string, userId: string) => {
+  const { error } = await supabase
+    .from('workshop_enrollments')
+    .insert([{ workshop_id: workshopId, user_id: userId }])
+  return { error }
+}
+
+export const leaveWorkshop = async (workshopId: string, userId: string) => {
+  const { error } = await supabase
+    .from('workshop_enrollments')
+    .delete()
+    .eq('workshop_id', workshopId)
+    .eq('user_id', userId)
+  return { error }
+}
+
+export const hasJoinedWorkshop = async (workshopId: string, userId: string) => {
+  const { data } = await supabase
+    .from('workshop_enrollments')
+    .select('id')
+    .eq('workshop_id', workshopId)
+    .eq('user_id', userId)
+    .single()
+  return { data: !!data }
+}
+
+export const getMyWorkshopJoins = async (userId: string): Promise<string[]> => {
+  const { data } = await supabase
+    .from('workshop_enrollments')
+    .select('workshop_id')
+    .eq('user_id', userId)
+  return (data || []).map((r: any) => r.workshop_id)
+}
+
+// Feedback given by an instructor (feedback they wrote about others)
+export const getFeedbackGiven = async (reviewerId: string) => {
+  const { data, error } = await supabase
+    .from('feedback')
+    .select('*, recipient:profile_user_id(id, username, avatar_url, verified)')
+    .eq('reviewer_id', reviewerId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}

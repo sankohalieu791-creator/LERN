@@ -36,7 +36,7 @@ export default function BottomNav() {
       {showMenu && (
         <div
           className="fixed z-50 flex flex-col gap-2.5 items-center"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 70px)', left: '50%', transform: 'translateX(-50%)' }}
+          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 63px)', left: '50%', transform: 'translateX(-50%)' }}
         >
           {isInstructor && (
             <button
@@ -65,7 +65,7 @@ export default function BottomNav() {
 
       {/* nav bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#0f0f0f] border-t border-[rgba(255,255,255,0.08)]">
-        <div className="flex items-center" style={{ height: '56px' }}>
+        <div className="flex items-center" style={{ height: '49px' }}>
           <Link href="/feed"       className={linkCls('/feed')}>
             <Home    className="w-6 h-6" />
             <span className="text-[10px] font-medium">Feed</span>
@@ -80,7 +80,7 @@ export default function BottomNav() {
             <button
               onClick={() => setShowMenu(!showMenu)}
               className="flex items-center justify-center bg-white rounded-full shadow-lg active:scale-95 transition-transform"
-              style={{ width: '48px', height: '48px', marginTop: '-18px' }}
+              style={{ width: '46px', height: '46px', marginTop: '-16px' }}
             >
               <Plus className={`w-6 h-6 text-black transition-transform duration-200 ${showMenu ? 'rotate-45' : ''}`} />
             </button>

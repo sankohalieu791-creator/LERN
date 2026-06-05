@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Search, Bell, ThumbsUp, ThumbsDown, MessageCircle, Share2, X, Send, Play } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Search, Bell, ThumbsUp, MessageCircle, Share2, X, Send, Play, Trash2 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getVideos, likeVideo, unlikeVideo, hasUserLiked,
   followUser, unfollowUser, isFollowing,
-  getComments, addComment, getNotifications,
+  getComments, addComment, deleteComment, getNotifications,
   createNotification, markNotificationsRead,
+  incrementProfileViews,
 } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
@@ -28,20 +30,10 @@ function timeAgo(dateStr: string) {
   if (!dateStr) return ''
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
   if (diff < 60) return 'just now'
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d`
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-}
-
-const SUBJECT_STYLES: Record<string, string> = {
-  TYPESCRIPT: 'bg-blue-900/70 text-blue-200',
-  JAVASCRIPT: 'bg-yellow-900/70 text-yellow-200',
-  REACT:      'bg-cyan-900/70 text-cyan-200',
-  PYTHON:     'bg-green-900/70 text-green-200',
-  FITNESS:    'bg-orange-900/70 text-orange-200',
-  MUSIC:      'bg-purple-900/70 text-purple-200',
-  BUSINESS:   'bg-slate-700/70 text-slate-200',
 }
 
 function fmt(n: number) {
@@ -52,43 +44,25 @@ function fmt(n: number) {
 
 export default function FeedPage() {
   const { user } = useAuth()
+  const router = useRouter()
 
-  const [videos,        setVideos]        = useState<any[]>([])
-  const [loading,       setLoading]       = useState(true)
-  const [userLikes,     setUserLikes]     = useState<Set<string>>(new Set())
-  const [likeAnim,      setLikeAnim]      = useState<Set<string>>(new Set())
-  const [following,     setFollowing]     = useState<Set<string>>(new Set())
-  const [selectedVideo, setSelectedVideo] = useState<any>(null)
-  const [searchOpen,    setSearchOpen]    = useState(false)
-  const [searchQuery,   setSearchQuery]   = useState('')
-  const [notifCount,    setNotifCount]    = useState(0)
-  const [notifs,        setNotifs]        = useState<any[]>([])
-  const [showNotifs,    setShowNotifs]    = useState(false)
-  const [comments,      setComments]      = useState<any[]>([])
-  const [newComment,    setNewComment]    = useState('')
-  const [commentLoading,setCommentLoading]= useState(false)
+  const [videos,         setVideos]         = useState<any[]>([])
+  const [loading,        setLoading]        = useState(true)
+  const [userLikes,      setUserLikes]      = useState<Set<string>>(new Set())
+  const [likeAnim,       setLikeAnim]       = useState<Set<string>>(new Set())
+  const [following,      setFollowing]      = useState<Set<string>>(new Set())
+  const [selectedVideo,  setSelectedVideo]  = useState<any>(null)
+  const [searchOpen,     setSearchOpen]     = useState(false)
+  const [searchQuery,    setSearchQuery]    = useState('')
+  const [notifCount,     setNotifCount]     = useState(0)
+  const [notifs,         setNotifs]         = useState<any[]>([])
+  const [showNotifs,     setShowNotifs]     = useState(false)
+  const [comments,       setComments]       = useState<any[]>([])
+  const [newComment,     setNewComment]     = useState('')
+  const [commentLoading, setCommentLoading] = useState(false)
 
   const searchRef  = useRef<HTMLInputElement>(null)
   const commentRef = useRef<HTMLInputElement>(null)
-
-  // Lock both <html> and <body> scroll. Also set overscroll-behavior so iOS
-  // PWA can't rubber-band even when overflow is technically 0.
-  useEffect(() => {
-    const prevBody = document.body.style.overflow
-    const prevHtml = document.documentElement.style.overflow
-    const prevBodyOs = (document.body.style as any).overscrollBehavior
-    const prevHtmlOs = (document.documentElement.style as any).overscrollBehavior
-    document.body.style.overflow = 'hidden'
-    document.documentElement.style.overflow = 'hidden'
-    ;(document.body.style as any).overscrollBehavior = 'none'
-    ;(document.documentElement.style as any).overscrollBehavior = 'none'
-    return () => {
-      document.body.style.overflow = prevBody
-      document.documentElement.style.overflow = prevHtml
-      ;(document.body.style as any).overscrollBehavior = prevBodyOs
-      ;(document.documentElement.style as any).overscrollBehavior = prevHtmlOs
-    }
-  }, [])
 
   useEffect(() => {
     const load = async () => {
@@ -96,7 +70,7 @@ export default function FeedPage() {
       const vids = data || []
       setVideos(vids)
       if (user) {
-        const [likes, follows, notifs] = await Promise.all([
+        const [likes, follows, notifRes] = await Promise.all([
           Promise.all(vids.map(async (v: any) => {
             const { data: liked } = await hasUserLiked(v.id, user.id)
             return liked ? v.id : null
@@ -110,7 +84,7 @@ export default function FeedPage() {
         ])
         setUserLikes(new Set(likes.filter(Boolean) as string[]))
         setFollowing(new Set(follows.filter(Boolean) as string[]))
-        const notifList = notifs.data || []
+        const notifList = notifRes.data || []
         setNotifs(notifList)
         setNotifCount(notifList.filter((n: any) => !n.read).length)
       }
@@ -118,6 +92,14 @@ export default function FeedPage() {
     }
     load()
   }, [user])
+
+  const goToProfile = async (userId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    if (user && user.id !== userId) {
+      try { await incrementProfileViews(userId) } catch {}
+    }
+    router.push(`/profile/${userId}`)
+  }
 
   const openVideo = async (video: any) => {
     setSelectedVideo(video)
@@ -185,6 +167,16 @@ export default function FeedPage() {
     }
   }
 
+  const handleDeleteComment = async (commentId: string) => {
+    if (!user) return
+    await deleteComment(commentId, user.id)
+    setComments(prev => prev.filter(c => c.id !== commentId))
+    if (selectedVideo) {
+      setSelectedVideo((v: any) => ({ ...v, comments_count: Math.max(0, v.comments_count - 1) }))
+      setVideos(vs => vs.map(v => v.id === selectedVideo.id ? { ...v, comments_count: Math.max(0, v.comments_count - 1) } : v))
+    }
+  }
+
   const filteredVideos = searchQuery.trim()
     ? videos.filter(v =>
         v.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -203,7 +195,7 @@ export default function FeedPage() {
     <>
     <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col z-10">
 
-      {/* ── HEADER — never moves ────────────────────────────── */}
+      {/* HEADER */}
       <div
         className="flex-shrink-0 bg-[#0f0f0f] border-b border-[rgba(255,255,255,0.06)]"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
@@ -219,9 +211,7 @@ export default function FeedPage() {
               className="flex-1 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] rounded-full px-4 py-2.5 text-white text-sm placeholder-[#444] outline-none"
             />
             <button onClick={() => { setSearchOpen(false); setSearchQuery('') }}
-              className="text-[#888] text-sm font-semibold">
-              Cancel
-            </button>
+              className="text-[#888] text-sm font-semibold">Cancel</button>
           </div>
         ) : (
           <div className="px-4 py-3 flex items-center justify-between">
@@ -253,7 +243,7 @@ export default function FeedPage() {
         )}
       </div>
 
-      {/* ── VIDEO CARDS — only this scrolls ─────────────────── */}
+      {/* FEED — scrollable */}
       <div
         className="flex-1 overflow-y-auto overscroll-contain"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}
@@ -277,88 +267,83 @@ export default function FeedPage() {
               onClick={() => openVideo(video)}
               className="cursor-pointer border-b border-[rgba(255,255,255,0.05)]"
             >
-              {/* THUMBNAIL — compact height */}
-              <div className="relative w-full bg-[#1a1a1a] overflow-hidden" style={{ height: '180px' }}>
+              {/* THUMBNAIL */}
+              <div className="relative w-full bg-[#1a1a1a] overflow-hidden" style={{ height: '210px' }}>
                 {video.thumbnail_url
                   ? <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover" />
                   : <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] flex items-center justify-center">
-                      <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
-                        <Play className="w-6 h-6 text-white/50 ml-0.5" />
+                      <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center">
+                        <Play className="w-7 h-7 text-white/50 ml-0.5" />
                       </div>
                     </div>
                 }
-                <span className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded ${SUBJECT_STYLES[video.subject] ?? 'bg-[#252525] text-[#888]'}`}>
-                  {video.subject}
-                </span>
-                <span className="absolute top-2 right-2 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
-                  {video.duration}
-                </span>
+                {video.subject && (
+                  <span className="absolute top-2 left-2 text-[10px] font-bold bg-black/70 text-white px-2 py-0.5 rounded-full">
+                    {video.subject}
+                  </span>
+                )}
+                {video.duration && (
+                  <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
+                    {video.duration}
+                  </span>
+                )}
               </div>
 
-              {/* CARD BODY */}
-              <div className="px-4 pt-2.5 pb-3">
-                <h3 className="text-white font-bold text-sm leading-snug mb-2 line-clamp-2">{video.title}</h3>
-
-                {/* INSTRUCTOR + FOLLOW + ACTIONS in one row */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 overflow-hidden">
-                      {video.users?.avatar_url
-                        ? <img src={video.users.avatar_url} className="w-full h-full object-cover" />
-                        : video.users?.username?.[0]?.toUpperCase()
-                      }
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[#888] text-xs font-semibold flex items-center gap-1 truncate">
-                        {video.users?.username}
-                        {video.users?.verified && <VerifiedBadge size={11} />}
-                        {video.users?.title && <span className="text-[#555]">· {video.users.title}</span>}
-                      </p>
-                      <p className="text-[#444] text-[11px]">{fmt(video.views)} views · {timeAgo(video.created_at)}</p>
-                    </div>
+              {/* CARD BODY — YouTube style */}
+              <div className="px-3 pt-3 pb-3 flex gap-3">
+                {/* Avatar — clickable → profile + increment views */}
+                <button
+                  onClick={e => goToProfile(video.user_id, e)}
+                  className="flex-shrink-0 mt-0.5"
+                >
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-[11px] font-bold overflow-hidden">
+                    {video.users?.avatar_url
+                      ? <img src={video.users.avatar_url} className="w-full h-full object-cover" />
+                      : video.users?.username?.[0]?.toUpperCase()
+                    }
                   </div>
+                </button>
 
-                  <div className="flex items-center gap-4 flex-shrink-0 ml-2">
-                    {user?.id !== video.user_id && (
-                      <button
-                        onClick={e => handleFollow(video.user_id, e)}
-                        className={`text-[11px] font-bold px-3 py-1.5 rounded-full border transition ${
-                          following.has(video.user_id)
-                            ? 'border-[rgba(255,255,255,0.1)] text-[#444]'
-                            : 'border-white text-white'
-                        }`}
-                      >
-                        {following.has(video.user_id) ? 'Following' : 'Follow'}
-                      </button>
-                    )}
-
-                    <button onClick={e => handleLike(video.id, e)} className="flex items-center gap-1 active:scale-90 transition-transform">
-                      <span className={likeAnim.has(video.id) ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
-                        {userLikes.has(video.id)
-                          ? <ThumbsUp  className="w-5 h-5" fill="#ef4444" color="#ef4444" strokeWidth={1.5} />
-                          : <ThumbsDown className="w-5 h-5" fill="none"    color="#555"    strokeWidth={1.5} />
-                        }
-                      </span>
-                      <span className={`text-xs font-bold ${userLikes.has(video.id) ? 'text-red-500' : 'text-[#555]'}`}>
-                        {fmt(video.likes_count)}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={e => { e.stopPropagation(); openVideo(video) }}
-                      className="flex items-center gap-1 text-[#555] active:scale-90 transition-transform"
-                    >
-                      <MessageCircle className="w-5 h-5" />
-                      <span className="text-xs font-bold">{fmt(video.comments_count)}</span>
-                    </button>
-
-                    <button
-                      onClick={e => { e.stopPropagation(); navigator.share?.({ title: video.title, url: `${window.location.origin}/feed/${video.id}` }) }}
-                      className="text-[#555] active:scale-90 transition-transform"
-                    >
-                      <Share2 className="w-5 h-5" />
-                    </button>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-white font-bold text-sm leading-snug line-clamp-2 mb-1">{video.title}</h3>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="text-[#888] text-xs font-semibold flex items-center gap-1">
+                      {video.users?.username}
+                      {video.users?.verified && <VerifiedBadge size={11} />}
+                    </span>
+                    <span className="text-[#444] text-xs">
+                      · {fmt(video.views)} views · {timeAgo(video.created_at)}
+                    </span>
                   </div>
+                </div>
+
+                {/* Right: Follow + Like */}
+                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                  {user?.id !== video.user_id && (
+                    <button
+                      onClick={e => handleFollow(video.user_id, e)}
+                      className={`text-[11px] font-bold px-3 py-1 rounded-full border transition ${
+                        following.has(video.user_id)
+                          ? 'border-[rgba(255,255,255,0.1)] text-[#444]'
+                          : 'border-white text-white'
+                      }`}
+                    >
+                      {following.has(video.user_id) ? 'Following' : 'Follow'}
+                    </button>
+                  )}
+                  <button onClick={e => handleLike(video.id, e)} className="flex items-center gap-1 active:scale-90 transition-transform">
+                    <span className={likeAnim.has(video.id) ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
+                      <ThumbsUp
+                        className="w-4 h-4"
+                        fill={userLikes.has(video.id) ? '#ef4444' : 'none'}
+                        color={userLikes.has(video.id) ? '#ef4444' : '#555'}
+                        strokeWidth={1.5}
+                      />
+                    </span>
+                    <span className={`text-xs font-bold ${userLikes.has(video.id) ? 'text-red-500' : 'text-[#555]'}`}>
+                      {fmt(video.likes_count)}
+                    </span>
+                  </button>
                 </div>
               </div>
             </article>
@@ -367,70 +352,65 @@ export default function FeedPage() {
       </div>
     </div>
 
-    {/* ── NOTIFICATIONS PANEL ────────────────────────────── */}
-      {showNotifs && (
-        <div className="fixed inset-0 z-[60] flex flex-col">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setShowNotifs(false)} />
-          <div
-            className="relative mt-auto bg-[#141414] rounded-t-3xl flex flex-col"
-            style={{ maxHeight: '75vh', paddingBottom: 'env(safe-area-inset-bottom)' }}
-          >
-            <div className="flex justify-center pt-3 flex-shrink-0">
-              <div className="w-10 h-1 bg-[#333] rounded-full" />
-            </div>
-            <div className="flex items-center justify-between px-5 pt-3 pb-3 flex-shrink-0 border-b border-[rgba(255,255,255,0.07)]">
-              <h2 className="text-white font-bold text-lg">Notifications</h2>
-              <button onClick={() => setShowNotifs(false)} className="w-8 h-8 bg-[#222] rounded-full flex items-center justify-center">
-                <X className="w-4 h-4 text-white" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto overscroll-contain">
-              {notifs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 px-8">
-                  <Bell className="w-10 h-10 text-[#2a2a2a] mb-3" />
-                  <p className="text-[#444] text-sm text-center">No notifications yet</p>
-                  <p className="text-[#333] text-xs text-center mt-1">Likes, comments and follows will appear here</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-[rgba(255,255,255,0.05)]">
-                  {notifs.map((n: any) => (
-                    <div
-                      key={n.id}
-                      className={`flex items-start gap-3 px-5 py-4 cursor-pointer active:bg-[#1e1e1e] transition ${!n.read ? 'bg-[rgba(255,107,43,0.05)]' : ''}`}
-                      onClick={() => {
-                        setShowNotifs(false)
-                        if (n.link) window.location.href = n.link
-                      }}
-                    >
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-base flex-shrink-0">
-                        {n.type === 'like' ? '❤️' : n.type === 'comment' ? '💬' : n.type === 'follow' ? '👤' : '🔔'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-semibold">{n.title}</p>
-                        <p className="text-[#888] text-xs mt-0.5 line-clamp-2">{n.body}</p>
-                        <p className="text-[#444] text-xs mt-1">
-                          {new Date(n.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                        </p>
-                      </div>
-                      {!n.read && <div className="w-2 h-2 bg-[#FF6B2B] rounded-full flex-shrink-0 mt-1.5" />}
+    {/* NOTIFICATIONS PANEL */}
+    {showNotifs && (
+      <div className="fixed inset-0 z-[60] flex flex-col">
+        <div className="absolute inset-0 bg-black/60" onClick={() => setShowNotifs(false)} />
+        <div
+          className="relative mt-auto bg-[#141414] rounded-t-3xl flex flex-col"
+          style={{ maxHeight: '75vh', paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          <div className="flex justify-center pt-3 flex-shrink-0">
+            <div className="w-10 h-1 bg-[#333] rounded-full" />
+          </div>
+          <div className="flex items-center justify-between px-5 pt-3 pb-3 flex-shrink-0 border-b border-[rgba(255,255,255,0.07)]">
+            <h2 className="text-white font-bold text-lg">Notifications</h2>
+            <button onClick={() => setShowNotifs(false)} className="w-8 h-8 bg-[#222] rounded-full flex items-center justify-center">
+              <X className="w-4 h-4 text-white" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            {notifs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 px-8">
+                <Bell className="w-10 h-10 text-[#2a2a2a] mb-3" />
+                <p className="text-[#444] text-sm text-center">No notifications yet</p>
+                <p className="text-[#333] text-xs text-center mt-1">Likes, comments and follows will appear here</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-[rgba(255,255,255,0.05)]">
+                {notifs.map((n: any) => (
+                  <div
+                    key={n.id}
+                    className={`flex items-start gap-3 px-5 py-4 cursor-pointer active:bg-[#1e1e1e] transition ${!n.read ? 'bg-[rgba(255,107,43,0.05)]' : ''}`}
+                    onClick={() => { setShowNotifs(false); if (n.link) window.location.href = n.link }}
+                  >
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-base flex-shrink-0">
+                      {n.type === 'like' ? '❤️' : n.type === 'comment' ? '💬' : n.type === 'follow' ? '👤' : '🔔'}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-semibold">{n.title}</p>
+                      <p className="text-[#888] text-xs mt-0.5 line-clamp-2">{n.body}</p>
+                      <p className="text-[#444] text-xs mt-1">
+                        {new Date(n.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      </p>
+                    </div>
+                    {!n.read && <div className="w-2 h-2 bg-[#FF6B2B] rounded-full flex-shrink-0 mt-1.5" />}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
+    )}
 
-      {/* ── VIDEO MODAL ─────────────────────────────────────── */}
-      {selectedVideo && (
-        <div className="fixed inset-0 bg-black z-[60] flex flex-col">
+    {/* VIDEO MODAL — YouTube-style */}
+    {selectedVideo && (
+      <div className="fixed inset-0 bg-black z-[60] flex flex-col">
 
-          {/* VIDEO — sits just below status bar */}
-          <div
-            className="relative w-full aspect-video bg-black flex-shrink-0"
-            style={{ marginTop: 'env(safe-area-inset-top)' }}
-          >
+        {/* VIDEO at top, full width */}
+        <div className="relative w-full bg-black flex-shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
             {selectedVideo.video_url
               ? <video
                   src={selectedVideo.video_url}
@@ -439,7 +419,7 @@ export default function FeedPage() {
                   playsInline
                   // @ts-ignore
                   webkit-playsinline="true"
-                  className="w-full h-full"
+                  className="w-full h-full bg-black"
                 />
               : selectedVideo.thumbnail_url
                 ? <img src={selectedVideo.thumbnail_url} alt={selectedVideo.title} className="w-full h-full object-cover" />
@@ -449,158 +429,177 @@ export default function FeedPage() {
             }
             <button
               onClick={() => setSelectedVideo(null)}
-              className="absolute top-3 right-3 w-9 h-9 bg-black/60 rounded-full flex items-center justify-center z-10"
+              className="absolute top-2 right-2 w-8 h-8 bg-black/60 rounded-full flex items-center justify-center z-10"
             >
-              <X className="w-5 h-5 text-white" />
+              <X className="w-4 h-4 text-white" />
             </button>
           </div>
-
-          {/* SCROLLABLE CONTENT */}
-          <div className="flex-1 overflow-y-auto bg-[#0f0f0f]">
-            <div className="px-4 pt-5 pb-4">
-
-              {/* ACTIONS ROW */}
-              <div className="flex items-center gap-7 mb-5">
-                <button onClick={() => handleLike(selectedVideo.id)} className="flex items-center gap-2.5 active:scale-90 transition-transform">
-                  <span className={likeAnim.has(selectedVideo.id) ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
-                    {userLikes.has(selectedVideo.id)
-                      ? <ThumbsUp  className="w-8 h-8" fill="#ef4444" color="#ef4444" strokeWidth={1.5} />
-                      : <ThumbsDown className="w-8 h-8" fill="none"    color="#888"    strokeWidth={1.5} />
-                    }
-                  </span>
-                  <span className={`text-base font-bold ${userLikes.has(selectedVideo.id) ? 'text-red-500' : 'text-[#888]'}`}>
-                    {fmt(selectedVideo.likes_count)}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => setTimeout(() => commentRef.current?.focus(), 100)}
-                  className="flex items-center gap-2.5 text-[#888] active:scale-90 transition-transform"
-                >
-                  <MessageCircle className="w-8 h-8" />
-                  <span className="text-base font-bold">{fmt(selectedVideo.comments_count)}</span>
-                </button>
-
-                <button
-                  onClick={() => navigator.share?.({ title: selectedVideo.title, url: `${window.location.origin}/feed/${selectedVideo.id}` })}
-                  className="text-[#888] active:scale-90 transition-transform"
-                >
-                  <Share2 className="w-8 h-8" />
-                </button>
-              </div>
-
-              {/* INSTRUCTOR + FOLLOW */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-                    {selectedVideo.users?.avatar_url
-                      ? <img src={selectedVideo.users.avatar_url} className="w-full h-full object-cover" />
-                      : selectedVideo.users?.username?.[0]?.toUpperCase()
-                    }
-                  </div>
-                  <div>
-                    <p className="text-white text-sm font-bold flex items-center gap-1.5">
-                      {selectedVideo.users?.username}
-                      {selectedVideo.users?.verified && <VerifiedBadge size={13} />}
-                    </p>
-                    {selectedVideo.users?.title && (
-                      <p className="text-[#555] text-xs">{selectedVideo.users.title}</p>
-                    )}
-                  </div>
-                </div>
-                {user?.id !== selectedVideo.user_id && (
-                  <button
-                    onClick={() => handleFollow(selectedVideo.user_id)}
-                    className={`text-sm font-bold px-5 py-2 rounded-full border transition flex-shrink-0 ${
-                      following.has(selectedVideo.user_id)
-                        ? 'border-[rgba(255,255,255,0.12)] text-[#666]'
-                        : 'border-white text-white'
-                    }`}
-                  >
-                    {following.has(selectedVideo.user_id) ? 'Following' : 'Follow'}
-                  </button>
-                )}
-              </div>
-
-              <h2 className="text-white font-bold text-lg leading-snug mb-1.5">{selectedVideo.title}</h2>
-              {selectedVideo.description && (
-                <p className="text-[#555] text-sm leading-relaxed mb-2">{selectedVideo.description}</p>
-              )}
-              <p className="text-[#444] text-xs mb-6">{fmt(selectedVideo.views)} views · {selectedVideo.duration}</p>
-
-              {/* COMMENTS LIST */}
-              <div className="border-t border-[rgba(255,255,255,0.07)] pt-4">
-                <p className="text-white font-bold mb-4">{comments.length} Comments</p>
-                {commentLoading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="w-6 h-6 border-2 border-[#333] border-t-white rounded-full animate-spin" />
-                  </div>
-                ) : comments.length === 0 ? (
-                  <p className="text-[#444] text-sm text-center py-6">No comments yet — be the first!</p>
-                ) : (
-                  <div className="space-y-4 pb-2">
-                    {comments.map((c: any) => (
-                      <div key={c.id} className="flex gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
-                          {c.users?.avatar_url
-                            ? <img src={c.users.avatar_url} className="w-full h-full object-cover" />
-                            : c.users?.username?.[0]?.toUpperCase()
-                          }
-                        </div>
-                        <div>
-                          <p className="text-white text-xs font-bold mb-0.5 flex items-center gap-1">
-                            {c.users?.username}
-                            {c.users?.verified && <VerifiedBadge size={11} />}
-                          </p>
-                          <p className="text-[#888] text-sm">{c.text}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="h-4" />
-          </div>
-
-          {/* COMMENT INPUT — pinned to bottom */}
-          {user ? (
-            <form
-              onSubmit={handleAddComment}
-              className="flex-shrink-0 px-4 py-3 border-t border-[rgba(255,255,255,0.08)] bg-[#111] flex gap-3 items-center"
-              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
-            >
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold overflow-hidden flex-shrink-0">
-                {(user as any).avatar_url
-                  ? <img src={(user as any).avatar_url} className="w-full h-full object-cover" />
-                  : (user as any).username?.[0]?.toUpperCase()
-                }
-              </div>
-              <input
-                ref={commentRef}
-                value={newComment}
-                onChange={e => setNewComment(e.target.value)}
-                placeholder="Add a comment…"
-                className="flex-1 bg-[#1e1e1e] border border-[rgba(255,255,255,0.1)] rounded-full px-4 py-3 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.25)] transition"
-              />
-              <button
-                type="submit"
-                disabled={!newComment.trim()}
-                className="w-10 h-10 bg-white rounded-full flex items-center justify-center disabled:opacity-30 flex-shrink-0 active:scale-95 transition"
-              >
-                <Send className="w-4 h-4 text-black" />
-              </button>
-            </form>
-          ) : (
-            <div
-              className="flex-shrink-0 px-4 py-4 text-center border-t border-[rgba(255,255,255,0.08)] bg-[#111]"
-              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
-            >
-              <p className="text-[#444] text-sm">Sign in to comment</p>
-            </div>
-          )}
         </div>
-      )}
+
+        {/* SCROLLABLE CONTENT below video */}
+        <div className="flex-1 overflow-y-auto bg-[#0f0f0f]">
+          <div className="px-4 pt-4 pb-2">
+
+            {/* Title + stats */}
+            <h2 className="text-white font-bold text-base leading-snug mb-1">{selectedVideo.title}</h2>
+            <p className="text-[#444] text-xs mb-4">
+              {fmt(selectedVideo.views)} views · {timeAgo(selectedVideo.created_at)}
+              {selectedVideo.duration ? ` · ${selectedVideo.duration}` : ''}
+            </p>
+
+            {/* ACTION ROW */}
+            <div className="flex items-center gap-6 pb-4 border-b border-[rgba(255,255,255,0.07)] mb-4">
+              <button onClick={() => handleLike(selectedVideo.id)} className="flex items-center gap-2 active:scale-90 transition-transform">
+                <span className={likeAnim.has(selectedVideo.id) ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
+                  <ThumbsUp
+                    className="w-6 h-6"
+                    fill={userLikes.has(selectedVideo.id) ? '#ef4444' : 'none'}
+                    color={userLikes.has(selectedVideo.id) ? '#ef4444' : '#888'}
+                    strokeWidth={1.5}
+                  />
+                </span>
+                <span className={`text-sm font-bold ${userLikes.has(selectedVideo.id) ? 'text-red-500' : 'text-[#888]'}`}>
+                  {fmt(selectedVideo.likes_count)}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setTimeout(() => commentRef.current?.focus(), 100)}
+                className="flex items-center gap-2 text-[#888] active:scale-90 transition-transform"
+              >
+                <MessageCircle className="w-6 h-6" />
+                <span className="text-sm font-bold">{fmt(selectedVideo.comments_count)}</span>
+              </button>
+
+              <button
+                onClick={() => navigator.share?.({ title: selectedVideo.title, url: `${window.location.origin}/feed/${selectedVideo.id}` })}
+                className="text-[#888] active:scale-90 transition-transform"
+              >
+                <Share2 className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* INSTRUCTOR ROW — clickable avatar + follow button */}
+            <div className="flex items-center justify-between mb-5">
+              <button
+                onClick={() => { setSelectedVideo(null); goToProfile(selectedVideo.user_id) }}
+                className="flex items-center gap-3"
+              >
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
+                  {selectedVideo.users?.avatar_url
+                    ? <img src={selectedVideo.users.avatar_url} className="w-full h-full object-cover" />
+                    : selectedVideo.users?.username?.[0]?.toUpperCase()
+                  }
+                </div>
+                <div className="text-left">
+                  <p className="text-white text-sm font-bold flex items-center gap-1.5">
+                    {selectedVideo.users?.username}
+                    {selectedVideo.users?.verified && <VerifiedBadge size={13} />}
+                  </p>
+                  {selectedVideo.users?.title && (
+                    <p className="text-[#555] text-xs">{selectedVideo.users.title}</p>
+                  )}
+                </div>
+              </button>
+              {user?.id !== selectedVideo.user_id && (
+                <button
+                  onClick={() => handleFollow(selectedVideo.user_id)}
+                  className={`text-sm font-bold px-5 py-2 rounded-full border transition flex-shrink-0 ${
+                    following.has(selectedVideo.user_id)
+                      ? 'border-[rgba(255,255,255,0.12)] text-[#666]'
+                      : 'border-white text-white'
+                  }`}
+                >
+                  {following.has(selectedVideo.user_id) ? 'Following' : 'Follow'}
+                </button>
+              )}
+            </div>
+
+            {selectedVideo.description && (
+              <p className="text-[#555] text-sm leading-relaxed mb-5">{selectedVideo.description}</p>
+            )}
+
+            {/* COMMENTS */}
+            <div className="border-t border-[rgba(255,255,255,0.07)] pt-4">
+              <p className="text-white font-bold mb-4">{comments.length} Comments</p>
+              {commentLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-[#333] border-t-white rounded-full animate-spin" />
+                </div>
+              ) : comments.length === 0 ? (
+                <p className="text-[#444] text-sm text-center py-6">No comments yet — be the first!</p>
+              ) : (
+                <div className="space-y-4 pb-2">
+                  {comments.map((c: any) => (
+                    <div key={c.id} className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
+                        {c.users?.avatar_url
+                          ? <img src={c.users.avatar_url} className="w-full h-full object-cover" />
+                          : c.users?.username?.[0]?.toUpperCase()
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-xs font-bold mb-0.5 flex items-center gap-1">
+                          {c.users?.username}
+                          {c.users?.verified && <VerifiedBadge size={11} />}
+                        </p>
+                        <p className="text-[#888] text-sm">{c.text}</p>
+                      </div>
+                      {user?.id === c.user_id && (
+                        <button
+                          onClick={() => handleDeleteComment(c.id)}
+                          className="flex-shrink-0 text-[#444] hover:text-red-400 transition p-1 active:scale-90"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="h-4" />
+        </div>
+
+        {/* COMMENT INPUT — pinned to bottom */}
+        {user ? (
+          <form
+            onSubmit={handleAddComment}
+            className="flex-shrink-0 px-4 py-3 border-t border-[rgba(255,255,255,0.08)] bg-[#111] flex gap-3 items-center"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
+          >
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold overflow-hidden flex-shrink-0">
+              {(user as any).avatar_url
+                ? <img src={(user as any).avatar_url} className="w-full h-full object-cover" />
+                : (user as any).username?.[0]?.toUpperCase()
+              }
+            </div>
+            <input
+              ref={commentRef}
+              value={newComment}
+              onChange={e => setNewComment(e.target.value)}
+              placeholder="Add a comment…"
+              className="flex-1 bg-[#1e1e1e] border border-[rgba(255,255,255,0.1)] rounded-full px-4 py-3 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.25)] transition"
+            />
+            <button
+              type="submit"
+              disabled={!newComment.trim()}
+              className="w-10 h-10 bg-white rounded-full flex items-center justify-center disabled:opacity-30 flex-shrink-0 active:scale-95 transition"
+            >
+              <Send className="w-4 h-4 text-black" />
+            </button>
+          </form>
+        ) : (
+          <div
+            className="flex-shrink-0 px-4 py-4 text-center border-t border-[rgba(255,255,255,0.08)] bg-[#111]"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
+          >
+            <p className="text-[#444] text-sm">Sign in to comment</p>
+          </div>
+        )}
+      </div>
+    )}
     </>
   )
 }

@@ -6,8 +6,10 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getUserProfile, followUser, unfollowUser, isFollowing,
   getUserVideos, getFeedback, incrementProfileViews,
+  addFeedback, createNotification,
 } from '@/lib/supabase'
-import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2 } from 'lucide-react'
+import { sendPush } from '@/lib/push'
+import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send } from 'lucide-react'
 import Link from 'next/link'
 
 function VerifiedBadge({ size = 16 }: { size?: number }) {
@@ -53,6 +55,12 @@ export default function UserProfilePage() {
   const [followLoading, setFollowLoading] = useState(false)
   const [activeTab,     setActiveTab]     = useState<'posts' | 'feedback'>('posts')
 
+  // Inline feedback form state (for instructors viewing someone else's profile)
+  const [fbRating,      setFbRating]      = useState(0)
+  const [fbText,        setFbText]        = useState('')
+  const [fbSubmitting,  setFbSubmitting]  = useState(false)
+  const [fbSubmitted,   setFbSubmitted]   = useState(false)
+
   const profileId  = userId as string
   const isOwnProfile = user?.id === profileId
 
@@ -95,12 +103,26 @@ export default function UserProfilePage() {
     setFollowLoading(false)
   }
 
-  // Only employers and instructors can leave feedback
   const canLeaveFeedback =
     user &&
     !isOwnProfile &&
     (user.account_type === 'employer' || user.account_type === 'instructor' ||
-     user.is_employer || user.is_instructor)
+     (user as any).is_employer || (user as any).is_instructor)
+
+  const handleSubmitFeedback = async () => {
+    if (!user || fbRating === 0 || !fbText.trim()) return
+    setFbSubmitting(true)
+    try {
+      await addFeedback(profileId, user.id, fbRating, fbText.trim())
+      sendPush(profileId, '⭐ New feedback', `${(user as any).username ?? user.email?.split('@')[0]} gave you ${fbRating}-star feedback`, `/profile/${profileId}`)
+      createNotification(profileId, 'feedback', '⭐ New feedback', `${(user as any).username ?? user.email?.split('@')[0]} gave you ${fbRating}-star feedback`, `/profile/${profileId}`)
+      const { data: fresh } = await getFeedback(profileId)
+      setFeedback(fresh ?? [])
+      setFbRating(0); setFbText(''); setFbSubmitted(true)
+    } finally {
+      setFbSubmitting(false)
+    }
+  }
 
   if (loading) return (
     <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
@@ -179,13 +201,13 @@ export default function UserProfilePage() {
           </button>
 
           {canLeaveFeedback && (
-            <Link
-              href={`/profile/${profileId}/feedback`}
+            <button
+              onClick={() => setActiveTab('feedback')}
               className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-[#222] transition"
             >
               <MessageSquare className="w-4 h-4" />
               Feedback
-            </Link>
+            </button>
           )}
         </div>
       )}
@@ -250,32 +272,79 @@ export default function UserProfilePage() {
 
         {/* FEEDBACK */}
         {activeTab === 'feedback' && (
-          feedback.length === 0 ? (
-            <div className="text-center py-16">
-              <MessageSquare className="w-10 h-10 text-[#2a2a2a] mx-auto mb-3" />
-              <p className="text-[#444] text-sm">No feedback yet</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {feedback.map((f: any) => (
-                <div key={f.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                        {f.users?.username?.[0]?.toUpperCase() ?? 'E'}
-                      </div>
-                      <p className="text-white text-sm font-semibold">{f.users?.username ?? 'Employer'}</p>
+          <div>
+            {/* Inline "Drop a feedback" form for instructors */}
+            {canLeaveFeedback && (
+              <div className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4 mb-4">
+                {fbSubmitted ? (
+                  <div className="text-center py-4">
+                    <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-2">
+                      <MessageSquare className="w-6 h-6 text-white" />
                     </div>
-                    <Stars rating={f.rating} />
+                    <p className="text-white font-bold">Feedback sent!</p>
+                    <button onClick={() => setFbSubmitted(false)} className="text-[#555] text-xs mt-2">Leave another</button>
                   </div>
-                  <p className="text-[#777] text-sm leading-relaxed">{f.feedback_text}</p>
-                  <p className="text-[#444] text-xs mt-2">
-                    {new Date(f.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )
+                ) : (
+                  <>
+                    <p className="text-[#888] text-xs font-bold uppercase tracking-wider mb-3">Drop a feedback</p>
+                    {/* Stars */}
+                    <div className="flex gap-2 mb-3">
+                      {[1,2,3,4,5].map(n => (
+                        <button key={n} onClick={() => setFbRating(n)} className="transition active:scale-90">
+                          <Star className={`w-7 h-7 ${n <= fbRating ? 'fill-yellow-400 text-yellow-400' : 'text-[#333]'}`} />
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={fbText}
+                      onChange={e => setFbText(e.target.value)}
+                      placeholder={`Share your experience with ${profile.username}…`}
+                      rows={3}
+                      className="w-full bg-[#111] border border-[rgba(255,255,255,0.07)] rounded-xl px-3 py-2.5 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.2)] transition resize-none mb-3"
+                    />
+                    <button
+                      onClick={handleSubmitFeedback}
+                      disabled={fbSubmitting || fbRating === 0 || !fbText.trim()}
+                      className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-3 rounded-xl text-sm disabled:opacity-40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                    >
+                      <Send className="w-4 h-4" />
+                      {fbSubmitting ? 'Sending…' : 'Send Feedback'}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {feedback.length === 0 ? (
+              <div className="text-center py-12">
+                <MessageSquare className="w-10 h-10 text-[#2a2a2a] mx-auto mb-3" />
+                <p className="text-[#444] text-sm">No feedback yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {feedback.map((f: any) => (
+                  <div key={f.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
+                          {f.users?.avatar_url
+                            ? <img src={f.users.avatar_url} className="w-full h-full object-cover" />
+                            : f.users?.username?.[0]?.toUpperCase() ?? 'E'
+                          }
+                        </div>
+                        <p className="text-white text-sm font-semibold">{f.users?.username ?? 'Instructor'}</p>
+                      </div>
+                      <Stars rating={f.rating} />
+                    </div>
+                    <p className="text-[#777] text-sm leading-relaxed">{f.feedback_text}</p>
+                    <p className="text-[#444] text-xs mt-2">
+                      {new Date(f.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

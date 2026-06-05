@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { X, ImageIcon, Wifi, MapPin } from 'lucide-react'
+import { useState } from 'react'
+import { X } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import { createWorkshop, supabase } from '@/lib/supabase'
+import { createWorkshop } from '@/lib/supabase'
 
 interface CreateWorkshopProps {
   isOpen: boolean
@@ -15,16 +15,12 @@ const labelCls = 'block text-[#888] text-[11px] font-bold uppercase tracking-wid
 
 export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps) {
   const { user } = useAuth()
-  const [title,          setTitle]          = useState('')
-  const [description,    setDescription]    = useState('')
-  const [date,           setDate]           = useState('')
-  const [time,           setTime]           = useState('')
-  const [isOnline,       setIsOnline]       = useState(true)
-  const [location,       setLocation]       = useState('')
-  const [maxParticipants,setMaxParticipants]= useState('')
-  const [thumbnail,      setThumbnail]      = useState<File | null>(null)
-  const [loading,        setLoading]        = useState(false)
-  const galleryRef = useRef<HTMLInputElement>(null)
+  const [title,       setTitle]       = useState('')
+  const [description, setDescription] = useState('')
+  const [date,        setDate]        = useState('')
+  const [time,        setTime]        = useState('')
+  const [location,    setLocation]    = useState('')
+  const [loading,     setLoading]     = useState(false)
 
   if (!isOpen) return null
 
@@ -41,30 +37,22 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
     )
   }
 
-  const canSubmit = !!(title && date && time)
+  const canSubmit = !!(title && date && time && location)
 
   const handleSubmit = async () => {
     if (!user || !canSubmit) return
     setLoading(true)
     try {
-      let thumbnailUrl: string | null = null
-      if (thumbnail) {
-        const ext  = thumbnail.name.split('.').pop()
-        const path = `${user.id}/${Date.now()}_thumb.${ext}`
-        const { error: upErr } = await supabase.storage.from('course-thumbnails').upload(path, thumbnail)
-        if (!upErr) thumbnailUrl = supabase.storage.from('course-thumbnails').getPublicUrl(path).data.publicUrl
-      }
       await createWorkshop(user.id, {
-        title, description,
+        title,
+        description,
         workshop_date: date,
         workshop_time: time,
-        location: isOnline ? 'Online' : (location || 'TBD'),
-        is_online: isOnline,
-        max_participants: parseInt(maxParticipants) || 30,
-        thumbnail_url: thumbnailUrl,
+        location,
+        is_online: false,
+        enrolled_count: 0,
       })
-      setTitle(''); setDescription(''); setDate(''); setTime('')
-      setIsOnline(true); setLocation(''); setMaxParticipants(''); setThumbnail(null)
+      setTitle(''); setDescription(''); setDate(''); setTime(''); setLocation('')
       onClose()
     } catch (err) {
       console.error(err)
@@ -78,12 +66,10 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-[#141414] rounded-t-3xl flex flex-col" style={{ maxHeight: '92vh' }}>
 
-        {/* Handle */}
         <div className="flex justify-center pt-3 flex-shrink-0">
           <div className="w-10 h-1 bg-[#333] rounded-full" />
         </div>
 
-        {/* Header */}
         <div className="flex items-center justify-between px-5 pt-3 pb-4 flex-shrink-0 border-b border-[rgba(255,255,255,0.07)]">
           <h2 className="text-white text-xl font-bold">Create Workshop</h2>
           <button onClick={onClose} className="w-8 h-8 bg-[#222] rounded-full flex items-center justify-center">
@@ -91,7 +77,6 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
           </button>
         </div>
 
-        {/* Scrollable fields */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 space-y-5">
 
           <div>
@@ -115,43 +100,13 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
             </div>
           </div>
 
-          {/* Online / In Person toggle */}
           <div>
-            <label className={labelCls}>Format</label>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setIsOnline(true)}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition ${isOnline ? 'bg-white text-black' : 'bg-[#252525] text-[#888] border border-[rgba(255,255,255,0.07)]'}`}>
-                <Wifi className="w-4 h-4" /> Online
-              </button>
-              <button type="button" onClick={() => setIsOnline(false)}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition ${!isOnline ? 'bg-white text-black' : 'bg-[#252525] text-[#888] border border-[rgba(255,255,255,0.07)]'}`}>
-                <MapPin className="w-4 h-4" /> In Person
-              </button>
-            </div>
+            <label className={labelCls}>Location</label>
+            <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Address or venue name" className={inputCls} />
           </div>
-
-          {!isOnline && (
-            <div>
-              <label className={labelCls}>Location</label>
-              <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Address or venue name" className={inputCls} />
-            </div>
-          )}
-
-          <div>
-            <label className={labelCls}>Max Participants</label>
-            <input type="number" value={maxParticipants} onChange={e => setMaxParticipants(e.target.value)} placeholder="30" className={inputCls} />
-          </div>
-
-          <button type="button" onClick={() => galleryRef.current?.click()}
-            className="w-full flex items-center justify-center gap-2 bg-[#1e1e1e] border border-[rgba(255,255,255,0.08)] text-[#888] text-sm py-3.5 rounded-2xl hover:text-white transition">
-            <ImageIcon className="w-4 h-4" />
-            {thumbnail ? thumbnail.name : 'Add Thumbnail'}
-          </button>
-          <input ref={galleryRef} type="file" accept="image/*" onChange={e => setThumbnail(e.target.files?.[0] || null)} className="hidden" />
 
         </div>
 
-        {/* Sticky submit */}
         <div className="flex-shrink-0 px-5 py-4 border-t border-[rgba(255,255,255,0.07)] bg-[#141414]"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
           <button
