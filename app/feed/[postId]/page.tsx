@@ -42,14 +42,22 @@ export default function PostDetailPage() {
   const [newComment, setNewComment] = useState('')
   const [loading,    setLoading]    = useState(true)
 
+  // Lock both html and body — must happen BEFORE layout so body padding-top
+  // doesn't shift content. fixed inset-0 handles safe area internally.
   useEffect(() => {
     const prevBody = document.body.style.overflow
     const prevHtml = document.documentElement.style.overflow
+    const prevBodyOs = (document.body.style as any).overscrollBehavior
+    const prevHtmlOs = (document.documentElement.style as any).overscrollBehavior
     document.body.style.overflow = 'hidden'
     document.documentElement.style.overflow = 'hidden'
+    ;(document.body.style as any).overscrollBehavior = 'none'
+    ;(document.documentElement.style as any).overscrollBehavior = 'none'
     return () => {
       document.body.style.overflow = prevBody
       document.documentElement.style.overflow = prevHtml
+      ;(document.body.style as any).overscrollBehavior = prevBodyOs
+      ;(document.documentElement.style as any).overscrollBehavior = prevHtmlOs
     }
   }, [])
 
@@ -110,23 +118,31 @@ export default function PostDetailPage() {
     setVideo((v: any) => ({ ...v, comments_count: v.comments_count + 1 }))
   }
 
+  // ── loading / error use fixed inset-0 so body padding-top doesn't shift them
   if (loading) return (
-    <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
+    <div className="fixed inset-0 bg-[#0f0f0f] flex items-center justify-center">
       <div className="w-8 h-8 border-2 border-[#333] border-t-white rounded-full animate-spin" />
     </div>
   )
 
   if (!video) return (
-    <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
-      <p className="text-[#444]">Post not found</p>
+    <div className="fixed inset-0 bg-[#0f0f0f] flex items-center justify-center">
+      <div className="text-center">
+        <p className="text-[#444] mb-4">Post not found</p>
+        <button onClick={() => router.back()} className="text-white text-sm underline">Go back</button>
+      </div>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] flex flex-col">
+    /* fixed inset-0 — positioned at exact viewport coords regardless of body padding */
+    <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col">
 
-      {/* VIDEO */}
-      <div className="relative w-full aspect-video bg-black flex-shrink-0">
+      {/* VIDEO — marginTop pushes it below status bar */}
+      <div
+        className="relative w-full aspect-video bg-black flex-shrink-0"
+        style={{ marginTop: 'env(safe-area-inset-top)' }}
+      >
         {video.video_url
           ? <video src={video.video_url} controls autoPlay playsInline className="w-full h-full" />
           : video.thumbnail_url
@@ -135,13 +151,16 @@ export default function PostDetailPage() {
                 <Play className="w-12 h-12 text-white/50" />
               </div>
         }
-        <button onClick={() => router.back()} className="absolute top-3 left-3 w-9 h-9 bg-black/60 rounded-full flex items-center justify-center">
+        <button
+          onClick={() => router.back()}
+          className="absolute top-3 left-3 w-9 h-9 bg-black/60 rounded-full flex items-center justify-center"
+        >
           <ArrowLeft className="w-5 h-5 text-white" />
         </button>
       </div>
 
-      {/* SCROLLABLE CONTENT */}
-      <div className="flex-1 overflow-y-auto">
+      {/* SCROLLABLE CONTENT — flex-1 gives it all remaining height so overflow-y works */}
+      <div className="flex-1 overflow-y-auto overscroll-contain">
         <div className="px-4 pt-4">
 
           {/* ACTIONS */}
@@ -149,20 +168,23 @@ export default function PostDetailPage() {
             <button onClick={handleLike} className="flex items-center gap-2">
               <span className={likeAnim ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
                 {liked
-                  ? <ThumbsUp className="w-7 h-7" fill="#FF6B2B" color="#FF6B2B" strokeWidth={1.5} />
-                  : <ThumbsDown className="w-7 h-7" fill="none" color="#888" strokeWidth={1.5} />
+                  ? <ThumbsUp  className="w-8 h-8" fill="#ef4444" color="#ef4444" strokeWidth={1.5} />
+                  : <ThumbsDown className="w-8 h-8" fill="none"    color="#888"    strokeWidth={1.5} />
                 }
               </span>
-              <span className={`text-base font-bold ${liked ? 'text-[#FF6B2B]' : 'text-[#888]'}`}>
+              <span className={`text-base font-bold ${liked ? 'text-red-500' : 'text-[#888]'}`}>
                 {fmt(video.likes_count)}
               </span>
             </button>
             <div className="flex items-center gap-2 text-[#888]">
-              <MessageCircle className="w-7 h-7" />
+              <MessageCircle className="w-8 h-8" />
               <span className="text-base font-bold">{fmt(video.comments_count)}</span>
             </div>
-            <button onClick={() => navigator.share?.({ title: video.title, url: window.location.href })} className="text-[#888]">
-              <Share2 className="w-7 h-7" />
+            <button
+              onClick={() => navigator.share?.({ title: video.title, url: window.location.href })}
+              className="text-[#888]"
+            >
+              <Share2 className="w-8 h-8" />
             </button>
           </div>
 
@@ -206,7 +228,10 @@ export default function PostDetailPage() {
                 {comments.map((c: any) => (
                   <div key={c.id} className="flex gap-3">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
-                      {c.users?.avatar_url ? <img src={c.users.avatar_url} className="w-full h-full object-cover" /> : c.users?.username?.[0]?.toUpperCase()}
+                      {c.users?.avatar_url
+                        ? <img src={c.users.avatar_url} className="w-full h-full object-cover" />
+                        : c.users?.username?.[0]?.toUpperCase()
+                      }
                     </div>
                     <div>
                       <p className="text-white text-xs font-bold mb-0.5">{c.users?.username}</p>
@@ -217,11 +242,11 @@ export default function PostDetailPage() {
               </div>
             )}
           </div>
-          <div className="h-20" />
+          <div className="h-4" />
         </div>
       </div>
 
-      {/* STICKY COMMENT INPUT */}
+      {/* STICKY COMMENT INPUT — always visible at bottom */}
       {user ? (
         <form
           onSubmit={handleAddComment}
@@ -229,19 +254,33 @@ export default function PostDetailPage() {
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
         >
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold overflow-hidden flex-shrink-0">
-            {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : user.username?.[0]?.toUpperCase()}
+            {(user as any).avatar_url
+              ? <img src={(user as any).avatar_url} className="w-full h-full object-cover" />
+              : (user as any).username?.[0]?.toUpperCase()
+            }
           </div>
           <input
             value={newComment}
             onChange={e => setNewComment(e.target.value)}
             placeholder="Add a comment…"
-            className="flex-1 bg-[#252525] rounded-full px-4 py-2.5 text-white text-sm placeholder-[#555] outline-none"
+            className="flex-1 bg-[#1e1e1e] border border-[rgba(255,255,255,0.15)] rounded-full px-4 py-3 text-white text-sm placeholder-[#555] outline-none focus:border-[rgba(255,255,255,0.3)] transition"
           />
-          <button type="submit" disabled={!newComment.trim()} className="w-9 h-9 bg-white rounded-full flex items-center justify-center disabled:opacity-30 flex-shrink-0">
+          <button
+            type="submit"
+            disabled={!newComment.trim()}
+            className="w-9 h-9 bg-white rounded-full flex items-center justify-center disabled:opacity-30 flex-shrink-0"
+          >
             <Send className="w-4 h-4 text-black" />
           </button>
         </form>
-      ) : null}
+      ) : (
+        <div
+          className="flex-shrink-0 px-4 py-4 text-center border-t border-[rgba(255,255,255,0.08)] bg-[#111]"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
+        >
+          <p className="text-[#444] text-sm">Sign in to comment</p>
+        </div>
+      )}
     </div>
   )
 }

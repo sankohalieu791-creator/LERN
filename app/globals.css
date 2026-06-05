@@ -19,6 +19,12 @@
 }
 *::-webkit-scrollbar { display: none; }
 
+/* Prevent iOS PWA rubber-band / overscroll bounce on the document.
+   Individual scroll containers use overscroll-contain so they still scroll. */
+html, body {
+  overscroll-behavior: none;
+}
+
 body {
   padding-top: env(safe-area-inset-top);
   padding-left: env(safe-area-inset-left);

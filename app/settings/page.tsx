@@ -70,10 +70,18 @@ export default function SettingsPage() {
     }
   }, [user])
 
-  // Lock body scroll when apply modal is open
   useEffect(() => {
-    document.body.style.overflow = showApply ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
+    if (showApply) {
+      document.body.style.overflow = 'hidden'
+      document.documentElement.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+      document.documentElement.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+      document.documentElement.style.overflow = ''
+    }
   }, [showApply])
 
   const toggleDarkMode = async () => {
@@ -104,8 +112,14 @@ export default function SettingsPage() {
       contact_phone:   applyForm.contact_phone || undefined,
     })
     setApplying(false)
-    if (error) setApplyError(error.message || 'Submission failed')
-    else setApplied(true)
+    if (error) {
+      setApplyError(error.message || 'Submission failed')
+    } else {
+      // Grant instructor access immediately — no waiting for admin review
+      await updateUserProfile(user.id, { account_type: 'instructor' })
+      await refreshUser()
+      setApplied(true)
+    }
   }
 
   const closeApply = () => {

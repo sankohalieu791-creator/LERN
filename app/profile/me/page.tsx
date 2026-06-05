@@ -5,12 +5,15 @@ import { useAuth } from '@/context/AuthContext'
 import {
   Grid3X3, Briefcase, Award, Users, MessageSquare,
   MapPin, Mail, Phone, Eye, Settings, Play,
-  Star, Upload, Loader2, Plus, FileText, X, Trash2
+  Star, Upload, Loader2, Plus, FileText, X, Trash2,
+  BookOpen, Inbox, Check, Clock,
 } from 'lucide-react'
 import Link from 'next/link'
 import {
   getProjectsByUser, getCertificatesByUser, getFeedback,
-  getUserVideos, addCertificate, deleteVideo, deleteProject, deleteCertificate, supabase,
+  getUserVideos, addCertificate, deleteVideo, deleteProject, deleteCertificate,
+  getInstructorCourses, getInstructorRequests, updateRequestStatus,
+  supabase,
 } from '@/lib/supabase'
 import type { Project, Certificate, Video } from '@/lib/types'
 
@@ -46,12 +49,19 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
-const TABS = [
+const STUDENT_TABS = [
   { id: 'posts',        icon: Grid3X3,       label: 'Posts'     },
   { id: 'projects',     icon: Briefcase,     label: 'Projects'  },
   { id: 'certificates', icon: Award,         label: 'Certs'     },
   { id: 'employers',    icon: Users,         label: 'Employers' },
   { id: 'feedback',     icon: MessageSquare, label: 'Feedback'  },
+]
+
+const INSTRUCTOR_TABS = [
+  { id: 'posts',     icon: Grid3X3,       label: 'Posts'     },
+  { id: 'courses',   icon: BookOpen,      label: 'Courses'   },
+  { id: 'requests',  icon: Inbox,         label: 'Requests'  },
+  { id: 'feedback',  icon: MessageSquare, label: 'Feedback'  },
 ]
 
 export default function ProfileMePage() {
@@ -79,23 +89,43 @@ export default function ProfileMePage() {
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'post' | 'project' | 'cert'; id: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  // Instructor-specific data
+  const [courses,          setCourses]          = useState<any[]>([])
+  const [requests,         setRequests]         = useState<any[]>([])
+  const [updatingRequest,  setUpdatingRequest]  = useState<string | null>(null)
+
+  const isInstructor = user?.account_type === 'instructor'
+  const TABS = isInstructor ? INSTRUCTOR_TABS : STUDENT_TABS
+
   const initial = user?.username?.[0]?.toUpperCase() ?? 'U'
 
-  // Load all tab data once user is available
   useEffect(() => {
     if (!user) return
     const load = async () => {
       setDataLoading(true)
-      const [v, p, c, f] = await Promise.all([
-        getUserVideos(user.id),
-        getProjectsByUser(user.id),
-        getCertificatesByUser(user.id),
-        getFeedback(user.id),
-      ])
-      setVideos(v.data ?? [])
-      setProjects(p.data ?? [])
-      setCertificates(c.data ?? [])
-      setFeedback(f.data ?? [])
+      if (user.account_type === 'instructor') {
+        const [v, f, c, r] = await Promise.all([
+          getUserVideos(user.id),
+          getFeedback(user.id),
+          getInstructorCourses(user.id),
+          getInstructorRequests(user.id),
+        ])
+        setVideos(v.data ?? [])
+        setFeedback(f.data ?? [])
+        setCourses(c.data ?? [])
+        setRequests(r.data ?? [])
+      } else {
+        const [v, p, c, f] = await Promise.all([
+          getUserVideos(user.id),
+          getProjectsByUser(user.id),
+          getCertificatesByUser(user.id),
+          getFeedback(user.id),
+        ])
+        setVideos(v.data ?? [])
+        setProjects(p.data ?? [])
+        setCertificates(c.data ?? [])
+        setFeedback(f.data ?? [])
+      }
       setDataLoading(false)
     }
     load()
@@ -141,6 +171,13 @@ export default function ProfileMePage() {
     } finally {
       setAddingCert(false)
     }
+  }
+
+  const handleRequestAction = async (requestId: string, status: 'accepted' | 'declined') => {
+    setUpdatingRequest(requestId)
+    await updateRequestStatus(requestId, status)
+    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status } : r))
+    setUpdatingRequest(null)
   }
 
   const confirmDelete = async () => {
@@ -455,6 +492,104 @@ export default function ProfileMePage() {
             title="No employer connections yet"
             hint="Employers who view your profile appear here"
           />
+        )}
+
+        {/* COURSES (instructor only) */}
+        {activeTab === 'courses' && (
+          dataLoading ? <LoadingSpinner /> :
+          courses.length === 0 ? (
+            <Empty icon={<BookOpen className="w-10 h-10" />} title="No courses yet" hint="Press + to create your first course" />
+          ) : (
+            <div className="space-y-3">
+              {courses.map((c: any) => (
+                <div key={c.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
+                      <BookOpen className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-bold text-sm">{c.title}</p>
+                      {c.description && <p className="text-[#555] text-xs mt-0.5 line-clamp-2">{c.description}</p>}
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="text-[#888] text-xs">{c.enrolled_count ?? 0} enrolled</span>
+                        <span className="text-[#444] text-xs capitalize">{c.level}</span>
+                        {c.subject && (
+                          <span className="text-[10px] font-bold bg-[#252525] text-[#888] px-2 py-0.5 rounded-full">{c.subject}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {/* REQUESTS (instructor only) */}
+        {activeTab === 'requests' && (
+          dataLoading ? <LoadingSpinner /> :
+          requests.length === 0 ? (
+            <Empty icon={<Inbox className="w-10 h-10" />} title="No requests yet" hint="1-to-1 training and mentorship requests appear here" />
+          ) : (
+            <div className="space-y-3">
+              {requests.map((r: any) => (
+                <div key={r.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
+                  {/* Requester */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
+                      {r.requester?.avatar_url
+                        ? <img src={r.requester.avatar_url} className="w-full h-full object-cover" />
+                        : r.requester?.username?.[0]?.toUpperCase() ?? '?'
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-bold">{r.requester?.username ?? 'Someone'}</p>
+                      <p className="text-[#555] text-xs">{new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    </div>
+                    {/* Type badge */}
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
+                      r.type === 'training' ? 'bg-orange-500/15 text-orange-400' : 'bg-purple-500/15 text-purple-400'
+                    }`}>
+                      {r.type === 'training' ? '🎯 Training' : '🤝 Mentorship'}
+                    </span>
+                  </div>
+
+                  {/* Message */}
+                  <p className="text-[#888] text-sm bg-[#111] rounded-xl px-3 py-2.5 mb-3 leading-relaxed">{r.message}</p>
+
+                  {/* Status / Actions */}
+                  {r.status === 'pending' ? (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRequestAction(r.id, 'accepted')}
+                        disabled={updatingRequest === r.id}
+                        className="flex-1 py-2.5 bg-green-500/15 border border-green-500/30 text-green-400 rounded-full text-sm font-semibold flex items-center justify-center gap-1.5 transition active:scale-95"
+                      >
+                        <Check className="w-4 h-4" />
+                        {updatingRequest === r.id ? '…' : 'Accept'}
+                      </button>
+                      <button
+                        onClick={() => handleRequestAction(r.id, 'declined')}
+                        disabled={updatingRequest === r.id}
+                        className="flex-1 py-2.5 bg-[#252525] border border-[rgba(255,255,255,0.07)] text-[#888] rounded-full text-sm font-semibold transition active:scale-95"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  ) : (
+                    <div className={`flex items-center gap-2 text-sm font-semibold ${
+                      r.status === 'accepted' ? 'text-green-400' : 'text-[#555]'
+                    }`}>
+                      {r.status === 'accepted'
+                        ? <><Check className="w-4 h-4" /> Accepted</>
+                        : <><Clock className="w-4 h-4" /> Declined</>
+                      }
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
         )}
 
         {/* FEEDBACK */}

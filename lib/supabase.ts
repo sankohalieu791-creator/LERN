@@ -284,6 +284,68 @@ export const getNotifications = async (userId: string) => {
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
+    .limit(50)
+  return { data, error }
+}
+
+export const createNotification = async (
+  userId: string,
+  type: string,
+  title: string,
+  body: string,
+  link?: string
+) => {
+  await supabase.from('notifications').insert([{ user_id: userId, type, title, body, link }])
+}
+
+export const markNotificationsRead = async (userId: string) => {
+  await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false)
+}
+
+// Training requests
+export const sendTrainingRequest = async (
+  fromUserId: string,
+  toInstructorId: string,
+  type: 'training' | 'mentorship',
+  message: string
+) => {
+  const { data, error } = await supabase
+    .from('training_requests')
+    .insert([{ from_user_id: fromUserId, to_instructor_id: toInstructorId, type, message, status: 'pending' }])
+  return { data, error }
+}
+
+export const getInstructorRequests = async (instructorId: string) => {
+  const { data, error } = await supabase
+    .from('training_requests')
+    .select('*, requester:from_user_id(id, username, avatar_url, verified)')
+    .eq('to_instructor_id', instructorId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const updateRequestStatus = async (requestId: string, status: 'accepted' | 'declined') => {
+  const { data, error } = await supabase
+    .from('training_requests')
+    .update({ status })
+    .eq('id', requestId)
+  return { data, error }
+}
+
+export const getMyTrainingRequests = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('training_requests')
+    .select('to_instructor_id')
+    .eq('from_user_id', userId)
+  return { data, error }
+}
+
+export const getInstructorCourses = async (instructorId: string) => {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('instructor_id', instructorId)
+    .order('created_at', { ascending: false })
   return { data, error }
 }
 

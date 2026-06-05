@@ -7,6 +7,7 @@ import {
   getVideos, likeVideo, unlikeVideo, hasUserLiked,
   followUser, unfollowUser, isFollowing,
   getComments, addComment, getNotifications,
+  createNotification, markNotificationsRead,
 } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
@@ -51,6 +52,8 @@ export default function FeedPage() {
   const [searchOpen,    setSearchOpen]    = useState(false)
   const [searchQuery,   setSearchQuery]   = useState('')
   const [notifCount,    setNotifCount]    = useState(0)
+  const [notifs,        setNotifs]        = useState<any[]>([])
+  const [showNotifs,    setShowNotifs]    = useState(false)
   const [comments,      setComments]      = useState<any[]>([])
   const [newComment,    setNewComment]    = useState('')
   const [commentLoading,setCommentLoading]= useState(false)
@@ -58,16 +61,22 @@ export default function FeedPage() {
   const searchRef  = useRef<HTMLInputElement>(null)
   const commentRef = useRef<HTMLInputElement>(null)
 
-  // Lock both <html> and <body> scroll.
-  // iOS Safari scrolls the html element, not body — must lock both.
+  // Lock both <html> and <body> scroll. Also set overscroll-behavior so iOS
+  // PWA can't rubber-band even when overflow is technically 0.
   useEffect(() => {
     const prevBody = document.body.style.overflow
     const prevHtml = document.documentElement.style.overflow
+    const prevBodyOs = (document.body.style as any).overscrollBehavior
+    const prevHtmlOs = (document.documentElement.style as any).overscrollBehavior
     document.body.style.overflow = 'hidden'
     document.documentElement.style.overflow = 'hidden'
+    ;(document.body.style as any).overscrollBehavior = 'none'
+    ;(document.documentElement.style as any).overscrollBehavior = 'none'
     return () => {
       document.body.style.overflow = prevBody
       document.documentElement.style.overflow = prevHtml
+      ;(document.body.style as any).overscrollBehavior = prevBodyOs
+      ;(document.documentElement.style as any).overscrollBehavior = prevHtmlOs
     }
   }, [])
 
@@ -91,7 +100,9 @@ export default function FeedPage() {
         ])
         setUserLikes(new Set(likes.filter(Boolean) as string[]))
         setFollowing(new Set(follows.filter(Boolean) as string[]))
-        setNotifCount((notifs.data || []).filter((n: any) => !n.read).length)
+        const notifList = notifs.data || []
+        setNotifs(notifList)
+        setNotifCount(notifList.filter((n: any) => !n.read).length)
       }
       setLoading(false)
     }
@@ -127,10 +138,10 @@ export default function FeedPage() {
       setUserLikes(p => new Set([...p, videoId]))
       setVideos(vs => vs.map(v => v.id === videoId ? { ...v, likes_count: v.likes_count + 1 } : v))
       if (selectedVideo?.id === videoId) setSelectedVideo((v: any) => ({ ...v, likes_count: v.likes_count + 1 }))
-      // Push the video owner (skip if it's the user's own video)
       const vid = videos.find(v => v.id === videoId)
       if (vid && vid.user_id !== user.id) {
         sendPush(vid.user_id, '❤️ New like', `${(user as any).username} liked your video`, `/feed/${videoId}`)
+        createNotification(vid.user_id, 'like', '❤️ New like', `${(user as any).username} liked your video`, `/feed/${videoId}`)
       }
     }
   }
@@ -145,6 +156,7 @@ export default function FeedPage() {
       await followUser(user.id, userId)
       setFollowing(p => new Set([...p, userId]))
       sendPush(userId, '👤 New follower', `${(user as any).username} started following you`, '/profile/me')
+      createNotification(userId, 'follow', '👤 New follower', `${(user as any).username} started following you`, '/profile/me')
     }
   }
 
@@ -159,6 +171,7 @@ export default function FeedPage() {
     setSelectedVideo((v: any) => ({ ...v, comments_count: v.comments_count + 1 }))
     if (selectedVideo.user_id !== user.id) {
       sendPush(selectedVideo.user_id, '💬 New comment', `${(user as any).username}: ${newComment.trim().slice(0, 60)}`, `/feed/${selectedVideo.id}`)
+      createNotification(selectedVideo.user_id, 'comment', '💬 New comment', `${(user as any).username}: ${newComment.trim().slice(0, 60)}`, `/feed/${selectedVideo.id}`)
     }
   }
 
@@ -207,7 +220,17 @@ export default function FeedPage() {
               <button onClick={() => { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 50) }}>
                 <Search className="w-6 h-6 text-[#888]" />
               </button>
-              <button className="relative">
+              <button
+                className="relative"
+                onClick={async () => {
+                  setShowNotifs(true)
+                  if (notifCount > 0 && user) {
+                    await markNotificationsRead(user.id)
+                    setNotifCount(0)
+                    setNotifs(prev => prev.map(n => ({ ...n, read: true })))
+                  }
+                }}
+              >
                 <Bell className="w-6 h-6 text-[#888]" />
                 {notifCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] rounded-full w-3.5 h-3.5 flex items-center justify-center font-bold">
@@ -222,7 +245,7 @@ export default function FeedPage() {
 
       {/* ── VIDEO CARDS — only this scrolls ─────────────────── */}
       <div
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-y-auto overscroll-contain"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}
       >
         {filteredVideos.length === 0 ? (
@@ -333,6 +356,61 @@ export default function FeedPage() {
           ))
         )}
       </div>
+
+      {/* ── NOTIFICATIONS PANEL ────────────────────────────── */}
+      {showNotifs && (
+        <div className="fixed inset-0 z-[60] flex flex-col">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowNotifs(false)} />
+          <div
+            className="relative mt-auto bg-[#141414] rounded-t-3xl flex flex-col"
+            style={{ maxHeight: '75vh', paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
+            <div className="flex justify-center pt-3 flex-shrink-0">
+              <div className="w-10 h-1 bg-[#333] rounded-full" />
+            </div>
+            <div className="flex items-center justify-between px-5 pt-3 pb-3 flex-shrink-0 border-b border-[rgba(255,255,255,0.07)]">
+              <h2 className="text-white font-bold text-lg">Notifications</h2>
+              <button onClick={() => setShowNotifs(false)} className="w-8 h-8 bg-[#222] rounded-full flex items-center justify-center">
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+              {notifs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-8">
+                  <Bell className="w-10 h-10 text-[#2a2a2a] mb-3" />
+                  <p className="text-[#444] text-sm text-center">No notifications yet</p>
+                  <p className="text-[#333] text-xs text-center mt-1">Likes, comments and follows will appear here</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-[rgba(255,255,255,0.05)]">
+                  {notifs.map((n: any) => (
+                    <div
+                      key={n.id}
+                      className={`flex items-start gap-3 px-5 py-4 cursor-pointer active:bg-[#1e1e1e] transition ${!n.read ? 'bg-[rgba(255,107,43,0.05)]' : ''}`}
+                      onClick={() => {
+                        setShowNotifs(false)
+                        if (n.link) window.location.href = n.link
+                      }}
+                    >
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-base flex-shrink-0">
+                        {n.type === 'like' ? '❤️' : n.type === 'comment' ? '💬' : n.type === 'follow' ? '👤' : '🔔'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-semibold">{n.title}</p>
+                        <p className="text-[#888] text-xs mt-0.5 line-clamp-2">{n.body}</p>
+                        <p className="text-[#444] text-xs mt-1">
+                          {new Date(n.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                        </p>
+                      </div>
+                      {!n.read && <div className="w-2 h-2 bg-[#FF6B2B] rounded-full flex-shrink-0 mt-1.5" />}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── VIDEO MODAL ─────────────────────────────────────── */}
       {selectedVideo && (

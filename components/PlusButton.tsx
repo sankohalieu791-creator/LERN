@@ -3,24 +3,29 @@
 import { useState } from 'react'
 import { Plus, Video, BookOpen, Users } from 'lucide-react'
 import { usePathname } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 import CreatePost from '@/components/CreatePost'
 import CreateCourse from '@/components/CreateCourse'
 import CreateWorkshop from '@/components/CreateWorkshop'
 
 export default function PlusButton() {
   const pathname = usePathname()
+  const { user } = useAuth()
   const [showMenu,           setShowMenu]           = useState(false)
   const [showCreatePost,     setShowCreatePost]     = useState(false)
   const [showCreateCourse,   setShowCreateCourse]   = useState(false)
   const [showCreateWorkshop, setShowCreateWorkshop] = useState(false)
 
-  // Hide on auth pages, classroom pages, and individual post pages
   if (pathname === '/' || pathname.startsWith('/auth') || pathname.includes('/classroom') || /^\/feed\/.+/.test(pathname)) return null
 
+  const isInstructor = user?.account_type === 'instructor'
+
   const options = [
-    { label: 'Post Video',      icon: Video,    action: () => { setShowMenu(false); setShowCreatePost(true) }     },
-    { label: 'Create Course',   icon: BookOpen, action: () => { setShowMenu(false); setShowCreateCourse(true) }   },
-    { label: 'Create Workshop', icon: Users,    action: () => { setShowMenu(false); setShowCreateWorkshop(true) } },
+    { label: 'Post Video', icon: Video, action: () => { setShowMenu(false); setShowCreatePost(true) } },
+    ...(isInstructor ? [
+      { label: 'Create Course',   icon: BookOpen, action: () => { setShowMenu(false); setShowCreateCourse(true) }   },
+      { label: 'Create Workshop', icon: Users,    action: () => { setShowMenu(false); setShowCreateWorkshop(true) } },
+    ] : []),
   ]
 
   return (
