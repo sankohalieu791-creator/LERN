@@ -107,19 +107,18 @@ export default function ProfileMePage() {
     setAddingCert(true)
     setCertError('')
     try {
-      let certUrl = 'pending'
+      let certUrl = 'none'
       if (certFile) {
         const ext = certFile.name.split('.').pop()
         const path = `${user.id}/${Date.now()}.${ext}`
         const { error: uploadErr } = await supabase.storage
           .from('certificates')
           .upload(path, certFile)
-        if (!uploadErr) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('certificates')
-            .getPublicUrl(path)
-          certUrl = publicUrl
-        }
+        if (uploadErr) throw new Error('File upload failed: ' + uploadErr.message)
+        const { data: urlData } = await supabase.storage
+          .from('certificates')
+          .createSignedUrl(path, 60 * 60 * 24 * 365)
+        certUrl = urlData?.signedUrl ?? 'none'
       }
       const { error } = await addCertificate(user.id, {
         title: certTitle,
