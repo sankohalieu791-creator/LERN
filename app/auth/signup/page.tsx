@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signUp } from '@/lib/supabase'
@@ -34,15 +33,8 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen bg-[#0f0f0f] flex flex-col items-center justify-center px-6">
 
-      <div className="mb-10">
-        <Image
-          src="/images/IMG_0400.PNG"
-          alt="LERN"
-          width={80}
-          height={80}
-          className="rounded-2xl"
-          priority
-        />
+      <div className="mb-10 text-center">
+        <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] bg-clip-text text-transparent">LERN</h1>
       </div>
 
       <div className="w-full max-w-sm space-y-4">
