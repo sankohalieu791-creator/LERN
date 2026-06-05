@@ -15,7 +15,7 @@ export default function PlusButton() {
   const [showCreateWorkshop, setShowCreateWorkshop] = useState(false)
 
   // Hide on auth pages and classroom pages
-  if (pathname.startsWith('/auth') || pathname.includes('/classroom')) return null
+  if (pathname === '/' || pathname.startsWith('/auth') || pathname.includes('/classroom')) return null
 
   const options = [
     { label: 'Post Video',      icon: Video,    action: () => { setShowMenu(false); setShowCreatePost(true) }     },

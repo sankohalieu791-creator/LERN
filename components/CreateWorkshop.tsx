@@ -12,6 +12,21 @@ interface CreateWorkshopProps {
 
 export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps) {
   const { user } = useAuth()
+
+  if (isOpen && !user?.is_instructor) {
+    return (
+      <div className="fixed inset-0 bg-black/90 z-50 flex items-end sm:items-center justify-center">
+        <div className="bg-[#1a1a1a] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-6 text-center">
+          <div className="w-14 h-14 rounded-full bg-[#252525] flex items-center justify-center mx-auto mb-4">
+            <X className="w-6 h-6 text-[#888]" />
+          </div>
+          <h2 className="text-white font-bold text-lg mb-2">Instructors Only</h2>
+          <p className="text-[#555] text-sm mb-6">You need to be an approved instructor to create workshops. Apply in Settings.</p>
+          <button onClick={onClose} className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-3 rounded-xl">Got it</button>
+        </div>
+      </div>
+    )
+  }
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState('')
