@@ -5,12 +5,12 @@ import { useAuth } from '@/context/AuthContext'
 import {
   Grid3X3, Briefcase, Award, Users, MessageSquare,
   MapPin, Mail, Phone, Eye, Settings, Play,
-  Star, Upload, Loader2, Plus, FileText, X
+  Star, Upload, Loader2, Plus, FileText, X, Trash2
 } from 'lucide-react'
 import Link from 'next/link'
 import {
   getProjectsByUser, getCertificatesByUser, getFeedback,
-  getUserVideos, addCertificate, supabase,
+  getUserVideos, addCertificate, deleteVideo, deleteProject, deleteCertificate, supabase,
 } from '@/lib/supabase'
 import type { Project, Certificate, Video } from '@/lib/types'
 
@@ -76,6 +76,9 @@ export default function ProfileMePage() {
   const [addingCert, setAddingCert] = useState(false)
   const [certError,  setCertError]  = useState('')
 
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'post' | 'project' | 'cert'; id: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
   const initial = user?.username?.[0]?.toUpperCase() ?? 'U'
 
   // Load all tab data once user is available
@@ -138,6 +141,23 @@ export default function ProfileMePage() {
     } finally {
       setAddingCert(false)
     }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    if (deleteTarget.type === 'post') {
+      await deleteVideo(deleteTarget.id)
+      setVideos(vs => vs.filter(v => v.id !== deleteTarget.id))
+    } else if (deleteTarget.type === 'project') {
+      await deleteProject(deleteTarget.id)
+      setProjects(ps => ps.filter(p => p.id !== deleteTarget.id))
+    } else {
+      await deleteCertificate(deleteTarget.id)
+      setCertificates(cs => cs.filter(c => c.id !== deleteTarget.id))
+    }
+    setDeleting(false)
+    setDeleteTarget(null)
   }
 
   return (
@@ -261,24 +281,28 @@ export default function ProfileMePage() {
           ) : (
             <div className="grid grid-cols-3 gap-1">
               {videos.map(v => (
-                <Link
-                  key={v.id}
-                  href={`/feed/${v.id}`}
-                  className="relative aspect-square bg-[#1a1a1a] rounded-lg overflow-hidden group"
-                >
-                  {v.thumbnail_url
-                    ? <img src={v.thumbnail_url} alt={v.title} className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center">
-                        <Play className="w-6 h-6 text-[#333]" />
+                <div key={v.id} className="relative aspect-square bg-[#1a1a1a] rounded-lg overflow-hidden group">
+                  <Link href={`/feed/${v.id}`} className="block w-full h-full">
+                    {v.thumbnail_url
+                      ? <img src={v.thumbnail_url} alt={v.title} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center">
+                          <Play className="w-6 h-6 text-[#333]" />
+                        </div>
+                    }
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                      <div className="flex items-center gap-1 text-white text-xs font-semibold">
+                        <Play className="w-3.5 h-3.5 fill-white" />
+                        {v.views.toLocaleString()}
                       </div>
-                  }
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                    <div className="flex items-center gap-1 text-white text-xs font-semibold">
-                      <Play className="w-3.5 h-3.5 fill-white" />
-                      {v.views.toLocaleString()}
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                  <button
+                    onClick={e => { e.preventDefault(); e.stopPropagation(); setDeleteTarget({ type: 'post', id: v.id }) }}
+                    className="absolute top-1.5 right-1.5 w-7 h-7 bg-black/70 rounded-full flex items-center justify-center z-10"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-white" />
+                  </button>
+                </div>
               ))}
             </div>
           )
@@ -297,19 +321,27 @@ export default function ProfileMePage() {
                   className="bg-[#1a1a1a] theme-card border border-[rgba(255,255,255,0.06)] theme-border rounded-2xl p-4"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <p className="text-white theme-text-1 font-semibold text-sm">{p.title}</p>
                       {p.description && (
                         <p className="text-[#555] theme-text-2 text-xs mt-1 line-clamp-2">{p.description}</p>
                       )}
                     </div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                      p.visibility === 'public'
-                        ? 'bg-green-500/15 text-green-400'
-                        : 'bg-[#2a2a2a] text-[#555]'
-                    }`}>
-                      {p.visibility}
-                    </span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        p.visibility === 'public'
+                          ? 'bg-green-500/15 text-green-400'
+                          : 'bg-[#2a2a2a] text-[#555]'
+                      }`}>
+                        {p.visibility}
+                      </span>
+                      <button
+                        onClick={() => setDeleteTarget({ type: 'project', id: p.id })}
+                        className="w-7 h-7 flex items-center justify-center rounded-full bg-[#2a2a2a] text-[#555] hover:text-red-400 transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -402,6 +434,12 @@ export default function ProfileMePage() {
                           View
                         </a>
                       )}
+                      <button
+                        onClick={() => setDeleteTarget({ type: 'cert', id: c.id })}
+                        className="w-7 h-7 flex items-center justify-center rounded-full bg-[#2a2a2a] text-[#555] hover:text-red-400 transition flex-shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -454,6 +492,34 @@ export default function ProfileMePage() {
           )
         )}
       </div>
+
+      {/* ── DELETE CONFIRM SHEET ─────────────────────────────── */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[70] flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setDeleteTarget(null)} />
+          <div className="relative bg-[#1a1a1a] rounded-t-3xl px-5 pt-6 pb-8"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
+            <div className="flex justify-center mb-4">
+              <div className="w-10 h-1 bg-[#333] rounded-full" />
+            </div>
+            <h3 className="text-white font-bold text-lg mb-1 text-center">Delete this {deleteTarget.type === 'post' ? 'post' : deleteTarget.type}?</h3>
+            <p className="text-[#555] text-sm text-center mb-6">This can't be undone.</p>
+            <button
+              onClick={confirmDelete}
+              disabled={deleting}
+              className="w-full bg-red-500 text-white font-bold py-4 rounded-2xl mb-3 disabled:opacity-40"
+            >
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+            <button
+              onClick={() => setDeleteTarget(null)}
+              className="w-full bg-[#252525] text-white font-bold py-4 rounded-2xl"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

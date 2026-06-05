@@ -70,6 +70,12 @@ export default function SettingsPage() {
     }
   }, [user])
 
+  // Lock body scroll when apply modal is open
+  useEffect(() => {
+    document.body.style.overflow = showApply ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [showApply])
+
   const toggleDarkMode = async () => {
     const next = !darkMode
     setDarkMode(next)
@@ -217,7 +223,7 @@ export default function SettingsPage() {
 
       {/* ── APPLY TO TEACH MODAL ─────────────────────────────── */}
       {showApply && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={!applied ? closeApply : undefined} />
           <div className="relative bg-[#141414] rounded-t-3xl flex flex-col" style={{ minHeight: '80vh', maxHeight: '94vh' }}>
 
@@ -252,7 +258,7 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 /* FORM */
-                <div className="px-5 pb-10 pt-1">
+                <div className="px-5 pb-6 pt-1">
                   <h2 className="text-white text-2xl font-bold mb-1">Apply to teach</h2>
                   <p className="text-[#555] text-sm mb-5 leading-relaxed">
                     Every instructor on LERNX is verified before they can publish a course or go live.
@@ -333,16 +339,23 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleApply}
-                    disabled={applying || !canSubmit}
-                    className="mt-7 w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 active:scale-[0.98] transition"
-                  >
-                    {applying ? 'Submitting…' : 'Submit application'}
-                  </button>
                 </div>
               )}
             </div>
+
+            {/* Sticky submit footer — always visible */}
+            {!applied && (
+              <div className="flex-shrink-0 px-5 py-4 border-t border-[rgba(255,255,255,0.07)] bg-[#141414]"
+                style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
+                <button
+                  onClick={handleApply}
+                  disabled={applying || !canSubmit}
+                  className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 active:scale-[0.98] transition"
+                >
+                  {applying ? 'Submitting…' : 'Submit application'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -6,7 +6,7 @@ import { Home, BookOpen, Compass, User } from 'lucide-react'
 
 export default function BottomNav() {
   const pathname = usePathname()
-  if (pathname === '/' || pathname.startsWith('/auth')) return null
+  if (pathname === '/' || pathname.startsWith('/auth') || /^\/feed\/.+/.test(pathname)) return null
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/')
 
   const navItems = [

@@ -6,6 +6,7 @@ import BottomNav from '@/components/BottomNav'
 import PlusButton from '@/components/PlusButton'
 import ThemeProvider from '@/components/ThemeProvider'
 import ClientShell from '@/components/ClientShell'
+import PushNotificationSetup from '@/components/PushNotificationSetup'
 
 export const metadata: Metadata = {
   title: 'LERN',
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AuthProvider>
           <ThemeProvider />
+          <PushNotificationSetup />
           <ConditionalNavbar />
           <ClientShell>
             {children}

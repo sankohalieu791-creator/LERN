@@ -261,6 +261,22 @@ export const getCertificatesByUser = async (userId: string) => {
   return { data, error }
 }
 
+// Delete content owned by user
+export const deleteVideo = async (videoId: string) => {
+  const { error } = await supabase.from('videos').delete().eq('id', videoId)
+  return { error }
+}
+
+export const deleteProject = async (projectId: string) => {
+  const { error } = await supabase.from('projects').delete().eq('id', projectId)
+  return { error }
+}
+
+export const deleteCertificate = async (certId: string) => {
+  const { error } = await supabase.from('certificates').delete().eq('id', certId)
+  return { error }
+}
+
 // Notifications
 export const getNotifications = async (userId: string) => {
   const { data, error } = await supabase
