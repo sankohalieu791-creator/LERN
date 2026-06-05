@@ -11,25 +11,10 @@
 }
 *::-webkit-scrollbar { display: none; }
 
-html {
-  height: 100%;
+html, body {
   overscroll-behavior: none;
-}
-
-body {
-  height: 100%;
-  overscroll-behavior: none;
+  overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
-  position: fixed;
-  width: 100%;
-  overflow: hidden;
-}
-
-#__next, main {
-  height: 100%;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: none;
 }
 
 /* ── Theme tokens ─────────────────────────────────────────── */
