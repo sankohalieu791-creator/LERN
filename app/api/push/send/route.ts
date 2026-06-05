@@ -2,18 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import webpush from 'web-push'
 import { createClient } from '@supabase/supabase-js'
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
-
-const service = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
+  const subject   = process.env.VAPID_SUBJECT
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+  const privateKey = process.env.VAPID_PRIVATE_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!subject || !publicKey || !privateKey || !supabaseUrl || !serviceKey) {
+    return NextResponse.json({ ok: false, error: 'Push not configured' }, { status: 200 })
+  }
+
+  webpush.setVapidDetails(subject, publicKey, privateKey)
+
+  const service = createClient(supabaseUrl, serviceKey)
+
   const { targetUserId, title, body, url } = await req.json()
   if (!targetUserId) return NextResponse.json({ error: 'Missing targetUserId' }, { status: 400 })
 
@@ -34,7 +39,6 @@ export async function POST(req: NextRequest) {
           payload
         )
         .catch(async (err: any) => {
-          // Remove expired / unsubscribed endpoints
           if (err.statusCode === 410 || err.statusCode === 404) {
             await service.from('push_subscriptions').delete().eq('endpoint', sub.endpoint)
           }
