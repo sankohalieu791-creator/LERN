@@ -114,6 +114,7 @@ export const createCourse = async (instructorId: string, courseData: any) => {
   const { data, error } = await supabase
     .from('courses')
     .insert([{ instructor_id: instructorId, ...courseData }])
+    .select()
   return { data, error }
 }
 
@@ -139,6 +140,7 @@ export const createWorkshop = async (instructorId: string, workshopData: any) =>
   const { data, error } = await supabase
     .from('workshops')
     .insert([{ instructor_id: instructorId, ...workshopData }])
+    .select()
   return { data, error }
 }
 
@@ -433,5 +435,38 @@ export const getFeedback = async (profileUserId: string) => {
     .select('*, users(*)')
     .eq('profile_user_id', profileUserId)
     .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// Course sessions
+export const createCourseSessions = async (courseId: string, sessions: any[]) => {
+  const { data, error } = await supabase
+    .from('course_sessions')
+    .insert(sessions)
+  return { data, error }
+}
+
+// Course ratings
+export const rateCourse = async (courseId: string, userId: string, stars: number) => {
+  const { error } = await supabase
+    .from('course_ratings')
+    .upsert([{ course_id: courseId, user_id: userId, rating: stars }], { onConflict: 'course_id,user_id' })
+  if (!error) {
+    const { data: all } = await supabase.from('course_ratings').select('rating').eq('course_id', courseId)
+    if (all?.length) {
+      const avg = Math.round((all.reduce((s, r) => s + r.rating, 0) / all.length) * 10) / 10
+      await supabase.from('courses').update({ rating: avg }).eq('id', courseId)
+    }
+  }
+  return { error }
+}
+
+export const getUserCourseRating = async (courseId: string, userId: string) => {
+  const { data, error } = await supabase
+    .from('course_ratings')
+    .select('rating')
+    .eq('course_id', courseId)
+    .eq('user_id', userId)
+    .single()
   return { data, error }
 }

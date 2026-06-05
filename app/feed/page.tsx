@@ -200,7 +200,7 @@ export default function FeedPage() {
   )
 
   return (
-    /* fixed inset-0 → fills exactly the viewport; body never scrolls */
+    <>
     <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col z-10">
 
       {/* ── HEADER — never moves ────────────────────────────── */}
@@ -277,13 +277,13 @@ export default function FeedPage() {
               onClick={() => openVideo(video)}
               className="cursor-pointer border-b border-[rgba(255,255,255,0.05)]"
             >
-              {/* THUMBNAIL */}
-              <div className="relative w-full aspect-video bg-[#1a1a1a]">
+              {/* THUMBNAIL — compact height */}
+              <div className="relative w-full bg-[#1a1a1a] overflow-hidden" style={{ height: '180px' }}>
                 {video.thumbnail_url
                   ? <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover" />
                   : <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] flex items-center justify-center">
-                      <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center">
-                        <Play className="w-7 h-7 text-white/50 ml-0.5" />
+                      <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
+                        <Play className="w-6 h-6 text-white/50 ml-0.5" />
                       </div>
                     </div>
                 }
@@ -296,73 +296,67 @@ export default function FeedPage() {
               </div>
 
               {/* CARD BODY */}
-              <div className="px-4 pt-3 pb-4">
-                <h3 className="text-white font-bold text-[15px] leading-snug mb-3">{video.title}</h3>
+              <div className="px-4 pt-2.5 pb-3">
+                <h3 className="text-white font-bold text-sm leading-snug mb-2 line-clamp-2">{video.title}</h3>
 
-                {/* INSTRUCTOR + FOLLOW */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
+                {/* INSTRUCTOR + FOLLOW + ACTIONS in one row */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 overflow-hidden">
                       {video.users?.avatar_url
                         ? <img src={video.users.avatar_url} className="w-full h-full object-cover" />
                         : video.users?.username?.[0]?.toUpperCase()
                       }
                     </div>
-                    <div>
-                      <p className="text-white text-sm font-semibold flex items-center gap-1">
+                    <div className="min-w-0">
+                      <p className="text-[#888] text-xs font-semibold flex items-center gap-1 truncate">
                         {video.users?.username}
-                        {video.users?.verified && <VerifiedBadge size={13} />}
+                        {video.users?.verified && <VerifiedBadge size={11} />}
+                        {video.users?.title && <span className="text-[#555]">· {video.users.title}</span>}
                       </p>
-                      {video.users?.title && (
-                        <p className="text-[#555] text-xs leading-tight">{video.users.title}</p>
-                      )}
+                      <p className="text-[#444] text-[11px]">{fmt(video.views)} views · {timeAgo(video.created_at)}</p>
                     </div>
                   </div>
-                  {user?.id !== video.user_id && (
-                    <button
-                      onClick={e => handleFollow(video.user_id, e)}
-                      className={`text-xs font-bold px-4 py-2 rounded-full border transition flex-shrink-0 ${
-                        following.has(video.user_id)
-                          ? 'border-[rgba(255,255,255,0.1)] text-[#444]'
-                          : 'border-white text-white'
-                      }`}
-                    >
-                      {following.has(video.user_id) ? 'Following' : 'Follow'}
-                    </button>
-                  )}
-                </div>
 
-                {/* VIEWS + LIKE / COMMENT / SHARE */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[#444] text-xs">{fmt(video.views)} views · {timeAgo(video.created_at)}</span>
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-4 flex-shrink-0 ml-2">
+                    {user?.id !== video.user_id && (
+                      <button
+                        onClick={e => handleFollow(video.user_id, e)}
+                        className={`text-[11px] font-bold px-3 py-1.5 rounded-full border transition ${
+                          following.has(video.user_id)
+                            ? 'border-[rgba(255,255,255,0.1)] text-[#444]'
+                            : 'border-white text-white'
+                        }`}
+                      >
+                        {following.has(video.user_id) ? 'Following' : 'Follow'}
+                      </button>
+                    )}
 
-                    {/* ThumbsDown → rotate → ThumbsUp (RED) */}
-                    <button onClick={e => handleLike(video.id, e)} className="flex items-center gap-2 active:scale-90 transition-transform">
+                    <button onClick={e => handleLike(video.id, e)} className="flex items-center gap-1 active:scale-90 transition-transform">
                       <span className={likeAnim.has(video.id) ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
                         {userLikes.has(video.id)
-                          ? <ThumbsUp  className="w-8 h-8" fill="#ef4444" color="#ef4444" strokeWidth={1.5} />
-                          : <ThumbsDown className="w-8 h-8" fill="none"    color="#555"    strokeWidth={1.5} />
+                          ? <ThumbsUp  className="w-5 h-5" fill="#ef4444" color="#ef4444" strokeWidth={1.5} />
+                          : <ThumbsDown className="w-5 h-5" fill="none"    color="#555"    strokeWidth={1.5} />
                         }
                       </span>
-                      <span className={`text-sm font-bold ${userLikes.has(video.id) ? 'text-red-500' : 'text-[#555]'}`}>
+                      <span className={`text-xs font-bold ${userLikes.has(video.id) ? 'text-red-500' : 'text-[#555]'}`}>
                         {fmt(video.likes_count)}
                       </span>
                     </button>
 
                     <button
                       onClick={e => { e.stopPropagation(); openVideo(video) }}
-                      className="flex items-center gap-2 text-[#555] active:scale-90 transition-transform"
+                      className="flex items-center gap-1 text-[#555] active:scale-90 transition-transform"
                     >
-                      <MessageCircle className="w-8 h-8" />
-                      <span className="text-sm font-bold">{fmt(video.comments_count)}</span>
+                      <MessageCircle className="w-5 h-5" />
+                      <span className="text-xs font-bold">{fmt(video.comments_count)}</span>
                     </button>
 
                     <button
                       onClick={e => { e.stopPropagation(); navigator.share?.({ title: video.title, url: `${window.location.origin}/feed/${video.id}` }) }}
                       className="text-[#555] active:scale-90 transition-transform"
                     >
-                      <Share2 className="w-8 h-8" />
+                      <Share2 className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
@@ -371,8 +365,9 @@ export default function FeedPage() {
           ))
         )}
       </div>
+    </div>
 
-      {/* ── NOTIFICATIONS PANEL ────────────────────────────── */}
+    {/* ── NOTIFICATIONS PANEL ────────────────────────────── */}
       {showNotifs && (
         <div className="fixed inset-0 z-[60] flex flex-col">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowNotifs(false)} />
@@ -606,6 +601,6 @@ export default function FeedPage() {
           )}
         </div>
       )}
-    </div>
+    </>
   )
 }

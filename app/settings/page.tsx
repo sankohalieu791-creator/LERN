@@ -135,6 +135,7 @@ export default function SettingsPage() {
   const initial = user?.username?.[0]?.toUpperCase() ?? 'U'
 
   return (
+    <>
     <div className="fixed inset-0 bg-[#0f0f0f] theme-bg flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
       {/* HEADER — always stays at top */}
@@ -146,7 +147,7 @@ export default function SettingsPage() {
       </div>
 
       {/* SCROLLABLE CONTENT */}
-      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 96px)' }}>
+      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
 
       {/* USER ROW */}
       <Link href="/profile/me" className="flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.07)] theme-border hover:bg-[#181818] transition">
@@ -254,8 +255,9 @@ export default function SettingsPage() {
       </div>
 
       </div>{/* end scrollable content */}
+    </div>
 
-      {/* ── APPLY TO TEACH MODAL ─────────────────────────────── */}
+    {/* ── APPLY TO TEACH MODAL ─────────────────────────────── */}
       {showApply && (
         <div className="fixed inset-0 z-[60] flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={!applied ? closeApply : undefined} />
@@ -393,7 +395,7 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 

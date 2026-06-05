@@ -198,8 +198,9 @@ export default function ProfileMePage() {
   }
 
   return (
+    <>
     <div className="fixed inset-0 bg-[#0f0f0f] theme-bg flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-    <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 96px)' }}>
+    <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
 
       {/* ── HEADER ROW: avatar left · stats right ───────────── */}
       <div className="px-4 pt-5 flex items-center gap-4 mb-4">
@@ -629,6 +630,7 @@ export default function ProfileMePage() {
       </div>
 
     </div>
+  </div>
 
     {deleteTarget && (
       <div className="fixed inset-0 z-[70] flex flex-col justify-end">
@@ -656,7 +658,7 @@ export default function ProfileMePage() {
         </div>
       </div>
     )}
-  </div>
+    </>
   )
 }
 

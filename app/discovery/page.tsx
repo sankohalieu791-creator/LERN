@@ -290,15 +290,17 @@ function ContactSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+    <div className="fixed inset-0 z-[60] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-[#141414] rounded-t-3xl overflow-hidden max-h-[88vh]">
-        <div className="h-28 bg-gradient-to-r from-[#FF6B2B] via-[#E91E8C] to-[#7C3AED] relative flex-shrink-0">
+      <div className="relative bg-[#141414] rounded-t-3xl flex flex-col" style={{ maxHeight: '90vh' }}>
+        {/* Banner */}
+        <div className="h-28 bg-gradient-to-r from-[#FF6B2B] via-[#E91E8C] to-[#7C3AED] relative flex-shrink-0 rounded-t-3xl">
           <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 bg-black/30 rounded-full flex items-center justify-center">
             <X className="w-4 h-4 text-white" />
           </button>
         </div>
-        <div className="overflow-y-auto pb-10">
+        <div className="flex-1 overflow-y-auto overscroll-contain"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
           <div className="px-5 -mt-10 mb-3">
             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] border-4 border-[#141414] flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
               {u?.avatar_url ? <img src={u.avatar_url} alt={app.full_name} className="w-full h-full object-cover" /> : (app.full_name?.[0] || '?').toUpperCase()}
@@ -441,6 +443,7 @@ export default function DiscoveryPage() {
   ]
 
   return (
+    <>
     <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
       {/* FIXED HEADER — never moves */}
@@ -492,7 +495,7 @@ export default function DiscoveryPage() {
 
       {/* SCROLLABLE CARDS */}
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 space-y-4 pt-1"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 96px)' }}>
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-6 h-6 text-[#444] animate-spin" />
@@ -520,24 +523,26 @@ export default function DiscoveryPage() {
         )}
       </div>
 
-      {/* CONTACT SHEET */}
-      {contact && (
-        <ContactSheet
-          app={contact}
-          onClose={() => setContact(null)}
-          isFollowed={followingIds.has(contact.users?.id ?? '')}
-          onFollow={() => handleFollow(contact.users?.id)}
-        />
-      )}
-
-      {/* REQUEST SHEET */}
-      {requestTarget && (
-        <RequestSheet
-          app={requestTarget}
-          onClose={() => setRequestTarget(null)}
-          onSent={() => setRequestedIds(prev => new Set([...prev, requestTarget.user_id]))}
-        />
-      )}
     </div>
+
+    {/* CONTACT SHEET — outside fixed container so z-[60] works in root */}
+    {contact && (
+      <ContactSheet
+        app={contact}
+        onClose={() => setContact(null)}
+        isFollowed={followingIds.has(contact.users?.id ?? '')}
+        onFollow={() => handleFollow(contact.users?.id)}
+      />
+    )}
+
+    {/* REQUEST SHEET */}
+    {requestTarget && (
+      <RequestSheet
+        app={requestTarget}
+        onClose={() => setRequestTarget(null)}
+        onSent={() => setRequestedIds(prev => new Set([...prev, requestTarget.user_id]))}
+      />
+    )}
+    </>
   )
 }

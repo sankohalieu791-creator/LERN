@@ -8,7 +8,7 @@ import {
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getCourses, getWorkshops, getCourseById, enrollCourse, isEnrolled } from '@/lib/supabase'
+import { getCourses, getWorkshops, getCourseById, enrollCourse, isEnrolled, rateCourse, getUserCourseRating } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 
 function VerifiedBadge({ size = 12 }: { size?: number }) {
@@ -36,17 +36,25 @@ function CourseDetailSheet({
   const router   = useRouter()
   const [course,    setCourse]    = useState<any>(null)
   const [loading,   setLoading]   = useState(true)
-  const [enrolled,  setEnrolled]  = useState(false)
-  const [enrolling, setEnrolling] = useState(false)
-  const [success,   setSuccess]   = useState(false)
+  const [enrolled,    setEnrolled]    = useState(false)
+  const [enrolling,   setEnrolling]   = useState(false)
+  const [success,     setSuccess]     = useState(false)
+  const [userRating,  setUserRating]  = useState(0)
+  const [ratingDone,  setRatingDone]  = useState(false)
+
+  const isOwner = !!(user && course && user.id === course.instructor_id)
 
   useEffect(() => {
     const load = async () => {
       const { data } = await getCourseById(courseId)
       setCourse(data)
       if (user) {
-        const { data: enrolled } = await isEnrolled(courseId, user.id)
-        setEnrolled(!!enrolled)
+        const [{ data: enrolledData }, { data: ratingData }] = await Promise.all([
+          isEnrolled(courseId, user.id),
+          getUserCourseRating(courseId, user.id),
+        ])
+        setEnrolled(!!enrolledData)
+        if (ratingData?.rating) { setUserRating(ratingData.rating); setRatingDone(true) }
       }
       setLoading(false)
     }
@@ -63,12 +71,21 @@ function CourseDetailSheet({
     setTimeout(() => setSuccess(false), 2000)
   }
 
+  const handleRate = async (stars: number) => {
+    if (!user || !enrolled) return
+    setUserRating(stars)
+    setRatingDone(true)
+    await rateCourse(courseId, user.id, stars)
+    const { data } = await getCourseById(courseId)
+    setCourse(data)
+  }
+
   const sessions = course?.course_sessions?.slice().sort((a: any, b: any) =>
     new Date(a.session_date || 0).getTime() - new Date(b.session_date || 0).getTime()
   ) ?? []
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+    <div className="fixed inset-0 z-[60] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-[#141414] rounded-t-3xl flex flex-col" style={{ maxHeight: '92vh' }}>
         {/* Drag handle */}
@@ -87,107 +104,134 @@ function CourseDetailSheet({
             <Loader2 className="w-6 h-6 text-[#444] animate-spin" />
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto px-5 pb-10">
+          <>
+            <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-4">
 
-            {/* TITLE */}
-            <h2 className="text-white text-xl font-bold leading-snug mb-3">{course?.title}</h2>
+              {/* TITLE */}
+              <h2 className="text-white text-xl font-bold leading-snug mb-3">{course?.title}</h2>
 
-            {/* INSTRUCTOR */}
-            <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-                {course?.users?.avatar_url
-                  ? <img src={course.users.avatar_url} className="w-full h-full object-cover" />
-                  : course?.users?.username?.[0]?.toUpperCase()
-                }
+              {/* INSTRUCTOR */}
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
+                  {course?.users?.avatar_url
+                    ? <img src={course.users.avatar_url} className="w-full h-full object-cover" />
+                    : course?.users?.username?.[0]?.toUpperCase()
+                  }
+                </div>
+                <p className="text-white text-sm font-semibold flex items-center gap-1.5">
+                  {course?.users?.username}
+                  {course?.users?.verified && <VerifiedBadge size={13} />}
+                </p>
               </div>
-              <p className="text-white text-sm font-semibold flex items-center gap-1.5">
-                {course?.users?.username}
-                {course?.users?.verified && <VerifiedBadge size={13} />}
-              </p>
-            </div>
 
-            <p className="text-[#888] text-sm leading-relaxed mb-4">{course?.description}</p>
+              <p className="text-[#888] text-sm leading-relaxed mb-4">{course?.description}</p>
 
-            {/* STATS */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-4 text-sm text-[#888]">
-                <span className="flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" />
-                  {course?.duration_weeks}w
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5" />
-                  {(course?.enrolled_count || 0).toLocaleString()}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-                  {course?.rating?.toFixed(1)}
+              {/* STATS */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4 text-sm text-[#888]">
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    {course?.duration_weeks}w
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5" />
+                    {(course?.enrolled_count || 0).toLocaleString()}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                    {course?.rating?.toFixed(1)}
+                  </span>
+                </div>
+                <span className="text-xs font-bold border border-[rgba(255,255,255,0.15)] text-[#888] px-3 py-1 rounded-full capitalize">
+                  {course?.level}
                 </span>
               </div>
-              <span className="text-xs font-bold border border-[rgba(255,255,255,0.15)] text-[#888] px-3 py-1 rounded-full capitalize">
-                {course?.level}
-              </span>
-            </div>
 
-            {/* CERTIFICATE BADGE */}
-            <div className="flex items-center gap-2.5 bg-[#1e1e1e] border border-[rgba(255,255,255,0.07)] rounded-2xl px-4 py-3.5 mb-5">
-              <ShieldCheck className="w-5 h-5 text-[#FF6B2B] flex-shrink-0" />
-              <p className="text-white text-sm font-medium">Includes verified certificate on completion</p>
-            </div>
+              {/* CERTIFICATE BADGE */}
+              <div className="flex items-center gap-2.5 bg-[#1e1e1e] border border-[rgba(255,255,255,0.07)] rounded-2xl px-4 py-3.5 mb-5">
+                <ShieldCheck className="w-5 h-5 text-[#FF6B2B] flex-shrink-0" />
+                <p className="text-white text-sm font-medium">Includes verified certificate on completion</p>
+              </div>
 
-            {/* TIMETABLE */}
-            {sessions.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-[#FF6B2B]" />
-                    <p className="text-white text-sm font-bold uppercase tracking-wide">Your Timetable</p>
+              {/* TIMETABLE */}
+              {sessions.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-[#FF6B2B]" />
+                      <p className="text-white text-sm font-bold uppercase tracking-wide">Your Timetable</p>
+                    </div>
+                    <span className="text-[#555] text-xs">{sessions.length} sessions</span>
                   </div>
-                  <span className="text-[#555] text-xs">{sessions.length} sessions</span>
-                </div>
-                <div className="space-y-2">
-                  {sessions.map((s: any) => {
-                    const d = s.session_date ? new Date(s.session_date) : null
-                    const mon = d?.toLocaleString('default', { month: 'short' }).toUpperCase()
-                    const day = d?.getDate()
-                    return (
-                      <div key={s.id} className="flex items-center gap-3 bg-[#1e1e1e] rounded-2xl px-4 py-3">
-                        {d ? (
-                          <div className="flex-shrink-0 w-12 text-center">
-                            <p className="text-[#555] text-[9px] font-bold">{mon}</p>
-                            <p className="text-white font-bold text-xl leading-none">{day}</p>
+                  <div className="space-y-2">
+                    {sessions.map((s: any) => {
+                      const d = s.session_date ? new Date(s.session_date) : null
+                      const mon = d?.toLocaleString('default', { month: 'short' }).toUpperCase()
+                      const day = d?.getDate()
+                      return (
+                        <div key={s.id} className="flex items-center gap-3 bg-[#1e1e1e] rounded-2xl px-4 py-3">
+                          {d ? (
+                            <div className="flex-shrink-0 w-12 text-center">
+                              <p className="text-[#555] text-[9px] font-bold">{mon}</p>
+                              <p className="text-white font-bold text-xl leading-none">{day}</p>
+                            </div>
+                          ) : (
+                            <div className="flex-shrink-0 w-12 text-center">
+                              <p className="text-white font-bold text-xl leading-none">{s.session_number}</p>
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-semibold truncate">{s.title}</p>
+                            <p className="text-[#555] text-xs mt-0.5">
+                              {d?.toLocaleString('default', { weekday: 'short' })}
+                              {s.session_time && ` ${s.session_time.slice(0, 5)}`}
+                              {' · 60 min'}
+                            </p>
                           </div>
-                        ) : (
-                          <div className="flex-shrink-0 w-12 text-center">
-                            <p className="text-white font-bold text-xl leading-none">{s.session_number}</p>
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white text-sm font-semibold truncate">{s.title}</p>
-                          <p className="text-[#555] text-xs mt-0.5">
-                            {d?.toLocaleString('default', { weekday: 'short' })}
-                            {s.session_time && ` ${s.session_time.slice(0, 5)}`}
-                            {' · 60 min'}
-                          </p>
+                          {s.is_project_day && (
+                            <span className="text-[9px] font-bold bg-red-500 text-white px-2 py-1 rounded-full flex-shrink-0">
+                              PROJECTS DAY
+                            </span>
+                          )}
+                          {s.is_live && (
+                            <span className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 animate-pulse" />
+                          )}
                         </div>
-                        {s.is_project_day && (
-                          <span className="text-[9px] font-bold bg-red-500 text-white px-2 py-1 rounded-full flex-shrink-0">
-                            PROJECTS DAY
-                          </span>
-                        )}
-                        {s.is_live && (
-                          <span className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 animate-pulse" />
-                        )}
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* ENROLL / JOIN BUTTON */}
-            <div className="mt-6">
-              {enrolled ? (
+              {/* RATING — show for enrolled non-owners */}
+              {enrolled && !isOwner && (
+                <div className="mt-5 pt-5 border-t border-[rgba(255,255,255,0.07)]">
+                  <p className="text-[#555] text-[11px] font-bold uppercase tracking-widest mb-3">
+                    {ratingDone ? 'Your rating' : 'Rate this course'}
+                  </p>
+                  <div className="flex gap-3">
+                    {[1,2,3,4,5].map(n => (
+                      <button key={n} onClick={() => handleRate(n)}
+                        className="flex-1 flex items-center justify-center transition active:scale-90">
+                        <Star className={`w-7 h-7 ${n <= userRating ? 'fill-yellow-400 text-yellow-400' : 'text-[#333]'}`} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* STICKY FOOTER */}
+            <div className="flex-shrink-0 px-5 py-4 border-t border-[rgba(255,255,255,0.07)] bg-[#141414]"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
+              {isOwner ? (
+                <Link
+                  href={`/courses/${courseId}/classroom`}
+                  className="block w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl text-center"
+                >
+                  🔴 Start Class
+                </Link>
+              ) : enrolled ? (
                 <Link
                   href={`/courses/${courseId}/classroom`}
                   className="block w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl text-center"
@@ -207,7 +251,7 @@ function CourseDetailSheet({
                 </button>
               )}
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>
@@ -260,6 +304,7 @@ export default function CoursesPage() {
   )
 
   return (
+    <>
     <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
       {/* TABS — always visible at top */}
@@ -279,7 +324,7 @@ export default function CoursesPage() {
 
       {/* SCROLLABLE CONTENT */}
       <div className="flex-1 overflow-y-auto overscroll-contain"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 96px)' }}>
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
 
       {/* ── COURSES TAB ─────────────────────────────────────── */}
       {activeTab === 'courses' && (
@@ -348,10 +393,11 @@ export default function CoursesPage() {
       )}
 
       </div>{/* end scrollable content */}
+    </div>
 
-      {/* ── FILTER SHEET ────────────────────────────────────── */}
-      {showFilter && (
-        <div className="fixed inset-0 z-50">
+    {/* ── FILTER SHEET ────────────────────────────────────── */}
+    {showFilter && (
+        <div className="fixed inset-0 z-[60]">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowFilter(false)} />
           <div
             className="absolute bottom-0 left-0 right-0 bg-[#1a1a1a] rounded-t-2xl px-4 pt-3 pb-8"
@@ -395,14 +441,14 @@ export default function CoursesPage() {
         </div>
       )}
 
-      {/* ── COURSE DETAIL SHEET ─────────────────────────────── */}
-      {detailCourseId && (
-        <CourseDetailSheet
-          courseId={detailCourseId}
-          onClose={() => setDetailCourseId(null)}
-        />
-      )}
-    </div>
+    {/* ── COURSE DETAIL SHEET ─────────────────────────────── */}
+    {detailCourseId && (
+      <CourseDetailSheet
+        courseId={detailCourseId}
+        onClose={() => setDetailCourseId(null)}
+      />
+    )}
+    </>
   )
 }
 

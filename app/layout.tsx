@@ -3,7 +3,6 @@ import './globals.css'
 import { AuthProvider } from '@/context/AuthContext'
 import ConditionalNavbar from '@/components/ConditionalNavbar'
 import BottomNav from '@/components/BottomNav'
-import PlusButton from '@/components/PlusButton'
 import ThemeProvider from '@/components/ThemeProvider'
 import ClientShell from '@/components/ClientShell'
 import PushNotificationSetup from '@/components/PushNotificationSetup'
@@ -46,7 +45,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </ClientShell>
           <BottomNav />
-          <PlusButton />
         </AuthProvider>
       </body>
     </html>
