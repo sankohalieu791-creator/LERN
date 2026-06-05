@@ -17,7 +17,7 @@ export default function BottomNav() {
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-[#111] border-t border-[rgba(255,255,255,0.07)] flex justify-around items-center h-16 z-50">
+    <nav className="fixed bottom-0 left-0 right-0 bg-[#111] border-t border-[rgba(255,255,255,0.07)] flex justify-around items-center z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom)', minHeight: '64px' }}>
       {navItems.map(({ href, icon: Icon, label }) => {
         const active = isActive(href)
         return (
