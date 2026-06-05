@@ -30,7 +30,7 @@ export default function PlusButton() {
 
   return (
     <>
-      <div className="fixed bottom-20 right-4 z-40">
+      <div className="fixed right-4 z-40" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 76px)' }}>
         {showMenu && (
           <div className="absolute bottom-16 right-0 flex flex-col gap-2 items-end">
             {options.map(opt => {

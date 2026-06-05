@@ -441,55 +441,58 @@ export default function DiscoveryPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] pb-24">
+    <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
-      {/* HEADER */}
-      <div className="px-4 pt-5 pb-3">
-        <h1 className="text-white text-2xl font-bold">Discover</h1>
-        {activeTab === 'request' && (
-          <p className="text-[#555] text-sm mt-0.5">Send a 1-to-1 training or mentorship request</p>
-        )}
-      </div>
-
-      {/* SEARCH */}
-      <div className="px-4 mb-4">
-        <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-2xl px-4 py-3">
-          <Search className="w-4 h-4 text-[#555] flex-shrink-0" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={activeTab === 'request' ? 'Search instructors…' : 'Search mentors…'}
-            className="flex-1 bg-transparent text-white text-sm placeholder-[#444] outline-none"
-          />
-          {search && (
-            <button onClick={() => setSearch('')}>
-              <X className="w-4 h-4 text-[#555]" />
-            </button>
+      {/* FIXED HEADER — never moves */}
+      <div className="flex-shrink-0">
+        <div className="px-4 pt-4 pb-3">
+          <h1 className="text-white text-2xl font-bold">Discover</h1>
+          {activeTab === 'request' && (
+            <p className="text-[#555] text-sm mt-0.5">Send a 1-to-1 training or mentorship request</p>
           )}
+        </div>
+
+        {/* SEARCH */}
+        <div className="px-4 mb-3">
+          <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-2xl px-4 py-3">
+            <Search className="w-4 h-4 text-[#555] flex-shrink-0" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder={activeTab === 'request' ? 'Search instructors…' : 'Search mentors…'}
+              className="flex-1 bg-transparent text-white text-sm placeholder-[#444] outline-none"
+            />
+            {search && (
+              <button onClick={() => setSearch('')}>
+                <X className="w-4 h-4 text-[#555]" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* TABS */}
+        <div className="px-4 flex gap-2 pb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+          {allTabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition ${
+                activeTab === t.id
+                  ? t.id === 'request'
+                    ? 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
+                    : 'bg-white text-black'
+                  : 'bg-[#1a1a1a] text-[#888] border border-[rgba(255,255,255,0.08)]'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* TABS */}
-      <div className="px-4 flex gap-2 mb-5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-        {allTabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setActiveTab(t.id)}
-            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition ${
-              activeTab === t.id
-                ? t.id === 'request'
-                  ? 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
-                  : 'bg-white text-black'
-                : 'bg-[#1a1a1a] text-[#888] border border-[rgba(255,255,255,0.08)]'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* CARDS */}
-      <div className="px-4 space-y-4">
+      {/* SCROLLABLE CARDS */}
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 space-y-4 pt-1"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 96px)' }}>
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-6 h-6 text-[#444] animate-spin" />

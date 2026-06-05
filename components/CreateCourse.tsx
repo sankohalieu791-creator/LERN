@@ -13,7 +13,7 @@ interface CreateCourseProps {
 export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
   const { user } = useAuth()
 
-  if (isOpen && !user?.is_instructor) {
+  if (isOpen && user?.account_type !== 'instructor') {
     return (
       <div className="fixed inset-0 bg-black/90 z-50 flex items-end sm:items-center justify-center">
         <div className="bg-[#1a1a1a] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-6 text-center">
@@ -82,18 +82,19 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-95 z-50 flex items-center justify-center p-4">
-      <div className="bg-[#1a1a1a] rounded-xl w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-6">
+    <div className="fixed inset-0 bg-black bg-opacity-95 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="bg-[#1a1a1a] rounded-2xl w-full max-w-md flex flex-col" style={{ maxHeight: '92vh' }}>
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 flex-shrink-0 border-b border-[rgba(255,255,255,0.07)]">
           <h2 className="text-white text-xl font-bold">Create Course</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-[rgba(124,58,237,0.2)] rounded-full transition"
+            className="w-9 h-9 bg-[#252525] rounded-full flex items-center justify-center"
           >
             <X className="w-5 h-5 text-white" />
           </button>
         </div>
 
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-white text-sm font-semibold mb-2">Title</label>
@@ -180,6 +181,7 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
             {loading ? 'Creating...' : 'Create Course'}
           </button>
         </form>
+        </div>
       </div>
     </div>
   )

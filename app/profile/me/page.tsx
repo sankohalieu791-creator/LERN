@@ -198,7 +198,8 @@ export default function ProfileMePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] theme-bg pb-24">
+    <div className="fixed inset-0 bg-[#0f0f0f] theme-bg flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 96px)' }}>
 
       {/* ── HEADER ROW: avatar left · stats right ───────────── */}
       <div className="px-4 pt-5 flex items-center gap-4 mb-4">
@@ -268,8 +269,7 @@ export default function ProfileMePage() {
       <div className="mx-4 mb-4 flex items-center gap-2 text-xs bg-[#1a1a1a] theme-card border border-[rgba(255,255,255,0.06)] theme-border rounded-xl px-3 py-2">
         <Eye className="w-3 h-3 text-[#555]" />
         <span className="text-[#555] font-bold">VIEWED BY</span>
-        <span className="text-white font-semibold">{user?.views_count ?? 0} Profile</span>
-        <span className="text-[#FF6B2B] font-semibold">0 Employers</span>
+        <span className="text-white font-semibold">{user?.views_count ?? 0} Profiles</span>
       </div>
 
       {/* ── ACTION BUTTONS ───────────────────────────────────── */}
@@ -628,34 +628,35 @@ export default function ProfileMePage() {
         )}
       </div>
 
-      {/* ── DELETE CONFIRM SHEET ─────────────────────────────── */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-[70] flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setDeleteTarget(null)} />
-          <div className="relative bg-[#1a1a1a] rounded-t-3xl px-5 pt-6 pb-8"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
-            <div className="flex justify-center mb-4">
-              <div className="w-10 h-1 bg-[#333] rounded-full" />
-            </div>
-            <h3 className="text-white font-bold text-lg mb-1 text-center">Delete this {deleteTarget.type === 'post' ? 'post' : deleteTarget.type}?</h3>
-            <p className="text-[#555] text-sm text-center mb-6">This can't be undone.</p>
-            <button
-              onClick={confirmDelete}
-              disabled={deleting}
-              className="w-full bg-red-500 text-white font-bold py-4 rounded-2xl mb-3 disabled:opacity-40"
-            >
-              {deleting ? 'Deleting…' : 'Delete'}
-            </button>
-            <button
-              onClick={() => setDeleteTarget(null)}
-              className="w-full bg-[#252525] text-white font-bold py-4 rounded-2xl"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
     </div>
+
+    {deleteTarget && (
+      <div className="fixed inset-0 z-[70] flex flex-col justify-end">
+        <div className="absolute inset-0 bg-black/60" onClick={() => setDeleteTarget(null)} />
+        <div className="relative bg-[#1a1a1a] rounded-t-3xl px-5 pt-6 pb-8"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
+          <div className="flex justify-center mb-4">
+            <div className="w-10 h-1 bg-[#333] rounded-full" />
+          </div>
+          <h3 className="text-white font-bold text-lg mb-1 text-center">Delete this {deleteTarget.type === 'post' ? 'post' : deleteTarget.type}?</h3>
+          <p className="text-[#555] text-sm text-center mb-6">This can&apos;t be undone.</p>
+          <button
+            onClick={confirmDelete}
+            disabled={deleting}
+            className="w-full bg-red-500 text-white font-bold py-4 rounded-2xl mb-3 disabled:opacity-40"
+          >
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
+          <button
+            onClick={() => setDeleteTarget(null)}
+            className="w-full bg-[#252525] text-white font-bold py-4 rounded-2xl"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
   )
 }
 

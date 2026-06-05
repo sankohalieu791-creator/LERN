@@ -115,8 +115,8 @@ export default function SettingsPage() {
     if (error) {
       setApplyError(error.message || 'Submission failed')
     } else {
-      // Grant instructor access immediately — no waiting for admin review
-      await updateUserProfile(user.id, { account_type: 'instructor' })
+      // Grant instructor access immediately + verified badge
+      await updateUserProfile(user.id, { account_type: 'instructor', verified: true })
       await refreshUser()
       setApplied(true)
     }
@@ -135,15 +135,18 @@ export default function SettingsPage() {
   const initial = user?.username?.[0]?.toUpperCase() ?? 'U'
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] theme-bg pb-24">
+    <div className="fixed inset-0 bg-[#0f0f0f] theme-bg flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
-      {/* HEADER */}
-      <div className="px-4 py-4 flex items-center gap-3 border-b border-[rgba(255,255,255,0.07)] theme-border sticky top-0 bg-[#0f0f0f] theme-bg z-10">
+      {/* HEADER — always stays at top */}
+      <div className="flex-shrink-0 px-4 py-4 flex items-center gap-3 border-b border-[rgba(255,255,255,0.07)] theme-border bg-[#0f0f0f] theme-bg">
         <Link href="/profile/me" className="text-[#888] hover:text-white transition">
           <ChevronLeft className="w-5 h-5" />
         </Link>
         <h1 className="text-white theme-text-1 font-bold text-lg">Settings</h1>
       </div>
+
+      {/* SCROLLABLE CONTENT */}
+      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 96px)' }}>
 
       {/* USER ROW */}
       <Link href="/profile/me" className="flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.07)] theme-border hover:bg-[#181818] transition">
@@ -167,19 +170,34 @@ export default function SettingsPage() {
       {/* CREATOR */}
       <SectionLabel>Creator</SectionLabel>
       <div className="border-t border-[rgba(255,255,255,0.05)] theme-border">
-        <button
-          onClick={() => setShowApply(true)}
-          className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition text-left"
-        >
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 className="w-4 h-4 text-white" />
+        {user?.account_type === 'instructor' ? (
+          <div className="flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)]">
+            <div className="w-9 h-9 rounded-full bg-[#1d9bf0] flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-white theme-text-1 text-sm font-semibold">Verified Instructor</p>
+                {user?.verified && <VerifiedBadge size={15} />}
+              </div>
+              <p className="text-[#555] theme-text-2 text-xs mt-0.5">Your instructor application was accepted.</p>
+            </div>
           </div>
-          <div className="flex-1">
-            <p className="text-white theme-text-1 text-sm font-semibold">Apply to be an instructor</p>
-            <p className="text-[#555] theme-text-2 text-xs mt-0.5">All instructors are verified before going live.</p>
-          </div>
-          <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
-        </button>
+        ) : (
+          <button
+            onClick={() => setShowApply(true)}
+            className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition text-left"
+          >
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-white theme-text-1 text-sm font-semibold">Apply to be an instructor</p>
+              <p className="text-[#555] theme-text-2 text-xs mt-0.5">All instructors are verified before going live.</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
+          </button>
+        )}
       </div>
 
       {/* APPEARANCE */}
@@ -234,6 +252,8 @@ export default function SettingsPage() {
           <span className="font-semibold">Sign out</span>
         </button>
       </div>
+
+      </div>{/* end scrollable content */}
 
       {/* ── APPLY TO TEACH MODAL ─────────────────────────────── */}
       {showApply && (

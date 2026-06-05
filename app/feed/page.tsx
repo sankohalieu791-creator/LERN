@@ -24,6 +24,16 @@ function VerifiedBadge({ size = 14 }: { size?: number }) {
   )
 }
 
+function timeAgo(dateStr: string) {
+  if (!dateStr) return ''
+  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
 const SUBJECT_STYLES: Record<string, string> = {
   TYPESCRIPT: 'bg-blue-900/70 text-blue-200',
   JAVASCRIPT: 'bg-yellow-900/70 text-yellow-200',
@@ -298,10 +308,15 @@ export default function FeedPage() {
                         : video.users?.username?.[0]?.toUpperCase()
                       }
                     </div>
-                    <p className="text-white text-sm font-semibold flex items-center gap-1 truncate">
-                      {video.users?.username}
-                      {video.users?.verified && <VerifiedBadge size={13} />}
-                    </p>
+                    <div>
+                      <p className="text-white text-sm font-semibold flex items-center gap-1">
+                        {video.users?.username}
+                        {video.users?.verified && <VerifiedBadge size={13} />}
+                      </p>
+                      {video.users?.title && (
+                        <p className="text-[#555] text-xs leading-tight">{video.users.title}</p>
+                      )}
+                    </div>
                   </div>
                   {user?.id !== video.user_id && (
                     <button
@@ -319,7 +334,7 @@ export default function FeedPage() {
 
                 {/* VIEWS + LIKE / COMMENT / SHARE */}
                 <div className="flex items-center justify-between">
-                  <span className="text-[#444] text-xs">{fmt(video.views)} views</span>
+                  <span className="text-[#444] text-xs">{fmt(video.views)} views · {timeAgo(video.created_at)}</span>
                   <div className="flex items-center gap-6">
 
                     {/* ThumbsDown → rotate → ThumbsUp (RED) */}

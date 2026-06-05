@@ -13,7 +13,7 @@ interface CreateWorkshopProps {
 export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps) {
   const { user } = useAuth()
 
-  if (isOpen && !user?.is_instructor) {
+  if (isOpen && user?.account_type !== 'instructor') {
     return (
       <div className="fixed inset-0 bg-black/90 z-50 flex items-end sm:items-center justify-center">
         <div className="bg-[#1a1a1a] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-6 text-center">

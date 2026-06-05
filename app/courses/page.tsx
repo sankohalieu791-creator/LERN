@@ -254,16 +254,16 @@ export default function CoursesPage() {
   const hasFilter = !!(filterLevel || filterSubject)
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
+    <div className="fixed inset-0 bg-[#0f0f0f] flex items-center justify-center">
       <div className="w-8 h-8 border-2 border-[#333] border-t-white rounded-full animate-spin" />
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] pb-20">
+    <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
-      {/* TABS — sticky at top (no global navbar) */}
-      <div className="flex border-b border-[rgba(255,255,255,0.07)] sticky top-0 bg-[#0f0f0f] z-30">
+      {/* TABS — always visible at top */}
+      <div className="flex-shrink-0 flex border-b border-[rgba(255,255,255,0.07)] bg-[#0f0f0f]">
         {(['courses','workshops','enrolled'] as Tab[]).map(tab => (
           <button
             key={tab}
@@ -276,6 +276,10 @@ export default function CoursesPage() {
           </button>
         ))}
       </div>
+
+      {/* SCROLLABLE CONTENT */}
+      <div className="flex-1 overflow-y-auto overscroll-contain"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 96px)' }}>
 
       {/* ── COURSES TAB ─────────────────────────────────────── */}
       {activeTab === 'courses' && (
@@ -342,6 +346,8 @@ export default function CoursesPage() {
           )}
         </div>
       )}
+
+      </div>{/* end scrollable content */}
 
       {/* ── FILTER SHEET ────────────────────────────────────── */}
       {showFilter && (
