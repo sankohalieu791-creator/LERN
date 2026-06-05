@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Bell, ThumbsUp, MessageCircle, Share2, X, Send, Play, Trash2 } from 'lucide-react'
+import { Search, Bell, ThumbsUp, MessageCircle, Share2, X, Send, Play, Trash2, Eye, Clock } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getVideos, likeVideo, unlikeVideo, hasUserLiked,
@@ -289,40 +289,38 @@ export default function FeedPage() {
                 )}
               </div>
 
-              {/* CARD BODY — YouTube style */}
-              <div className="px-3 pt-3 pb-3 flex gap-3">
-                {/* Avatar — clickable → profile + increment views */}
-                <button
-                  onClick={e => goToProfile(video.user_id, e)}
-                  className="flex-shrink-0 mt-0.5"
-                >
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-[11px] font-bold overflow-hidden">
-                    {video.users?.avatar_url
-                      ? <img src={video.users.avatar_url} className="w-full h-full object-cover" />
-                      : video.users?.username?.[0]?.toUpperCase()
-                    }
-                  </div>
-                </button>
+              {/* CARD BODY */}
+              <div className="px-4 pt-3 pb-0">
 
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-white font-bold text-sm leading-snug line-clamp-2 mb-1">{video.title}</h3>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    <span className="text-[#888] text-xs font-semibold flex items-center gap-1">
-                      {video.users?.username}
-                      {video.users?.verified && <VerifiedBadge size={11} />}
-                    </span>
-                    <span className="text-[#444] text-xs">
-                      · {fmt(video.views)} views · {timeAgo(video.created_at)}
-                    </span>
-                  </div>
-                </div>
+                {/* Title — full width, prominent */}
+                <h3 className="text-white font-bold text-[15px] leading-snug line-clamp-2 mb-3">{video.title}</h3>
 
-                {/* Right: Follow + Like */}
-                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                {/* Instructor row */}
+                <div className="flex items-center justify-between mb-2">
+                  <button
+                    onClick={e => goToProfile(video.user_id, e)}
+                    className="flex items-center gap-2.5 flex-1 min-w-0"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-[11px] font-bold overflow-hidden flex-shrink-0">
+                      {video.users?.avatar_url
+                        ? <img src={video.users.avatar_url} className="w-full h-full object-cover" />
+                        : video.users?.username?.[0]?.toUpperCase()
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-bold flex items-center gap-1 leading-none mb-0.5">
+                        {video.users?.username}
+                        {video.users?.verified && <VerifiedBadge size={13} />}
+                      </p>
+                      {(video.users as any)?.title && (
+                        <p className="text-[#555] text-xs truncate">{(video.users as any).title}</p>
+                      )}
+                    </div>
+                  </button>
                   {user?.id !== video.user_id && (
                     <button
                       onClick={e => handleFollow(video.user_id, e)}
-                      className={`text-[11px] font-bold px-3 py-1 rounded-full border transition ${
+                      className={`flex-shrink-0 text-[12px] font-bold px-4 py-1.5 rounded-full border transition ${
                         following.has(video.user_id)
                           ? 'border-[rgba(255,255,255,0.1)] text-[#444]'
                           : 'border-white text-white'
@@ -331,18 +329,53 @@ export default function FeedPage() {
                       {following.has(video.user_id) ? 'Following' : 'Follow'}
                     </button>
                   )}
-                  <button onClick={e => handleLike(video.id, e)} className="flex items-center gap-1 active:scale-90 transition-transform">
+                </div>
+
+                {/* Description */}
+                {video.description && (
+                  <p className="text-[#555] text-sm line-clamp-2 mb-2 leading-snug">{video.description}</p>
+                )}
+
+                {/* Stats */}
+                <div className="flex items-center gap-3 text-[#444] text-xs mb-3">
+                  <span className="flex items-center gap-1">
+                    <Eye className="w-3 h-3" />{fmt(video.views)} views
+                  </span>
+                  {video.duration && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />{video.duration}
+                    </span>
+                  )}
+                  <span>{timeAgo(video.created_at)}</span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-5 pb-4 border-b border-[rgba(255,255,255,0.05)]">
+                  <button onClick={e => handleLike(video.id, e)} className="flex items-center gap-1.5 active:scale-90 transition-transform">
                     <span className={likeAnim.has(video.id) ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
                       <ThumbsUp
-                        className="w-4 h-4"
+                        className="w-5 h-5"
                         fill={userLikes.has(video.id) ? '#ef4444' : 'none'}
                         color={userLikes.has(video.id) ? '#ef4444' : '#555'}
                         strokeWidth={1.5}
                       />
                     </span>
-                    <span className={`text-xs font-bold ${userLikes.has(video.id) ? 'text-red-500' : 'text-[#555]'}`}>
+                    <span className={`text-sm font-semibold ${userLikes.has(video.id) ? 'text-red-500' : 'text-[#555]'}`}>
                       {fmt(video.likes_count)}
                     </span>
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); openVideo(video) }}
+                    className="flex items-center gap-1.5 text-[#555] active:scale-90 transition-transform"
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                    <span className="text-sm font-semibold">{fmt((video as any).comments_count || 0)}</span>
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); navigator.share?.({ title: video.title, url: `${window.location.origin}/feed/${video.id}` }) }}
+                    className="text-[#555] active:scale-90 transition-transform ml-auto"
+                  >
+                    <Share2 className="w-5 h-5" />
                   </button>
                 </div>
               </div>
@@ -404,13 +437,16 @@ export default function FeedPage() {
       </div>
     )}
 
-    {/* VIDEO MODAL — YouTube-style */}
+    {/* VIDEO MODAL */}
     {selectedVideo && (
       <div className="fixed inset-0 bg-black z-[60] flex flex-col">
 
-        {/* VIDEO at top, full width */}
-        <div className="relative w-full bg-black flex-shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-          <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
+        {/* VIDEO — tall, starts from status bar */}
+        <div
+          className="relative w-full bg-black flex-shrink-0"
+          style={{ height: 'max(40vh, calc(100vw * 9 / 16))', paddingTop: 'env(safe-area-inset-top)' }}
+        >
+          <div className="absolute inset-0" style={{ top: 'env(safe-area-inset-top)' }}>
             {selectedVideo.video_url
               ? <video
                   src={selectedVideo.video_url}
@@ -419,35 +455,32 @@ export default function FeedPage() {
                   playsInline
                   // @ts-ignore
                   webkit-playsinline="true"
-                  className="w-full h-full bg-black"
+                  className="w-full h-full object-contain bg-black"
                 />
               : selectedVideo.thumbnail_url
                 ? <img src={selectedVideo.thumbnail_url} alt={selectedVideo.title} className="w-full h-full object-cover" />
                 : <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] flex items-center justify-center">
-                    <Play className="w-12 h-12 text-white/50" />
+                    <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center">
+                      <Play className="w-8 h-8 text-white/50 ml-1" />
+                    </div>
                   </div>
             }
-            <button
-              onClick={() => setSelectedVideo(null)}
-              className="absolute top-2 right-2 w-8 h-8 bg-black/60 rounded-full flex items-center justify-center z-10"
-            >
-              <X className="w-4 h-4 text-white" />
-            </button>
           </div>
+          {/* Close button */}
+          <button
+            onClick={() => setSelectedVideo(null)}
+            className="absolute top-3 right-3 w-9 h-9 bg-black/60 rounded-full flex items-center justify-center z-10"
+            style={{ marginTop: 'env(safe-area-inset-top)' }}
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
         </div>
 
-        {/* SCROLLABLE CONTENT below video */}
+        {/* SCROLLABLE CONTENT */}
         <div className="flex-1 overflow-y-auto bg-[#0f0f0f]">
           <div className="px-4 pt-4 pb-2">
 
-            {/* Title + stats */}
-            <h2 className="text-white font-bold text-base leading-snug mb-1">{selectedVideo.title}</h2>
-            <p className="text-[#444] text-xs mb-4">
-              {fmt(selectedVideo.views)} views · {timeAgo(selectedVideo.created_at)}
-              {selectedVideo.duration ? ` · ${selectedVideo.duration}` : ''}
-            </p>
-
-            {/* ACTION ROW */}
+            {/* ACTION ROW — directly below video */}
             <div className="flex items-center gap-6 pb-4 border-b border-[rgba(255,255,255,0.07)] mb-4">
               <button onClick={() => handleLike(selectedVideo.id)} className="flex items-center gap-2 active:scale-90 transition-transform">
                 <span className={likeAnim.has(selectedVideo.id) ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
@@ -462,28 +495,26 @@ export default function FeedPage() {
                   {fmt(selectedVideo.likes_count)}
                 </span>
               </button>
-
               <button
                 onClick={() => setTimeout(() => commentRef.current?.focus(), 100)}
                 className="flex items-center gap-2 text-[#888] active:scale-90 transition-transform"
               >
                 <MessageCircle className="w-6 h-6" />
-                <span className="text-sm font-bold">{fmt(selectedVideo.comments_count)}</span>
+                <span className="text-sm font-bold">{fmt((selectedVideo as any).comments_count || 0)}</span>
               </button>
-
               <button
                 onClick={() => navigator.share?.({ title: selectedVideo.title, url: `${window.location.origin}/feed/${selectedVideo.id}` })}
-                className="text-[#888] active:scale-90 transition-transform"
+                className="text-[#888] active:scale-90 transition-transform ml-auto"
               >
                 <Share2 className="w-6 h-6" />
               </button>
             </div>
 
-            {/* INSTRUCTOR ROW — clickable avatar + follow button */}
-            <div className="flex items-center justify-between mb-5">
+            {/* INSTRUCTOR ROW */}
+            <div className="flex items-center justify-between mb-4">
               <button
                 onClick={() => { setSelectedVideo(null); goToProfile(selectedVideo.user_id) }}
-                className="flex items-center gap-3"
+                className="flex items-center gap-3 flex-1 min-w-0"
               >
                 <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
                   {selectedVideo.users?.avatar_url
@@ -491,20 +522,20 @@ export default function FeedPage() {
                     : selectedVideo.users?.username?.[0]?.toUpperCase()
                   }
                 </div>
-                <div className="text-left">
+                <div className="text-left min-w-0">
                   <p className="text-white text-sm font-bold flex items-center gap-1.5">
                     {selectedVideo.users?.username}
                     {selectedVideo.users?.verified && <VerifiedBadge size={13} />}
                   </p>
-                  {selectedVideo.users?.title && (
-                    <p className="text-[#555] text-xs">{selectedVideo.users.title}</p>
+                  {(selectedVideo.users as any)?.title && (
+                    <p className="text-[#555] text-xs truncate">{(selectedVideo.users as any).title}</p>
                   )}
                 </div>
               </button>
               {user?.id !== selectedVideo.user_id && (
                 <button
                   onClick={() => handleFollow(selectedVideo.user_id)}
-                  className={`text-sm font-bold px-5 py-2 rounded-full border transition flex-shrink-0 ${
+                  className={`flex-shrink-0 text-sm font-bold px-5 py-2 rounded-full border transition ${
                     following.has(selectedVideo.user_id)
                       ? 'border-[rgba(255,255,255,0.12)] text-[#666]'
                       : 'border-white text-white'
@@ -513,6 +544,16 @@ export default function FeedPage() {
                   {following.has(selectedVideo.user_id) ? 'Following' : 'Follow'}
                 </button>
               )}
+            </div>
+
+            {/* TITLE */}
+            <h2 className="text-white font-bold text-base leading-snug mb-2">{selectedVideo.title}</h2>
+
+            {/* STATS */}
+            <div className="flex items-center gap-3 text-[#444] text-xs mb-4">
+              <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{fmt(selectedVideo.views)} views</span>
+              {selectedVideo.duration && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{selectedVideo.duration}</span>}
+              <span>{timeAgo(selectedVideo.created_at)}</span>
             </div>
 
             {selectedVideo.description && (
