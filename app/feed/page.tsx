@@ -265,7 +265,7 @@ export default function FeedPage() {
             <article
               key={video.id}
               onClick={() => openVideo(video)}
-              className="cursor-pointer border-b border-[rgba(255,255,255,0.05)]"
+              className="cursor-pointer"
             >
               {/* THUMBNAIL */}
               <div className="relative w-full bg-[#1a1a1a] overflow-hidden" style={{ height: '210px' }}>
@@ -441,36 +441,30 @@ export default function FeedPage() {
     {selectedVideo && (
       <div className="fixed inset-0 bg-black z-[60] flex flex-col">
 
-        {/* VIDEO — tall, starts from status bar */}
-        <div
-          className="relative w-full bg-black flex-shrink-0"
-          style={{ height: 'max(40vh, calc(100vw * 9 / 16))', paddingTop: 'env(safe-area-inset-top)' }}
-        >
-          <div className="absolute inset-0" style={{ top: 'env(safe-area-inset-top)' }}>
-            {selectedVideo.video_url
-              ? <video
-                  src={selectedVideo.video_url}
-                  controls
-                  autoPlay
-                  playsInline
-                  // @ts-ignore
-                  webkit-playsinline="true"
-                  className="w-full h-full object-contain bg-black"
-                />
-              : selectedVideo.thumbnail_url
-                ? <img src={selectedVideo.thumbnail_url} alt={selectedVideo.title} className="w-full h-full object-cover" />
-                : <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] flex items-center justify-center">
-                    <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center">
-                      <Play className="w-8 h-8 text-white/50 ml-1" />
-                    </div>
+        {/* safe-area spacer */}
+        <div className="flex-shrink-0 bg-black" style={{ height: 'env(safe-area-inset-top)' }} />
+
+        {/* VIDEO */}
+        <div className="relative w-full flex-shrink-0 bg-black" style={{ height: '40vh' }}>
+          {selectedVideo.video_url
+            ? <video
+                src={selectedVideo.video_url}
+                controls
+                autoPlay
+                playsInline
+                className="w-full h-full object-contain bg-black"
+              />
+            : selectedVideo.thumbnail_url
+              ? <img src={selectedVideo.thumbnail_url} alt={selectedVideo.title} className="w-full h-full object-cover" />
+              : <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center">
+                    <Play className="w-8 h-8 text-white/50 ml-1" />
                   </div>
-            }
-          </div>
-          {/* Close button */}
+                </div>
+          }
           <button
             onClick={() => setSelectedVideo(null)}
             className="absolute top-3 right-3 w-9 h-9 bg-black/60 rounded-full flex items-center justify-center z-10"
-            style={{ marginTop: 'env(safe-area-inset-top)' }}
           >
             <X className="w-5 h-5 text-white" />
           </button>
