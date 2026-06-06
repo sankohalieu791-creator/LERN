@@ -84,11 +84,11 @@ export const getVideos = async () => {
 
 export const getVideoById = async (videoId: string) => {
   const { data, error } = await supabase
-    .from('videos')
-    .select('*, users(*)')
-    .eq('id', videoId)
-    .single()
-  return { data, error }
+    .from('videos').select('*').eq('id', videoId).single()
+  if (!data) return { data, error }
+  const { data: userData } = await supabase
+    .from('users').select('id, username, avatar_url, verified, title').eq('id', data.user_id).single()
+  return { data: { ...data, users: userData ?? null }, error }
 }
 
 export const createVideo = async (userId: string, videoData: any) => {
@@ -238,11 +238,14 @@ export const addComment = async (videoId: string, userId: string, text: string) 
 
 export const getComments = async (videoId: string) => {
   const { data, error } = await supabase
-    .from('comments')
-    .select('*, users(*)')
-    .eq('video_id', videoId)
-    .order('created_at', { ascending: false })
-  return { data, error }
+    .from('comments').select('*').eq('video_id', videoId).order('created_at', { ascending: false })
+  if (!data) return { data, error }
+  const ids = [...new Set(data.map((c: any) => c.user_id).filter(Boolean))]
+  const { data: usersData } = ids.length
+    ? await supabase.from('users').select('id, username, avatar_url, verified').in('id', ids)
+    : { data: [] }
+  const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  return { data: data.map((c: any) => ({ ...c, users: map[c.user_id] ?? null })), error }
 }
 
 // Projects
@@ -342,10 +345,16 @@ export const sendTrainingRequest = async (
 export const getInstructorRequests = async (instructorId: string) => {
   const { data, error } = await supabase
     .from('training_requests')
-    .select('*, requester:from_user_id(id, username, avatar_url, verified)')
+    .select('*')
     .eq('to_instructor_id', instructorId)
     .order('created_at', { ascending: false })
-  return { data, error }
+  if (!data) return { data, error }
+  const ids = [...new Set(data.map((r: any) => r.from_user_id).filter(Boolean))]
+  const { data: usersData } = ids.length
+    ? await supabase.from('users').select('id, username, avatar_url, verified').in('id', ids)
+    : { data: [] }
+  const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  return { data: data.map((r: any) => ({ ...r, requester: map[r.from_user_id] ?? null })), error }
 }
 
 export const updateRequestStatus = async (requestId: string, status: 'accepted' | 'declined') => {
@@ -415,12 +424,16 @@ export const getInstructorApplication = async (userId: string) => {
 }
 
 export const getInstructors = async (roleType?: string) => {
-  let q = supabase
-    .from('instructor_applications')
-    .select('*, users(*)')
-    .order('created_at', { ascending: false })
+  let q = supabase.from('instructor_applications').select('*').order('created_at', { ascending: false })
   if (roleType) q = q.eq('role_type', roleType)
-  return q
+  const { data, error } = await q
+  if (!data) return { data, error }
+  const ids = [...new Set(data.map((a: any) => a.user_id).filter(Boolean))]
+  const { data: usersData } = ids.length
+    ? await supabase.from('users').select('id, username, avatar_url, verified, account_type, title').in('id', ids)
+    : { data: [] }
+  const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  return { data: data.map((a: any) => ({ ...a, users: map[a.user_id] ?? null })), error }
 }
 
 export const getFollowingIds = async (userId: string): Promise<string[]> => {
@@ -445,11 +458,14 @@ export const addFeedback = async (profileUserId: string, reviewerId: string, rat
 
 export const getFeedback = async (profileUserId: string) => {
   const { data, error } = await supabase
-    .from('feedback')
-    .select('*, users(*)')
-    .eq('profile_user_id', profileUserId)
-    .order('created_at', { ascending: false })
-  return { data, error }
+    .from('feedback').select('*').eq('profile_user_id', profileUserId).order('created_at', { ascending: false })
+  if (!data) return { data, error }
+  const ids = [...new Set(data.map((f: any) => f.reviewer_id).filter(Boolean))]
+  const { data: usersData } = ids.length
+    ? await supabase.from('users').select('id, username, avatar_url, verified').in('id', ids)
+    : { data: [] }
+  const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  return { data: data.map((f: any) => ({ ...f, users: map[f.reviewer_id] ?? null })), error }
 }
 
 // Course sessions
