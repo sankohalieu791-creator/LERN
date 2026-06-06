@@ -113,7 +113,7 @@ export const getCourseById = async (courseId: string) => {
 export const createCourse = async (instructorId: string, courseData: any) => {
   const { data, error } = await supabase
     .from('courses')
-    .insert([{ instructor_id: instructorId, ...courseData }])
+    .insert([{ instructor_id: instructorId, user_id: instructorId, ...courseData }])
     .select()
   return { data, error }
 }
@@ -139,7 +139,7 @@ export const isEnrolled = async (courseId: string, userId: string) => {
 export const createWorkshop = async (instructorId: string, workshopData: any) => {
   const { data, error } = await supabase
     .from('workshops')
-    .insert([{ instructor_id: instructorId, ...workshopData }])
+    .insert([{ instructor_id: instructorId, user_id: instructorId, ...workshopData }])
     .select()
   return { data, error }
 }
@@ -152,7 +152,7 @@ export const getWorkshops = async () => {
   return { data, error }
 }
 
-// Likes — DB triggers handle count updates automatically
+// Likes
 export const likeVideo = async (videoId: string, userId: string) => {
   const { data, error } = await supabase
     .from('video_likes')
@@ -179,7 +179,7 @@ export const hasUserLiked = async (videoId: string, userId: string) => {
   return { data: !!data, error }
 }
 
-// Follow — DB triggers handle count updates automatically
+// Follow
 export const followUser = async (followerId: string, followingId: string) => {
   const { data, error } = await supabase
     .from('followers')
@@ -206,7 +206,7 @@ export const isFollowing = async (followerId: string, followingId: string) => {
   return { data: !!data, error }
 }
 
-// Comments — DB trigger handles count update automatically
+// Comments
 export const addComment = async (videoId: string, userId: string, text: string) => {
   const { data, error } = await supabase
     .from('comments')
@@ -263,7 +263,7 @@ export const getCertificatesByUser = async (userId: string) => {
   return { data, error }
 }
 
-// Delete content owned by user
+// Delete content
 export const deleteVideo = async (videoId: string) => {
   const { error } = await supabase.from('videos').delete().eq('id', videoId)
   return { error }
@@ -392,7 +392,6 @@ export const getInstructorApplication = async (userId: string) => {
   return { data, error }
 }
 
-// Discover — list all instructor applications joined with user profile
 export const getInstructors = async (roleType?: string) => {
   let q = supabase
     .from('instructor_applications')
@@ -402,7 +401,6 @@ export const getInstructors = async (roleType?: string) => {
   return q
 }
 
-// IDs the current user is already following
 export const getFollowingIds = async (userId: string): Promise<string[]> => {
   const { data } = await supabase
     .from('followers')
@@ -411,7 +409,6 @@ export const getFollowingIds = async (userId: string): Promise<string[]> => {
   return data?.map((r: any) => r.following_id) ?? []
 }
 
-// Profile views (requires increment_profile_views RPC in Supabase)
 export const incrementProfileViews = async (userId: string) => {
   await supabase.rpc('increment_profile_views', { p_user_id: userId })
 }
@@ -420,12 +417,7 @@ export const incrementProfileViews = async (userId: string) => {
 export const addFeedback = async (profileUserId: string, reviewerId: string, rating: number, text: string) => {
   const { data, error } = await supabase
     .from('feedback')
-    .insert([{
-      profile_user_id: profileUserId,
-      reviewer_id: reviewerId,
-      rating,
-      feedback_text: text
-    }])
+    .insert([{ profile_user_id: profileUserId, reviewer_id: reviewerId, rating, feedback_text: text }])
   return { data, error }
 }
 
@@ -471,7 +463,6 @@ export const getUserCourseRating = async (courseId: string, userId: string) => {
   return { data, error }
 }
 
-// Delete own comment
 export const deleteComment = async (commentId: string, userId: string) => {
   const { error } = await supabase
     .from('comments')
@@ -516,7 +507,6 @@ export const getMyWorkshopJoins = async (userId: string): Promise<string[]> => {
   return (data || []).map((r: any) => r.workshop_id)
 }
 
-// Feedback given by an instructor (feedback they wrote about others)
 export const getFeedbackGiven = async (reviewerId: string) => {
   const { data, error } = await supabase
     .from('feedback')
@@ -524,4 +514,12 @@ export const getFeedbackGiven = async (reviewerId: string) => {
     .eq('reviewer_id', reviewerId)
     .order('created_at', { ascending: false })
   return { data, error }
+}
+
+export const setSessionLive = async (sessionId: string, isLive: boolean) => {
+  const { error } = await supabase
+    .from('course_sessions')
+    .update({ is_live: isLive })
+    .eq('id', sessionId)
+  return { error }
 }

@@ -1,248 +1,201 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Clock, MapPin, Users } from 'lucide-react'
-import { useParams } from 'next/navigation'
-import { useAuth } from '@/context/AuthContext'
+import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Workshop } from '@/lib/types'
+import { useAuth } from '@/context/AuthContext'
+import { Calendar, Clock, MapPin, Users, ChevronLeft, Loader2 } from 'lucide-react'
+
+function VerifiedBadge({ size = 14 }: { size?: number }) {
+  return (
+    <span className="inline-flex items-center justify-center bg-[#1d9bf0] rounded-full flex-shrink-0"
+      style={{ width: size, height: size }}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"
+        style={{ width: size * 0.58, height: size * 0.58 }}>
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    </span>
+  )
+}
 
 export default function WorkshopDetailPage() {
   const { workshopId } = useParams()
+  const router = useRouter()
   const { user } = useAuth()
-  const [workshop, setWorkshop] = useState<Workshop | null>(null)
+  const [workshop, setWorkshop] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [enrolled, setEnrolled] = useState(false)
-  const [showEnrollModal, setShowEnrollModal] = useState(false)
+  const [enrolling, setEnrolling] = useState(false)
 
   useEffect(() => {
-    const fetchWorkshop = async () => {
-      try {
-        const { data } = await supabase
-          .from('workshops')
-          .select('*, users(*)')
-          .eq('id', workshopId)
+    const fetch = async () => {
+      const { data } = await supabase
+        .from('workshops')
+        .select('*, users(*)')
+        .eq('id', workshopId)
+        .single()
+      setWorkshop(data)
+
+      if (user) {
+        const { data: e } = await supabase
+          .from('enrollments')
+          .select('*')
+          .eq('workshop_id', workshopId)
+          .eq('user_id', user.id)
           .single()
-
-        setWorkshop(data)
-
-        if (user) {
-          const { data: enrollmentData } = await supabase
-            .from('enrollments')
-            .select('*')
-            .eq('workshop_id', workshopId)
-            .eq('user_id', user.id)
-            .single()
-
-          setEnrolled(!!enrollmentData)
-        }
-      } catch (error) {
-        console.error('Error fetching workshop:', error)
-      } finally {
-        setLoading(false)
+        setEnrolled(!!e)
       }
+      setLoading(false)
     }
-
-    fetchWorkshop()
+    fetch()
   }, [workshopId, user])
 
   const handleEnroll = async () => {
-    if (!user || !workshop) return
-
-    try {
-      await supabase
-        .from('enrollments')
-        .insert([{ workshop_id: workshop.id, user_id: user.id }])
-
-      setEnrolled(true)
-      setShowEnrollModal(false)
-    } catch (error) {
-      console.error('Error enrolling:', error)
-    }
+    if (!user) { router.push('/auth/login'); return }
+    setEnrolling(true)
+    await supabase.from('enrollments').insert([{ workshop_id: workshopId, user_id: user.id }])
+    setEnrolled(true)
+    setEnrolling(false)
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <div className="animate-spin">
-          <div className="w-12 h-12 border-4 border-[#7C3AED] border-t-[#FF6B2B] rounded-full"></div>
-        </div>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div className="fixed inset-0 bg-[#0f0f0f] flex items-center justify-center">
+      <Loader2 className="w-6 h-6 text-[#444] animate-spin" />
+    </div>
+  )
 
-  if (!workshop) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <p className="text-[#888]">Workshop not found</p>
-      </div>
-    )
-  }
+  if (!workshop) return (
+    <div className="fixed inset-0 bg-[#0f0f0f] flex items-center justify-center">
+      <p className="text-[#555]">Workshop not found</p>
+    </div>
+  )
+
+  const date = workshop.workshop_date ? new Date(workshop.workshop_date) : null
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className="fixed inset-0 bg-[#0f0f0f] overflow-y-auto">
+
       {/* HERO */}
-      <div className="relative bg-[#1a1a1a] aspect-video overflow-hidden">
-        {workshop.thumbnail_url ? (
-          <img
-            src={workshop.thumbnail_url}
-            alt={workshop.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-[#FF6B2B] to-[#7C3AED] flex items-center justify-center">
-            <p className="text-white text-xl">Workshop Cover</p>
-          </div>
-        )}
+      <div className="relative w-full flex-shrink-0 bg-[#1a1a1a]" style={{ height: '240px' }}>
+        {workshop.thumbnail_url
+          ? <img src={workshop.thumbnail_url} alt={workshop.title} className="w-full h-full object-cover" />
+          : <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460]" />
+        }
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0f] via-transparent to-black/30" />
+
+        <button
+          onClick={() => router.back()}
+          className="absolute top-4 left-4 w-9 h-9 bg-black/60 rounded-full flex items-center justify-center z-10"
+          style={{ marginTop: 'env(safe-area-inset-top)' }}
+        >
+          <ChevronLeft className="w-5 h-5 text-white" />
+        </button>
 
         {workshop.is_live && (
-          <div className="absolute top-6 right-6 bg-[#FF3B30] text-white px-4 py-2 rounded-full font-bold flex items-center gap-2 animate-pulse">
-            <span className="w-2 h-2 bg-white rounded-full"></span>
+          <div
+            className="absolute top-4 right-4 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-full flex items-center gap-1 animate-pulse"
+            style={{ marginTop: 'env(safe-area-inset-top)' }}
+          >
+            <span className="w-1.5 h-1.5 bg-white rounded-full" />
             LIVE NOW
           </div>
         )}
       </div>
 
       {/* CONTENT */}
-      <div className="max-w-4xl mx-auto px-6 py-12">
-        <div className="mb-8">
-          <h1 className="text-white text-4xl font-bold mb-4">{workshop.title}</h1>
+      <div className="px-4 pt-5 pb-32">
 
-          {/* INSTRUCTOR */}
-          <div className="flex items-center gap-4 mb-6 pb-6 border-b border-[rgba(124,58,237,0.1)]">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#7C3AED]" />
-            <div>
-              <p className="text-white font-bold">
-                {workshop.users?.username}
-                {workshop.users?.verified && ' ✓'}
+        <h1 className="text-white font-bold text-xl leading-snug mb-4">{workshop.title}</h1>
+
+        {/* Instructor */}
+        <div className="flex items-center gap-3 mb-4 pb-4 border-b border-[rgba(255,255,255,0.07)]">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
+            {workshop.users?.avatar_url
+              ? <img src={workshop.users.avatar_url} className="w-full h-full object-cover" />
+              : workshop.users?.username?.[0]?.toUpperCase()
+            }
+          </div>
+          <div>
+            <p className="text-white text-sm font-bold flex items-center gap-1.5">
+              {workshop.users?.username}
+              {workshop.users?.verified && <VerifiedBadge size={13} />}
+            </p>
+            <p className="text-[#555] text-xs">Instructor</p>
+          </div>
+        </div>
+
+        {/* Description */}
+        <p className="text-[#888] text-sm leading-relaxed mb-5">{workshop.description}</p>
+
+        {/* Details grid */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          {date && (
+            <div className="bg-[#1a1a1a] rounded-2xl p-4 border border-[rgba(255,255,255,0.06)]">
+              <div className="flex items-center gap-2 mb-1">
+                <Calendar className="w-4 h-4 text-[#FF6B2B]" />
+                <p className="text-[#555] text-xs">Date</p>
+              </div>
+              <p className="text-white font-bold text-sm">
+                {date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
               </p>
-              <p className="text-[#888] text-sm">Instructor</p>
-            </div>
-            <button className="ml-auto bg-gradient-to-r from-[#FF6B2B] to-[#7C3AED] text-white px-6 py-2 rounded-lg font-bold hover:shadow-lg transition">
-              Follow
-            </button>
-          </div>
-
-          {/* DESCRIPTION */}
-          <p className="text-[#888] text-lg mb-8">{workshop.description}</p>
-
-          {/* DETAILS */}
-          <div className="grid md:grid-cols-2 gap-6 mb-8 p-6 bg-[rgba(124,58,237,0.08)] border border-[rgba(124,58,237,0.15)] rounded-lg">
-            <div className="flex items-center gap-3">
-              <Calendar className="w-6 h-6 text-[#FF6B2B]" />
-              <div>
-                <p className="text-[#888] text-sm">Date</p>
-                <p className="text-white font-bold">{workshop.workshop_date}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Clock className="w-6 h-6 text-[#00D9FF]" />
-              <div>
-                <p className="text-[#888] text-sm">Time</p>
-                <p className="text-white font-bold">{workshop.workshop_time}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <MapPin className="w-6 h-6 text-[#7C3AED]" />
-              <div>
-                <p className="text-[#888] text-sm">Location</p>
-                <p className="text-white font-bold">
-                  {workshop.is_online ? 'Online' : workshop.location}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Users className="w-6 h-6 text-[#2ECC71]" />
-              <div>
-                <p className="text-[#888] text-sm">Enrolled</p>
-                <p className="text-white font-bold">
-                  {workshop.enrolled_count} / {workshop.max_participants}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* ENROLL BUTTON */}
-          {!enrolled ? (
-            <button
-              onClick={() => setShowEnrollModal(true)}
-              className="bg-gradient-to-r from-[#FF6B2B] to-[#7C3AED] text-white px-8 py-4 rounded-lg font-bold hover:shadow-lg transition"
-            >
-              Enroll Now - FREE
-            </button>
-          ) : workshop.is_live ? (
-            <button className="bg-[#2ECC71] text-white px-8 py-4 rounded-lg font-bold hover:bg-[#27AE60] transition">
-              Join Workshop Now
-            </button>
-          ) : (
-            <div className="bg-[rgba(46,204,113,0.2)] border border-[#2ECC71] text-[#2ECC71] px-8 py-4 rounded-lg font-bold">
-              ✓ You&apos;re Enrolled
             </div>
           )}
+          {workshop.workshop_time && (
+            <div className="bg-[#1a1a1a] rounded-2xl p-4 border border-[rgba(255,255,255,0.06)]">
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className="w-4 h-4 text-[#1d9bf0]" />
+                <p className="text-[#555] text-xs">Time</p>
+              </div>
+              <p className="text-white font-bold text-sm">{workshop.workshop_time.slice(0, 5)}</p>
+            </div>
+          )}
+          <div className="bg-[#1a1a1a] rounded-2xl p-4 border border-[rgba(255,255,255,0.06)]">
+            <div className="flex items-center gap-2 mb-1">
+              <MapPin className="w-4 h-4 text-[#C026D3]" />
+              <p className="text-[#555] text-xs">Location</p>
+            </div>
+            <p className="text-white font-bold text-sm">
+              {workshop.is_online ? 'Online' : (workshop.location || 'TBD')}
+            </p>
+          </div>
+          <div className="bg-[#1a1a1a] rounded-2xl p-4 border border-[rgba(255,255,255,0.06)]">
+            <div className="flex items-center gap-2 mb-1">
+              <Users className="w-4 h-4 text-green-500" />
+              <p className="text-[#555] text-xs">Spots</p>
+            </div>
+            <p className="text-white font-bold text-sm">
+              {workshop.enrolled_count || 0}{workshop.max_participants ? ` / ${workshop.max_participants}` : ' joined'}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* ENROLL MODAL */}
-      {showEnrollModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-95 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowEnrollModal(false)}
-        >
-          <div
-            className="bg-[#1a1a1a] rounded-xl w-full max-w-md p-8"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-white text-2xl font-bold mb-6">Enroll in Workshop</h2>
-
-            <div className="mb-6 space-y-4">
-              <div className="bg-[rgba(124,58,237,0.08)] border border-[rgba(124,58,237,0.15)] rounded-lg p-4">
-                <p className="text-white font-bold">{workshop.title}</p>
-                <p className="text-[#888] text-sm mt-2">by {workshop.users?.username}</p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-white">
-                  <span>Date &amp; Time:</span>
-                  <span className="font-bold">{workshop.workshop_date}</span>
-                </div>
-                <div className="flex items-center justify-between text-white">
-                  <span>Location:</span>
-                  <span className="font-bold">
-                    {workshop.is_online ? 'Online' : workshop.location}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-white">
-                  <span>Available Spots:</span>
-                  <span className="font-bold">
-                    {workshop.max_participants - workshop.enrolled_count}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-white">
-                  <span>Price:</span>
-                  <span className="font-bold text-[#2ECC71]">FREE</span>
-                </div>
-              </div>
+      {/* STICKY BUTTON */}
+      <div
+        className="fixed bottom-0 left-0 right-0 px-4 py-4 bg-[#0f0f0f] border-t border-[rgba(255,255,255,0.07)]"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
+      >
+        {enrolled ? (
+          workshop.is_live ? (
+            <button className="w-full bg-red-500 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2">
+              <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+              Join Workshop Now
+            </button>
+          ) : (
+            <div className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] text-white font-bold py-4 rounded-2xl text-center">
+              ✓ You're Enrolled
             </div>
-
-            <button
-              onClick={handleEnroll}
-              className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#7C3AED] text-white font-bold py-3 rounded-lg hover:shadow-lg transition mb-3"
-            >
-              Confirm Enrollment
-            </button>
-
-            <button
-              onClick={() => setShowEnrollModal(false)}
-              className="w-full bg-[rgba(124,58,237,0.2)] hover:bg-[rgba(124,58,237,0.3)] text-white font-bold py-3 rounded-lg transition"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+          )
+        ) : (
+          <button
+            onClick={handleEnroll}
+            disabled={enrolling}
+            className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            {enrolling ? <><Loader2 className="w-4 h-4 animate-spin" />Enrolling…</> : 'Join Workshop — Free'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }

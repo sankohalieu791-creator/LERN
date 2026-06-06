@@ -1,64 +1,517 @@
-'use client'
+import { createClient } from '@supabase/supabase-js'
 
-import { useState } from 'react'
-import { Plus, Video, BookOpen, Users } from 'lucide-react'
-import { usePathname } from 'next/navigation'
-import { useAuth } from '@/context/AuthContext'
-import CreatePost from '@/components/CreatePost'
-import CreateCourse from '@/components/CreateCourse'
-import CreateWorkshop from '@/components/CreateWorkshop'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export default function PlusButton() {
-  const pathname = usePathname()
-  const { user } = useAuth()
-  const [showMenu,           setShowMenu]           = useState(false)
-  const [showCreatePost,     setShowCreatePost]     = useState(false)
-  const [showCreateCourse,   setShowCreateCourse]   = useState(false)
-  const [showCreateWorkshop, setShowCreateWorkshop] = useState(false)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-  if (pathname === '/' || pathname.startsWith('/auth') || pathname.includes('/classroom') || /^\/feed\/.+/.test(pathname)) return null
+// Auth
+export const signUp = async (email: string, password: string, username: string) => {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { username } }
+  })
+  if (!error && data.user) {
+    await createUserProfile(data.user.id, username, email)
+  }
+  return { data, error }
+}
 
-  const isInstructor = user?.account_type === 'instructor'
+export const signIn = async (email: string, password: string) => {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  return { data, error }
+}
 
-  const options = [
-    { label: 'Post Video', icon: Video, action: () => { setShowMenu(false); setShowCreatePost(true) } },
-    ...(isInstructor ? [
-      { label: 'Create Course',   icon: BookOpen, action: () => { setShowMenu(false); setShowCreateCourse(true) }   },
-      { label: 'Create Workshop', icon: Users,    action: () => { setShowMenu(false); setShowCreateWorkshop(true) } },
-    ] : []),
-  ]
+export const signOut = async () => {
+  const { error } = await supabase.auth.signOut()
+  return { error }
+}
 
-  return (
-    <>
-      <div className="fixed right-4 z-40" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 76px)' }}>
-        {showMenu && (
-          <div className="absolute bottom-16 right-0 flex flex-col gap-2 items-end">
-            {options.map(opt => {
-              const Icon = opt.icon
-              return (
-                <button
-                  key={opt.label}
-                  onClick={opt.action}
-                  className="flex items-center gap-2 bg-[#1e1e1e] border border-[rgba(255,255,255,0.12)] text-white text-sm font-semibold px-4 py-2.5 rounded-full hover:bg-[#252525] transition whitespace-nowrap shadow-lg"
-                >
-                  <Icon className="w-4 h-4" />
-                  {opt.label}
-                </button>
-              )
-            })}
-          </div>
-        )}
-        <button
-          onClick={() => setShowMenu(!showMenu)}
-          className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center shadow-xl hover:bg-[#eee] transition active:scale-95"
-        >
-          <Plus className={`w-6 h-6 transition-transform duration-200 ${showMenu ? 'rotate-45' : ''}`} />
-        </button>
-      </div>
+export const getUser = async () => {
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+}
 
-      <CreatePost     isOpen={showCreatePost}     onClose={() => setShowCreatePost(false)}     />
-      <CreateCourse   isOpen={showCreateCourse}   onClose={() => setShowCreateCourse(false)}   />
-      <CreateWorkshop isOpen={showCreateWorkshop} onClose={() => setShowCreateWorkshop(false)} />
-    </>
-  )
+// Users
+export const createUserProfile = async (userId: string, username: string, email: string) => {
+  const { data, error } = await supabase
+    .from('users')
+    .insert([{ id: userId, username, email, account_type: 'student' }])
+  return { data, error }
+}
+
+export const getUserProfile = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single()
+  return { data, error }
+}
+
+export const updateUserProfile = async (userId: string, updates: any) => {
+  const { data, error } = await supabase
+    .from('users')
+    .update(updates)
+    .eq('id', userId)
+  return { data, error }
+}
+
+export const getUserByUsername = async (username: string) => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('username', username)
+    .single()
+  return { data, error }
+}
+
+// Videos
+export const getVideos = async () => {
+  const { data, error } = await supabase
+    .from('videos')
+    .select('*, users(*)')
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const getVideoById = async (videoId: string) => {
+  const { data, error } = await supabase
+    .from('videos')
+    .select('*, users(*)')
+    .eq('id', videoId)
+    .single()
+  return { data, error }
+}
+
+export const createVideo = async (userId: string, videoData: any) => {
+  const { data, error } = await supabase
+    .from('videos')
+    .insert([{ user_id: userId, ...videoData }])
+  return { data, error }
+}
+
+// Courses
+export const getCourses = async () => {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*, users(*)')
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const getCourseById = async (courseId: string) => {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*, users(*), course_sessions(*)')
+    .eq('id', courseId)
+    .single()
+  return { data, error }
+}
+
+export const createCourse = async (instructorId: string, courseData: any) => {
+  const { data, error } = await supabase
+    .from('courses')
+    .insert([{ instructor_id: instructorId, user_id: instructorId, ...courseData }])
+    .select()
+  return { data, error }
+}
+
+export const enrollCourse = async (courseId: string, userId: string) => {
+  const { data, error } = await supabase
+    .from('enrollments')
+    .insert([{ course_id: courseId, user_id: userId }])
+  return { data, error }
+}
+
+export const isEnrolled = async (courseId: string, userId: string) => {
+  const { data, error } = await supabase
+    .from('enrollments')
+    .select('*')
+    .eq('course_id', courseId)
+    .eq('user_id', userId)
+    .single()
+  return { data, error }
+}
+
+// Workshops
+export const createWorkshop = async (instructorId: string, workshopData: any) => {
+  const { data, error } = await supabase
+    .from('workshops')
+    .insert([{ instructor_id: instructorId, user_id: instructorId, ...workshopData }])
+    .select()
+  return { data, error }
+}
+
+export const getWorkshops = async () => {
+  const { data, error } = await supabase
+    .from('workshops')
+    .select('*, users(*)')
+    .order('workshop_date', { ascending: true })
+  return { data, error }
+}
+
+// Likes
+export const likeVideo = async (videoId: string, userId: string) => {
+  const { data, error } = await supabase
+    .from('video_likes')
+    .insert([{ video_id: videoId, user_id: userId }])
+  return { data, error }
+}
+
+export const unlikeVideo = async (videoId: string, userId: string) => {
+  const { error } = await supabase
+    .from('video_likes')
+    .delete()
+    .eq('video_id', videoId)
+    .eq('user_id', userId)
+  return { error }
+}
+
+export const hasUserLiked = async (videoId: string, userId: string) => {
+  const { data, error } = await supabase
+    .from('video_likes')
+    .select('*')
+    .eq('video_id', videoId)
+    .eq('user_id', userId)
+    .single()
+  return { data: !!data, error }
+}
+
+// Follow
+export const followUser = async (followerId: string, followingId: string) => {
+  const { data, error } = await supabase
+    .from('followers')
+    .insert([{ follower_id: followerId, following_id: followingId }])
+  return { data, error }
+}
+
+export const unfollowUser = async (followerId: string, followingId: string) => {
+  const { error } = await supabase
+    .from('followers')
+    .delete()
+    .eq('follower_id', followerId)
+    .eq('following_id', followingId)
+  return { error }
+}
+
+export const isFollowing = async (followerId: string, followingId: string) => {
+  const { data, error } = await supabase
+    .from('followers')
+    .select('*')
+    .eq('follower_id', followerId)
+    .eq('following_id', followingId)
+    .single()
+  return { data: !!data, error }
+}
+
+// Comments
+export const addComment = async (videoId: string, userId: string, text: string) => {
+  const { data, error } = await supabase
+    .from('comments')
+    .insert([{ video_id: videoId, user_id: userId, text }])
+  return { data, error }
+}
+
+export const getComments = async (videoId: string) => {
+  const { data, error } = await supabase
+    .from('comments')
+    .select('*, users(*)')
+    .eq('video_id', videoId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// Projects
+export const createProject = async (userId: string, projectData: any) => {
+  const { data, error } = await supabase
+    .from('projects')
+    .insert([{ user_id: userId, ...projectData }])
+  return { data, error }
+}
+
+export const getProjectsByUser = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('user_id', userId)
+  return { data, error }
+}
+
+export const updateProject = async (projectId: string, updates: any) => {
+  const { data, error } = await supabase
+    .from('projects')
+    .update(updates)
+    .eq('id', projectId)
+  return { data, error }
+}
+
+// Certificates
+export const addCertificate = async (userId: string, certData: any) => {
+  const { data, error } = await supabase
+    .from('certificates')
+    .insert([{ user_id: userId, ...certData }])
+  return { data, error }
+}
+
+export const getCertificatesByUser = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('certificates')
+    .select('*')
+    .eq('user_id', userId)
+  return { data, error }
+}
+
+// Delete content
+export const deleteVideo = async (videoId: string) => {
+  const { error } = await supabase.from('videos').delete().eq('id', videoId)
+  return { error }
+}
+
+export const deleteProject = async (projectId: string) => {
+  const { error } = await supabase.from('projects').delete().eq('id', projectId)
+  return { error }
+}
+
+export const deleteCertificate = async (certId: string) => {
+  const { error } = await supabase.from('certificates').delete().eq('id', certId)
+  return { error }
+}
+
+// Notifications
+export const getNotifications = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  return { data, error }
+}
+
+export const createNotification = async (
+  userId: string,
+  type: string,
+  title: string,
+  body: string,
+  link?: string
+) => {
+  await supabase.from('notifications').insert([{ user_id: userId, type, title, body, link }])
+}
+
+export const markNotificationsRead = async (userId: string) => {
+  await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false)
+}
+
+// Training requests
+export const sendTrainingRequest = async (
+  fromUserId: string,
+  toInstructorId: string,
+  type: 'training' | 'mentorship',
+  message: string
+) => {
+  const { data, error } = await supabase
+    .from('training_requests')
+    .insert([{ from_user_id: fromUserId, to_instructor_id: toInstructorId, type, message, status: 'pending' }])
+  return { data, error }
+}
+
+export const getInstructorRequests = async (instructorId: string) => {
+  const { data, error } = await supabase
+    .from('training_requests')
+    .select('*, requester:from_user_id(id, username, avatar_url, verified)')
+    .eq('to_instructor_id', instructorId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const updateRequestStatus = async (requestId: string, status: 'accepted' | 'declined') => {
+  const { data, error } = await supabase
+    .from('training_requests')
+    .update({ status })
+    .eq('id', requestId)
+  return { data, error }
+}
+
+export const getMyTrainingRequests = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('training_requests')
+    .select('to_instructor_id')
+    .eq('from_user_id', userId)
+  return { data, error }
+}
+
+export const getInstructorCourses = async (instructorId: string) => {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('instructor_id', instructorId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// Videos by user
+export const getUserVideos = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('videos')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// Instructor applications
+export const submitInstructorApplication = async (
+  userId: string,
+  payload: {
+    full_name: string
+    topic: string
+    bio: string
+    role_type: string
+    location?: string
+    experience_years?: number
+    contact_email?: string
+    contact_phone?: string
+  }
+) => {
+  const { data, error } = await supabase
+    .from('instructor_applications')
+    .upsert([{ user_id: userId, ...payload, status: 'pending' }], { onConflict: 'user_id' })
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const getInstructorApplication = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('instructor_applications')
+    .select('*')
+    .eq('user_id', userId)
+    .single()
+  return { data, error }
+}
+
+export const getInstructors = async (roleType?: string) => {
+  let q = supabase
+    .from('instructor_applications')
+    .select('*, users(*)')
+    .order('created_at', { ascending: false })
+  if (roleType) q = q.eq('role_type', roleType)
+  return q
+}
+
+export const getFollowingIds = async (userId: string): Promise<string[]> => {
+  const { data } = await supabase
+    .from('followers')
+    .select('following_id')
+    .eq('follower_id', userId)
+  return data?.map((r: any) => r.following_id) ?? []
+}
+
+export const incrementProfileViews = async (userId: string) => {
+  await supabase.rpc('increment_profile_views', { p_user_id: userId })
+}
+
+// Feedback
+export const addFeedback = async (profileUserId: string, reviewerId: string, rating: number, text: string) => {
+  const { data, error } = await supabase
+    .from('feedback')
+    .insert([{ profile_user_id: profileUserId, reviewer_id: reviewerId, rating, feedback_text: text }])
+  return { data, error }
+}
+
+export const getFeedback = async (profileUserId: string) => {
+  const { data, error } = await supabase
+    .from('feedback')
+    .select('*, users(*)')
+    .eq('profile_user_id', profileUserId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// Course sessions
+export const createCourseSessions = async (courseId: string, sessions: any[]) => {
+  const { data, error } = await supabase
+    .from('course_sessions')
+    .insert(sessions)
+  return { data, error }
+}
+
+// Course ratings
+export const rateCourse = async (courseId: string, userId: string, stars: number) => {
+  const { error } = await supabase
+    .from('course_ratings')
+    .upsert([{ course_id: courseId, user_id: userId, rating: stars }], { onConflict: 'course_id,user_id' })
+  if (!error) {
+    const { data: all } = await supabase.from('course_ratings').select('rating').eq('course_id', courseId)
+    if (all?.length) {
+      const avg = Math.round((all.reduce((s, r) => s + r.rating, 0) / all.length) * 10) / 10
+      await supabase.from('courses').update({ rating: avg }).eq('id', courseId)
+    }
+  }
+  return { error }
+}
+
+export const getUserCourseRating = async (courseId: string, userId: string) => {
+  const { data, error } = await supabase
+    .from('course_ratings')
+    .select('rating')
+    .eq('course_id', courseId)
+    .eq('user_id', userId)
+    .single()
+  return { data, error }
+}
+
+export const deleteComment = async (commentId: string, userId: string) => {
+  const { error } = await supabase
+    .from('comments')
+    .delete()
+    .eq('id', commentId)
+    .eq('user_id', userId)
+  return { error }
+}
+
+// Workshop enrollments
+export const joinWorkshop = async (workshopId: string, userId: string) => {
+  const { error } = await supabase
+    .from('workshop_enrollments')
+    .insert([{ workshop_id: workshopId, user_id: userId }])
+  return { error }
+}
+
+export const leaveWorkshop = async (workshopId: string, userId: string) => {
+  const { error } = await supabase
+    .from('workshop_enrollments')
+    .delete()
+    .eq('workshop_id', workshopId)
+    .eq('user_id', userId)
+  return { error }
+}
+
+export const hasJoinedWorkshop = async (workshopId: string, userId: string) => {
+  const { data } = await supabase
+    .from('workshop_enrollments')
+    .select('id')
+    .eq('workshop_id', workshopId)
+    .eq('user_id', userId)
+    .single()
+  return { data: !!data }
+}
+
+export const getMyWorkshopJoins = async (userId: string): Promise<string[]> => {
+  const { data } = await supabase
+    .from('workshop_enrollments')
+    .select('workshop_id')
+    .eq('user_id', userId)
+  return (data || []).map((r: any) => r.workshop_id)
+}
+
+export const getFeedbackGiven = async (reviewerId: string) => {
+  const { data, error } = await supabase
+    .from('feedback')
+    .select('*, recipient:profile_user_id(id, username, avatar_url, verified)')
+    .eq('reviewer_id', reviewerId)
+    .order('created_at', { ascending: false })
+  return { data, error }
 }

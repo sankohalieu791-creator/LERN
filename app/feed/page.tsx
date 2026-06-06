@@ -243,7 +243,7 @@ export default function FeedPage() {
         )}
       </div>
 
-      {/* FEED — scrollable */}
+      {/* FEED */}
       <div
         className="flex-1 overflow-y-auto overscroll-contain"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}
@@ -265,10 +265,10 @@ export default function FeedPage() {
             <article
               key={video.id}
               onClick={() => openVideo(video)}
-              className="cursor-pointer"
+              className="cursor-pointer border-b border-[rgba(255,255,255,0.05)]"
             >
-              {/* THUMBNAIL */}
-              <div className="relative w-full bg-[#1a1a1a] overflow-hidden" style={{ height: '210px' }}>
+              {/* THUMBNAIL with overlays */}
+              <div className="relative w-full bg-[#1a1a1a] overflow-hidden" style={{ height: '230px' }}>
                 {video.thumbnail_url
                   ? <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover" />
                   : <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] flex items-center justify-center">
@@ -277,23 +277,36 @@ export default function FeedPage() {
                       </div>
                     </div>
                 }
+
+                {/* Play button overlay */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-full bg-black/50 flex items-center justify-center">
+                    <Play className="w-7 h-7 text-white ml-0.5" fill="white" />
+                  </div>
+                </div>
+
+                {/* Top left: subject tag */}
                 {video.subject && (
-                  <span className="absolute top-2 left-2 text-[10px] font-bold bg-black/70 text-white px-2 py-0.5 rounded-full">
+                  <span className="absolute top-2.5 left-2.5 text-[10px] font-bold bg-black/70 text-white px-2.5 py-1 rounded-full uppercase tracking-wide">
                     {video.subject}
                   </span>
                 )}
+
+                {/* Top right: duration */}
                 {video.duration && (
-                  <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
-                    {video.duration}
+                  <span className="absolute top-2.5 right-2.5 bg-black/70 text-white text-[11px] px-2 py-1 rounded-full font-semibold flex items-center gap-1">
+                    <Clock className="w-3 h-3" />{video.duration}
                   </span>
                 )}
+
+                {/* Bottom: title overlay */}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent px-3 pt-8 pb-3">
+                  <h3 className="text-white font-bold text-[15px] leading-snug line-clamp-2">{video.title}</h3>
+                </div>
               </div>
 
               {/* CARD BODY */}
-              <div className="px-4 pt-3 pb-0">
-
-                {/* Title — full width, prominent */}
-                <h3 className="text-white font-bold text-[15px] leading-snug line-clamp-2 mb-3">{video.title}</h3>
+              <div className="px-4 pt-3 pb-1">
 
                 {/* Instructor row */}
                 <div className="flex items-center justify-between mb-2">
@@ -350,7 +363,7 @@ export default function FeedPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-5 pb-4 border-b border-[rgba(255,255,255,0.05)]">
+                <div className="flex items-center gap-5 pb-4">
                   <button onClick={e => handleLike(video.id, e)} className="flex items-center gap-1.5 active:scale-90 transition-transform">
                     <span className={likeAnim.has(video.id) ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
                       <ThumbsUp
@@ -441,7 +454,6 @@ export default function FeedPage() {
     {selectedVideo && (
       <div className="fixed inset-0 bg-black z-[60] flex flex-col">
 
-        {/* safe-area spacer */}
         <div className="flex-shrink-0 bg-black" style={{ height: 'env(safe-area-inset-top)' }} />
 
         {/* VIDEO */}
@@ -474,7 +486,7 @@ export default function FeedPage() {
         <div className="flex-1 overflow-y-auto bg-[#0f0f0f]">
           <div className="px-4 pt-4 pb-2">
 
-            {/* ACTION ROW — directly below video */}
+            {/* ACTION ROW */}
             <div className="flex items-center gap-6 pb-4 border-b border-[rgba(255,255,255,0.07)] mb-4">
               <button onClick={() => handleLike(selectedVideo.id)} className="flex items-center gap-2 active:scale-90 transition-transform">
                 <span className={likeAnim.has(selectedVideo.id) ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
@@ -505,7 +517,7 @@ export default function FeedPage() {
             </div>
 
             {/* INSTRUCTOR ROW */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <button
                 onClick={() => { setSelectedVideo(null); goToProfile(selectedVideo.user_id) }}
                 className="flex items-center gap-3 flex-1 min-w-0"
@@ -543,16 +555,16 @@ export default function FeedPage() {
             {/* TITLE */}
             <h2 className="text-white font-bold text-base leading-snug mb-2">{selectedVideo.title}</h2>
 
-            {/* STATS */}
-            <div className="flex items-center gap-3 text-[#444] text-xs mb-4">
-              <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{fmt(selectedVideo.views)} views</span>
-              {selectedVideo.duration && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{selectedVideo.duration}</span>}
-              <span>{timeAgo(selectedVideo.created_at)}</span>
-            </div>
-
+            {/* DESCRIPTION */}
             {selectedVideo.description && (
-              <p className="text-[#555] text-sm leading-relaxed mb-5">{selectedVideo.description}</p>
+              <p className="text-[#555] text-sm leading-relaxed mb-3">{selectedVideo.description}</p>
             )}
+
+            {/* STATS */}
+            <div className="flex items-center gap-3 text-[#444] text-xs mb-5">
+              <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{fmt(selectedVideo.views)} views</span>
+              {selectedVideo.duration && <span>· {selectedVideo.duration}</span>}
+            </div>
 
             {/* COMMENTS */}
             <div className="border-t border-[rgba(255,255,255,0.07)] pt-4">
@@ -597,7 +609,7 @@ export default function FeedPage() {
           <div className="h-4" />
         </div>
 
-        {/* COMMENT INPUT — pinned to bottom */}
+        {/* COMMENT INPUT */}
         {user ? (
           <form
             onSubmit={handleAddComment}

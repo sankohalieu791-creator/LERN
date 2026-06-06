@@ -16,7 +16,6 @@ import {
 import { sendPush } from '@/lib/push'
 import type { InstructorApplication } from '@/lib/types'
 
-// ── Tabs ──────────────────────────────────────────────────────
 const ROLE_TABS = [
   { id: 'mentor',    label: 'Mentors'    },
   { id: 'coach',     label: 'Coaches'    },
@@ -30,7 +29,6 @@ const ROLE_COLOUR: Record<string, string> = {
   teacher: 'bg-green-600', mentor: 'bg-purple-600',
 }
 
-// ── Helpers ───────────────────────────────────────────────────
 function getBadge(count: number) {
   if (count >= 50000) return { label: 'TOP MENTOR 2025', icon: '🏆' }
   if (count >= 5000)  return { label: 'RISING MENTOR',   icon: '🏅' }
@@ -77,7 +75,6 @@ function Avatar({ app, size = 56 }: { app: InstructorApplication; size?: number 
   )
 }
 
-// ── Instructor card ───────────────────────────────────────────
 function InstructorCard({
   app, isFollowed, onFollow, onContact, onRequest, requestMode, alreadyRequested,
 }: {
@@ -164,7 +161,6 @@ function InstructorCard({
   )
 }
 
-// ── Request sheet ─────────────────────────────────────────────
 function RequestSheet({
   app, onClose, onSent,
 }: {
@@ -209,7 +205,6 @@ function RequestSheet({
           </button>
         </div>
 
-        {/* Instructor mini-card */}
         <div className="mx-5 mt-4 mb-4 flex items-center gap-3 bg-[#1e1e1e] border border-[rgba(255,255,255,0.07)] rounded-2xl p-3">
           <Avatar app={app} size={44} />
           <div>
@@ -228,7 +223,6 @@ function RequestSheet({
           </div>
         ) : (
           <div className="px-5 pb-6">
-            {/* Type */}
             <p className="text-[#555] text-[11px] font-bold uppercase tracking-widest mb-3">Type</p>
             <div className="flex gap-3 mb-5">
               {(['training', 'mentorship'] as const).map(t => (
@@ -246,7 +240,6 @@ function RequestSheet({
               ))}
             </div>
 
-            {/* Message */}
             <p className="text-[#555] text-[11px] font-bold uppercase tracking-widest mb-2">Message</p>
             <textarea
               value={message}
@@ -271,7 +264,6 @@ function RequestSheet({
   )
 }
 
-// ── Contact sheet ─────────────────────────────────────────────
 function ContactSheet({
   app, onClose, isFollowed, onFollow,
 }: {
@@ -295,19 +287,27 @@ function ContactSheet({
     <div className="fixed inset-0 z-[60] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-[#141414] rounded-t-3xl flex flex-col" style={{ maxHeight: '90vh' }}>
+
         {/* Banner */}
         <div className="h-28 bg-gradient-to-r from-[#FF6B2B] via-[#E91E8C] to-[#7C3AED] relative flex-shrink-0 rounded-t-3xl">
           <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 bg-black/30 rounded-full flex items-center justify-center">
             <X className="w-4 h-4 text-white" />
           </button>
         </div>
+
         <div className="flex-1 overflow-y-auto overscroll-contain"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
-          <div className="px-5 -mt-10 mb-3">
+
+          {/* Avatar — pulled up over banner */}
+          <div className="px-5 -mt-14 mb-3">
             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] border-4 border-[#141414] flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
-              {u?.avatar_url ? <img src={u.avatar_url} alt={app.full_name} className="w-full h-full object-cover" /> : (app.full_name?.[0] || '?').toUpperCase()}
+              {u?.avatar_url
+                ? <img src={u.avatar_url} alt={app.full_name} className="w-full h-full object-cover" />
+                : (app.full_name?.[0] || '?').toUpperCase()
+              }
             </div>
           </div>
+
           <div className="px-5">
             <div className="flex items-center gap-2 flex-wrap mb-0.5">
               <h2 className="text-white text-xl font-bold">{app.full_name}</h2>
@@ -393,7 +393,6 @@ function ContactRow({ icon, label, value, copyKey, copied, onCopy }: {
   )
 }
 
-// ── Page ──────────────────────────────────────────────────────
 export default function DiscoveryPage() {
   const { user } = useAuth()
   const [activeTab,     setActiveTab]     = useState<TabId>('mentor')
@@ -405,7 +404,6 @@ export default function DiscoveryPage() {
   const [contact,       setContact]       = useState<InstructorApplication | null>(null)
   const [requestTarget, setRequestTarget] = useState<InstructorApplication | null>(null)
 
-  // Load instructors when tab changes
   useEffect(() => {
     const load = async () => {
       setLoading(true)
@@ -417,7 +415,6 @@ export default function DiscoveryPage() {
     load()
   }, [activeTab])
 
-  // Load follow + request state for current user
   useEffect(() => {
     if (!user) return
     getFollowingIds(user.id).then(ids => setFollowingIds(new Set(ids)))
@@ -459,7 +456,6 @@ export default function DiscoveryPage() {
     <>
     <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
-      {/* FIXED HEADER — never moves */}
       <div className="flex-shrink-0">
         <div className="px-4 pt-4 pb-3">
           <h1 className="text-white text-2xl font-bold">Discover</h1>
@@ -468,7 +464,6 @@ export default function DiscoveryPage() {
           )}
         </div>
 
-        {/* SEARCH */}
         <div className="px-4 mb-3">
           <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-2xl px-4 py-3">
             <Search className="w-4 h-4 text-[#555] flex-shrink-0" />
@@ -486,7 +481,6 @@ export default function DiscoveryPage() {
           </div>
         </div>
 
-        {/* TABS */}
         <div className="px-4 flex gap-2 pb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {allTabs.map(t => (
             <button
@@ -506,7 +500,6 @@ export default function DiscoveryPage() {
         </div>
       </div>
 
-      {/* SCROLLABLE CARDS */}
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 space-y-4 pt-1"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
         {loading ? (
@@ -535,10 +528,8 @@ export default function DiscoveryPage() {
           ))
         )}
       </div>
-
     </div>
 
-    {/* CONTACT SHEET — outside fixed container so z-[60] works in root */}
     {contact && (
       <ContactSheet
         app={contact}
@@ -548,7 +539,6 @@ export default function DiscoveryPage() {
       />
     )}
 
-    {/* REQUEST SHEET */}
     {requestTarget && (
       <RequestSheet
         app={requestTarget}
