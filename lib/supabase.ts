@@ -71,9 +71,15 @@ export const getUserByUsername = async (username: string) => {
 export const getVideos = async () => {
   const { data, error } = await supabase
     .from('videos')
-    .select('*, users(*)')
+    .select('*')
     .order('created_at', { ascending: false })
-  return { data, error }
+  if (!data) return { data, error }
+  const ids = [...new Set(data.map((v: any) => v.user_id).filter(Boolean))]
+  const { data: usersData } = ids.length
+    ? await supabase.from('users').select('id, username, avatar_url, verified, title').in('id', ids)
+    : { data: [] }
+  const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  return { data: data.map((v: any) => ({ ...v, users: map[v.user_id] ?? null })), error }
 }
 
 export const getVideoById = async (videoId: string) => {
@@ -96,18 +102,28 @@ export const createVideo = async (userId: string, videoData: any) => {
 export const getCourses = async () => {
   const { data, error } = await supabase
     .from('courses')
-    .select('*, users(*)')
+    .select('*')
     .order('created_at', { ascending: false })
-  return { data, error }
+  if (!data) return { data, error }
+  const ids = [...new Set(data.map((c: any) => c.instructor_id || c.user_id).filter(Boolean))]
+  const { data: usersData } = ids.length
+    ? await supabase.from('users').select('id, username, avatar_url, verified, title').in('id', ids)
+    : { data: [] }
+  const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  return { data: data.map((c: any) => ({ ...c, users: map[c.instructor_id || c.user_id] ?? null })), error }
 }
 
 export const getCourseById = async (courseId: string) => {
   const { data, error } = await supabase
     .from('courses')
-    .select('*, users(*), course_sessions(*)')
+    .select('*, course_sessions(*)')
     .eq('id', courseId)
     .single()
-  return { data, error }
+  if (!data) return { data, error }
+  const { data: userData } = await supabase
+    .from('users').select('id, username, avatar_url, verified, title')
+    .eq('id', data.instructor_id || data.user_id).single()
+  return { data: { ...data, users: userData ?? null }, error }
 }
 
 export const createCourse = async (instructorId: string, courseData: any) => {
@@ -147,9 +163,15 @@ export const createWorkshop = async (instructorId: string, workshopData: any) =>
 export const getWorkshops = async () => {
   const { data, error } = await supabase
     .from('workshops')
-    .select('*, users(*)')
+    .select('*')
     .order('workshop_date', { ascending: true })
-  return { data, error }
+  if (!data) return { data, error }
+  const ids = [...new Set(data.map((w: any) => w.instructor_id || w.user_id).filter(Boolean))]
+  const { data: usersData } = ids.length
+    ? await supabase.from('users').select('id, username, avatar_url, verified').in('id', ids)
+    : { data: [] }
+  const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  return { data: data.map((w: any) => ({ ...w, users: map[w.instructor_id || w.user_id] ?? null })), error }
 }
 
 // Likes
