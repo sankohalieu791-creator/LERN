@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Bell, ThumbsUp, MessageCircle, Share2, X, Send, Play, Trash2, Eye, Clock } from 'lucide-react'
+import { Search, Bell, ThumbsUp, MessageCircle, Share2, X, Send, Play, Trash2, Eye, Clock, Plus } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getVideos, likeVideo, unlikeVideo, hasUserLiked,
@@ -13,6 +13,7 @@ import {
 } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
+import CreatePost from '@/components/CreatePost'
 
 function VerifiedBadge({ size = 14 }: { size?: number }) {
   return (
@@ -60,6 +61,7 @@ export default function FeedPage() {
   const [comments,       setComments]       = useState<any[]>([])
   const [newComment,     setNewComment]     = useState('')
   const [commentLoading, setCommentLoading] = useState(false)
+  const [showCreatePost, setShowCreatePost] = useState(false)
 
   const searchRef  = useRef<HTMLInputElement>(null)
   const commentRef = useRef<HTMLInputElement>(null)
@@ -215,7 +217,13 @@ export default function FeedPage() {
           </div>
         ) : (
           <div className="px-4 py-3 flex items-center justify-between">
-            <span className="text-white font-black text-xl tracking-tight">LERN</span>
+            <button
+              onClick={() => setShowCreatePost(true)}
+              className="flex items-center gap-1.5 bg-white text-black text-sm font-bold px-4 py-1.5 rounded-full active:scale-95 transition-transform"
+            >
+              <Plus className="w-4 h-4" strokeWidth={2.5} />
+              Create
+            </button>
             <div className="flex items-center gap-5">
               <button onClick={() => { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 50) }}>
                 <Search className="w-6 h-6 text-[#888]" />
@@ -367,7 +375,7 @@ export default function FeedPage() {
                   <button onClick={e => handleLike(video.id, e)} className="flex items-center gap-1.5 active:scale-90 transition-transform">
                     <span className={likeAnim.has(video.id) ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
                       <ThumbsUp
-                        className="w-5 h-5"
+                        className={`w-5 h-5 transition-transform duration-300 ${userLikes.has(video.id) ? 'rotate-0' : 'rotate-180'}`}
                         fill={userLikes.has(video.id) ? '#ef4444' : 'none'}
                         color={userLikes.has(video.id) ? '#ef4444' : '#555'}
                         strokeWidth={1.5}
@@ -491,7 +499,7 @@ export default function FeedPage() {
               <button onClick={() => handleLike(selectedVideo.id)} className="flex items-center gap-2 active:scale-90 transition-transform">
                 <span className={likeAnim.has(selectedVideo.id) ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
                   <ThumbsUp
-                    className="w-6 h-6"
+                    className={`w-6 h-6 transition-transform duration-300 ${userLikes.has(selectedVideo.id) ? 'rotate-0' : 'rotate-180'}`}
                     fill={userLikes.has(selectedVideo.id) ? '#ef4444' : 'none'}
                     color={userLikes.has(selectedVideo.id) ? '#ef4444' : '#888'}
                     strokeWidth={1.5}
@@ -647,6 +655,8 @@ export default function FeedPage() {
         )}
       </div>
     )}
+
+    <CreatePost isOpen={showCreatePost} onClose={() => setShowCreatePost(false)} />
     </>
   )
 }

@@ -368,7 +368,7 @@ export const updateRequestStatus = async (requestId: string, status: 'accepted' 
 export const getMyTrainingRequests = async (userId: string) => {
   const { data, error } = await supabase
     .from('training_requests')
-    .select('to_instructor_id')
+    .select('to_instructor_id, status')
     .eq('from_user_id', userId)
   return { data, error }
 }
@@ -658,5 +658,36 @@ export const setSessionLive = async (sessionId: string, isLive: boolean) => {
     .from('course_sessions')
     .update({ is_live: isLive })
     .eq('id', sessionId)
+  return { error }
+}
+
+export const getEnrolledCourses = async (userId: string) => {
+  const { data: enrollmentData } = await supabase
+    .from('enrollments').select('course_id').eq('user_id', userId)
+  const courseIds = (enrollmentData || []).map((e: any) => e.course_id).filter(Boolean)
+  if (!courseIds.length) return { data: [], error: null }
+  const { data: coursesData, error } = await supabase
+    .from('courses').select('*, course_sessions(*)').in('id', courseIds)
+  if (!coursesData) return { data: [], error }
+  const instIds = [...new Set(coursesData.map((c: any) => c.instructor_id || c.user_id).filter(Boolean))]
+  const { data: usersData } = instIds.length
+    ? await supabase.from('users').select('id, username, avatar_url, verified').in('id', instIds)
+    : { data: [] }
+  const userMap = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  return {
+    data: coursesData.map((c: any) => ({ ...c, users: userMap[c.instructor_id || c.user_id] ?? null })),
+    error,
+  }
+}
+
+export const deleteCourse = async (courseId: string, instructorId: string) => {
+  const { error } = await supabase
+    .from('courses').delete().eq('id', courseId).eq('instructor_id', instructorId)
+  return { error }
+}
+
+export const deleteWorkshop = async (workshopId: string, instructorId: string) => {
+  const { error } = await supabase
+    .from('workshops').delete().eq('id', workshopId).eq('instructor_id', instructorId)
   return { error }
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Search, MapPin, Users, X, Mail, Phone,
-  Check, Loader2, Send, ExternalLink, MessageCircle,
+  Check, Loader2, Send, MessageCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
@@ -13,7 +13,7 @@ import {
   getInstructors, getFollowingIds,
   followUser, unfollowUser,
   sendTrainingRequest, getMyTrainingRequests,
-  createNotification,
+  createNotification, getOrCreateConversation,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import type { InstructorApplication } from '@/lib/types'
@@ -78,7 +78,7 @@ function Avatar({ app, size = 56 }: { app: InstructorApplication; size?: number 
 }
 
 function InstructorCard({
-  app, isFollowed, onFollow, onContact, onRequest, requestMode, alreadyRequested,
+  app, isFollowed, onFollow, onContact, onRequest, requestMode, alreadyRequested, requestStatus,
 }: {
   app: InstructorApplication
   isFollowed: boolean
@@ -87,6 +87,7 @@ function InstructorCard({
   onRequest?: () => void
   requestMode?: boolean
   alreadyRequested?: boolean
+  requestStatus?: string
 }) {
   const router = useRouter()
   const u = app.users
@@ -146,12 +147,14 @@ function InstructorCard({
             onClick={onRequest}
             disabled={alreadyRequested}
             className={`flex-1 py-2.5 rounded-full text-sm font-semibold transition ${
-              alreadyRequested
-                ? 'bg-[#252525] text-[#555] border border-[rgba(255,255,255,0.06)] cursor-default'
-                : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
+              requestStatus === 'accepted'
+                ? 'bg-green-600/20 text-green-400 border border-green-600/40 cursor-default'
+                : alreadyRequested
+                  ? 'bg-[#252525] text-[#555] border border-[rgba(255,255,255,0.06)] cursor-default'
+                  : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
             }`}
           >
-            {alreadyRequested ? 'Requested' : 'Request'}
+            {requestStatus === 'accepted' ? '✓ Accepted' : alreadyRequested ? 'Requested' : 'Request'}
           </button>
         ) : (
           <button
@@ -278,6 +281,7 @@ function ContactSheet({
   onFollow: () => void
 }) {
   const router = useRouter()
+  const { user: currentUser } = useAuth()
   const u = app.users
   const badge = getBadge(u?.followers_count ?? 0)
   const [copied, setCopied] = useState<string | null>(null)
@@ -300,18 +304,18 @@ function ContactSheet({
           </button>
         </div>
 
+        {/* Avatar row — NOT inside scroll container so it's never clipped */}
+        <div className="flex-shrink-0 px-5" style={{ marginTop: '-40px', marginBottom: '8px' }}>
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] border-4 border-[#141414] flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
+            {u?.avatar_url
+              ? <img src={u.avatar_url} alt={app.full_name} className="w-full h-full object-cover" />
+              : (app.full_name?.[0] || '?').toUpperCase()
+            }
+          </div>
+        </div>
+
         <div className="flex-1 overflow-y-auto overscroll-contain"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
-
-          {/* Avatar — pulled up over banner */}
-          <div className="px-5 -mt-14 mb-3">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] border-4 border-[#141414] flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
-              {u?.avatar_url
-                ? <img src={u.avatar_url} alt={app.full_name} className="w-full h-full object-cover" />
-                : (app.full_name?.[0] || '?').toUpperCase()
-              }
-            </div>
-          </div>
 
           <div className="px-5">
             <div className="flex items-center gap-2 flex-wrap mb-0.5">
@@ -348,13 +352,16 @@ function ContactSheet({
               >
                 {isFollowed ? 'Following' : 'Follow'}
               </button>
-              {app.user_id && (
+              {app.user_id && currentUser && (
                 <button
-                  onClick={() => { onClose(); router.push(`/profile/${app.user_id}`) }}
+                  onClick={async () => {
+                    const { data } = await getOrCreateConversation(currentUser.id, app.user_id)
+                    if (data?.id) { onClose(); router.push(`/messages/${data.id}`) }
+                  }}
                   className="flex items-center gap-1.5 bg-[#1e1e1e] border border-[rgba(255,255,255,0.1)] text-white px-4 py-3 rounded-full text-sm font-bold"
                 >
-                  <ExternalLink className="w-4 h-4" />
-                  Profile
+                  <MessageCircle className="w-4 h-4" />
+                  Message
                 </button>
               )}
             </div>
@@ -405,7 +412,7 @@ export default function DiscoveryPage() {
   const [instructors,   setInstructors]   = useState<InstructorApplication[]>([])
   const [loading,       setLoading]       = useState(false)
   const [followingIds,  setFollowingIds]  = useState<Set<string>>(new Set())
-  const [requestedIds,  setRequestedIds]  = useState<Set<string>>(new Set())
+  const [requestedIds,  setRequestedIds]  = useState<Map<string, string>>(new Map())
   const [contact,       setContact]       = useState<InstructorApplication | null>(null)
   const [requestTarget, setRequestTarget] = useState<InstructorApplication | null>(null)
   const [unreadMsgs,    setUnreadMsgs]    = useState(0)
@@ -430,7 +437,7 @@ export default function DiscoveryPage() {
     if (!user) return
     getFollowingIds(user.id).then(ids => setFollowingIds(new Set(ids)))
     getMyTrainingRequests(user.id).then(({ data }) => {
-      if (data) setRequestedIds(new Set(data.map((r: any) => r.to_instructor_id)))
+      if (data) setRequestedIds(new Map(data.map((r: any) => [r.to_instructor_id, r.status ?? 'pending'])))
     })
   }, [user])
 
@@ -545,6 +552,7 @@ export default function DiscoveryPage() {
               onRequest={activeTab === 'request' ? () => setRequestTarget(app) : undefined}
               requestMode={activeTab === 'request'}
               alreadyRequested={requestedIds.has(app.user_id)}
+              requestStatus={requestedIds.get(app.user_id)}
             />
           ))
         )}
@@ -564,7 +572,7 @@ export default function DiscoveryPage() {
       <RequestSheet
         app={requestTarget}
         onClose={() => setRequestTarget(null)}
-        onSent={() => setRequestedIds(prev => new Set([...prev, requestTarget.user_id]))}
+        onSent={() => setRequestedIds(prev => new Map([...prev, [requestTarget.user_id, 'pending']]))}
       />
     )}
     </>

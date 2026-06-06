@@ -27,6 +27,7 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
   const [thumbnail,    setThumbnail]    = useState<File | null>(null)
   const [sessionCount, setSessionCount] = useState(8)
   const [projectName,  setProjectName]  = useState('')
+  const [startDate,    setStartDate]    = useState('')
   const [loading,      setLoading]      = useState(false)
   const galleryRef = useRef<HTMLInputElement>(null)
 
@@ -67,19 +68,30 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
       })
       const newCourseId = (courseData as any)?.[0]?.id
       if (newCourseId && sessionCount > 0) {
-        const sessions = Array.from({ length: sessionCount }, (_, i) => ({
-          course_id: newCourseId,
-          session_number: i + 1,
-          title: i === sessionCount - 1
-            ? `Projects Day${projectName ? ` — ${projectName}` : ''}`
-            : `Session ${i + 1}`,
-          is_project_day: i === sessionCount - 1,
-          is_live: false,
-        }))
+        const baseDate = startDate ? new Date(startDate + 'T12:00:00') : null
+        const sessions = Array.from({ length: sessionCount }, (_, i) => {
+          let sessionDate: string | null = null
+          if (baseDate) {
+            const d = new Date(baseDate)
+            d.setDate(d.getDate() + i * 7)
+            sessionDate = d.toISOString().split('T')[0]
+          }
+          return {
+            course_id: newCourseId,
+            session_number: i + 1,
+            title: i === sessionCount - 1
+              ? `Projects Day${projectName ? ` — ${projectName}` : ''}`
+              : `Session ${i + 1}`,
+            session_date: sessionDate,
+            session_time: '19:00',
+            is_project_day: i === sessionCount - 1,
+            is_live: false,
+          }
+        })
         await createCourseSessions(newCourseId, sessions)
       }
       setTitle(''); setDescription(''); setSubject(''); setLevel('')
-      setDuration(''); setThumbnail(null); setSessionCount(8); setProjectName('')
+      setDuration(''); setThumbnail(null); setSessionCount(8); setProjectName(''); setStartDate('')
       onClose()
       router.push('/courses')
     } catch (err) {
@@ -147,6 +159,20 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
           <div>
             <label className={labelCls}>Duration (weeks)</label>
             <input type="number" value={duration} onChange={e => setDuration(e.target.value)} placeholder="4" className={inputCls} />
+          </div>
+
+          <div>
+            <label className={labelCls}>Start Date <span className="text-[#444] normal-case font-normal">(optional)</span></label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              className={inputCls}
+              min={new Date().toISOString().split('T')[0]}
+            />
+            {startDate && (
+              <p className="text-[#444] text-xs mt-1">Sessions will be scheduled weekly from this date</p>
+            )}
           </div>
 
           {/* Thumbnail */}

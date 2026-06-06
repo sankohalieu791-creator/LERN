@@ -2,14 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
-  Mic, MicOff, Video as VideoIcon, VideoOff,
+  Mic, MicOff,
   Hand, X, Users, MoreVertical, Send, Loader2, WifiOff,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type {
   IAgoraRTCClient,
-  ICameraVideoTrack,
   IMicrophoneAudioTrack,
   IAgoraRTCRemoteUser,
 } from 'agora-rtc-sdk-ng'
@@ -71,9 +70,7 @@ export default function VirtualClassroom({
   // ── Agora refs ────────────────────────────────────────────
   const clientRef        = useRef<IAgoraRTCClient | null>(null)
   const localAudioRef    = useRef<IMicrophoneAudioTrack | null>(null)
-  const localVideoRef    = useRef<ICameraVideoTrack | null>(null)
   const remoteVideoElRef = useRef<HTMLDivElement>(null)
-  const localVideoElRef  = useRef<HTMLDivElement>(null)
   const realtimeRef      = useRef<RealtimeChannel | null>(null)
   const chatRef          = useRef<HTMLDivElement>(null)
 
@@ -81,7 +78,6 @@ export default function VirtualClassroom({
   const [joined,      setJoined]      = useState(false)
   const [connecting,  setConnecting]  = useState(false)
   const [muted,       setMuted]       = useState(true)
-  const [camOff,      setCamOff]      = useState(true)
   const [handUp,      setHandUp]      = useState(false)
   const [rtcError,    setRtcError]    = useState('')
   const [remoteUsers, setRemoteUsers] = useState<IAgoraRTCRemoteUser[]>([])
@@ -206,21 +202,16 @@ export default function VirtualClassroom({
   useEffect(() => {
     return () => {
       localAudioRef.current?.close()
-      localVideoRef.current?.stop()
-      localVideoRef.current?.close()
       clientRef.current?.leave().catch(() => {})
     }
   }, [])
 
   const leaveAndClose = useCallback(async () => {
     localAudioRef.current?.close()
-    localVideoRef.current?.stop()
-    localVideoRef.current?.close()
     localAudioRef.current = null
-    localVideoRef.current = null
     try { await clientRef.current?.leave() } catch {}
     clientRef.current = null
-    setJoined(false); setRemoteUsers([]); setMuted(true); setCamOff(true); setRtcError('')
+    setJoined(false); setRemoteUsers([]); setMuted(true); setRtcError('')
     onClose()
   }, [onClose])
 
@@ -242,28 +233,6 @@ export default function VirtualClassroom({
         setMuted(true)
       }
     } catch { setRtcError('Microphone access denied.') }
-  }
-
-  const toggleCam = async () => {
-    if (!joined || !clientRef.current) return
-    try {
-      const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
-      if (camOff) {
-        const video = await AgoraRTC.createCameraVideoTrack()
-        localVideoRef.current = video
-        await clientRef.current.publish([video])
-        if (localVideoElRef.current) video.play(localVideoElRef.current)
-        setCamOff(false)
-      } else {
-        if (localVideoRef.current) {
-          await clientRef.current.unpublish([localVideoRef.current])
-          localVideoRef.current.stop()
-          localVideoRef.current.close()
-          localVideoRef.current = null
-        }
-        setCamOff(true)
-      }
-    } catch { setRtcError('Camera access denied.') }
   }
 
   const sendMessage = (e: React.FormEvent) => {
@@ -336,11 +305,6 @@ export default function VirtualClassroom({
             </div>
           )}
 
-          {!camOff && (
-            <div ref={localVideoElRef}
-              className="absolute bottom-3 right-3 w-20 h-28 rounded-xl overflow-hidden border-2 border-white/20 bg-[#111]" />
-          )}
-
           <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-black/60 rounded-full px-2.5 py-1">
             <Users className="w-3 h-3 text-white" />
             <span className="text-white text-xs font-bold">{userCount}</span>
@@ -400,11 +364,6 @@ export default function VirtualClassroom({
           <button onClick={toggleMic} disabled={!joined}
             className={`w-11 h-11 rounded-full flex items-center justify-center transition disabled:opacity-40 ${muted ? 'bg-[#333] text-white' : 'bg-[#FF6B2B] text-white'}`}>
             {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-          </button>
-
-          <button onClick={toggleCam} disabled={!joined}
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition disabled:opacity-40 ${camOff ? 'bg-[#333] text-white' : 'bg-[#FF6B2B] text-white'}`}>
-            {camOff ? <VideoOff className="w-5 h-5" /> : <VideoIcon className="w-5 h-5" />}
           </button>
 
           <button onClick={() => setHandUp(v => !v)}

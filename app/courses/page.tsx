@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import {
   SlidersHorizontal, Star, Clock, Users, X, Check,
-  Calendar, ShieldCheck, Loader2, Lock,
-  UserCheck,
+  Calendar, Loader2, Lock,
+  UserCheck, Plus, BookOpen, Trash2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -13,9 +13,10 @@ import {
   getCourses, getWorkshops, getCourseById, enrollCourse,
   isEnrolled, rateCourse, getUserCourseRating,
   joinWorkshop, leaveWorkshop, getMyWorkshopJoins,
-  setSessionLive,
+  setSessionLive, getEnrolledCourses,
 } from '@/lib/supabase'
-import { supabase } from '@/lib/supabase'
+import CreateCourse from '@/components/CreateCourse'
+import CreateWorkshop from '@/components/CreateWorkshop'
 
 function VerifiedBadge({ size = 12 }: { size?: number }) {
   return (
@@ -224,11 +225,6 @@ function CourseDetailSheet({ courseId, onClose }: { courseId: string; onClose: (
                 <span className="text-xs font-bold border border-[rgba(255,255,255,0.15)] text-[#888] px-3 py-1 rounded-full capitalize">{course?.level}</span>
               </div>
 
-              <div className="flex items-center gap-2.5 bg-[#1e1e1e] border border-[rgba(255,255,255,0.07)] rounded-2xl px-4 py-3.5 mb-5">
-                <ShieldCheck className="w-5 h-5 text-[#FF6B2B] flex-shrink-0" />
-                <p className="text-white text-sm font-medium">Includes verified certificate on completion</p>
-              </div>
-
               {sessions.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -304,12 +300,18 @@ function CourseDetailSheet({ courseId, onClose }: { courseId: string; onClose: (
                   {starting ? <><Loader2 className="w-4 h-4 animate-spin" />Starting…</> : '🔴 Start Class'}
                 </button>
               ) : enrolled ? (
-                <Link
-                  href={`/courses/${courseId}/classroom`}
-                  className="block w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl text-center"
-                >
-                  Enter Live Classroom
-                </Link>
+                <div className="space-y-2">
+                  <div className="bg-green-500/10 border border-green-500/25 rounded-2xl px-4 py-3 text-center">
+                    <p className="text-green-400 font-bold text-sm">✓ You're enrolled!</p>
+                    <p className="text-green-400/70 text-xs mt-0.5">Check the Enrolled tab to join live classes</p>
+                  </div>
+                  <button
+                    onClick={() => { onClose(); setTimeout(() => { const el = document.querySelector('[data-tab="enrolled"]') as HTMLElement; el?.click() }, 100) }}
+                    className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-3.5 rounded-2xl"
+                  >
+                    View Timetable →
+                  </button>
+                </div>
               ) : (
                 <button
                   onClick={handleEnroll}
@@ -343,6 +345,10 @@ export default function CoursesPage() {
   const [detailCourseId,  setDetailCourseId]  = useState<string | null>(null)
   const [joinedWorkshops, setJoinedWorkshops] = useState<Set<string>>(new Set())
   const [joiningId,       setJoiningId]       = useState<string | null>(null)
+  const [showCreateCourse,   setShowCreateCourse]   = useState(false)
+  const [showCreateWorkshop, setShowCreateWorkshop] = useState(false)
+  const [showCreateMenu,     setShowCreateMenu]     = useState(false)
+  const isInstructor = user?.account_type === 'instructor'
 
   useEffect(() => {
     const load = async () => {
@@ -352,11 +358,11 @@ export default function CoursesPage() {
       const subjects = [...new Set(((c || []) as any[]).map(course => course.subject).filter(Boolean))] as string[]
       setAllSubjects(subjects)
       if (user) {
-        const [enrollRes, joinIds] = await Promise.all([
-          supabase.from('enrollments').select('courses(*, users(*), course_sessions(*))').eq('user_id', user.id).not('course_id', 'is', null),
+        const [enrolledCourses, joinIds] = await Promise.all([
+          getEnrolledCourses(user.id),
           getMyWorkshopJoins(user.id),
         ])
-        setEnrolled(((enrollRes.data || []) as any[]).map(r => r.courses).filter(Boolean))
+        setEnrolled(enrolledCourses.data || [])
         setJoinedWorkshops(new Set(joinIds))
       }
       setLoading(false)
@@ -400,7 +406,7 @@ export default function CoursesPage() {
       {/* TABS */}
       <div className="flex-shrink-0 flex border-b border-[rgba(255,255,255,0.07)] bg-[#0f0f0f]">
         {(['courses','workshops','enrolled'] as Tab[]).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
+          <button key={tab} data-tab={tab} onClick={() => setActiveTab(tab)}
             className={`flex-1 py-3.5 text-sm font-semibold capitalize border-b-2 transition ${
               activeTab === tab ? 'text-white border-white' : 'text-[#555] border-transparent'
             }`}>
@@ -534,6 +540,53 @@ export default function CoursesPage() {
     {detailCourseId && (
       <CourseDetailSheet courseId={detailCourseId} onClose={() => setDetailCourseId(null)} />
     )}
+
+    {/* Instructor create FAB */}
+    {isInstructor && (
+      <>
+        {showCreateMenu && (
+          <div className="fixed inset-0 z-40" onClick={() => setShowCreateMenu(false)} />
+        )}
+        {showCreateMenu && (
+          <div
+            className="fixed z-50 flex flex-col gap-2.5 items-end"
+            style={{ bottom: 'calc(env(safe-area-inset-bottom) + 72px)', right: '20px' }}
+          >
+            <button
+              onClick={() => { setShowCreateMenu(false); setShowCreateWorkshop(true) }}
+              className="flex items-center gap-2.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.12)] text-white text-sm font-semibold px-5 py-3 rounded-full shadow-2xl whitespace-nowrap"
+            >
+              <Users className="w-4 h-4" /> New Workshop
+            </button>
+            <button
+              onClick={() => { setShowCreateMenu(false); setShowCreateCourse(true) }}
+              className="flex items-center gap-2.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.12)] text-white text-sm font-semibold px-5 py-3 rounded-full shadow-2xl whitespace-nowrap"
+            >
+              <BookOpen className="w-4 h-4" /> New Course
+            </button>
+          </div>
+        )}
+        <button
+          onClick={() => setShowCreateMenu(!showCreateMenu)}
+          className="fixed z-50 w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-xl active:scale-95 transition-transform"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 72px)', right: '20px', ...(showCreateMenu && { display: 'none' }) }}
+        >
+          <Plus className="w-5 h-5 text-black" strokeWidth={2.5} />
+        </button>
+        {showCreateMenu && (
+          <button
+            onClick={() => setShowCreateMenu(false)}
+            className="fixed z-50 w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-xl active:scale-95 transition-transform"
+            style={{ bottom: 'calc(env(safe-area-inset-bottom) + 72px)', right: '20px' }}
+          >
+            <X className="w-5 h-5 text-black" />
+          </button>
+        )}
+      </>
+    )}
+
+    <CreateCourse   isOpen={showCreateCourse}   onClose={() => setShowCreateCourse(false)} />
+    <CreateWorkshop isOpen={showCreateWorkshop} onClose={() => setShowCreateWorkshop(false)} />
     </>
   )
 }

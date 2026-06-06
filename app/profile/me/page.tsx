@@ -15,6 +15,7 @@ import {
   getUserVideos, addCertificate, deleteVideo, deleteProject, deleteCertificate,
   getInstructorCourses, getInstructorRequests, updateRequestStatus,
   getMyTrainingRequestsFull, getOrCreateConversation,
+  deleteCourse, deleteWorkshop,
   supabase,
 } from '@/lib/supabase'
 import type { Project, Certificate, Video } from '@/lib/types'
@@ -89,7 +90,7 @@ export default function ProfileMePage() {
   const [addingCert, setAddingCert] = useState(false)
   const [certError,  setCertError]  = useState('')
 
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'post' | 'project' | 'cert'; id: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'post' | 'project' | 'cert' | 'course'; id: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   // Instructor-specific data
@@ -206,6 +207,9 @@ export default function ProfileMePage() {
     } else if (deleteTarget.type === 'project') {
       await deleteProject(deleteTarget.id)
       setProjects(ps => ps.filter(p => p.id !== deleteTarget.id))
+    } else if (deleteTarget.type === 'course') {
+      if (user) await deleteCourse(deleteTarget.id, user.id)
+      setCourses(cs => cs.filter(c => c.id !== deleteTarget.id))
     } else {
       await deleteCertificate(deleteTarget.id)
       setCertificates(cs => cs.filter(c => c.id !== deleteTarget.id))
@@ -582,6 +586,14 @@ export default function ProfileMePage() {
                       </div>
                     </div>
                   </div>
+                  <div className="flex justify-end mt-3 pt-3 border-t border-[rgba(255,255,255,0.06)]">
+                    <button
+                      onClick={() => setDeleteTarget({ type: 'course', id: c.id })}
+                      className="flex items-center gap-1.5 text-[#444] text-xs hover:text-red-400 transition"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete course
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -712,7 +724,7 @@ export default function ProfileMePage() {
           <div className="flex justify-center mb-4">
             <div className="w-10 h-1 bg-[#333] rounded-full" />
           </div>
-          <h3 className="text-white font-bold text-lg mb-1 text-center">Delete this {deleteTarget.type === 'post' ? 'post' : deleteTarget.type}?</h3>
+          <h3 className="text-white font-bold text-lg mb-1 text-center">Delete this {deleteTarget.type === 'post' ? 'post' : deleteTarget.type === 'course' ? 'course' : deleteTarget.type}?</h3>
           <p className="text-[#555] text-sm text-center mb-6">This can&apos;t be undone.</p>
           <button
             onClick={confirmDelete}
