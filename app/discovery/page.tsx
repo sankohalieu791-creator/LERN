@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Search, MapPin, Users, X, Mail, Phone,
-  Check, Loader2, Send, ExternalLink,
+  Check, Loader2, Send, ExternalLink, MessageCircle,
 } from 'lucide-react'
+import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
+import { getUnreadMessageCount } from '@/lib/supabase'
 import {
   getInstructors, getFollowingIds,
   followUser, unfollowUser,
@@ -86,13 +88,16 @@ function InstructorCard({
   requestMode?: boolean
   alreadyRequested?: boolean
 }) {
+  const router = useRouter()
   const u = app.users
   const badge = getBadge(u?.followers_count ?? 0)
 
   return (
     <div className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4">
       <div className="flex items-start gap-3 mb-3">
-        <Avatar app={app} size={56} />
+        <button onClick={() => app.user_id && router.push(`/profile/${app.user_id}`)} className="flex-shrink-0">
+          <Avatar app={app} size={56} />
+        </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
             <p className="text-white font-bold text-base leading-tight">{app.full_name}</p>
@@ -403,6 +408,12 @@ export default function DiscoveryPage() {
   const [requestedIds,  setRequestedIds]  = useState<Set<string>>(new Set())
   const [contact,       setContact]       = useState<InstructorApplication | null>(null)
   const [requestTarget, setRequestTarget] = useState<InstructorApplication | null>(null)
+  const [unreadMsgs,    setUnreadMsgs]    = useState(0)
+
+  useEffect(() => {
+    if (!user) return
+    getUnreadMessageCount(user.id).then(setUnreadMsgs)
+  }, [user])
 
   useEffect(() => {
     const load = async () => {
@@ -457,11 +468,21 @@ export default function DiscoveryPage() {
     <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
       <div className="flex-shrink-0">
-        <div className="px-4 pt-4 pb-3">
-          <h1 className="text-white text-2xl font-bold">Discover</h1>
-          {activeTab === 'request' && (
-            <p className="text-[#555] text-sm mt-0.5">Send a 1-to-1 training or mentorship request</p>
-          )}
+        <div className="flex items-start justify-between px-4 pt-4 pb-3">
+          <div>
+            <h1 className="text-white text-2xl font-bold">Discover</h1>
+            {activeTab === 'request' && (
+              <p className="text-[#555] text-sm mt-0.5">Send a 1-to-1 training or mentorship request</p>
+            )}
+          </div>
+          <Link href="/messages" className="relative mt-1">
+            <MessageCircle className="w-6 h-6 text-[#888]" />
+            {unreadMsgs > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FF6B2B] rounded-full text-white text-[9px] font-bold flex items-center justify-center">
+                {unreadMsgs > 9 ? '9+' : unreadMsgs}
+              </span>
+            )}
+          </Link>
         </div>
 
         <div className="px-4 mb-3">
