@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import {
   SlidersHorizontal, Star, Clock, Users, X, Check,
   Calendar, ShieldCheck, Loader2, Lock,
-  MapPin, UserCheck,
+  UserCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -601,46 +601,66 @@ function WorkshopCard({ workshop, isJoined, joining, onJoin }: {
   onJoin: () => void
 }) {
   const date = workshop.workshop_date ? new Date(workshop.workshop_date) : null
+  const dateStr = date
+    ? date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null
 
   return (
-    <div className="bg-[#1a1a1a] rounded-2xl border border-[rgba(255,255,255,0.06)] p-4">
-      <div className="flex items-start gap-4 mb-3">
-        {date ? (
-          <div className="flex-shrink-0 w-14 text-center bg-[#252525] rounded-xl py-2.5">
-            <p className="text-[#888] text-[9px] font-bold uppercase">{date.toLocaleString('default', { month: 'short' })}</p>
-            <p className="text-white font-bold text-2xl leading-none">{date.getDate()}</p>
-            <p className="text-[#555] text-[9px] mt-0.5">{date.toLocaleString('default', { weekday: 'short' }).toUpperCase()}</p>
-          </div>
-        ) : (
-          <div className="flex-shrink-0 w-14 text-center bg-[#252525] rounded-xl py-2.5">
-            <Calendar className="w-5 h-5 text-[#555] mx-auto" />
-            <p className="text-[#555] text-[9px] mt-1">TBD</p>
+    <div className="bg-[#1a1a1a] rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.06)]">
+      {/* Thumbnail */}
+      <div className="relative w-full bg-[#252525] overflow-hidden" style={{ height: '190px' }}>
+        {workshop.thumbnail_url
+          ? <img src={workshop.thumbnail_url} alt={workshop.title} className="w-full h-full object-cover" />
+          : <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460]" />
+        }
+        {dateStr && (
+          <div className="absolute top-2.5 left-2.5 bg-black/80 rounded-xl px-2.5 py-1.5">
+            <p className="text-white text-xs font-bold">{dateStr}</p>
           </div>
         )}
-        <div className="flex-1 min-w-0">
-          <h3 className="text-white font-bold text-sm leading-snug mb-1">{workshop.title}</h3>
-          {workshop.description && (
-            <p className="text-[#444] text-xs line-clamp-2">{workshop.description}</p>
+        {workshop.location && (
+          <span className="absolute top-2.5 right-2.5 text-[10px] font-bold bg-black/80 text-white px-2.5 py-1 rounded-full uppercase tracking-wide">
+            {workshop.location}
+          </span>
+        )}
+      </div>
+
+      <div className="p-4">
+        <h3 className="text-white font-bold text-[15px] leading-snug line-clamp-2 mb-2">{workshop.title}</h3>
+        {workshop.description && (
+          <p className="text-[#555] text-sm line-clamp-2 mb-3 leading-snug">{workshop.description}</p>
+        )}
+
+        {workshop.users && (
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] overflow-hidden flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+              {workshop.users?.avatar_url
+                ? <img src={workshop.users.avatar_url} className="w-full h-full object-cover" />
+                : workshop.users?.username?.[0]?.toUpperCase()}
+            </div>
+            <span className="text-white text-sm font-semibold flex items-center gap-1">
+              {workshop.users?.username}
+              {workshop.users?.verified && <VerifiedBadge size={13} />}
+            </span>
+          </div>
+        )}
+
+        <div className="flex items-center gap-4 text-[#555] text-xs mb-4">
+          {workshop.workshop_time && (
+            <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{workshop.workshop_time.slice(0, 5)}</span>
           )}
+          <span className="flex items-center gap-1"><UserCheck className="w-3 h-3" />{workshop.enrolled_count || 0} joined</span>
         </div>
+
+        <button onClick={onJoin} disabled={joining}
+          className={`w-full py-3 rounded-2xl text-sm font-bold transition active:scale-[0.98] disabled:opacity-40 ${
+            isJoined
+              ? 'bg-[#252525] text-white border border-[rgba(255,255,255,0.08)]'
+              : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
+          }`}>
+          {joining ? '…' : isJoined ? 'Joined ✓' : 'Join Workshop'}
+        </button>
       </div>
-      <div className="flex items-center gap-3 text-[#555] text-xs mb-4">
-        {workshop.workshop_time && (
-          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{workshop.workshop_time.slice(0, 5)}</span>
-        )}
-        {workshop.location && workshop.location !== 'Online' && (
-          <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{workshop.location}</span>
-        )}
-        <span className="flex items-center gap-1"><UserCheck className="w-3 h-3" />{workshop.enrolled_count || 0} joined</span>
-      </div>
-      <button onClick={onJoin} disabled={joining}
-        className={`w-full py-2.5 rounded-full text-sm font-bold transition active:scale-[0.98] disabled:opacity-40 ${
-          isJoined
-            ? 'bg-[#252525] text-[#888] border border-[rgba(255,255,255,0.08)]'
-            : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
-        }`}>
-        {joining ? '…' : isJoined ? 'Joined ✓' : 'Join Workshop'}
-      </button>
     </div>
   )
 }

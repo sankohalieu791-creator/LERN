@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { X, ImageIcon } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { createCourse, createCourseSessions, supabase } from '@/lib/supabase'
@@ -17,6 +18,7 @@ const LEVELS = ['beginner','intermediate','advanced']
 
 export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
   const { user } = useAuth()
+  const router = useRouter()
   const [title,       setTitle]       = useState('')
   const [description, setDescription] = useState('')
   const [subject,     setSubject]     = useState('')
@@ -79,6 +81,7 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
       setTitle(''); setDescription(''); setSubject(''); setLevel('')
       setDuration(''); setThumbnail(null); setSessionCount(8); setProjectName('')
       onClose()
+      router.push('/courses')
     } catch (err) {
       console.error(err)
     } finally {

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { X, ImageIcon } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import { createWorkshop } from '@/lib/supabase'
+import { createWorkshop, supabase } from '@/lib/supabase'
 
 interface CreateWorkshopProps {
   isOpen: boolean
@@ -15,12 +16,15 @@ const labelCls = 'block text-[#888] text-[11px] font-bold uppercase tracking-wid
 
 export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps) {
   const { user } = useAuth()
+  const router = useRouter()
   const [title,       setTitle]       = useState('')
   const [description, setDescription] = useState('')
   const [date,        setDate]        = useState('')
   const [time,        setTime]        = useState('')
   const [location,    setLocation]    = useState('')
+  const [thumbnail,   setThumbnail]   = useState<File | null>(null)
   const [loading,     setLoading]     = useState(false)
+  const galleryRef = useRef<HTMLInputElement>(null)
 
   if (!isOpen) return null
 
@@ -43,6 +47,13 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
     if (!user || !canSubmit) return
     setLoading(true)
     try {
+      let thumbnailUrl: string | null = null
+      if (thumbnail) {
+        const ext  = thumbnail.name.split('.').pop()
+        const path = `${user.id}/${Date.now()}_workshop.${ext}`
+        const { error: upErr } = await supabase.storage.from('course-thumbnails').upload(path, thumbnail)
+        if (!upErr) thumbnailUrl = supabase.storage.from('course-thumbnails').getPublicUrl(path).data.publicUrl
+      }
       await createWorkshop(user.id, {
         title,
         description,
@@ -51,9 +62,11 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
         location,
         is_online: false,
         enrolled_count: 0,
+        thumbnail_url: thumbnailUrl,
       })
-      setTitle(''); setDescription(''); setDate(''); setTime(''); setLocation('')
+      setTitle(''); setDescription(''); setDate(''); setTime(''); setLocation(''); setThumbnail(null)
       onClose()
+      router.push('/courses?tab=workshops')
     } catch (err) {
       console.error(err)
     } finally {
@@ -102,8 +115,15 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
 
           <div>
             <label className={labelCls}>Location</label>
-            <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Address or venue name" className={inputCls} />
+            <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Address or Online" className={inputCls} />
           </div>
+
+          <button type="button" onClick={() => galleryRef.current?.click()}
+            className="w-full flex items-center justify-center gap-2 bg-[#1e1e1e] border border-[rgba(255,255,255,0.08)] text-[#888] text-sm py-3.5 rounded-2xl hover:text-white transition">
+            <ImageIcon className="w-4 h-4" />
+            {thumbnail ? thumbnail.name : 'Add Thumbnail'}
+          </button>
+          <input ref={galleryRef} type="file" accept="image/*" onChange={e => setThumbnail(e.target.files?.[0] || null)} className="hidden" />
 
         </div>
 
