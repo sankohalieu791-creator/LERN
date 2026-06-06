@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, BookOpen, Compass, User, Plus, Video, Users } from 'lucide-react'
-import { useState } from 'react'
+import { Home, BookOpen, MessageCircle, User, Plus, Video, Users } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
+import { getUnreadMessageCount } from '@/lib/supabase'
 import CreatePost from '@/components/CreatePost'
 import CreateCourse from '@/components/CreateCourse'
 import CreateWorkshop from '@/components/CreateWorkshop'
@@ -16,6 +17,12 @@ export default function BottomNav() {
   const [showPost,    setShowPost]    = useState(false)
   const [showCourse,  setShowCourse]  = useState(false)
   const [showWS,      setShowWS]      = useState(false)
+  const [unread,      setUnread]      = useState(0)
+
+  useEffect(() => {
+    if (!user) return
+    getUnreadMessageCount(user.id).then(setUnread)
+  }, [user, pathname])
 
   if (pathname === '/' || pathname.startsWith('/auth') || /^\/feed\/.+/.test(pathname)) return null
 
@@ -86,9 +93,16 @@ export default function BottomNav() {
             </button>
           </div>
 
-          <Link href="/discovery"  className={linkCls('/discovery')}>
-            <Compass className="w-6 h-6" />
-            <span className="text-[10px] font-medium">Discover</span>
+          <Link href="/messages" className={linkCls('/messages')} style={{ position: 'relative' }}>
+            <div className="relative">
+              <MessageCircle className="w-6 h-6" />
+              {unread > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FF6B2B] rounded-full text-white text-[9px] font-bold flex items-center justify-center">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] font-medium">Messages</span>
           </Link>
           <Link href="/profile/me" className={linkCls('/profile/me')}>
             <User    className="w-6 h-6" />

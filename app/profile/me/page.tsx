@@ -6,13 +6,15 @@ import {
   Grid3X3, Briefcase, Award, Users, MessageSquare,
   MapPin, Mail, Phone, Eye, Settings, Play,
   Star, Upload, Loader2, Plus, FileText, X, Trash2,
-  BookOpen, Inbox, Check, Clock,
+  BookOpen, Inbox, Check, Clock, MessageCircle,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   getProjectsByUser, getCertificatesByUser, getFeedback, getFeedbackGiven,
   getUserVideos, addCertificate, deleteVideo, deleteProject, deleteCertificate,
   getInstructorCourses, getInstructorRequests, updateRequestStatus,
+  getMyTrainingRequestsFull, getOrCreateConversation,
   supabase,
 } from '@/lib/supabase'
 import type { Project, Certificate, Video } from '@/lib/types'
@@ -53,7 +55,7 @@ const STUDENT_TABS = [
   { id: 'posts',        icon: Grid3X3,       label: 'Posts'     },
   { id: 'projects',     icon: Briefcase,     label: 'Projects'  },
   { id: 'certificates', icon: Award,         label: 'Certs'     },
-  { id: 'employers',    icon: Users,         label: 'Employers' },
+  { id: 'connections',  icon: Users,         label: 'Connect'   },
   { id: 'feedback',     icon: MessageSquare, label: 'Feedback'  },
 ]
 
@@ -66,6 +68,7 @@ const INSTRUCTOR_TABS = [
 
 export default function ProfileMePage() {
   const { user } = useAuth()
+  const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const certFileRef = useRef<HTMLInputElement>(null)
 
@@ -94,6 +97,10 @@ export default function ProfileMePage() {
   const [requests,         setRequests]         = useState<any[]>([])
   const [updatingRequest,  setUpdatingRequest]  = useState<string | null>(null)
 
+  // Student connections (sent requests)
+  const [myRequests,       setMyRequests]       = useState<any[]>([])
+  const [openingMsg,       setOpeningMsg]       = useState<string | null>(null)
+
   const isInstructor = user?.account_type === 'instructor'
   const TABS = isInstructor ? INSTRUCTOR_TABS : STUDENT_TABS
 
@@ -115,16 +122,18 @@ export default function ProfileMePage() {
         setCourses(c.data ?? [])
         setRequests(r.data ?? [])
       } else {
-        const [v, p, c, f] = await Promise.all([
+        const [v, p, c, f, mr] = await Promise.all([
           getUserVideos(user.id),
           getProjectsByUser(user.id),
           getCertificatesByUser(user.id),
           getFeedback(user.id),
+          getMyTrainingRequestsFull(user.id),
         ])
         setVideos(v.data ?? [])
         setProjects(p.data ?? [])
         setCertificates(c.data ?? [])
         setFeedback(f.data ?? [])
+        setMyRequests(mr.data ?? [])
       }
       setDataLoading(false)
     }
@@ -171,6 +180,14 @@ export default function ProfileMePage() {
     } finally {
       setAddingCert(false)
     }
+  }
+
+  const handleOpenMessage = async (instructorId: string) => {
+    if (!user) return
+    setOpeningMsg(instructorId)
+    const { data } = await getOrCreateConversation(user.id, instructorId)
+    setOpeningMsg(null)
+    if (data?.id) router.push(`/messages/${data.id}`)
   }
 
   const handleRequestAction = async (requestId: string, status: 'accepted' | 'declined') => {
@@ -486,13 +503,58 @@ export default function ProfileMePage() {
           </div>
         )}
 
-        {/* EMPLOYERS */}
-        {activeTab === 'employers' && (
-          <Empty
-            icon={<Users className="w-10 h-10" />}
-            title="No employer connections yet"
-            hint="Employers who view your profile appear here"
-          />
+        {/* CONNECTIONS (student only) */}
+        {activeTab === 'connections' && (
+          dataLoading ? <LoadingSpinner /> :
+          myRequests.length === 0 ? (
+            <Empty icon={<Users className="w-10 h-10" />} title="No connections yet" hint="Send a training or mentorship request to an instructor" />
+          ) : (
+            <div className="space-y-3">
+              {myRequests.map((r: any) => (
+                <div key={r.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
+                      {r.instructor?.avatar_url
+                        ? <img src={r.instructor.avatar_url} className="w-full h-full object-cover" />
+                        : r.instructor?.username?.[0]?.toUpperCase() ?? '?'
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-bold">{r.instructor?.username ?? 'Instructor'}</p>
+                      <p className="text-[#555] text-xs">{new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
+                      r.type === 'training' ? 'bg-orange-500/15 text-orange-400' : 'bg-purple-500/15 text-purple-400'
+                    }`}>
+                      {r.type === 'training' ? '🎯 Training' : '🤝 Mentorship'}
+                    </span>
+                  </div>
+                  <p className="text-[#888] text-sm bg-[#111] rounded-xl px-3 py-2.5 mb-3 leading-relaxed line-clamp-2">{r.message}</p>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${
+                      r.status === 'accepted'
+                        ? 'bg-green-500/15 text-green-400'
+                        : r.status === 'declined'
+                        ? 'bg-[#252525] text-[#555]'
+                        : 'bg-yellow-500/10 text-yellow-500'
+                    }`}>
+                      {r.status === 'accepted' ? '✓ Accepted' : r.status === 'declined' ? '✕ Declined' : '⏳ Pending'}
+                    </span>
+                    {r.status === 'accepted' && (
+                      <button
+                        onClick={() => handleOpenMessage(r.to_instructor_id)}
+                        disabled={openingMsg === r.to_instructor_id}
+                        className="flex items-center gap-1.5 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white text-xs font-bold px-4 py-1.5 rounded-full active:scale-95 transition disabled:opacity-50"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        {openingMsg === r.to_instructor_id ? '…' : 'Message'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         )}
 
         {/* COURSES (instructor only) */}

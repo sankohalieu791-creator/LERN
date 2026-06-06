@@ -548,10 +548,109 @@ export const getMyWorkshopJoins = async (userId: string): Promise<string[]> => {
 export const getFeedbackGiven = async (reviewerId: string) => {
   const { data, error } = await supabase
     .from('feedback')
-    .select('*, recipient:profile_user_id(id, username, avatar_url, verified)')
+    .select('*')
     .eq('reviewer_id', reviewerId)
     .order('created_at', { ascending: false })
+  if (!data) return { data, error }
+  const ids = [...new Set(data.map((f: any) => f.profile_user_id).filter(Boolean))]
+  const { data: usersData } = ids.length
+    ? await supabase.from('users').select('id, username, avatar_url, verified').in('id', ids)
+    : { data: [] }
+  const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  return { data: data.map((f: any) => ({ ...f, recipient: map[f.profile_user_id] ?? null })), error }
+}
+
+// My sent training requests (as user to instructors)
+export const getMyTrainingRequestsFull = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('training_requests')
+    .select('*')
+    .eq('from_user_id', userId)
+    .order('created_at', { ascending: false })
+  if (!data) return { data, error }
+  const ids = [...new Set(data.map((r: any) => r.to_instructor_id).filter(Boolean))]
+  const { data: usersData } = ids.length
+    ? await supabase.from('users').select('id, username, avatar_url, verified').in('id', ids)
+    : { data: [] }
+  const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  return { data: data.map((r: any) => ({ ...r, instructor: map[r.to_instructor_id] ?? null })), error }
+}
+
+// Messaging
+export const getOrCreateConversation = async (myId: string, otherId: string) => {
+  const u1 = myId < otherId ? myId : otherId
+  const u2 = myId < otherId ? otherId : myId
+  const { data: existing } = await supabase
+    .from('conversations').select('*').eq('user1_id', u1).eq('user2_id', u2).single()
+  if (existing) return { data: existing, error: null }
+  const { data, error } = await supabase
+    .from('conversations').insert([{ user1_id: u1, user2_id: u2 }]).select().single()
   return { data, error }
+}
+
+export const getConversations = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('conversations').select('*')
+    .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+    .order('last_message_at', { ascending: false })
+  if (!data) return { data: [], error }
+  const otherIds = [...new Set(data.map((c: any) => c.user1_id === userId ? c.user2_id : c.user1_id))]
+  const { data: usersData } = otherIds.length
+    ? await supabase.from('users').select('id, username, avatar_url, verified').in('id', otherIds)
+    : { data: [] }
+  const userMap = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  const lastMsgMap: Record<string, any> = {}
+  for (const c of data) {
+    const { data: msgs } = await supabase
+      .from('messages').select('content, created_at, sender_id')
+      .eq('conversation_id', c.id).order('created_at', { ascending: false }).limit(1)
+    if (msgs?.[0]) lastMsgMap[c.id] = msgs[0]
+  }
+  return {
+    data: data.map((c: any) => {
+      const otherId = c.user1_id === userId ? c.user2_id : c.user1_id
+      return { ...c, otherUser: userMap[otherId] ?? null, lastMessage: lastMsgMap[c.id] ?? null }
+    }),
+    error
+  }
+}
+
+export const getMessages = async (conversationId: string) => {
+  const { data, error } = await supabase
+    .from('messages').select('*').eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true })
+  if (!data) return { data, error }
+  const ids = [...new Set(data.map((m: any) => m.sender_id).filter(Boolean))]
+  const { data: usersData } = ids.length
+    ? await supabase.from('users').select('id, username, avatar_url').in('id', ids)
+    : { data: [] }
+  const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  return { data: data.map((m: any) => ({ ...m, sender: map[m.sender_id] ?? null })), error }
+}
+
+export const sendMessage = async (conversationId: string, senderId: string, content: string) => {
+  const { data, error } = await supabase
+    .from('messages').insert([{ conversation_id: conversationId, sender_id: senderId, content }]).select().single()
+  if (!error) {
+    await supabase.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', conversationId)
+  }
+  return { data, error }
+}
+
+export const markMessagesRead = async (conversationId: string, userId: string) => {
+  await supabase.from('messages').update({ read_at: new Date().toISOString() })
+    .eq('conversation_id', conversationId).neq('sender_id', userId).is('read_at', null)
+}
+
+export const getUnreadMessageCount = async (userId: string): Promise<number> => {
+  const { data: convs } = await supabase
+    .from('conversations').select('id').or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+  const convIds = (convs || []).map((c: any) => c.id)
+  if (!convIds.length) return 0
+  const { count } = await supabase
+    .from('messages').select('id', { count: 'exact', head: true })
+    .neq('sender_id', userId).is('read_at', null).in('conversation_id', convIds)
+  return count ?? 0
 }
 
 export const setSessionLive = async (sessionId: string, isLive: boolean) => {
