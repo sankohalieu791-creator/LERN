@@ -315,7 +315,7 @@ function CourseDetailSheet({ courseId, onClose }: { courseId: string; onClose: (
                   disabled={enrolling}
                   className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
                 >
-                  {enrolling ? <><Loader2 className="w-4 h-4 animate-spin" />Enrolling…</> : success ? '✓ Enrolled!' : 'Enroll — Free'}
+                  {enrolling ? <><Loader2 className="w-4 h-4 animate-spin" />Enrolling…</> : success ? '✓ Enrolled!' : 'Enroll'}
                 </button>
               )}
             </div>
@@ -435,6 +435,7 @@ export default function CoursesPage() {
                 : filtered.map(c => (
                     <CourseCard key={c.id} course={c}
                       isEnrolled={enrolled.some(e => e.id === c.id)}
+                      isOwner={user?.id === c.instructor_id}
                       onTap={() => setDetailCourseId(c.id)} />
                   ))
               }
@@ -589,9 +590,10 @@ export default function CoursesPage() {
 }
 
 // ── CourseCard ────────────────────────────────────────────────
-function CourseCard({ course, isEnrolled, onTap }: {
+function CourseCard({ course, isEnrolled, isOwner, onTap }: {
   course: any
   isEnrolled?: boolean
+  isOwner?: boolean
   onTap: () => void
 }) {
   return (
@@ -607,10 +609,11 @@ function CourseCard({ course, isEnrolled, onTap }: {
             {[course.subject, course.level].filter(Boolean).join(' · ')}
           </span>
         )}
-        <div className="absolute top-2.5 right-2.5 flex gap-1.5">
-          <span className="text-[10px] font-bold bg-[#1d9bf0] text-white px-2 py-1 rounded-full">CERT</span>
-          <span className="text-[10px] font-bold bg-green-500 text-white px-2 py-1 rounded-full">FREE</span>
-        </div>
+        {isOwner && (
+          <div className="absolute top-2.5 right-2.5">
+            <span className="text-[10px] font-bold bg-[#FF6B2B] text-white px-2.5 py-1 rounded-full">YOUR COURSE</span>
+          </div>
+        )}
       </div>
       <div className="p-4">
         <h3 className="text-white font-bold text-[15px] leading-snug line-clamp-2 mb-2">{course.title}</h3>
@@ -633,11 +636,17 @@ function CourseCard({ course, isEnrolled, onTap }: {
           <span className="flex items-center gap-1"><Users className="w-3 h-3" />{(course.enrolled_count || 0).toLocaleString()}</span>
           <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />{course.rating?.toFixed(1)}</span>
         </div>
-        <div className={`w-full py-3 rounded-2xl text-center text-sm font-bold ${
-          isEnrolled ? 'bg-[#252525] text-white' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
-        }`}>
-          {isEnrolled ? 'Enrolled ✓' : 'Enroll — Free'}
-        </div>
+        {isOwner ? (
+          <div className="w-full py-3 rounded-2xl text-center text-sm font-bold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white">
+            Start Class →
+          </div>
+        ) : (
+          <div className={`w-full py-3 rounded-2xl text-center text-sm font-bold ${
+            isEnrolled ? 'bg-[#252525] text-white' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
+          }`}>
+            {isEnrolled ? 'Enrolled ✓' : 'Enroll'}
+          </div>
+        )}
       </div>
     </div>
   )

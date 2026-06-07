@@ -34,6 +34,13 @@ const SLIDES = [
     body: 'Browse instructors, professors, and coaches. Request 1-to-1 training and message them directly when accepted.',
   },
   {
+    bg: 'linear-gradient(160deg, #1a0533 0%, #4a1272 50%, #7C3AED 100%)',
+    emoji: '🎤',
+    title: 'Are you an expert?',
+    sub: 'Teach on LERN',
+    body: 'Share your knowledge, run live courses, and mentor the next generation. Apply to become a verified instructor in Settings.',
+  },
+  {
     bg: 'linear-gradient(160deg, #0c1445 0%, #1a237e 50%, #283593 100%)',
     emoji: '🚀',
     title: "You're all set!",

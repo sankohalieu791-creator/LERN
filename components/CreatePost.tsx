@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { X, Upload, Image as ImageIcon, Loader2 } from 'lucide-react'
+import { X, Upload, Image as ImageIcon, Loader2, Globe, Lock } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { createVideo } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
@@ -39,6 +39,7 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
   const [thumbnail,   setThumbnail]   = useState<File | null>(null)
   const [video,       setVideo]       = useState<File | null>(null)
   const [thumbPreview, setThumbPreview] = useState<string | null>(null)
+  const [isPublic,    setIsPublic]    = useState(true)
   const [loading,     setLoading]     = useState(false)
   const [error,       setError]       = useState('')
 
@@ -47,7 +48,7 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
 
   const reset = () => {
     setTitle(''); setDescription(''); setSubject(''); setDuration('0:00')
-    setThumbnail(null); setVideo(null); setThumbPreview(null); setError('')
+    setThumbnail(null); setVideo(null); setThumbPreview(null); setError(''); setIsPublic(true)
   }
 
   const handleClose = () => { reset(); onClose() }
@@ -91,6 +92,7 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
         thumbnail_url: thumbnailUrl,
         video_url:     videoUrl,
         views: 0,
+        is_public: isPublic,
       })
       if (createErr) throw createErr
       reset()
@@ -164,6 +166,35 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
               <option value="">Select subject</option>
               {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+          </div>
+
+          {/* PUBLIC / PRIVATE */}
+          <div>
+            <label className="block text-[#888] text-xs font-semibold mb-2 uppercase tracking-wide">Visibility</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPublic(true)}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-bold transition ${
+                  isPublic
+                    ? 'bg-white text-black border-white'
+                    : 'bg-[#111] border-[rgba(255,255,255,0.08)] text-[#555]'
+                }`}
+              >
+                <Globe className="w-4 h-4" /> Public
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPublic(false)}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-bold transition ${
+                  !isPublic
+                    ? 'bg-white text-black border-white'
+                    : 'bg-[#111] border-[rgba(255,255,255,0.08)] text-[#555]'
+                }`}
+              >
+                <Lock className="w-4 h-4" /> Private
+              </button>
+            </div>
           </div>
 
           {/* VIDEO UPLOAD */}

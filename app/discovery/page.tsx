@@ -366,7 +366,7 @@ function ContactSheet({
                   }}
                   className="flex items-center gap-1.5 bg-[#1e1e1e] border border-[rgba(255,255,255,0.1)] text-white px-4 py-3 rounded-full text-sm font-bold"
                 >
-                  <MessageCircle className="w-4 h-4" />
+                  <MessageCircle className="w-5 h-5" />
                   Message
                 </button>
               )}
@@ -492,7 +492,7 @@ export default function DiscoveryPage() {
             )}
           </div>
           <Link href="/messages" className="relative mt-1">
-            <MessageCircle className="w-6 h-6 text-[#888]" />
+            <MessageCircle className="w-7 h-7 text-[#888]" />
             {unreadMsgs > 0 && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FF6B2B] rounded-full text-white text-[9px] font-bold flex items-center justify-center">
                 {unreadMsgs > 9 ? '9+' : unreadMsgs}

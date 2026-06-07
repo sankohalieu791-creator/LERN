@@ -112,15 +112,14 @@ export default function VirtualClassroom({
     // ── Presence sync → update participants list ──────────
     channel.on('presence', { event: 'sync' }, () => {
       const state = channel.presenceState<{ username: string; avatar_url: string | null; handUp: boolean }>()
-      const list: Participant[] = Object.entries(state).flatMap(([uid, presences]) =>
-        presences.map(p => ({
-          userId:     uid,
-          username:   p.username,
-          avatar_url: p.avatar_url,
-          handUp:     p.handUp ?? false,
-          isSelf:     uid === myUserId,
-        }))
-      )
+      // Take first presence per userId to avoid duplicates on reconnect
+      const list: Participant[] = Object.entries(state).map(([uid, presences]) => ({
+        userId:     uid,
+        username:   presences[0].username,
+        avatar_url: presences[0].avatar_url,
+        handUp:     presences[0].handUp ?? false,
+        isSelf:     uid === myUserId,
+      }))
       setParticipants(list)
     })
 

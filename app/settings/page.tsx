@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { updateUserProfile, submitInstructorApplication } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import {
-  ChevronLeft, ChevronRight, Moon, Lock, Bell,
+  ChevronLeft, ChevronRight, Moon, Lock, Bell, Shield,
   LogOut, X, CheckCircle2, MapPin, Clock, Mail, Phone,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -241,6 +241,21 @@ export default function SettingsPage() {
           <div className="flex-1">
             <p className="text-white theme-text-1 text-sm font-semibold">Notifications</p>
             <p className="text-[#555] theme-text-2 text-xs mt-0.5">Push, email, course reminders</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
+        </Link>
+      </div>
+
+      {/* LEGAL */}
+      <SectionLabel>Legal</SectionLabel>
+      <div className="border-t border-[rgba(255,255,255,0.05)] theme-border">
+        <Link href="/settings/privacy" className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition">
+          <div className="w-9 h-9 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
+            <Shield className="w-4 h-4 text-[#888]" />
+          </div>
+          <div className="flex-1">
+            <p className="text-white theme-text-1 text-sm font-semibold">Privacy &amp; Policy</p>
+            <p className="text-[#555] theme-text-2 text-xs mt-0.5">How we use and protect your data</p>
           </div>
           <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
         </Link>
