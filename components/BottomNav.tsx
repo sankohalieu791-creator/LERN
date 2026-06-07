@@ -29,8 +29,8 @@ export default function BottomNav() {
         left: 0,
         right: 0,
         zIndex: 9999,
-        backgroundColor: '#0f0f0f',
-        borderTop: '1px solid rgba(255,255,255,0.08)',
+        background: 'var(--bg-app)',
+        borderTop: '1px solid var(--border)',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -58,8 +58,8 @@ export default function BottomNav() {
         </Link>
 
       </div>
-      {/* Fills the iPhone home-indicator area below the tabs */}
-      <div style={{ height: 'env(safe-area-inset-bottom, 0px)', backgroundColor: '#0f0f0f' }} />
+      {/* Fills the iPhone home-indicator area — matches theme background */}
+      <div style={{ height: 'env(safe-area-inset-bottom, 0px)', background: 'var(--bg-app)' }} />
     </nav>
   )
 }

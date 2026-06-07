@@ -6,6 +6,7 @@ import BottomNav from '@/components/BottomNav'
 import ThemeProvider from '@/components/ThemeProvider'
 import ClientShell from '@/components/ClientShell'
 import PushNotificationSetup from '@/components/PushNotificationSetup'
+import OnboardingFlow from '@/components/OnboardingFlow'
 
 export const metadata: Metadata = {
   title: 'LERN',
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </ClientShell>
           <BottomNav />
+          <OnboardingFlow />
         </AuthProvider>
       </body>
     </html>

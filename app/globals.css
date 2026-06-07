@@ -147,6 +147,16 @@ html.light nav { background-color: #fafafa !important; }
 /* Sticky headers */
 html.light .sticky { background-color: inherit !important; }
 
+/* Video card overlay chips (subject tag, duration) — keep dark so text is readable over thumbnails */
+html.light .bg-black\/70  { background-color: rgba(0,0,0,0.70) !important; color: #fff !important; }
+html.light .bg-black\/60  { background-color: rgba(0,0,0,0.60) !important; }
+html.light .bg-black\/40  { background-color: rgba(0,0,0,0.40) !important; }
+
+/* Feed page main container and video modal stay dark */
+html.light .bg-black { background-color: #000 !important; }
+html.light .bg-\[\#111\]  { background-color: #111 !important; }
+html.light .bg-\[\#0f0f0f\]\.z-10 { background-color: #f2f2f2 !important; }
+
 ::-webkit-scrollbar {
   width: 8px;
 }

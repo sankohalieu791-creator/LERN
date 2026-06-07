@@ -37,7 +37,7 @@ type Tab = 'courses' | 'workshops' | 'enrolled'
 function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => void }) {
   const sessions = ((course.course_sessions || []) as any[])
     .slice()
-    .sort((a, b) => new Date(a.session_date || '9999').getTime() - new Date(b.session_date || '9999').getTime())
+    .sort((a, b) => (a.session_number ?? 999) - (b.session_number ?? 999))
 
   const firstSession = sessions[0]
   const isLive = sessions.some(s => s.is_live)
@@ -154,9 +154,7 @@ function CourseDetailSheet({ courseId, onClose }: { courseId: string; onClose: (
 
   const handleStartClass = async () => {
     setStarting(true)
-    const sessions = course?.course_sessions?.slice().sort((a: any, b: any) =>
-      new Date(a.session_date || 0).getTime() - new Date(b.session_date || 0).getTime()
-    ) ?? []
+    const sessions = course?.course_sessions?.slice().sort((a: any, b: any) => (a.session_number ?? 999) - (b.session_number ?? 999)) ?? []
     const nextSession = sessions.find((s: any) => !s.is_live && !s.is_project_day)
     if (nextSession) {
       await setSessionLive(nextSession.id, true)
