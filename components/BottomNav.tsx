@@ -17,40 +17,49 @@ export default function BottomNav() {
   const active = (p: string) => pathname === p || pathname.startsWith(p + '/')
 
   const cls = (p: string) =>
-    `flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-colors ${
+    `flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
       active(p) ? 'text-white' : 'text-[#444]'
     }`
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 bg-[#0f0f0f] border-t border-[rgba(255,255,255,0.08)]"
-      style={{ zIndex: 9999 }}
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 9999,
+        backgroundColor: '#0f0f0f',
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
     >
-      <div className="flex items-stretch" style={{ height: '56px' }}>
+      <div style={{ display: 'flex', height: '56px' }}>
 
         <Link href="/feed" className={cls('/feed')}>
-          <Home className="w-[22px] h-[22px]" />
-          <span className="text-[10px] font-medium">Feed</span>
+          <Home style={{ width: 22, height: 22 }} />
+          <span style={{ fontSize: 10, fontWeight: 500 }}>Feed</span>
         </Link>
 
         <Link href="/courses" className={cls('/courses')}>
-          <BookOpen className="w-[22px] h-[22px]" />
-          <span className="text-[10px] font-medium">Courses</span>
+          <BookOpen style={{ width: 22, height: 22 }} />
+          <span style={{ fontSize: 10, fontWeight: 500 }}>Courses</span>
         </Link>
 
         <Link href="/discovery" className={cls('/discovery')}>
-          <Compass className="w-[22px] h-[22px]" />
-          <span className="text-[10px] font-medium">Discover</span>
+          <Compass style={{ width: 22, height: 22 }} />
+          <span style={{ fontSize: 10, fontWeight: 500 }}>Discover</span>
         </Link>
 
         <Link href="/profile/me" className={cls('/profile/me')}>
-          <User className="w-[22px] h-[22px]" />
-          <span className="text-[10px] font-medium">Profile</span>
+          <User style={{ width: 22, height: 22 }} />
+          <span style={{ fontSize: 10, fontWeight: 500 }}>Profile</span>
         </Link>
 
       </div>
-      {/* home-indicator spacer */}
-      <div style={{ height: 'env(safe-area-inset-bottom)', background: '#0f0f0f' }} />
+      {/* Fills the iPhone home-indicator area below the tabs */}
+      <div style={{ height: 'env(safe-area-inset-bottom, 0px)', backgroundColor: '#0f0f0f' }} />
     </nav>
   )
 }

@@ -447,16 +447,21 @@ export default function DiscoveryPage() {
 
   const handleFollow = useCallback(async (targetId: string | undefined) => {
     if (!user || !targetId) return
-    const next = new Set(followingIds)
-    if (next.has(targetId)) {
+    // Read current state inside the setter to avoid stale closure
+    let wasFollowing = false
+    setFollowingIds(prev => {
+      wasFollowing = prev.has(targetId)
+      const next = new Set(prev)
+      wasFollowing ? next.delete(targetId) : next.add(targetId)
+      return next
+    })
+    // Fire API based on the state we just read
+    if (wasFollowing) {
       await unfollowUser(user.id, targetId)
-      next.delete(targetId)
     } else {
       await followUser(user.id, targetId)
-      next.add(targetId)
     }
-    setFollowingIds(next)
-  }, [user, followingIds])
+  }, [user])
 
   const filtered = instructors.filter(a => {
     if (!search.trim()) return true
@@ -550,8 +555,8 @@ export default function DiscoveryPage() {
             <InstructorCard
               key={app.id}
               app={app}
-              isFollowed={followingIds.has(app.users?.id ?? '')}
-              onFollow={() => handleFollow(app.users?.id)}
+              isFollowed={followingIds.has(app.user_id ?? '')}
+              onFollow={() => handleFollow(app.user_id)}
               onContact={activeTab !== 'request' ? () => setContact(app) : undefined}
               onRequest={activeTab === 'request' ? () => setRequestTarget(app) : undefined}
               requestMode={activeTab === 'request'}
