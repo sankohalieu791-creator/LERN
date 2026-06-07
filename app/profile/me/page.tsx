@@ -15,7 +15,7 @@ import {
   getUserVideos, addCertificate, deleteVideo, deleteProject, deleteCertificate,
   getInstructorCourses, getInstructorRequests, updateRequestStatus,
   getMyTrainingRequestsFull, getOrCreateConversation,
-  deleteCourse, deleteWorkshop,
+  deleteCourse, deleteWorkshop, getInstructorWorkshops,
   supabase,
 } from '@/lib/supabase'
 import type { Project, Certificate, Video } from '@/lib/types'
@@ -63,6 +63,7 @@ const STUDENT_TABS = [
 const INSTRUCTOR_TABS = [
   { id: 'posts',     icon: Grid3X3,       label: 'Posts'     },
   { id: 'courses',   icon: BookOpen,      label: 'Courses'   },
+  { id: 'workshops', icon: Users,         label: 'Workshops' },
   { id: 'requests',  icon: Inbox,         label: 'Requests'  },
   { id: 'feedback',  icon: MessageSquare, label: 'Feedback'  },
 ]
@@ -90,11 +91,12 @@ export default function ProfileMePage() {
   const [addingCert, setAddingCert] = useState(false)
   const [certError,  setCertError]  = useState('')
 
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'post' | 'project' | 'cert' | 'course'; id: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'post' | 'project' | 'cert' | 'course' | 'workshop'; id: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   // Instructor-specific data
   const [courses,          setCourses]          = useState<any[]>([])
+  const [workshops,        setWorkshops]        = useState<any[]>([])
   const [requests,         setRequests]         = useState<any[]>([])
   const [updatingRequest,  setUpdatingRequest]  = useState<string | null>(null)
 
@@ -112,15 +114,17 @@ export default function ProfileMePage() {
     const load = async () => {
       setDataLoading(true)
       if (user.account_type === 'instructor') {
-        const [v, f, c, r] = await Promise.all([
+        const [v, f, c, ws, r] = await Promise.all([
           getUserVideos(user.id),
-          getFeedbackGiven(user.id),  // instructors see feedback they GAVE
+          getFeedbackGiven(user.id),
           getInstructorCourses(user.id),
+          getInstructorWorkshops(user.id),
           getInstructorRequests(user.id),
         ])
         setVideos(v.data ?? [])
         setFeedback(f.data ?? [])
         setCourses(c.data ?? [])
+        setWorkshops(ws.data ?? [])
         setRequests(r.data ?? [])
       } else {
         const [v, p, c, f, mr] = await Promise.all([
@@ -210,6 +214,9 @@ export default function ProfileMePage() {
     } else if (deleteTarget.type === 'course') {
       if (user) await deleteCourse(deleteTarget.id, user.id)
       setCourses(cs => cs.filter(c => c.id !== deleteTarget.id))
+    } else if (deleteTarget.type === 'workshop') {
+      if (user) await deleteWorkshop(deleteTarget.id, user.id)
+      setWorkshops(ws => ws.filter(w => w.id !== deleteTarget.id))
     } else {
       await deleteCertificate(deleteTarget.id)
       setCertificates(cs => cs.filter(c => c.id !== deleteTarget.id))
@@ -592,6 +599,49 @@ export default function ProfileMePage() {
                       className="flex items-center gap-1.5 text-[#444] text-xs hover:text-red-400 transition"
                     >
                       <Trash2 className="w-3.5 h-3.5" /> Delete course
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {/* WORKSHOPS (instructor only) */}
+        {activeTab === 'workshops' && (
+          dataLoading ? <LoadingSpinner /> :
+          workshops.length === 0 ? (
+            <Empty icon={<Users className="w-10 h-10" />} title="No workshops yet" hint="Press + to create your first workshop" />
+          ) : (
+            <div className="space-y-3">
+              {workshops.map((w: any) => (
+                <div key={w.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#C026D3] flex items-center justify-center flex-shrink-0">
+                      <Users className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-bold text-sm">{w.title}</p>
+                      {w.description && <p className="text-[#555] text-xs mt-0.5 line-clamp-2">{w.description}</p>}
+                      <div className="flex items-center gap-3 mt-2">
+                        {w.workshop_date && (
+                          <span className="text-[#888] text-xs flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(w.workshop_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                        )}
+                        {w.max_participants && (
+                          <span className="text-[#444] text-xs">{w.max_participants} spots</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end mt-3 pt-3 border-t border-[rgba(255,255,255,0.06)]">
+                    <button
+                      onClick={() => setDeleteTarget({ type: 'workshop', id: w.id })}
+                      className="flex items-center gap-1.5 text-[#444] text-xs hover:text-red-400 transition"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete workshop
                     </button>
                   </div>
                 </div>

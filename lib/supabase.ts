@@ -691,3 +691,12 @@ export const deleteWorkshop = async (workshopId: string, instructorId: string) =
     .from('workshops').delete().eq('id', workshopId).eq('instructor_id', instructorId)
   return { error }
 }
+
+export const getInstructorWorkshops = async (instructorId: string) => {
+  const { data, error } = await supabase
+    .from('workshops')
+    .select('*')
+    .eq('instructor_id', instructorId)
+    .order('workshop_date', { ascending: true })
+  return { data, error }
+}

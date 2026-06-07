@@ -70,8 +70,13 @@ body {
   background: var(--bg-app);
   color: var(--text-1);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  overflow-x: hidden;
   transition: background 0.25s, color 0.25s;
+}
+
+/* overflow-x clip on a wrapper — NOT on body/html, which breaks
+   position:fixed on iOS Safari (fixed elements attach to body bottom) */
+#__next, main {
+  overflow-x: clip;
 }
 
 /* ── Light-mode: full-app overrides ──────────────────────────
