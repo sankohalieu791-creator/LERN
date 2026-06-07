@@ -8,9 +8,10 @@ import {
   getUserVideos, getFeedback, incrementProfileViews,
   addFeedback, createNotification,
   getInstructorRequests, updateRequestStatus,
+  getProjectsByUser, getCertificatesByUser,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
-import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X } from 'lucide-react'
+import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 
 function VerifiedBadge({ size = 16 }: { size?: number }) {
@@ -52,12 +53,14 @@ export default function UserProfilePage() {
   const [profile,       setProfile]       = useState<any>(null)
   const [myProfile,     setMyProfile]     = useState<any>(null)
   const [videos,        setVideos]        = useState<any[]>([])
+  const [projects,      setProjects]      = useState<any[]>([])
+  const [certs,         setCerts]         = useState<any[]>([])
   const [feedback,      setFeedback]      = useState<any[]>([])
   const [requests,      setRequests]      = useState<any[]>([])
   const [following,     setFollowing]     = useState(false)
   const [loading,       setLoading]       = useState(true)
   const [followLoading, setFollowLoading] = useState(false)
-  const [activeTab,     setActiveTab]     = useState<'posts' | 'feedback' | 'requests'>('posts')
+  const [activeTab,     setActiveTab]     = useState<'posts' | 'projects' | 'certs' | 'feedback' | 'requests'>('posts')
 
   const [fbRating,     setFbRating]     = useState(0)
   const [fbText,       setFbText]       = useState('')
@@ -73,14 +76,22 @@ export default function UserProfilePage() {
     const load = async () => {
       setLoading(true)
 
-      const [profileRes, videosRes, feedbackRes] = await Promise.all([
+      const [profileRes, videosRes, feedbackRes, projectsRes, certsRes] = await Promise.all([
         getUserProfile(profileId),
         getUserVideos(profileId),
         getFeedback(profileId),
+        getProjectsByUser(profileId),
+        getCertificatesByUser(profileId),
       ])
       setProfile(profileRes.data)
       setVideos(videosRes.data ?? [])
       setFeedback(feedbackRes.data ?? [])
+      // Respect public/private: when viewing someone else's profile, only show public items
+      const viewerIsOwner = user?.id === profileId
+      const rawProjects = (projectsRes.data ?? []) as any[]
+      const rawCerts    = (certsRes.data    ?? []) as any[]
+      setProjects(viewerIsOwner ? rawProjects : rawProjects.filter(p => p.is_public !== false))
+      setCerts(viewerIsOwner   ? rawCerts    : rawCerts.filter(c => c.is_public !== false))
 
       if (user) {
         // Always fetch the logged-in user's own profile so we know their account_type
@@ -164,7 +175,9 @@ export default function UserProfilePage() {
   const pendingCount = requests.filter(r => r.status === 'pending').length
 
   const tabs = [
-    { id: 'posts',    icon: Grid3X3,      label: 'Posts'    },
+    { id: 'posts',    icon: Grid3X3,       label: 'Posts'    },
+    { id: 'projects', icon: FolderOpen,    label: 'Projects' },
+    { id: 'certs',    icon: Award,         label: 'Certs'    },
     { id: 'feedback', icon: MessageSquare, label: 'Feedback' },
     ...(isOwnProfile && isInstructor
       ? [{ id: 'requests', icon: Inbox, label: 'Requests' }]
@@ -296,6 +309,71 @@ export default function UserProfilePage() {
                     </div>
                   </div>
                 </Link>
+              ))}
+            </div>
+          )
+        )}
+
+        {/* PROJECTS */}
+        {activeTab === 'projects' && (
+          projects.length === 0 ? (
+            <div className="text-center py-16">
+              <FolderOpen className="w-10 h-10 text-[#2a2a2a] mx-auto mb-3" />
+              <p className="text-[#444] text-sm">No public projects</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {projects.map((p: any) => (
+                <div key={p.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-bold text-sm mb-1 truncate">{p.title}</p>
+                      {p.description && <p className="text-[#666] text-xs leading-relaxed line-clamp-2">{p.description}</p>}
+                      {p.tech_stack && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {(Array.isArray(p.tech_stack) ? p.tech_stack : p.tech_stack.split(',')).map((t: string) => (
+                            <span key={t} className="bg-[#252525] text-[#888] text-[10px] font-bold px-2 py-0.5 rounded-full">{t.trim()}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {p.project_url && (
+                      <a href={p.project_url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 text-[#FF6B2B]">
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {/* CERTS */}
+        {activeTab === 'certs' && (
+          certs.length === 0 ? (
+            <div className="text-center py-16">
+              <Award className="w-10 h-10 text-[#2a2a2a] mx-auto mb-3" />
+              <p className="text-[#444] text-sm">No public certificates</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {certs.map((c: any) => (
+                <div key={c.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
+                    <Award className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-sm truncate">{c.title}</p>
+                    {c.issuer && <p className="text-[#666] text-xs mt-0.5">{c.issuer}</p>}
+                    {c.issued_date && <p className="text-[#444] text-[11px] mt-0.5">{new Date(c.issued_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>}
+                  </div>
+                  {c.credential_url && (
+                    <a href={c.credential_url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 text-[#FF6B2B]">
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
               ))}
             </div>
           )

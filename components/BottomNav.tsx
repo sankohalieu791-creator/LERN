@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, BookOpen, Compass, User, Radio } from 'lucide-react'
+import { Home, BookOpen, Compass, User } from 'lucide-react'
 
 export default function BottomNav() {
   const pathname = usePathname()
@@ -22,17 +22,15 @@ export default function BottomNav() {
     }`
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#0f0f0f] border-t border-[rgba(255,255,255,0.08)]">
+    <nav
+      className="fixed bottom-0 left-0 right-0 bg-[#0f0f0f] border-t border-[rgba(255,255,255,0.08)]"
+      style={{ zIndex: 9999 }}
+    >
       <div className="flex items-stretch" style={{ height: '56px' }}>
 
         <Link href="/feed" className={cls('/feed')}>
           <Home className="w-[22px] h-[22px]" />
           <span className="text-[10px] font-medium">Feed</span>
-        </Link>
-
-        <Link href="/live" className={cls('/live')}>
-          <Radio className="w-[22px] h-[22px]" />
-          <span className="text-[10px] font-medium">Live</span>
         </Link>
 
         <Link href="/courses" className={cls('/courses')}>

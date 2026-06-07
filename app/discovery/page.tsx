@@ -297,20 +297,31 @@ function ContactSheet({
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-[#141414] rounded-t-3xl flex flex-col" style={{ maxHeight: '90vh' }}>
 
-        {/* Banner */}
-        <div className="h-28 bg-gradient-to-r from-[#FF6B2B] via-[#E91E8C] to-[#7C3AED] relative flex-shrink-0 rounded-t-3xl">
-          <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 bg-black/30 rounded-full flex items-center justify-center">
+        {/* Handle + close */}
+        <div className="flex-shrink-0 flex items-center justify-between px-5 pt-4 pb-2">
+          <div className="w-10 h-1 bg-[#333] rounded-full mx-auto absolute left-1/2 -translate-x-1/2 top-3" />
+          <div />
+          <button onClick={onClose} className="w-8 h-8 bg-[#222] rounded-full flex items-center justify-center ml-auto">
             <X className="w-4 h-4 text-white" />
           </button>
         </div>
 
-        {/* Avatar row — NOT inside scroll container so it's never clipped */}
-        <div className="flex-shrink-0 px-5" style={{ marginTop: '-40px', marginBottom: '8px' }}>
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] border-4 border-[#141414] flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
+        {/* Avatar row */}
+        <div className="flex-shrink-0 px-5 pb-3 flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] border-2 border-[#2a2a2a] flex items-center justify-center text-white text-xl font-bold overflow-hidden flex-shrink-0">
             {u?.avatar_url
               ? <img src={u.avatar_url} alt={app.full_name} className="w-full h-full object-cover" />
               : (app.full_name?.[0] || '?').toUpperCase()
             }
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-white text-lg font-bold truncate">{app.full_name}</h2>
+              {u?.verified && <VerifiedTick size={18} />}
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <RolePill role={app.role_type} />
+            </div>
           </div>
         </div>
 
@@ -318,11 +329,6 @@ function ContactSheet({
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
 
           <div className="px-5">
-            <div className="flex items-center gap-2 flex-wrap mb-0.5">
-              <h2 className="text-white text-xl font-bold">{app.full_name}</h2>
-              {u?.verified && <VerifiedTick size={20} />}
-              <RolePill role={app.role_type} />
-            </div>
             <p className="text-[#888] text-sm mb-1">{app.topic}</p>
             {(app.location || app.experience_years) && (
               <div className="flex items-center gap-1 text-[#555] text-xs mb-3">
@@ -426,20 +432,18 @@ export default function DiscoveryPage() {
     const load = async () => {
       setLoading(true)
       const roleFilter = activeTab === 'request' ? undefined : activeTab
-      const { data } = await getInstructors(roleFilter)
+      const [{ data }, followIds, reqData] = await Promise.all([
+        getInstructors(roleFilter),
+        user ? getFollowingIds(user.id) : Promise.resolve([] as string[]),
+        user ? getMyTrainingRequests(user.id) : Promise.resolve({ data: null }),
+      ])
       setInstructors((data as any[]) ?? [])
+      setFollowingIds(new Set(followIds))
+      if (reqData.data) setRequestedIds(new Map(reqData.data.map((r: any) => [r.to_instructor_id, r.status ?? 'pending'])))
       setLoading(false)
     }
     load()
-  }, [activeTab])
-
-  useEffect(() => {
-    if (!user) return
-    getFollowingIds(user.id).then(ids => setFollowingIds(new Set(ids)))
-    getMyTrainingRequests(user.id).then(({ data }) => {
-      if (data) setRequestedIds(new Map(data.map((r: any) => [r.to_instructor_id, r.status ?? 'pending'])))
-    })
-  }, [user])
+  }, [activeTab, user])
 
   const handleFollow = useCallback(async (targetId: string | undefined) => {
     if (!user || !targetId) return

@@ -40,8 +40,7 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
     .sort((a, b) => new Date(a.session_date || '9999').getTime() - new Date(b.session_date || '9999').getTime())
 
   const firstSession = sessions[0]
-  const isLive = sessions.some(s => s.is_live) ||
-    (firstSession?.session_date && new Date(firstSession.session_date) <= new Date())
+  const isLive = sessions.some(s => s.is_live)
 
   const startDateStr = firstSession?.session_date
     ? new Date(firstSession.session_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -100,10 +99,10 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
               Join Now
             </button>
           ) : (
-            <button onClick={onJoin} className="bg-[#252525] text-[#666] text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-[rgba(255,255,255,0.07)]">
+            <span className="bg-[#1a1a1a] text-[#555] text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-[rgba(255,255,255,0.06)]">
               <Lock className="w-3 h-3" />
-              {startDateStr ?? 'Soon'}
-            </button>
+              {startDateStr ? `Starts ${startDateStr}` : 'Coming Soon'}
+            </span>
           )}
         </div>
       </div>
