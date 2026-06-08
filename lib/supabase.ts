@@ -202,10 +202,22 @@ export const hasUserLiked = async (videoId: string, userId: string) => {
 }
 
 // Follow
+async function syncFollowCounts(followerId: string, followingId: string) {
+  const [{ count: fwing }, { count: fwers }] = await Promise.all([
+    supabase.from('followers').select('*', { count: 'exact', head: true }).eq('follower_id', followerId),
+    supabase.from('followers').select('*', { count: 'exact', head: true }).eq('following_id', followingId),
+  ])
+  await Promise.all([
+    supabase.from('users').update({ following_count: fwing ?? 0 }).eq('id', followerId),
+    supabase.from('users').update({ followers_count: fwers ?? 0 }).eq('id', followingId),
+  ])
+}
+
 export const followUser = async (followerId: string, followingId: string) => {
   const { data, error } = await supabase
     .from('followers')
     .insert([{ follower_id: followerId, following_id: followingId }])
+  if (!error) syncFollowCounts(followerId, followingId).catch(() => {})
   return { data, error }
 }
 
@@ -215,6 +227,7 @@ export const unfollowUser = async (followerId: string, followingId: string) => {
     .delete()
     .eq('follower_id', followerId)
     .eq('following_id', followingId)
+  if (!error) syncFollowCounts(followerId, followingId).catch(() => {})
   return { error }
 }
 

@@ -179,10 +179,10 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
           {/* Sessions */}
           <div>
             <label className={labelCls}>Number of Sessions</label>
-            <div className="flex gap-2">
-              {[4, 6, 8, 10, 12].map(n => (
+            <div className="grid grid-cols-5 gap-2">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                 <button key={n} type="button" onClick={() => setSessionCount(n)}
-                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition ${sessionCount === n ? 'bg-white text-black' : 'bg-[#252525] text-[#888] border border-[rgba(255,255,255,0.07)]'}`}>
+                  className={`py-2.5 rounded-xl text-sm font-bold transition ${sessionCount === n ? 'bg-white text-black' : 'bg-[#252525] text-[#888] border border-[rgba(255,255,255,0.07)]'}`}>
                   {n}
                 </button>
               ))}

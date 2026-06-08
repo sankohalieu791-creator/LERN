@@ -187,15 +187,21 @@ export default function VirtualClassroom({
       // Clear ref so the user can retry
       try { await clientRef.current?.leave() } catch {}
       clientRef.current = null
-      const code: string = err?.code ?? ''
-      const msg =
-        code === 'DYNAMIC_USE_STATIC_KEY'
-          ? 'Token required — add AGORA_APP_CERTIFICATE to your Vercel env vars.'
-          : code === 'INVALID_TOKEN'
-          ? 'Invalid token — add AGORA_APP_CERTIFICATE to generate fresh tokens.'
-          : code === 'TOKEN_EXPIRED'
-          ? 'Token expired — add AGORA_APP_CERTIFICATE to Vercel env vars.'
-          : err.message || 'Could not connect to classroom'
+      const code:   string = (err?.code    ?? '').toUpperCase()
+      const errMsg: string = (err?.message ?? err?.msg ?? '').toLowerCase()
+      const isStaticKey =
+        code === 'DYNAMIC_USE_STATIC_KEY' ||
+        code === 'CAN_NOT_GATEWAY_SERVER' ||
+        errMsg.includes('static key') ||
+        errMsg.includes('dynamic use static') ||
+        errMsg.includes('invalid vendor key')
+      const msg = isStaticKey
+        ? 'Classroom needs a token — go to Vercel → Settings → Environment Variables and add AGORA_APP_CERTIFICATE (copy the Primary Certificate from your Agora Console project).'
+        : code === 'INVALID_TOKEN' || errMsg.includes('invalid token')
+        ? 'Agora token is invalid — regenerate it in Agora Console and update AGORA_APP_CERTIFICATE in Vercel.'
+        : code === 'TOKEN_EXPIRED' || errMsg.includes('token expired')
+        ? 'Agora token expired — update AGORA_APP_CERTIFICATE in Vercel env vars.'
+        : err.message || 'Could not connect to classroom'
       setRtcError(msg)
       setConnecting(false)
     }
