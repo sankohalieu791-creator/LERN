@@ -39,6 +39,7 @@ const ROLE_OPTIONS: { value: string; label: string; desc: string; color: string 
   { value: 'coach',     label: 'Coach',     desc: 'Train & develop skills',       color: 'bg-orange-500' },
   { value: 'teacher',   label: 'Teacher',   desc: 'Teach structured curriculum',  color: 'bg-green-600'  },
   { value: 'professor', label: 'Professor', desc: 'Academic & research-led',      color: 'bg-blue-600'   },
+  { value: 'dr',        label: 'Dr.',       desc: 'Doctorate & expert-led',       color: 'bg-teal-600'   },
 ]
 
 // ── page ──────────────────────────────────────────────────────

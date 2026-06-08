@@ -6,7 +6,7 @@ import {
   Grid3X3, Briefcase, Award, Users, MessageSquare,
   MapPin, Mail, Phone, Eye, Settings, Play,
   Star, Upload, Loader2, Plus, FileText, X, Trash2,
-  BookOpen, Inbox, Check, Clock, MessageCircle,
+  BookOpen, Inbox, Check, Clock, MessageCircle, Bookmark,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -17,8 +17,10 @@ import {
   getMyTrainingRequestsFull, getOrCreateConversation,
   deleteCourse, deleteWorkshop, getInstructorWorkshops,
   getFollowersList, getFollowingList,
+  getJobsByInstructor, deleteJob, getSavedJobs, saveJob, unsaveJob,
   supabase,
 } from '@/lib/supabase'
+import CreateJob from '@/components/CreateJob'
 import type { Project, Certificate, Video } from '@/lib/types'
 
 // ── Verified badge ────────────────────────────────────────────
@@ -59,6 +61,7 @@ const STUDENT_TABS = [
   { id: 'certificates', icon: Award,         label: 'Certs'     },
   { id: 'connections',  icon: Users,         label: 'Connect'   },
   { id: 'feedback',     icon: MessageSquare, label: 'Feedback'  },
+  { id: 'saved',        icon: Bookmark,      label: 'Saved'     },
 ]
 
 const INSTRUCTOR_TABS = [
@@ -67,6 +70,7 @@ const INSTRUCTOR_TABS = [
   { id: 'workshops', icon: Users,         label: 'Workshops' },
   { id: 'requests',  icon: Inbox,         label: 'Requests'  },
   { id: 'feedback',  icon: MessageSquare, label: 'Feedback'  },
+  { id: 'jobs',      icon: Briefcase,     label: 'Jobs'      },
 ]
 
 export default function ProfileMePage() {
@@ -92,7 +96,7 @@ export default function ProfileMePage() {
   const [addingCert, setAddingCert] = useState(false)
   const [certError,  setCertError]  = useState('')
 
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'post' | 'project' | 'cert' | 'course' | 'workshop'; id: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'post' | 'project' | 'cert' | 'course' | 'workshop' | 'job'; id: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   // Instructor-specific data
@@ -100,6 +104,11 @@ export default function ProfileMePage() {
   const [workshops,        setWorkshops]        = useState<any[]>([])
   const [requests,         setRequests]         = useState<any[]>([])
   const [updatingRequest,  setUpdatingRequest]  = useState<string | null>(null)
+
+  // Jobs
+  const [myJobs,       setMyJobs]       = useState<any[]>([])
+  const [savedJobs,    setSavedJobs]    = useState<any[]>([])
+  const [showCreateJob, setShowCreateJob] = useState(false)
 
   // Followers sheet
   const [followSheet,     setFollowSheet]     = useState<'followers' | 'following' | null>(null)
@@ -120,31 +129,35 @@ export default function ProfileMePage() {
     const load = async () => {
       setDataLoading(true)
       if (user.account_type === 'instructor') {
-        const [v, f, c, ws, r] = await Promise.all([
+        const [v, f, c, ws, r, jbs] = await Promise.all([
           getUserVideos(user.id),
           getFeedbackGiven(user.id),
           getInstructorCourses(user.id),
           getInstructorWorkshops(user.id),
           getInstructorRequests(user.id),
+          getJobsByInstructor(user.id),
         ])
         setVideos(v.data ?? [])
         setFeedback(f.data ?? [])
         setCourses(c.data ?? [])
         setWorkshops(ws.data ?? [])
         setRequests(r.data ?? [])
+        setMyJobs(jbs.data ?? [])
       } else {
-        const [v, p, c, f, mr] = await Promise.all([
+        const [v, p, c, f, mr, sj] = await Promise.all([
           getUserVideos(user.id),
           getProjectsByUser(user.id),
           getCertificatesByUser(user.id),
           getFeedback(user.id),
           getMyTrainingRequestsFull(user.id),
+          getSavedJobs(user.id),
         ])
         setVideos(v.data ?? [])
         setProjects(p.data ?? [])
         setCertificates(c.data ?? [])
         setFeedback(f.data ?? [])
         setMyRequests(mr.data ?? [])
+        setSavedJobs(sj.data ?? [])
       }
       setDataLoading(false)
     }
@@ -223,6 +236,9 @@ export default function ProfileMePage() {
     } else if (deleteTarget.type === 'workshop') {
       if (user) await deleteWorkshop(deleteTarget.id, user.id)
       setWorkshops(ws => ws.filter(w => w.id !== deleteTarget.id))
+    } else if (deleteTarget.type === 'job') {
+      if (user) await deleteJob(deleteTarget.id, user.id)
+      setMyJobs(js => js.filter(j => j.id !== deleteTarget.id))
     } else {
       await deleteCertificate(deleteTarget.id)
       setCertificates(cs => cs.filter(c => c.id !== deleteTarget.id))
@@ -780,10 +796,117 @@ export default function ProfileMePage() {
             </div>
           )
         )}
+
+        {/* JOBS (instructor) */}
+        {activeTab === 'jobs' && (
+          <div>
+            <button
+              onClick={() => setShowCreateJob(true)}
+              className="w-full mb-4 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition"
+            >
+              <Plus className="w-4 h-4" />
+              Post a Job
+            </button>
+            {dataLoading ? <LoadingSpinner /> : myJobs.length === 0 ? (
+              <Empty icon={<Briefcase className="w-10 h-10" />} title="No jobs posted" hint="Post a job to attract candidates" />
+            ) : (
+              <div className="space-y-3">
+                {myJobs.map(j => (
+                  <div key={j.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-bold text-sm">{j.title}</p>
+                        {j.company && <p className="text-[#666] text-xs">{j.company}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="bg-[#252525] text-[#888] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">{j.type}</span>
+                        <button onClick={() => setDeleteTarget({ type: 'job', id: j.id })}
+                          className="w-7 h-7 flex items-center justify-center rounded-full bg-[#2a2a2a] text-[#555] hover:text-red-400 transition">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[#666] mb-2">
+                      {j.salary && <span className="text-[#FF6B2B] font-semibold">{j.salary}</span>}
+                      {j.location && <span>{j.location}</span>}
+                    </div>
+                    {j.tags && j.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {j.tags.map((tag: string) => (
+                          <span key={tag} className="bg-[#252525] text-[#888] text-[10px] px-2 py-0.5 rounded-full">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* SAVED JOBS (student) */}
+        {activeTab === 'saved' && (
+          dataLoading ? <LoadingSpinner /> : savedJobs.length === 0 ? (
+            <Empty icon={<Bookmark className="w-10 h-10" />} title="No saved jobs" hint="Save jobs from Discover to apply later" />
+          ) : (
+            <div className="space-y-3">
+              {savedJobs.map((s: any) => {
+                const j = s.jobs
+                if (!j) return null
+                return (
+                  <div key={s.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-bold text-sm">{j.title}</p>
+                        {j.company && <p className="text-[#666] text-xs">{j.company}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="bg-[#252525] text-[#888] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">{j.type}</span>
+                        <button onClick={async () => {
+                          if (!user) return
+                          await unsaveJob(user.id, j.id)
+                          setSavedJobs(prev => prev.filter(x => x.id !== s.id))
+                        }} className="w-7 h-7 flex items-center justify-center rounded-full bg-[#2a2a2a] text-[#FF6B2B] hover:text-[#555] transition">
+                          <Bookmark className="w-3.5 h-3.5 fill-current" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[#666] mb-3">
+                      {j.salary && <span className="text-[#FF6B2B] font-semibold">{j.salary}</span>}
+                      {j.location && <span>{j.location}</span>}
+                      {j.users?.username && <span className="text-[#555]">by {j.users.username}</span>}
+                    </div>
+                    {j.tags && j.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {j.tags.map((tag: string) => (
+                          <span key={tag} className="bg-[#252525] text-[#888] text-[10px] px-2 py-0.5 rounded-full">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                    {j.apply_link && (
+                      <a href={j.apply_link} target="_blank" rel="noopener noreferrer"
+                        className="block w-full text-center py-2.5 rounded-2xl bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white text-sm font-bold">
+                        Apply Now
+                      </a>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        )}
       </div>
 
     </div>
   </div>
+
+    {showCreateJob && user && (
+      <CreateJob
+        instructorId={user.id}
+        onCreated={job => setMyJobs(prev => [job, ...prev])}
+        onClose={() => setShowCreateJob(false)}
+      />
+    )}
 
     {deleteTarget && (
       <div className="fixed inset-0 z-[70] flex flex-col justify-end">
@@ -835,7 +958,8 @@ export default function ProfileMePage() {
             ) : (
               <div className="divide-y divide-[rgba(255,255,255,0.05)]">
                 {followList.map((u: any) => (
-                  <div key={u.id} className="flex items-center gap-3 px-5 py-3">
+                  <button key={u.id} onClick={() => { setFollowSheet(null); router.push(`/profile/${u.id}`) }}
+                    className="flex items-center gap-3 px-5 py-3 w-full text-left">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] overflow-hidden flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                       {u.avatar_url
                         ? <img src={u.avatar_url} className="w-full h-full object-cover" />
@@ -848,7 +972,7 @@ export default function ProfileMePage() {
                       </p>
                       {u.title && <p className="text-[#555] text-xs truncate">{u.title}</p>}
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}

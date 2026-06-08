@@ -648,11 +648,31 @@ export const getConversations = async (userId: string) => {
   }
   return {
     data: data.map((c: any) => {
-      const otherId = c.user1_id === userId ? c.user2_id : c.user1_id
-      return { ...c, otherUser: userMap[otherId] ?? null, lastMessage: lastMsgMap[c.id] ?? null }
-    }),
+      const isUser1 = c.user1_id === userId
+      const otherId = isUser1 ? c.user2_id : c.user1_id
+      const isFavorite = isUser1 ? (c.is_favorite_user1 ?? false) : (c.is_favorite_user2 ?? false)
+      const isDeleted  = isUser1 ? (c.deleted_by_user1  ?? false) : (c.deleted_by_user2  ?? false)
+      return { ...c, otherUser: userMap[otherId] ?? null, lastMessage: lastMsgMap[c.id] ?? null, isFavorite, isUser1, isDeleted }
+    }).filter((c: any) => !c.isDeleted),
     error
   }
+}
+
+export const deleteConversationForUser = async (conversationId: string, isUser1: boolean) => {
+  const col = isUser1 ? 'deleted_by_user1' : 'deleted_by_user2'
+  const { error } = await supabase.from('conversations').update({ [col]: true }).eq('id', conversationId)
+  return { error }
+}
+
+export const setConversationFavorite = async (conversationId: string, isUser1: boolean, favorite: boolean) => {
+  const col = isUser1 ? 'is_favorite_user1' : 'is_favorite_user2'
+  const { error } = await supabase.from('conversations').update({ [col]: favorite }).eq('id', conversationId)
+  return { error }
+}
+
+export const deleteMessage = async (messageId: string) => {
+  const { error } = await supabase.from('messages').delete().eq('id', messageId)
+  return { error }
 }
 
 export const getMessages = async (conversationId: string) => {
@@ -739,4 +759,70 @@ export const getInstructorWorkshops = async (instructorId: string) => {
     .eq('instructor_id', instructorId)
     .order('workshop_date', { ascending: true })
   return { data, error }
+}
+
+// Jobs
+export const createJob = async (job: {
+  instructor_id: string
+  title: string
+  company?: string
+  type: string
+  salary?: string
+  location?: string
+  description?: string
+  requirements?: string
+  apply_link?: string
+  tags?: string[]
+}) => {
+  const { data, error } = await supabase.from('jobs').insert([job]).select().single()
+  return { data, error }
+}
+
+export const getJobs = async () => {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('*, users:instructor_id(id, username, avatar_url, verified, followers_count)')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const getJobsByInstructor = async (instructorId: string) => {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('instructor_id', instructorId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const deleteJob = async (jobId: string, instructorId: string) => {
+  const { error } = await supabase
+    .from('jobs').delete().eq('id', jobId).eq('instructor_id', instructorId)
+  return { error }
+}
+
+export const saveJob = async (userId: string, jobId: string) => {
+  const { data, error } = await supabase.from('saved_jobs').insert([{ user_id: userId, job_id: jobId }])
+  return { data, error }
+}
+
+export const unsaveJob = async (userId: string, jobId: string) => {
+  const { error } = await supabase.from('saved_jobs').delete().eq('user_id', userId).eq('job_id', jobId)
+  return { error }
+}
+
+export const getSavedJobs = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('saved_jobs')
+    .select('*, jobs(*, users:instructor_id(id, username, avatar_url, verified))')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const getSavedJobIds = async (userId: string) => {
+  const { data } = await supabase
+    .from('saved_jobs').select('job_id').eq('user_id', userId)
+  return data?.map((r: any) => r.job_id) ?? []
 }

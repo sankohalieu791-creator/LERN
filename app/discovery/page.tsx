@@ -14,6 +14,7 @@ import {
   followUser, unfollowUser,
   sendTrainingRequest, getMyTrainingRequests,
   createNotification, getOrCreateConversation,
+  getJobs, saveJob, unsaveJob, getSavedJobIds,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import type { InstructorApplication } from '@/lib/types'
@@ -23,12 +24,14 @@ const ROLE_TABS = [
   { id: 'coach',     label: 'Coaches'    },
   { id: 'teacher',   label: 'Teachers'   },
   { id: 'professor', label: 'Professors' },
+  { id: 'dr',        label: 'Dr.'        },
 ] as const
-type TabId = typeof ROLE_TABS[number]['id'] | 'request'
+type TabId = typeof ROLE_TABS[number]['id'] | 'request' | 'jobs'
 
 const ROLE_COLOUR: Record<string, string> = {
   coach: 'bg-orange-500', professor: 'bg-blue-600',
   teacher: 'bg-green-600', mentor: 'bg-purple-600',
+  dr: 'bg-teal-600',
 }
 
 function getBadge(count: number) {
@@ -411,6 +414,98 @@ function ContactRow({ icon, label, value, copyKey, copied, onCopy }: {
   )
 }
 
+const JOB_TYPE_COLOUR: Record<string, string> = {
+  job: 'bg-blue-600', internship: 'bg-purple-600', apprenticeship: 'bg-orange-500',
+  'part-time': 'bg-green-600', contract: 'bg-yellow-600', freelance: 'bg-teal-600',
+}
+
+function JobCard({
+  job, isSaved, isFollowed, onSave, onFollow,
+}: {
+  job: any
+  isSaved: boolean
+  isFollowed: boolean
+  onSave: () => void
+  onFollow: () => void
+}) {
+  const router = useRouter()
+  const u = job.users
+  const typeColor = JOB_TYPE_COLOUR[job.type] ?? 'bg-gray-600'
+
+  return (
+    <div className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4">
+      <div className="flex items-start gap-3 mb-3">
+        <button onClick={() => u?.id && router.push(`/profile/${u.id}`)} className="flex-shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white font-bold overflow-hidden"
+            style={{ fontSize: 18 }}>
+            {u?.avatar_url
+              ? <img src={u.avatar_url} alt={u.username} className="w-full h-full object-cover" />
+              : u?.username?.[0]?.toUpperCase() ?? '?'}
+          </div>
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-white font-bold text-base leading-tight">{job.title}</p>
+              {job.company && <p className="text-[#888] text-sm">{job.company}</p>}
+            </div>
+            <span className={`${typeColor} text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide flex-shrink-0 mt-0.5`}>
+              {job.type}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-x-3 gap-y-1 mb-3 text-[#666] text-xs">
+        {job.salary && <span className="text-[#FF6B2B] font-semibold">{job.salary}</span>}
+        {job.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{job.location}</span>}
+        {u?.username && <span className="text-[#555]">by {u.username}</span>}
+      </div>
+
+      {job.description && (
+        <p className="text-[#666] text-sm leading-relaxed line-clamp-2 mb-3">{job.description}</p>
+      )}
+
+      {job.tags && job.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {job.tags.map((tag: string) => (
+            <span key={tag} className="bg-[#252525] text-[#888] text-[11px] px-2.5 py-1 rounded-full border border-[rgba(255,255,255,0.06)]">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        {job.apply_link ? (
+          <a href={job.apply_link} target="_blank" rel="noopener noreferrer"
+            className="flex-1 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white text-center">
+            Apply
+          </a>
+        ) : (
+          <div className="flex-1 py-2.5 rounded-full text-sm font-semibold bg-[#252525] text-[#555] text-center">Apply</div>
+        )}
+        <button onClick={onFollow}
+          className={`flex-1 py-2.5 rounded-full text-sm font-semibold transition ${
+            isFollowed
+              ? 'bg-[#2a2a2a] text-[#888] border border-[rgba(255,255,255,0.1)]'
+              : 'bg-white text-black'
+          }`}>
+          {isFollowed ? 'Following' : 'Follow'}
+        </button>
+        <button onClick={onSave}
+          className={`px-4 py-2.5 rounded-full text-sm font-semibold transition border ${
+            isSaved
+              ? 'bg-[#FF6B2B]/15 border-[#FF6B2B] text-[#FF6B2B]'
+              : 'bg-[#1e1e1e] border-[rgba(255,255,255,0.1)] text-[#888]'
+          }`}>
+          {isSaved ? '★' : '☆'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function DiscoveryPage() {
   const { user } = useAuth()
   const [activeTab,     setActiveTab]     = useState<TabId>('mentor')
@@ -423,12 +518,17 @@ export default function DiscoveryPage() {
   const [requestTarget, setRequestTarget] = useState<InstructorApplication | null>(null)
   const [unreadMsgs,    setUnreadMsgs]    = useState(0)
 
+  const [jobs,         setJobs]         = useState<any[]>([])
+  const [savedJobIds,  setSavedJobIds]  = useState<Set<string>>(new Set())
+  const [jobsLoading,  setJobsLoading]  = useState(false)
+
   useEffect(() => {
     if (!user) return
     getUnreadMessageCount(user.id).then(setUnreadMsgs)
   }, [user])
 
   useEffect(() => {
+    if (activeTab === 'jobs') return
     const load = async () => {
       setLoading(true)
       const roleFilter = activeTab === 'request' ? undefined : activeTab
@@ -445,9 +545,25 @@ export default function DiscoveryPage() {
     load()
   }, [activeTab, user])
 
+  useEffect(() => {
+    if (activeTab !== 'jobs') return
+    const load = async () => {
+      setJobsLoading(true)
+      const [{ data }, followIds, savedIds] = await Promise.all([
+        getJobs(),
+        user ? getFollowingIds(user.id) : Promise.resolve([] as string[]),
+        user ? getSavedJobIds(user.id) : Promise.resolve([] as string[]),
+      ])
+      setJobs((data as any[]) ?? [])
+      setFollowingIds(new Set(followIds))
+      setSavedJobIds(new Set(savedIds))
+      setJobsLoading(false)
+    }
+    load()
+  }, [activeTab, user])
+
   const handleFollow = useCallback(async (targetId: string | undefined) => {
     if (!user || !targetId) return
-    // Read current state inside the setter to avoid stale closure
     let wasFollowing = false
     setFollowingIds(prev => {
       wasFollowing = prev.has(targetId)
@@ -455,11 +571,26 @@ export default function DiscoveryPage() {
       wasFollowing ? next.delete(targetId) : next.add(targetId)
       return next
     })
-    // Fire API based on the state we just read
     if (wasFollowing) {
       await unfollowUser(user.id, targetId)
     } else {
       await followUser(user.id, targetId)
+    }
+  }, [user])
+
+  const handleSaveJob = useCallback(async (jobId: string) => {
+    if (!user) return
+    let wasSaved = false
+    setSavedJobIds(prev => {
+      wasSaved = prev.has(jobId)
+      const next = new Set(prev)
+      wasSaved ? next.delete(jobId) : next.add(jobId)
+      return next
+    })
+    if (wasSaved) {
+      await unsaveJob(user.id, jobId)
+    } else {
+      await saveJob(user.id, jobId)
     }
   }, [user])
 
@@ -474,8 +605,20 @@ export default function DiscoveryPage() {
     )
   })
 
+  const filteredJobs = jobs.filter(j => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return (
+      j.title?.toLowerCase().includes(q) ||
+      j.company?.toLowerCase().includes(q) ||
+      j.location?.toLowerCase().includes(q) ||
+      j.users?.username?.toLowerCase().includes(q)
+    )
+  })
+
   const allTabs: { id: TabId; label: string }[] = [
     ...ROLE_TABS,
+    { id: 'jobs',    label: '💼 Jobs'    },
     { id: 'request', label: '✉ Request' },
   ]
 
@@ -507,7 +650,7 @@ export default function DiscoveryPage() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder={activeTab === 'request' ? 'Search instructors…' : 'Search mentors…'}
+              placeholder={activeTab === 'jobs' ? 'Search jobs…' : activeTab === 'request' ? 'Search instructors…' : 'Search mentors…'}
               className="flex-1 bg-transparent text-white text-sm placeholder-[#444] outline-none"
             />
             {search && (
@@ -539,7 +682,29 @@ export default function DiscoveryPage() {
 
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 space-y-4 pt-1"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
-        {loading ? (
+        {activeTab === 'jobs' ? (
+          jobsLoading ? (
+            <div className="flex justify-center py-20">
+              <Loader2 className="w-6 h-6 text-[#444] animate-spin" />
+            </div>
+          ) : filteredJobs.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-[#444] text-sm">No jobs posted yet</p>
+              <p className="text-[#333] text-xs mt-1">Instructors can post jobs from their profile</p>
+            </div>
+          ) : (
+            filteredJobs.map(job => (
+              <JobCard
+                key={job.id}
+                job={job}
+                isSaved={savedJobIds.has(job.id)}
+                isFollowed={followingIds.has(job.instructor_id ?? '')}
+                onSave={() => handleSaveJob(job.id)}
+                onFollow={() => handleFollow(job.instructor_id)}
+              />
+            ))
+          )
+        ) : loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-6 h-6 text-[#444] animate-spin" />
           </div>

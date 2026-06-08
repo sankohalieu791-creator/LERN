@@ -159,14 +159,12 @@ function FeedCard({ video, userLikes, likeAnim, following, user, onOpen, onLike,
 
         <div className="flex items-center gap-5 pb-4">
           <button onClick={onLike} className="flex items-center gap-1.5 active:scale-90 transition-transform">
-            <span className={likeAnim.has(video.id) ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
               <ThumbsUp
-                className={`w-5 h-5 transition-transform duration-300 ${userLikes.has(video.id) ? 'rotate-0' : 'rotate-180'}`}
+                className="w-5 h-5"
                 fill={userLikes.has(video.id) ? '#ef4444' : 'none'}
                 color={userLikes.has(video.id) ? '#ef4444' : '#555'}
                 strokeWidth={1.5}
               />
-            </span>
             <span className={`text-sm font-semibold ${userLikes.has(video.id) ? 'text-red-500' : 'text-[#555]'}`}>
               {fmt(video.likes_count)}
             </span>

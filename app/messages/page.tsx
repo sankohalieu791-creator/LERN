@@ -1,10 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getConversations } from '@/lib/supabase'
-import { ArrowLeft, MessageCircle, Loader2 } from 'lucide-react'
+import {
+  getConversations,
+  deleteConversationForUser,
+  setConversationFavorite,
+} from '@/lib/supabase'
+import { ArrowLeft, MessageCircle, Loader2, MoreVertical, Star, Trash2 } from 'lucide-react'
 
 function timeAgo(dateStr: string) {
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
@@ -19,18 +23,49 @@ export default function MessagesPage() {
   const { user } = useAuth()
   const router = useRouter()
   const [conversations, setConversations] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading]             = useState(true)
+  const [menuFor, setMenuFor]             = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!user) return
     const load = async () => {
       setLoading(true)
       const { data } = await getConversations(user.id)
-      setConversations(data || [])
+      // favourites first
+      const sorted = [...(data || [])].sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0))
+      setConversations(sorted)
       setLoading(false)
     }
     load()
   }, [user])
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!menuFor) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuFor(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuFor])
+
+  const handleDelete = async (convId: string, isUser1: boolean) => {
+    setMenuFor(null)
+    await deleteConversationForUser(convId, isUser1)
+    setConversations(prev => prev.filter(c => c.id !== convId))
+  }
+
+  const handleFavorite = async (convId: string, isUser1: boolean, current: boolean) => {
+    setMenuFor(null)
+    await setConversationFavorite(convId, isUser1, !current)
+    setConversations(prev => {
+      const updated = prev.map(c => c.id === convId ? { ...c, isFavorite: !current } : c)
+      return [...updated].sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0))
+    })
+  }
 
   return (
     <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -50,41 +85,81 @@ export default function MessagesPage() {
           <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
             <MessageCircle className="w-12 h-12 text-[#2a2a2a] mb-4" />
             <p className="text-[#444] text-sm font-semibold">No messages yet</p>
-            <p className="text-[#333] text-xs mt-1">When an instructor accepts your request you can start a conversation</p>
+            <p className="text-[#333] text-xs mt-1">Start a conversation from someone's profile</p>
           </div>
         ) : (
           <div>
             {conversations.map((c: any) => {
-              const other = c.otherUser
-              const last = c.lastMessage
+              const other   = c.otherUser
+              const last    = c.lastMessage
               const initial = other?.username?.[0]?.toUpperCase() ?? '?'
+              const isOpen  = menuFor === c.id
               return (
-                <button
-                  key={c.id}
-                  onClick={() => router.push(`/messages/${c.id}`)}
-                  className="w-full flex items-center gap-3 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] active:bg-[#1a1a1a] transition text-left"
-                >
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-base font-bold overflow-hidden flex-shrink-0">
-                    {other?.avatar_url
-                      ? <img src={other.avatar_url} alt={other.username} className="w-full h-full object-cover" />
-                      : initial
-                    }
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <p className="text-white font-bold text-sm">{other?.username ?? 'User'}</p>
-                      {last && (
-                        <p className="text-[#444] text-xs flex-shrink-0 ml-2">{timeAgo(last.created_at)}</p>
+                <div key={c.id} className="relative flex items-center border-b border-[rgba(255,255,255,0.05)]">
+                  {/* Conversation row */}
+                  <button
+                    onClick={() => router.push(`/messages/${c.id}`)}
+                    className="flex-1 flex items-center gap-3 px-4 py-4 active:bg-[#1a1a1a] transition text-left"
+                  >
+                    <div className="relative flex-shrink-0">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-base font-bold overflow-hidden">
+                        {other?.avatar_url
+                          ? <img src={other.avatar_url} alt={other.username} className="w-full h-full object-cover" />
+                          : initial
+                        }
+                      </div>
+                      {c.isFavorite && (
+                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center">
+                          <Star className="w-3 h-3 text-yellow-900 fill-yellow-900" />
+                        </span>
                       )}
                     </div>
-                    <p className="text-[#555] text-sm truncate">
-                      {last
-                        ? (last.sender_id === user?.id ? 'You: ' : '') + last.content
-                        : 'Start a conversation'
-                      }
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <p className="text-white font-bold text-sm">{other?.username ?? 'User'}</p>
+                        {last && (
+                          <p className="text-[#444] text-xs flex-shrink-0 ml-2">{timeAgo(last.created_at)}</p>
+                        )}
+                      </div>
+                      <p className="text-[#555] text-sm truncate">
+                        {last
+                          ? (last.sender_id === user?.id ? 'You: ' : '') + last.content
+                          : 'Start a conversation'
+                        }
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Three-dot button */}
+                  <div className="relative flex-shrink-0 pr-2" ref={isOpen ? menuRef : undefined}>
+                    <button
+                      onClick={e => { e.stopPropagation(); setMenuFor(isOpen ? null : c.id) }}
+                      className="w-8 h-8 flex items-center justify-center text-[#444] hover:text-[#888] transition rounded-full hover:bg-[#1a1a1a]"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+
+                    {isOpen && (
+                      <div className="absolute right-0 top-9 z-50 bg-[#1e1e1e] border border-[rgba(255,255,255,0.1)] rounded-2xl overflow-hidden shadow-2xl min-w-[180px]">
+                        <button
+                          onClick={() => handleFavorite(c.id, c.isUser1, c.isFavorite)}
+                          className="flex items-center gap-3 w-full px-4 py-3.5 text-white text-sm active:bg-[#2a2a2a] transition"
+                        >
+                          <Star className={`w-4 h-4 ${c.isFavorite ? 'text-yellow-400 fill-yellow-400' : 'text-[#888]'}`} />
+                          {c.isFavorite ? 'Unfavourite' : 'Favourite'}
+                        </button>
+                        <div className="h-px bg-[rgba(255,255,255,0.07)]" />
+                        <button
+                          onClick={() => handleDelete(c.id, c.isUser1)}
+                          className="flex items-center gap-3 w-full px-4 py-3.5 text-red-400 text-sm active:bg-[#2a2a2a] transition"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete conversation
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>

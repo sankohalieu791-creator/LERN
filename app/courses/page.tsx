@@ -647,7 +647,7 @@ export default function CoursesPage() {
             className={`flex-1 py-3.5 text-sm font-semibold capitalize border-b-2 transition ${
               activeTab === tab ? 'text-white border-white' : 'text-[#555] border-transparent'
             }`}>
-            {tab}
+            {tab === 'enrolled' ? 'Enroll' : tab}
           </button>
         ))}
       </div>

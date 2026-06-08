@@ -9,9 +9,10 @@ import {
   addFeedback, createNotification,
   getInstructorRequests, updateRequestStatus,
   getProjectsByUser, getCertificatesByUser,
+  getJobsByInstructor,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
-import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink } from 'lucide-react'
+import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin } from 'lucide-react'
 import Link from 'next/link'
 
 function VerifiedBadge({ size = 16 }: { size?: number }) {
@@ -60,12 +61,14 @@ export default function UserProfilePage() {
   const [following,     setFollowing]     = useState(false)
   const [loading,       setLoading]       = useState(true)
   const [followLoading, setFollowLoading] = useState(false)
-  const [activeTab,     setActiveTab]     = useState<'posts' | 'projects' | 'certs' | 'feedback' | 'requests'>('posts')
+  const [activeTab,     setActiveTab]     = useState<'posts' | 'projects' | 'certs' | 'feedback' | 'requests' | 'jobs'>('posts')
 
   const [fbRating,     setFbRating]     = useState(0)
   const [fbText,       setFbText]       = useState('')
   const [fbSubmitting, setFbSubmitting] = useState(false)
   const [fbSubmitted,  setFbSubmitted]  = useState(false)
+
+  const [jobs, setJobs] = useState<any[]>([])
 
   const profileId    = userId as string
   const isOwnProfile = user?.id === profileId
@@ -76,16 +79,18 @@ export default function UserProfilePage() {
     const load = async () => {
       setLoading(true)
 
-      const [profileRes, videosRes, feedbackRes, projectsRes, certsRes] = await Promise.all([
+      const [profileRes, videosRes, feedbackRes, projectsRes, certsRes, jobsRes] = await Promise.all([
         getUserProfile(profileId),
         getUserVideos(profileId),
         getFeedback(profileId),
         getProjectsByUser(profileId),
         getCertificatesByUser(profileId),
+        getJobsByInstructor(profileId),
       ])
       setProfile(profileRes.data)
       setVideos(videosRes.data ?? [])
       setFeedback(feedbackRes.data ?? [])
+      setJobs(jobsRes.data ?? [])
       // Respect public/private: when viewing someone else's profile, only show public items
       const viewerIsOwner = user?.id === profileId
       const rawProjects = (projectsRes.data ?? []) as any[]
@@ -136,11 +141,8 @@ export default function UserProfilePage() {
     setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status } : r))
   }
 
-  // Uses myProfile (the logged-in user's db record) for reliable account_type check
-  const canLeaveFeedback =
-    user &&
-    !isOwnProfile &&
-    (myProfile?.account_type === 'instructor' || myProfile?.account_type === 'employer')
+  // Any logged-in user who isn't on their own profile can leave feedback
+  const canLeaveFeedback = !!user && !isOwnProfile
 
   const handleSubmitFeedback = async () => {
     if (!user || fbRating === 0 || !fbText.trim()) return
@@ -179,6 +181,10 @@ export default function UserProfilePage() {
     { id: 'projects', icon: FolderOpen,    label: 'Projects' },
     { id: 'certs',    icon: Award,         label: 'Certs'    },
     { id: 'feedback', icon: MessageSquare, label: 'Feedback' },
+    ...(isInstructor
+      ? [{ id: 'jobs', icon: Briefcase, label: 'Jobs' }]
+      : []
+    ),
     ...(isOwnProfile && isInstructor
       ? [{ id: 'requests', icon: Inbox, label: 'Requests' }]
       : []
@@ -513,6 +519,52 @@ export default function UserProfilePage() {
                       }`}>
                         {r.status === 'accepted' ? '✓ Accepted' : '✕ Declined'}
                       </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* JOBS */}
+        {activeTab === 'jobs' && (
+          <div>
+            {jobs.length === 0 ? (
+              <div className="text-center py-16">
+                <Briefcase className="w-10 h-10 text-[#2a2a2a] mx-auto mb-3" />
+                <p className="text-[#444] text-sm">No jobs posted yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {jobs.map((j: any) => (
+                  <div key={j.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-bold text-sm">{j.title}</p>
+                        {j.company && <p className="text-[#666] text-xs">{j.company}</p>}
+                      </div>
+                      <span className="bg-[#252525] text-[#888] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase flex-shrink-0">{j.type}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[#666] mb-2">
+                      {j.salary && <span className="text-[#FF6B2B] font-semibold">{j.salary}</span>}
+                      {j.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{j.location}</span>}
+                    </div>
+                    {j.description && (
+                      <p className="text-[#666] text-sm line-clamp-2 mb-3">{j.description}</p>
+                    )}
+                    {j.tags && j.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {j.tags.map((tag: string) => (
+                          <span key={tag} className="bg-[#252525] text-[#888] text-[10px] px-2 py-0.5 rounded-full">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                    {j.apply_link && (
+                      <a href={j.apply_link} target="_blank" rel="noopener noreferrer"
+                        className="block w-full text-center py-2.5 rounded-2xl bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white text-sm font-bold">
+                        Apply Now
+                      </a>
                     )}
                   </div>
                 ))}

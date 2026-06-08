@@ -17,7 +17,7 @@ export default function BottomNav() {
   const [showCourse, setShowCourse] = useState(false)
   const [showWS,     setShowWS]     = useState(false)
 
-  if (pathname === '/' || pathname.startsWith('/auth') || /^\/feed\/.+/.test(pathname)) return null
+  if (pathname === '/' || pathname.startsWith('/auth') || /^\/feed\/.+/.test(pathname) || /^\/messages\/.+/.test(pathname)) return null
 
   const active = (p: string) => pathname === p || pathname.startsWith(p + '/')
   const isInstructor = user?.account_type === 'instructor'
