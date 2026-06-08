@@ -7,6 +7,8 @@ import ThemeProvider from '@/components/ThemeProvider'
 import ClientShell from '@/components/ClientShell'
 import PushNotificationSetup from '@/components/PushNotificationSetup'
 import OnboardingFlow from '@/components/OnboardingFlow'
+import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 
 export const metadata: Metadata = {
   title: 'LERN',
@@ -49,6 +51,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <BottomNav />
           <OnboardingFlow />
         </AuthProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
