@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Bell, ThumbsUp, MessageCircle, Share2, X, Send, Play, Trash2, Eye, Clock, Plus } from 'lucide-react'
+import { Search, Bell, ThumbsUp, MessageCircle, Share2, X, Send, Play, Trash2, Eye, Clock } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getVideos, likeVideo, unlikeVideo, hasUserLiked,
@@ -13,7 +13,6 @@ import {
 } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
-import CreatePost from '@/components/CreatePost'
 
 function VerifiedBadge({ size = 14 }: { size?: number }) {
   return (
@@ -99,15 +98,6 @@ function FeedCard({ video, userLikes, likeAnim, following, user, onOpen, onLike,
           <video ref={videoRef} src={video.video_url} muted loop playsInline
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${playing ? 'opacity-100' : 'opacity-0'}`}
           />
-        )}
-
-        {/* Play overlay — hide when playing */}
-        {!playing && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-14 h-14 rounded-full bg-black/50 flex items-center justify-center">
-              <Play className="w-7 h-7 text-white ml-0.5" fill="white" />
-            </div>
-          </div>
         )}
 
         {video.subject && (
@@ -214,8 +204,6 @@ export default function FeedPage() {
   const [comments,       setComments]       = useState<any[]>([])
   const [newComment,     setNewComment]     = useState('')
   const [commentLoading, setCommentLoading] = useState(false)
-  const [showCreatePost, setShowCreatePost] = useState(false)
-
   const searchRef  = useRef<HTMLInputElement>(null)
   const commentRef = useRef<HTMLInputElement>(null)
 
@@ -370,13 +358,7 @@ export default function FeedPage() {
           </div>
         ) : (
           <div className="px-4 py-3 flex items-center justify-between">
-            <button
-              onClick={() => setShowCreatePost(true)}
-              className="flex items-center gap-1.5 bg-white text-black text-sm font-bold px-4 py-1.5 rounded-full active:scale-95 transition-transform"
-            >
-              <Plus className="w-4 h-4" strokeWidth={2.5} />
-              Create
-            </button>
+            <span className="text-white font-black text-xl tracking-tight">LERN</span>
             <div className="flex items-center gap-5">
               <button onClick={() => { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 50) }}>
                 <Search className="w-6 h-6 text-[#888]" />
@@ -689,7 +671,6 @@ export default function FeedPage() {
       </div>
     )}
 
-    <CreatePost isOpen={showCreatePost} onClose={() => setShowCreatePost(false)} />
     </>
   )
 }

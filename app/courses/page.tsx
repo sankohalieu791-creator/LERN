@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import {
   SlidersHorizontal, Star, Clock, Users, X, Check,
   Calendar, Loader2, Lock,
-  UserCheck, Plus, BookOpen, Trash2,
+  UserCheck, Plus, BookOpen, Trash2, MapPin,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -104,6 +104,139 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
               {startDateStr ? `Starts ${startDateStr}` : 'Coming Soon'}
             </span>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Workshop detail bottom sheet ─────────────────────────────
+function WorkshopDetailSheet({ workshop, isJoined, onJoin, onClose }: {
+  workshop: any
+  isJoined: boolean
+  onJoin: () => void
+  onClose: () => void
+}) {
+  const [joining, setJoining] = useState(false)
+
+  const handleJoin = async () => {
+    setJoining(true)
+    await onJoin()
+    setJoining(false)
+  }
+
+  const date = workshop.workshop_date ? new Date(workshop.workshop_date) : null
+  const dateStr = date
+    ? date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : null
+  const mon = date?.toLocaleString('default', { month: 'short' }).toUpperCase()
+  const day = date?.getDate()
+
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-[#141414] rounded-t-3xl flex flex-col" style={{ maxHeight: '92vh' }}>
+        <div className="flex justify-center pt-3 flex-shrink-0">
+          <div className="w-10 h-1 bg-[#333] rounded-full" />
+        </div>
+        <div className="flex justify-end px-4 pt-2 pb-1 flex-shrink-0">
+          <button onClick={onClose} className="w-8 h-8 bg-[#222] rounded-full flex items-center justify-center">
+            <X className="w-4 h-4 text-white" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-4">
+          {/* Thumbnail */}
+          {workshop.thumbnail_url && (
+            <div className="w-full rounded-2xl overflow-hidden mb-4" style={{ height: '180px' }}>
+              <img src={workshop.thumbnail_url} alt={workshop.title} className="w-full h-full object-cover" />
+            </div>
+          )}
+
+          <h2 className="text-white text-xl font-bold leading-snug mb-4">{workshop.title}</h2>
+
+          {/* Date + time */}
+          {date && (
+            <div className="flex items-center gap-3 bg-[#1e1e1e] rounded-2xl px-4 py-3 mb-3">
+              <div className="flex-shrink-0 w-12 text-center">
+                <p className="text-[#555] text-[9px] font-bold">{mon}</p>
+                <p className="text-white font-bold text-2xl leading-none">{day}</p>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-semibold">{dateStr}</p>
+                {workshop.workshop_time && (
+                  <p className="text-[#555] text-xs mt-0.5">{workshop.workshop_time.slice(0, 5)}</p>
+                )}
+              </div>
+              <Calendar className="w-4 h-4 text-[#FF6B2B] flex-shrink-0" />
+            </div>
+          )}
+
+          {/* Location */}
+          {workshop.location && (
+            <div className="flex items-center gap-3 bg-[#1e1e1e] rounded-2xl px-4 py-3 mb-3">
+              <MapPin className="w-4 h-4 text-[#FF6B2B] flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[#555] text-[10px] font-bold uppercase tracking-wide">Location</p>
+                <p className="text-white text-sm font-semibold">{workshop.location}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Capacity */}
+          <div className="flex items-center gap-3 bg-[#1e1e1e] rounded-2xl px-4 py-3 mb-4">
+            <Users className="w-4 h-4 text-[#FF6B2B] flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[#555] text-[10px] font-bold uppercase tracking-wide">Attendees</p>
+              <p className="text-white text-sm font-semibold">
+                {workshop.enrolled_count || 0}
+                {workshop.capacity ? ` / ${workshop.capacity} spots` : ' joined'}
+              </p>
+            </div>
+            {workshop.capacity && (
+              <div className="w-16 h-1.5 bg-[#333] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] rounded-full"
+                  style={{ width: `${Math.min(100, ((workshop.enrolled_count || 0) / workshop.capacity) * 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Instructor */}
+          {workshop.users && (
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] overflow-hidden flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                {workshop.users.avatar_url
+                  ? <img src={workshop.users.avatar_url} className="w-full h-full object-cover" />
+                  : workshop.users.username?.[0]?.toUpperCase()}
+              </div>
+              <p className="text-white text-sm font-semibold flex items-center gap-1.5">
+                {workshop.users.username}
+                {workshop.users.verified && <VerifiedBadge size={13} />}
+              </p>
+            </div>
+          )}
+
+          {/* Description */}
+          {workshop.description && (
+            <p className="text-[#888] text-sm leading-relaxed">{workshop.description}</p>
+          )}
+        </div>
+
+        <div className="flex-shrink-0 px-5 py-4 border-t border-[rgba(255,255,255,0.07)] bg-[#141414]"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
+          <button
+            onClick={handleJoin}
+            disabled={joining}
+            className={`w-full font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2 ${
+              isJoined
+                ? 'bg-[#252525] text-white border border-[rgba(255,255,255,0.08)]'
+                : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
+            }`}
+          >
+            {joining ? <><Loader2 className="w-4 h-4 animate-spin" />Loading…</> : isJoined ? 'Leave Workshop' : 'Join Workshop'}
+          </button>
         </div>
       </div>
     </div>
@@ -339,7 +472,8 @@ export default function CoursesPage() {
   const [filterLevel,     setFilterLevel]     = useState('')
   const [filterSubject,   setFilterSubject]   = useState('')
   const [allSubjects,     setAllSubjects]     = useState<string[]>([])
-  const [detailCourseId,  setDetailCourseId]  = useState<string | null>(null)
+  const [detailCourseId,    setDetailCourseId]    = useState<string | null>(null)
+  const [detailWorkshop,    setDetailWorkshop]    = useState<any>(null)
   const [joinedWorkshops, setJoinedWorkshops] = useState<Set<string>>(new Set())
   const [joiningId,       setJoiningId]       = useState<string | null>(null)
   const [showCreateCourse,   setShowCreateCourse]   = useState(false)
@@ -452,7 +586,8 @@ export default function CoursesPage() {
                   <WorkshopCard key={w.id} workshop={w}
                     isJoined={joinedWorkshops.has(w.id)}
                     joining={joiningId === w.id}
-                    onJoin={() => handleWorkshopJoin(w.id)} />
+                    onJoin={() => handleWorkshopJoin(w.id)}
+                    onTap={() => setDetailWorkshop(w)} />
                 ))
             }
           </div>
@@ -537,6 +672,15 @@ export default function CoursesPage() {
 
     {detailCourseId && (
       <CourseDetailSheet courseId={detailCourseId} onClose={() => setDetailCourseId(null)} />
+    )}
+
+    {detailWorkshop && (
+      <WorkshopDetailSheet
+        workshop={detailWorkshop}
+        isJoined={joinedWorkshops.has(detailWorkshop.id)}
+        onJoin={() => handleWorkshopJoin(detailWorkshop.id)}
+        onClose={() => setDetailWorkshop(null)}
+      />
     )}
 
     {/* Instructor create FAB */}
@@ -653,11 +797,12 @@ function CourseCard({ course, isEnrolled, isOwner, onTap }: {
 }
 
 // ── WorkshopCard ──────────────────────────────────────────────
-function WorkshopCard({ workshop, isJoined, joining, onJoin }: {
+function WorkshopCard({ workshop, isJoined, joining, onJoin, onTap }: {
   workshop: any
   isJoined?: boolean
   joining?: boolean
   onJoin: () => void
+  onTap?: () => void
 }) {
   const date = workshop.workshop_date ? new Date(workshop.workshop_date) : null
   const dateStr = date
@@ -665,7 +810,7 @@ function WorkshopCard({ workshop, isJoined, joining, onJoin }: {
     : null
 
   return (
-    <div className="bg-[#1a1a1a] rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.06)]">
+    <div className="bg-[#1a1a1a] rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.06)] active:opacity-90 cursor-pointer" onClick={onTap}>
       {/* Thumbnail */}
       <div className="relative w-full bg-[#252525] overflow-hidden" style={{ height: '190px' }}>
         {workshop.thumbnail_url
@@ -711,13 +856,13 @@ function WorkshopCard({ workshop, isJoined, joining, onJoin }: {
           <span className="flex items-center gap-1"><UserCheck className="w-3 h-3" />{workshop.enrolled_count || 0} joined</span>
         </div>
 
-        <button onClick={onJoin} disabled={joining}
+        <button onClick={e => { e.stopPropagation(); onJoin() }} disabled={joining}
           className={`w-full py-3 rounded-2xl text-sm font-bold transition active:scale-[0.98] disabled:opacity-40 ${
             isJoined
               ? 'bg-[#252525] text-white border border-[rgba(255,255,255,0.08)]'
               : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
           }`}>
-          {joining ? '…' : isJoined ? 'Joined ✓' : 'Join Workshop'}
+          {joining ? '…' : isJoined ? 'Joined ✓' : 'View & Join'}
         </button>
       </div>
     </div>

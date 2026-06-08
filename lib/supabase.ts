@@ -228,6 +228,36 @@ export const isFollowing = async (followerId: string, followingId: string) => {
   return { data: !!data, error }
 }
 
+export const getFollowersList = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('followers')
+    .select('follower_id')
+    .eq('following_id', userId)
+  if (!data || error) return { data: [], error }
+  const ids = data.map((r: any) => r.follower_id).filter(Boolean)
+  if (!ids.length) return { data: [], error: null }
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, username, avatar_url, verified, title')
+    .in('id', ids)
+  return { data: users ?? [], error: null }
+}
+
+export const getFollowingList = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('followers')
+    .select('following_id')
+    .eq('follower_id', userId)
+  if (!data || error) return { data: [], error }
+  const ids = data.map((r: any) => r.following_id).filter(Boolean)
+  if (!ids.length) return { data: [], error: null }
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, username, avatar_url, verified, title')
+    .in('id', ids)
+  return { data: users ?? [], error: null }
+}
+
 // Comments
 export const addComment = async (videoId: string, userId: string, text: string) => {
   const { data, error } = await supabase

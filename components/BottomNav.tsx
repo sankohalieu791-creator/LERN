@@ -61,7 +61,9 @@ export default function BottomNav() {
         </div>
       )}
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#0f0f0f] border-t border-[rgba(255,255,255,0.08)]">
+      <nav
+        style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: '#0f0f0f', borderTop: '1px solid rgba(255,255,255,0.08)' }}
+      >
         <div className="flex items-center" style={{ height: '60px' }}>
           <Link href="/feed" className={linkCls('/feed')}>
             <Home className="w-6 h-6" />

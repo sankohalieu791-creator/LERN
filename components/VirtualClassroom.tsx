@@ -2,14 +2,15 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
-  Mic, MicOff,
-  Hand, X, Users, MoreVertical, Send, Loader2, WifiOff,
+  Mic, MicOff, Video, VideoOff,
+  Hand, X, Users, MoreVertical, Send, Loader2, WifiOff, UserX, Volume2, VolumeX, Check,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type {
   IAgoraRTCClient,
   IMicrophoneAudioTrack,
+  ICameraVideoTrack,
   IAgoraRTCRemoteUser,
 } from 'agora-rtc-sdk-ng'
 import type { RealtimeChannel } from '@supabase/supabase-js'
@@ -38,7 +39,8 @@ interface ChatMessage {
   instructor: boolean
 }
 
-const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!
+const APP_ID   = process.env.NEXT_PUBLIC_AGORA_APP_ID!
+const RTC_TOKEN = process.env.NEXT_PUBLIC_AGORA_TEMP_TOKEN ?? null
 
 const AVATAR_COLORS = [
   'from-red-500 to-orange-500',
@@ -70,7 +72,9 @@ export default function VirtualClassroom({
   // ── Agora refs ────────────────────────────────────────────
   const clientRef        = useRef<IAgoraRTCClient | null>(null)
   const localAudioRef    = useRef<IMicrophoneAudioTrack | null>(null)
+  const localCameraRef   = useRef<ICameraVideoTrack | null>(null)
   const remoteVideoElRef = useRef<HTMLDivElement>(null)
+  const selfVideoElRef   = useRef<HTMLDivElement>(null)
   const realtimeRef      = useRef<RealtimeChannel | null>(null)
   const chatRef          = useRef<HTMLDivElement>(null)
 
@@ -78,6 +82,7 @@ export default function VirtualClassroom({
   const [joined,      setJoined]      = useState(false)
   const [connecting,  setConnecting]  = useState(false)
   const [muted,       setMuted]       = useState(true)
+  const [cameraOn,    setCameraOn]    = useState(false)
   const [handUp,      setHandUp]      = useState(false)
   const [rtcError,    setRtcError]    = useState('')
   const [remoteUsers, setRemoteUsers] = useState<IAgoraRTCRemoteUser[]>([])
@@ -129,6 +134,27 @@ export default function VirtualClassroom({
         if (prev.find(m => m.id === payload.id)) return prev
         return [...prev, payload as ChatMessage]
       })
+    })
+
+    // ── Broadcast → instructor commands ───────────────────
+    channel.on('broadcast', { event: 'kick' }, ({ payload }) => {
+      if (payload.targetUserId === myUserId) leaveAndClose()
+    })
+    channel.on('broadcast', { event: 'mute' }, ({ payload }) => {
+      if (payload.targetUserId === myUserId) {
+        localAudioRef.current?.close()
+        localAudioRef.current = null
+        setMuted(true)
+      }
+    })
+    channel.on('broadcast', { event: 'accept_hand' }, ({ payload }) => {
+      if (payload.targetUserId === myUserId) {
+        setHandUp(false)
+        setMessages(prev => [...prev, {
+          id: String(Date.now()), userId: 'system', username: 'Instructor',
+          text: '✅ You have been accepted to speak.', instructor: true,
+        }])
+      }
     })
 
     channel.subscribe(async (status) => {
@@ -186,7 +212,7 @@ export default function VirtualClassroom({
           setRemoteUsers(prev => prev.filter(u => u.uid !== remoteUser.uid))
         })
 
-        await client.join(APP_ID, channelName, null, null)
+        await client.join(APP_ID, channelName, RTC_TOKEN, null)
         if (!cancelled) { setJoined(true); setConnecting(false) }
       } catch (err: any) {
         if (!cancelled) { setRtcError(err.message || 'Could not connect'); setConnecting(false) }
@@ -205,14 +231,55 @@ export default function VirtualClassroom({
     }
   }, [])
 
+  const isInstructorUser = (user as any)?.username === instructorName
+
   const leaveAndClose = useCallback(async () => {
     localAudioRef.current?.close()
     localAudioRef.current = null
+    if (localCameraRef.current) {
+      localCameraRef.current.stop()
+      localCameraRef.current.close()
+      localCameraRef.current = null
+    }
     try { await clientRef.current?.leave() } catch {}
     clientRef.current = null
-    setJoined(false); setRemoteUsers([]); setMuted(true); setRtcError('')
+    setJoined(false); setRemoteUsers([]); setMuted(true); setCameraOn(false); setRtcError('')
     onClose()
   }, [onClose])
+
+  const toggleCamera = async () => {
+    if (!joined || !clientRef.current) return
+    try {
+      const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
+      if (!cameraOn) {
+        const video = await AgoraRTC.createCameraVideoTrack()
+        localCameraRef.current = video
+        await clientRef.current.publish([video])
+        if (selfVideoElRef.current) video.play(selfVideoElRef.current)
+        setCameraOn(true)
+      } else {
+        if (localCameraRef.current) {
+          await clientRef.current.unpublish([localCameraRef.current])
+          localCameraRef.current.stop()
+          localCameraRef.current.close()
+          localCameraRef.current = null
+        }
+        setCameraOn(false)
+      }
+    } catch { setRtcError('Camera access denied.') }
+  }
+
+  const kickParticipant = (targetUserId: string) => {
+    realtimeRef.current?.send({ type: 'broadcast', event: 'kick', payload: { targetUserId } })
+  }
+
+  const muteParticipant = (targetUserId: string) => {
+    realtimeRef.current?.send({ type: 'broadcast', event: 'mute', payload: { targetUserId } })
+  }
+
+  const acceptHand = (targetUserId: string) => {
+    realtimeRef.current?.send({ type: 'broadcast', event: 'accept_hand', payload: { targetUserId } })
+  }
 
   const toggleMic = async () => {
     if (!joined || !clientRef.current) return
@@ -318,6 +385,13 @@ export default function VirtualClassroom({
           )}
         </div>
 
+        {/* Self-camera preview (instructor) */}
+        {cameraOn && (
+          <div className="mx-4 mb-3 rounded-xl overflow-hidden bg-black" style={{ height: 120 }}>
+            <div ref={selfVideoElRef} className="w-full h-full" />
+          </div>
+        )}
+
         {/* IN THE ROOM */}
         {participants.length > 0 && (
           <div className="px-4 mb-4">
@@ -336,6 +410,34 @@ export default function VirtualClassroom({
                   <p className="text-[#888] text-[10px] max-w-[52px] truncate text-center">
                     {p.isSelf ? 'You' : p.username.split(' ')[0]}
                   </p>
+                  {/* Instructor controls */}
+                  {isInstructorUser && !p.isSelf && (
+                    <div className="flex gap-1 mt-0.5">
+                      {p.handUp && (
+                        <button
+                          onClick={() => acceptHand(p.userId)}
+                          className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center"
+                          title="Accept to speak"
+                        >
+                          <Check className="w-3 h-3 text-white" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => muteParticipant(p.userId)}
+                        className="w-6 h-6 rounded-full bg-[#333] flex items-center justify-center"
+                        title="Mute"
+                      >
+                        <VolumeX className="w-3 h-3 text-white" />
+                      </button>
+                      <button
+                        onClick={() => kickParticipant(p.userId)}
+                        className="w-6 h-6 rounded-full bg-red-500/80 flex items-center justify-center"
+                        title="Remove"
+                      >
+                        <UserX className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -365,10 +467,17 @@ export default function VirtualClassroom({
             {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </button>
 
-          <button onClick={() => setHandUp(v => !v)}
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition ${handUp ? 'bg-[#FF6B2B] text-white' : 'bg-[#333] text-white'}`}>
-            <Hand className="w-5 h-5" />
+          <button onClick={toggleCamera} disabled={!joined}
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition disabled:opacity-40 ${cameraOn ? 'bg-[#FF6B2B] text-white' : 'bg-[#333] text-white'}`}>
+            {cameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
           </button>
+
+          {!isInstructorUser && (
+            <button onClick={() => setHandUp(v => !v)}
+              className={`w-11 h-11 rounded-full flex items-center justify-center transition ${handUp ? 'bg-[#FF6B2B] text-white' : 'bg-[#333] text-white'}`}>
+              <Hand className="w-5 h-5" />
+            </button>
+          )}
 
           <div className="flex-1" />
 

@@ -16,6 +16,7 @@ import {
   getInstructorCourses, getInstructorRequests, updateRequestStatus,
   getMyTrainingRequestsFull, getOrCreateConversation,
   deleteCourse, deleteWorkshop, getInstructorWorkshops,
+  getFollowersList, getFollowingList,
   supabase,
 } from '@/lib/supabase'
 import type { Project, Certificate, Video } from '@/lib/types'
@@ -99,6 +100,11 @@ export default function ProfileMePage() {
   const [workshops,        setWorkshops]        = useState<any[]>([])
   const [requests,         setRequests]         = useState<any[]>([])
   const [updatingRequest,  setUpdatingRequest]  = useState<string | null>(null)
+
+  // Followers sheet
+  const [followSheet,     setFollowSheet]     = useState<'followers' | 'following' | null>(null)
+  const [followList,      setFollowList]      = useState<any[]>([])
+  const [followLoading,   setFollowLoading]   = useState(false)
 
   // Student connections (sent requests)
   const [myRequests,       setMyRequests]       = useState<any[]>([])
@@ -241,14 +247,27 @@ export default function ProfileMePage() {
 
         <div className="flex flex-1 justify-around">
           {[
-            { label: 'Posts',     value: videos.length             },
-            { label: 'Followers', value: user?.followers_count ?? 0 },
-            { label: 'Following', value: user?.following_count ?? 0 },
+            { label: 'Posts',     value: videos.length,             tap: null                },
+            { label: 'Followers', value: user?.followers_count ?? 0, tap: 'followers' as const },
+            { label: 'Following', value: user?.following_count ?? 0, tap: 'following' as const },
           ].map(s => (
-            <div key={s.label} className="text-center">
+            <button
+              key={s.label}
+              className="text-center active:opacity-70 transition"
+              onClick={async () => {
+                if (!s.tap || !user) return
+                setFollowSheet(s.tap)
+                setFollowLoading(true)
+                const { data } = s.tap === 'followers'
+                  ? await getFollowersList(user.id)
+                  : await getFollowingList(user.id)
+                setFollowList(data ?? [])
+                setFollowLoading(false)
+              }}
+            >
               <p className="text-white theme-text-1 font-bold text-lg leading-none">{s.value.toLocaleString()}</p>
               <p className="text-[#555] theme-text-2 text-xs mt-0.5">{s.label}</p>
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -789,6 +808,51 @@ export default function ProfileMePage() {
           >
             Cancel
           </button>
+        </div>
+      </div>
+    )}
+    {/* ── FOLLOWERS / FOLLOWING SHEET ─────────────────────── */}
+    {followSheet && (
+      <div className="fixed inset-0 z-[70] flex flex-col justify-end">
+        <div className="absolute inset-0 bg-black/70" onClick={() => setFollowSheet(null)} />
+        <div className="relative bg-[#141414] rounded-t-3xl flex flex-col" style={{ maxHeight: '80vh', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <div className="flex justify-center pt-3 flex-shrink-0">
+            <div className="w-10 h-1 bg-[#333] rounded-full" />
+          </div>
+          <div className="flex items-center justify-between px-5 py-4 flex-shrink-0">
+            <h2 className="text-white font-bold text-lg capitalize">{followSheet}</h2>
+            <button onClick={() => setFollowSheet(null)} className="w-8 h-8 bg-[#222] rounded-full flex items-center justify-center">
+              <X className="w-4 h-4 text-white" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            {followLoading ? (
+              <div className="flex justify-center py-16">
+                <Loader2 className="w-6 h-6 text-[#444] animate-spin" />
+              </div>
+            ) : followList.length === 0 ? (
+              <p className="text-center text-[#444] text-sm py-16">No {followSheet} yet</p>
+            ) : (
+              <div className="divide-y divide-[rgba(255,255,255,0.05)]">
+                {followList.map((u: any) => (
+                  <div key={u.id} className="flex items-center gap-3 px-5 py-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] overflow-hidden flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                      {u.avatar_url
+                        ? <img src={u.avatar_url} className="w-full h-full object-cover" />
+                        : u.username?.[0]?.toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-bold flex items-center gap-1">
+                        {u.username}
+                        {u.verified && <VerifiedBadge size={13} />}
+                      </p>
+                      {u.title && <p className="text-[#555] text-xs truncate">{u.title}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     )}
