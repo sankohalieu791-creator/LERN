@@ -29,11 +29,11 @@ export default function BottomNav() {
 
   return (
     <>
-      {showMenu && <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />}
+      {showMenu && <div className="fixed inset-0 z-[9998]" onClick={() => setShowMenu(false)} />}
 
       {showMenu && (
-        <div
-          className="fixed z-50 flex flex-col gap-2.5 items-center bottom-[calc(env(safe-area-inset-bottom,16px)+74px)] left-1/2 -translate-x-1/2"
+        <div className="fixed z-[9999] flex flex-col gap-2.5 items-center"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom, 16px) + 74px)', left: '50%', transform: 'translateX(-50%)' }}
         >
           {isInstructor && (
             <button
@@ -60,10 +60,8 @@ export default function BottomNav() {
         </div>
       )}
 
-      <nav
-        className="fixed bottom-0 left-0 right-0 z-49 bg-[#0f0f0f] border-t border-[rgba(255,255,255,0.08)] pb-[env(safe-area-inset-bottom,16px)]"
-      >
-        <div className="flex items-center h-[60px]">
+      <nav className="fixed bottom-0 left-0 right-0 z-[9999] bg-[#0f0f0f] border-t border-[rgba(255,255,255,0.08)]">
+        <div className="flex items-center" style={{ height: '60px' }}>
           <Link href="/feed" className={linkCls('/feed')}>
             <Home className="w-6 h-6" />
             <span className="text-[10px] font-medium">Feed</span>
@@ -73,10 +71,11 @@ export default function BottomNav() {
             <span className="text-[10px] font-medium">Courses</span>
           </Link>
 
-          <div className="flex-shrink-0 flex items-center justify-center w-[72px]">
+          <div className="flex-shrink-0 flex items-center justify-center" style={{ width: '72px' }}>
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="flex items-center justify-center active:scale-95 transition-transform w-[46px] h-[46px] -mt-4"
+              className="flex items-center justify-center active:scale-95 transition-transform"
+              style={{ width: '46px', height: '46px', marginTop: '-16px' }}
             >
               <Plus className={`w-7 h-7 text-white transition-transform duration-200 ${showMenu ? 'rotate-45' : ''}`} />
             </button>
@@ -91,6 +90,7 @@ export default function BottomNav() {
             <span className="text-[10px] font-medium">Profile</span>
           </Link>
         </div>
+        <div style={{ height: 'env(safe-area-inset-bottom)', background: '#0f0f0f' }} />
       </nav>
 
       <CreatePost     isOpen={showPost}   onClose={() => setShowPost(false)}   />
