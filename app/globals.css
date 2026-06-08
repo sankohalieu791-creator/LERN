@@ -73,9 +73,9 @@ body {
   transition: background 0.25s, color 0.25s;
 }
 
-/* overflow-x clip on a wrapper — NOT on body/html, which breaks
-   position:fixed on iOS Safari (fixed elements attach to body bottom) */
-#__next, main {
+/* overflow-x clip on the scroll wrapper only — NOT body/html/any element
+   with transform, as those break position:fixed on iOS Safari */
+main {
   overflow-x: clip;
 }
 

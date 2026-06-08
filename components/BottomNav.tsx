@@ -62,7 +62,12 @@ export default function BottomNav() {
 
       <nav
         className="fixed bottom-0 left-0 right-0 bg-[#0f0f0f] border-t border-[rgba(255,255,255,0.08)]"
-        style={{ zIndex: 49, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        style={{
+          zIndex: 49,
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          WebkitTransform: 'translateZ(0)',
+          transform: 'translateZ(0)',
+        }}
       >
         <div className="flex items-center h-[60px]">
           <Link href="/feed" className={linkCls('/feed')}>
