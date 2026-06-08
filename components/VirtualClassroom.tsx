@@ -84,6 +84,10 @@ export default function VirtualClassroom({
   const realtimeRef      = useRef<RealtimeChannel | null>(null)
   const chatRef          = useRef<HTMLDivElement>(null)
 
+  // Keep onClose stable so leaveAndClose never changes reference
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
+
   // ── Agora state ───────────────────────────────────────────
   const [joined,      setJoined]      = useState(false)
   const [connecting,  setConnecting]  = useState(false)
@@ -112,49 +116,7 @@ export default function VirtualClassroom({
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight
   }, [messages])
 
-  // ── Join Agora RTC ────────────────────────────────────────
-  const joinAgoraRTC = useCallback(async () => {
-    if (clientRef.current) return
-    setConnecting(true)
-    setRtcError('')
-    try {
-      const res = await fetch(`/api/agora-token?channel=${encodeURIComponent(channelName)}&uid=0`)
-      const { token } = await res.json()
-
-      const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
-      AgoraRTC.setLogLevel(3)
-      const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' })
-      clientRef.current = client
-
-      client.on('user-published', async (remoteUser, mediaType) => {
-        await client.subscribe(remoteUser, mediaType)
-        if (mediaType === 'video' && remoteVideoElRef.current) {
-          remoteUser.videoTrack?.play(remoteVideoElRef.current)
-        }
-        if (mediaType === 'audio') remoteUser.audioTrack?.play()
-        setRemoteUsers(prev =>
-          prev.find(u => u.uid === remoteUser.uid) ? prev : [...prev, remoteUser]
-        )
-      })
-
-      client.on('user-unpublished', (remoteUser, mediaType) => {
-        if (mediaType === 'video') remoteUser.videoTrack?.stop()
-      })
-
-      client.on('user-left', (remoteUser) => {
-        setRemoteUsers(prev => prev.filter(u => u.uid !== remoteUser.uid))
-      })
-
-      await client.join(APP_ID, channelName, token, null)
-      setJoined(true)
-      setConnecting(false)
-    } catch (err: any) {
-      setRtcError(err.message || 'Could not connect')
-      setConnecting(false)
-    }
-  }, [channelName])
-
-  // ── Cleanup ───────────────────────────────────────────────
+  // ── Leave and close — stable ref, no deps ─────────────────
   const leaveAndClose = useCallback(async () => {
     localAudioRef.current?.close()
     localAudioRef.current = null
@@ -167,8 +129,77 @@ export default function VirtualClassroom({
     clientRef.current = null
     setJoined(false); setRemoteUsers([]); setMuted(true); setCameraOn(false); setRtcError('')
     setWaitingForApproval(false); setDenied(false); setShowDotPanel(false)
-    onClose()
-  }, [onClose])
+    onCloseRef.current()
+  }, []) // stable — uses only refs and state setters
+
+  // ── Join Agora RTC ────────────────────────────────────────
+  const joinAgoraRTC = useCallback(async () => {
+    if (clientRef.current) return
+    setConnecting(true)
+    setRtcError('')
+
+    // 1. Try server-generated token (needs AGORA_APP_CERTIFICATE in env)
+    // 2. Fall back to NEXT_PUBLIC_AGORA_TEMP_TOKEN (expires after 24h)
+    // 3. Fall back to null (only works if Agora project is in "App ID only / test" mode)
+    let token: string | null = null
+    try {
+      const res = await fetch(`/api/agora-token?channel=${encodeURIComponent(channelName)}&uid=0`)
+      if (res.ok) {
+        const data = await res.json()
+        token = data.token ?? null
+      }
+    } catch {
+      // API unreachable
+    }
+    if (!token) {
+      token = process.env.NEXT_PUBLIC_AGORA_TEMP_TOKEN ?? null
+    }
+
+    try {
+      const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
+      AgoraRTC.setLogLevel(1)
+      const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' })
+
+      // Set up listeners before join
+      client.on('user-published', async (remoteUser, mediaType) => {
+        await client.subscribe(remoteUser, mediaType)
+        if (mediaType === 'video' && remoteVideoElRef.current) {
+          remoteUser.videoTrack?.play(remoteVideoElRef.current)
+        }
+        if (mediaType === 'audio') remoteUser.audioTrack?.play()
+        setRemoteUsers(prev =>
+          prev.find(u => u.uid === remoteUser.uid) ? prev : [...prev, remoteUser]
+        )
+      })
+      client.on('user-unpublished', (remoteUser, mediaType) => {
+        if (mediaType === 'video') remoteUser.videoTrack?.stop()
+      })
+      client.on('user-left', (remoteUser) => {
+        setRemoteUsers(prev => prev.filter(u => u.uid !== remoteUser.uid))
+      })
+
+      // Only set ref after listeners are attached, before join
+      clientRef.current = client
+      await client.join(APP_ID, channelName, token, null)
+      setJoined(true)
+      setConnecting(false)
+    } catch (err: any) {
+      // Clear ref so the user can retry
+      try { await clientRef.current?.leave() } catch {}
+      clientRef.current = null
+      const code: string = err?.code ?? ''
+      const msg =
+        code === 'DYNAMIC_USE_STATIC_KEY'
+          ? 'Token required — add AGORA_APP_CERTIFICATE to your Vercel env vars.'
+          : code === 'INVALID_TOKEN'
+          ? 'Invalid token — add AGORA_APP_CERTIFICATE to generate fresh tokens.'
+          : code === 'TOKEN_EXPIRED'
+          ? 'Token expired — add AGORA_APP_CERTIFICATE to Vercel env vars.'
+          : err.message || 'Could not connect to classroom'
+      setRtcError(msg)
+      setConnecting(false)
+    }
+  }, [channelName])
 
   // ── Supabase Realtime ─────────────────────────────────────
   useEffect(() => {
@@ -250,7 +281,6 @@ export default function VirtualClassroom({
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await channel.track({ username: myUsername, avatar_url: myAvatarUrl, handUp: false, status: myStatus })
-
         if (isInstructor) {
           joinAgoraRTC()
         } else {
@@ -263,9 +293,12 @@ export default function VirtualClassroom({
       channel.unsubscribe()
       realtimeRef.current = null
     }
-  }, [isOpen, user, channelName, isInstructor, joinAgoraRTC, leaveAndClose])
+    // leaveAndClose intentionally excluded — it's stable (empty deps) and
+    // adding it would cause unnecessary re-subscriptions when parent re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, user, channelName, isInstructor, joinAgoraRTC])
 
-  // ── Update presence on hand change ───────────────────────
+  // ── Update presence on hand/joined state change ───────────
   useEffect(() => {
     if (!realtimeRef.current || !user || !joined) return
     const myUsername  = (user as any).username  ?? 'Participant'
@@ -289,19 +322,15 @@ export default function VirtualClassroom({
   const approveRequest = (targetUserId: string) => {
     realtimeRef.current?.send({ type: 'broadcast', event: 'join_approve', payload: { targetUserId } })
   }
-
   const denyRequest = (targetUserId: string) => {
     realtimeRef.current?.send({ type: 'broadcast', event: 'join_deny', payload: { targetUserId } })
   }
-
   const kickParticipant = (targetUserId: string) => {
     realtimeRef.current?.send({ type: 'broadcast', event: 'kick', payload: { targetUserId } })
   }
-
   const muteParticipant = (targetUserId: string) => {
     realtimeRef.current?.send({ type: 'broadcast', event: 'mute', payload: { targetUserId } })
   }
-
   const acceptHand = (targetUserId: string) => {
     realtimeRef.current?.send({ type: 'broadcast', event: 'accept_hand', payload: { targetUserId } })
   }
@@ -367,15 +396,13 @@ export default function VirtualClassroom({
   if (!isOpen) return null
 
   const hasRemoteVideo = remoteUsers.some(u => u.videoTrack)
-  const userCount = participants.filter(p => p.status !== 'waiting').length || 1
+  const admittedCount  = participants.filter(p => p.status !== 'waiting').length || 1
 
   // ── Waiting screen ────────────────────────────────────────
   if (waitingForApproval) {
     return (
-      <div
-        className="fixed inset-0 bg-[#0a0a0a] z-50 flex flex-col items-center justify-center gap-6 px-8"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-      >
+      <div className="fixed inset-0 bg-[#0a0a0a] z-50 flex flex-col items-center justify-center gap-6 px-8"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="w-16 h-16 rounded-full bg-[#1e1e1e] flex items-center justify-center">
           <Loader2 className="w-8 h-8 text-[#FF6B2B] animate-spin" />
         </div>
@@ -383,10 +410,8 @@ export default function VirtualClassroom({
           <p className="text-white font-bold text-lg mb-1">Waiting for admission</p>
           <p className="text-[#555] text-sm">The instructor will let you in shortly</p>
         </div>
-        <button
-          onClick={leaveAndClose}
-          className="mt-4 bg-[#1e1e1e] text-white px-6 py-3 rounded-full font-semibold text-sm border border-[rgba(255,255,255,0.08)]"
-        >
+        <button onClick={leaveAndClose}
+          className="mt-4 bg-[#1e1e1e] text-white px-6 py-3 rounded-full font-semibold text-sm border border-[rgba(255,255,255,0.08)]">
           Cancel
         </button>
       </div>
@@ -396,10 +421,8 @@ export default function VirtualClassroom({
   // ── Denied screen ─────────────────────────────────────────
   if (denied) {
     return (
-      <div
-        className="fixed inset-0 bg-[#0a0a0a] z-50 flex flex-col items-center justify-center gap-6 px-8"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-      >
+      <div className="fixed inset-0 bg-[#0a0a0a] z-50 flex flex-col items-center justify-center gap-6 px-8"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
           <X className="w-8 h-8 text-red-400" />
         </div>
@@ -407,10 +430,8 @@ export default function VirtualClassroom({
           <p className="text-white font-bold text-lg mb-1">Request denied</p>
           <p className="text-[#555] text-sm">The instructor has not admitted you to this class</p>
         </div>
-        <button
-          onClick={leaveAndClose}
-          className="mt-4 bg-[#1e1e1e] text-white px-6 py-3 rounded-full font-semibold text-sm border border-[rgba(255,255,255,0.08)]"
-        >
+        <button onClick={leaveAndClose}
+          className="mt-4 bg-[#1e1e1e] text-white px-6 py-3 rounded-full font-semibold text-sm border border-[rgba(255,255,255,0.08)]">
           Leave
         </button>
       </div>
@@ -428,7 +449,7 @@ export default function VirtualClassroom({
         </button>
         <div className="text-center flex-1 px-3">
           <p className="text-[#555] text-[9px] font-bold uppercase tracking-widest">
-            {connecting ? 'Connecting…' : joined ? '🔴 Virtual Classroom' : 'Virtual Classroom'}
+            {connecting ? 'Connecting…' : joined ? '🔴 Live' : 'Virtual Classroom'}
           </p>
           <p className="text-white text-xs font-bold mt-0.5 line-clamp-1">{courseTitle}</p>
         </div>
@@ -447,7 +468,7 @@ export default function VirtualClassroom({
         </div>
       </div>
 
-      {/* THREE-DOT PANEL (instructor: waiting room) */}
+      {/* WAITING ROOM PANEL (instructor only) */}
       {showDotPanel && isInstructor && (
         <div className="mx-4 mb-3 bg-[#1a1a1a] rounded-2xl border border-[rgba(255,255,255,0.07)] overflow-hidden flex-shrink-0">
           <div className="px-4 py-3 border-b border-[rgba(255,255,255,0.07)] flex items-center justify-between">
@@ -472,16 +493,12 @@ export default function VirtualClassroom({
                 <div key={p.userId} className="px-4 py-3 flex items-center gap-3">
                   <Avatar name={p.username} avatarUrl={p.avatar_url} size={36} colorIndex={i + 1} />
                   <p className="text-white text-sm font-semibold flex-1 truncate">{p.username}</p>
-                  <button
-                    onClick={() => denyRequest(p.userId)}
-                    className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center mr-1"
-                  >
+                  <button onClick={() => denyRequest(p.userId)}
+                    className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center mr-1">
                     <X className="w-4 h-4 text-red-400" />
                   </button>
-                  <button
-                    onClick={() => approveRequest(p.userId)}
-                    className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center"
-                  >
+                  <button onClick={() => approveRequest(p.userId)}
+                    className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
                     <Check className="w-4 h-4 text-green-400" />
                   </button>
                 </div>
@@ -493,10 +510,18 @@ export default function VirtualClassroom({
 
       {/* ERROR BANNER */}
       {rtcError && (
-        <div className="mx-4 mb-2 flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 flex-shrink-0">
-          <WifiOff className="w-4 h-4 text-red-400 flex-shrink-0" />
+        <div className="mx-4 mb-2 flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 flex-shrink-0">
+          <WifiOff className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
           <p className="text-red-400 text-xs flex-1">{rtcError}</p>
-          <button onClick={() => setRtcError('')} className="text-red-400 text-xs font-bold">✕</button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setRtcError(''); joinAgoraRTC() }}
+              className="text-[#FF6B2B] text-xs font-bold flex-shrink-0"
+            >
+              Retry
+            </button>
+            <button onClick={() => setRtcError('')} className="text-red-400 text-xs font-bold flex-shrink-0">✕</button>
+          </div>
         </div>
       )}
 
@@ -514,24 +539,33 @@ export default function VirtualClassroom({
             </div>
           )}
 
+          {!connecting && !joined && !rtcError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#111] gap-3">
+              <Avatar name={instructorName} size={56} colorIndex={0} />
+              <p className="text-[#555] text-sm">Connecting…</p>
+            </div>
+          )}
+
           {!connecting && joined && !hasRemoteVideo && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] gap-2">
               <Avatar name={instructorName} size={64} colorIndex={0} />
               <p className="text-white text-sm font-semibold mt-1">{instructorName}</p>
-              <p className="text-[#555] text-xs">Waiting for instructor to go live…</p>
+              <p className="text-[#555] text-xs">
+                {isInstructor ? 'Turn on your camera to go live' : 'Waiting for instructor to go live…'}
+              </p>
             </div>
           )}
 
           <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-black/60 rounded-full px-2.5 py-1">
             <Users className="w-3 h-3 text-white" />
-            <span className="text-white text-xs font-bold">{userCount}</span>
+            <span className="text-white text-xs font-bold">{admittedCount}</span>
           </div>
 
-          {!connecting && (
+          {joined && (
             <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-black/70 rounded-full px-3 py-1.5">
               <Avatar name={instructorName} size={20} colorIndex={0} />
               <span className="text-white text-xs font-semibold">{instructorName}</span>
-              {joined && <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />}
+              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
             </div>
           )}
         </div>
@@ -547,7 +581,7 @@ export default function VirtualClassroom({
         {participants.filter(p => p.status !== 'waiting').length > 0 && (
           <div className="px-4 mb-4">
             <p className="text-white text-xs font-bold uppercase tracking-wide mb-3">
-              In the Room · {userCount}
+              In the Room · {admittedCount}
             </p>
             <div className="flex gap-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
               {participants
@@ -556,9 +590,7 @@ export default function VirtualClassroom({
                   <div key={p.userId} className="flex flex-col items-center gap-1 flex-shrink-0">
                     <div className="relative">
                       <Avatar name={p.username} avatarUrl={p.avatar_url} size={48} colorIndex={i} />
-                      {p.handUp && (
-                        <span className="absolute -top-1 -right-1 text-sm">✋</span>
-                      )}
+                      {p.handUp && <span className="absolute -top-1 -right-1 text-sm">✋</span>}
                     </div>
                     <p className="text-[#888] text-[10px] max-w-[52px] truncate text-center">
                       {p.isSelf ? 'You' : p.username.split(' ')[0]}
@@ -566,26 +598,17 @@ export default function VirtualClassroom({
                     {isInstructor && !p.isSelf && (
                       <div className="flex gap-1 mt-0.5">
                         {p.handUp && (
-                          <button
-                            onClick={() => acceptHand(p.userId)}
-                            className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center"
-                            title="Accept to speak"
-                          >
+                          <button onClick={() => acceptHand(p.userId)}
+                            className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center" title="Accept to speak">
                             <Check className="w-3 h-3 text-white" />
                           </button>
                         )}
-                        <button
-                          onClick={() => muteParticipant(p.userId)}
-                          className="w-6 h-6 rounded-full bg-[#333] flex items-center justify-center"
-                          title="Mute"
-                        >
+                        <button onClick={() => muteParticipant(p.userId)}
+                          className="w-6 h-6 rounded-full bg-[#333] flex items-center justify-center" title="Mute">
                           <VolumeX className="w-3 h-3 text-white" />
                         </button>
-                        <button
-                          onClick={() => kickParticipant(p.userId)}
-                          className="w-6 h-6 rounded-full bg-red-500/80 flex items-center justify-center"
-                          title="Remove"
-                        >
+                        <button onClick={() => kickParticipant(p.userId)}
+                          className="w-6 h-6 rounded-full bg-red-500/80 flex items-center justify-center" title="Remove">
                           <UserX className="w-3 h-3 text-white" />
                         </button>
                       </div>
@@ -610,10 +633,8 @@ export default function VirtualClassroom({
       </div>
 
       {/* CONTROLS */}
-      <div
-        className="px-4 py-3 bg-[#111] border-t border-[rgba(255,255,255,0.06)] flex-shrink-0"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
-      >
+      <div className="px-4 py-3 bg-[#111] border-t border-[rgba(255,255,255,0.06)] flex-shrink-0"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}>
         <div className="flex items-center gap-3 mb-3">
 
           <button onClick={toggleMic} disabled={!joined}
@@ -635,10 +656,8 @@ export default function VirtualClassroom({
 
           <div className="flex-1" />
 
-          <button
-            onClick={leaveAndClose}
-            className="bg-red-500 text-white font-bold px-5 py-2.5 rounded-full text-sm hover:bg-red-600 transition"
-          >
+          <button onClick={leaveAndClose}
+            className="bg-red-500 text-white font-bold px-5 py-2.5 rounded-full text-sm hover:bg-red-600 transition">
             Leave
           </button>
         </div>
