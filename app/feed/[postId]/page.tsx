@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, ThumbsUp, ThumbsDown, MessageCircle, Share2, Send, Play } from 'lucide-react'
+import { ArrowLeft, ThumbsUp, MessageCircle, Share2, Send, Play } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getVideoById, likeVideo, unlikeVideo, hasUserLiked,
@@ -36,7 +36,6 @@ export default function PostDetailPage() {
 
   const [video,      setVideo]      = useState<any>(null)
   const [liked,      setLiked]      = useState(false)
-  const [likeAnim,   setLikeAnim]   = useState(false)
   const [following,  setFollowing]  = useState(false)
   const [comments,   setComments]   = useState<any[]>([])
   const [newComment, setNewComment] = useState('')
@@ -84,8 +83,6 @@ export default function PostDetailPage() {
 
   const handleLike = async () => {
     if (!user || !video) return
-    setLikeAnim(true)
-    setTimeout(() => setLikeAnim(false), 350)
     if (liked) {
       await unlikeVideo(video.id, user.id)
       setLiked(false)
@@ -166,12 +163,12 @@ export default function PostDetailPage() {
           {/* ACTIONS */}
           <div className="flex items-center gap-6 mb-4">
             <button onClick={handleLike} className="flex items-center gap-2">
-              <span className={likeAnim ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
-                {liked
-                  ? <ThumbsUp  className="w-8 h-8" fill="#ef4444" color="#ef4444" strokeWidth={1.5} />
-                  : <ThumbsDown className="w-8 h-8" fill="none"    color="#888"    strokeWidth={1.5} />
-                }
-              </span>
+              <ThumbsUp
+                className="w-8 h-8"
+                fill={liked ? '#ef4444' : 'none'}
+                color={liked ? '#ef4444' : '#888'}
+                strokeWidth={1.5}
+              />
               <span className={`text-base font-bold ${liked ? 'text-red-500' : 'text-[#888]'}`}>
                 {fmt(video.likes_count)}
               </span>

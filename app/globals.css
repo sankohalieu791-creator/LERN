@@ -2,15 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Like button spin animation ──────────────────────────── */
-@keyframes like-rotate {
-  0%   { transform: rotate(0deg);   }
-  100% { transform: rotate(360deg); }
-}
-.like-spin {
-  animation: like-rotate 0.35s ease-in-out;
-}
-
 /* ── Native app feel ──────────────────────────────────────── */
 *, *::before, *::after {
   -webkit-tap-highlight-color: transparent;

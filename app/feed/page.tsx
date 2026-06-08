@@ -43,10 +43,9 @@ function fmt(n: number) {
 }
 
 // Auto-plays video preview after 3 s of visible dwell — like YouTube
-function FeedCard({ video, userLikes, likeAnim, following, user, onOpen, onLike, onFollow, onProfile }: {
+function FeedCard({ video, userLikes, following, user, onOpen, onLike, onFollow, onProfile }: {
   video: any
   userLikes: Set<string>
-  likeAnim: Set<string>
   following: Set<string>
   user: any
   onOpen: () => void
@@ -192,7 +191,6 @@ export default function FeedPage() {
   const [videos,         setVideos]         = useState<any[]>([])
   const [loading,        setLoading]        = useState(true)
   const [userLikes,      setUserLikes]      = useState<Set<string>>(new Set())
-  const [likeAnim,       setLikeAnim]       = useState<Set<string>>(new Set())
   const [following,      setFollowing]      = useState<Set<string>>(new Set())
   const [selectedVideo,  setSelectedVideo]  = useState<any>(null)
   const [searchOpen,     setSearchOpen]     = useState(false)
@@ -260,8 +258,6 @@ export default function FeedPage() {
   const handleLike = async (videoId: string, e?: React.MouseEvent) => {
     e?.stopPropagation()
     if (!user) return
-    setLikeAnim(p => new Set([...p, videoId]))
-    setTimeout(() => setLikeAnim(p => { const s = new Set(p); s.delete(videoId); return s }), 400)
     if (userLikes.has(videoId)) {
       await unlikeVideo(videoId, user.id)
       setUserLikes(p => { const s = new Set(p); s.delete(videoId); return s })
@@ -408,7 +404,6 @@ export default function FeedPage() {
               key={video.id}
               video={video}
               userLikes={userLikes}
-              likeAnim={likeAnim}
               following={following}
               user={user}
               onOpen={() => openVideo(video)}
@@ -526,14 +521,12 @@ export default function FeedPage() {
             {/* ACTION ROW */}
             <div className="flex items-center gap-6 pb-4 border-b border-[rgba(255,255,255,0.07)] mb-4">
               <button onClick={() => handleLike(selectedVideo.id)} className="flex items-center gap-2 active:scale-90 transition-transform">
-                <span className={likeAnim.has(selectedVideo.id) ? 'like-spin' : ''} style={{ display: 'inline-flex' }}>
                   <ThumbsUp
-                    className={`w-6 h-6 transition-transform duration-300 ${userLikes.has(selectedVideo.id) ? 'rotate-0' : 'rotate-180'}`}
+                    className="w-6 h-6"
                     fill={userLikes.has(selectedVideo.id) ? '#ef4444' : 'none'}
                     color={userLikes.has(selectedVideo.id) ? '#ef4444' : '#888'}
                     strokeWidth={1.5}
                   />
-                </span>
                 <span className={`text-sm font-bold ${userLikes.has(selectedVideo.id) ? 'text-red-500' : 'text-[#888]'}`}>
                   {fmt(selectedVideo.likes_count)}
                 </span>
