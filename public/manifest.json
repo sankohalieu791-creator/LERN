@@ -9,13 +9,13 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/images/IMG_0400.PNG",
+      "src": "/images/lern-logo.png",
       "sizes": "any",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/images/IMG_0400.PNG",
+      "src": "/images/lern-logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

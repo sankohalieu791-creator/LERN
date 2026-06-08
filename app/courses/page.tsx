@@ -13,7 +13,7 @@ import {
   getCourses, getWorkshops, getCourseById, enrollCourse,
   isEnrolled, rateCourse, getUserCourseRating,
   joinWorkshop, leaveWorkshop, getMyWorkshopJoins,
-  setSessionLive, getEnrolledCourses,
+  setSessionLive, getEnrolledCourses, deleteWorkshop,
 } from '@/lib/supabase'
 import CreateCourse from '@/components/CreateCourse'
 import CreateWorkshop from '@/components/CreateWorkshop'
@@ -161,7 +161,7 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
           {isLive ? (
             <button onClick={onJoin} className="bg-red-500 text-white text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-              Join Now
+              Request
             </button>
           ) : (
             <span className="bg-[#1a1a1a] text-[#555] text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-[rgba(255,255,255,0.06)]">
@@ -176,18 +176,28 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
 }
 
 // ── Workshop detail bottom sheet ─────────────────────────────
-function WorkshopDetailSheet({ workshop, isJoined, onJoin, onClose }: {
+function WorkshopDetailSheet({ workshop, isJoined, isOwner, onJoin, onDelete, onClose }: {
   workshop: any
   isJoined: boolean
+  isOwner?: boolean
   onJoin: () => void
+  onDelete?: () => void
   onClose: () => void
 }) {
-  const [joining, setJoining] = useState(false)
+  const [joining,   setJoining]   = useState(false)
+  const [deleting,  setDeleting]  = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
 
   const handleJoin = async () => {
     setJoining(true)
     await onJoin()
     setJoining(false)
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    await onDelete?.()
+    setDeleting(false)
   }
 
   const date = workshop.workshop_date ? new Date(workshop.workshop_date) : null
@@ -289,19 +299,49 @@ function WorkshopDetailSheet({ workshop, isJoined, onJoin, onClose }: {
           )}
         </div>
 
-        <div className="flex-shrink-0 px-5 py-4 border-t border-[rgba(255,255,255,0.07)] bg-[#141414]"
+        <div className="flex-shrink-0 px-5 py-4 border-t border-[rgba(255,255,255,0.07)] bg-[#141414] space-y-2"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
-          <button
-            onClick={handleJoin}
-            disabled={joining}
-            className={`w-full font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2 ${
-              isJoined
-                ? 'bg-[#252525] text-white border border-[rgba(255,255,255,0.08)]'
-                : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
-            }`}
-          >
-            {joining ? <><Loader2 className="w-4 h-4 animate-spin" />Loading…</> : isJoined ? 'Leave Workshop' : 'Join Workshop'}
-          </button>
+          {isOwner ? (
+            confirmDel ? (
+              <div className="space-y-2">
+                <p className="text-center text-[#888] text-sm">Delete this workshop? This cannot be undone.</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirmDel(false)}
+                    className="flex-1 bg-[#252525] text-white font-bold py-3.5 rounded-2xl"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="flex-1 bg-red-500 text-white font-bold py-3.5 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
+                  >
+                    {deleting ? <><Loader2 className="w-4 h-4 animate-spin" />Deleting…</> : <><Trash2 className="w-4 h-4" />Delete</>}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDel(true)}
+                className="w-full bg-red-500/10 border border-red-500/20 text-red-400 font-bold py-4 rounded-2xl flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />Delete Workshop
+              </button>
+            )
+          ) : (
+            <button
+              onClick={handleJoin}
+              disabled={joining}
+              className={`w-full font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2 ${
+                isJoined
+                  ? 'bg-[#252525] text-white border border-[rgba(255,255,255,0.08)]'
+                  : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
+              }`}
+            >
+              {joining ? <><Loader2 className="w-4 h-4 animate-spin" />Loading…</> : isJoined ? 'Leave Workshop' : 'Join Workshop'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -744,7 +784,14 @@ export default function CoursesPage() {
       <WorkshopDetailSheet
         workshop={detailWorkshop}
         isJoined={joinedWorkshops.has(detailWorkshop.id)}
+        isOwner={user?.id === detailWorkshop.instructor_id}
         onJoin={() => handleWorkshopJoin(detailWorkshop.id)}
+        onDelete={async () => {
+          if (!user) return
+          await deleteWorkshop(detailWorkshop.id, user.id)
+          setWorkshops(ws => ws.filter(w => w.id !== detailWorkshop.id))
+          setDetailWorkshop(null)
+        }}
         onClose={() => setDetailWorkshop(null)}
       />
     )}

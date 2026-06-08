@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 import { getCourseById } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
 import { Loader2 } from 'lucide-react'
 import type { ComponentProps } from 'react'
 import type VirtualClassroomType from '@/components/VirtualClassroom'
 
-// Agora SDK uses browser-only APIs — never SSR this component
 const VirtualClassroom = dynamic<ComponentProps<typeof VirtualClassroomType>>(
   () => import('@/components/VirtualClassroom'),
   { ssr: false }
@@ -17,6 +17,7 @@ const VirtualClassroom = dynamic<ComponentProps<typeof VirtualClassroomType>>(
 export default function ClassroomPage() {
   const { courseId } = useParams<{ courseId: string }>()
   const router = useRouter()
+  const { user } = useAuth()
   const [course, setCourse] = useState<any>(null)
 
   useEffect(() => {
@@ -31,11 +32,14 @@ export default function ClassroomPage() {
     )
   }
 
+  const isInstructor = !!(user && user.id === course.instructor_id)
+
   return (
     <VirtualClassroom
       courseTitle={course.title}
       instructorName={course.users?.username || 'Instructor'}
-      channelName={courseId}
+      channelName={`course_${courseId}`}
+      isInstructor={isInstructor}
       isOpen={true}
       onClose={() => router.back()}
     />

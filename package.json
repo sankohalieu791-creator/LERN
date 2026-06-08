@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
+    "agora-access-token": "^2.0.4",
     "agora-rtc-sdk-ng": "^4.20.0",
     "lucide-react": "^0.294.0",
     "next": "^14.2.29",

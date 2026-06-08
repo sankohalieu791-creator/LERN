@@ -350,9 +350,19 @@ export const createNotification = async (
   type: string,
   title: string,
   body: string,
-  link?: string
+  link?: string,
+  sender?: { id?: string; username?: string; avatar_url?: string | null }
 ) => {
-  await supabase.from('notifications').insert([{ user_id: userId, type, title, body, link }])
+  await supabase.from('notifications').insert([{
+    user_id: userId,
+    type,
+    title,
+    body,
+    link,
+    sender_id:         sender?.id ?? null,
+    sender_username:   sender?.username ?? null,
+    sender_avatar_url: sender?.avatar_url ?? null,
+  }])
 }
 
 export const markNotificationsRead = async (userId: string) => {

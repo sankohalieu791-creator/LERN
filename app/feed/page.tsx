@@ -277,7 +277,7 @@ export default function FeedPage() {
       const vid = videos.find(v => v.id === videoId)
       if (vid && vid.user_id !== user.id) {
         sendPush(vid.user_id, '❤️ New like', `${(user as any).username} liked your video`, `/feed/${videoId}`)
-        createNotification(vid.user_id, 'like', '❤️ New like', `${(user as any).username} liked your video`, `/feed/${videoId}`)
+        createNotification(vid.user_id, 'like', '❤️ New like', `${(user as any).username} liked your video`, `/feed/${videoId}`, { id: user.id, username: (user as any).username, avatar_url: (user as any).avatar_url })
       }
     }
   }
@@ -292,7 +292,7 @@ export default function FeedPage() {
       await followUser(user.id, userId)
       setFollowing(p => new Set([...p, userId]))
       sendPush(userId, '👤 New follower', `${(user as any).username} started following you`, '/profile/me')
-      createNotification(userId, 'follow', '👤 New follower', `${(user as any).username} started following you`, '/profile/me')
+      createNotification(userId, 'follow', '👤 New follower', `${(user as any).username} started following you`, '/profile/me', { id: user.id, username: (user as any).username, avatar_url: (user as any).avatar_url })
     }
   }
 
@@ -307,7 +307,7 @@ export default function FeedPage() {
     setSelectedVideo((v: any) => ({ ...v, comments_count: v.comments_count + 1 }))
     if (selectedVideo.user_id !== user.id) {
       sendPush(selectedVideo.user_id, '💬 New comment', `${(user as any).username}: ${newComment.trim().slice(0, 60)}`, `/feed/${selectedVideo.id}`)
-      createNotification(selectedVideo.user_id, 'comment', '💬 New comment', `${(user as any).username}: ${newComment.trim().slice(0, 60)}`, `/feed/${selectedVideo.id}`)
+      createNotification(selectedVideo.user_id, 'comment', '💬 New comment', `${(user as any).username}: ${newComment.trim().slice(0, 60)}`, `/feed/${selectedVideo.id}`, { id: user.id, username: (user as any).username, avatar_url: (user as any).avatar_url })
     }
   }
 
@@ -452,13 +452,27 @@ export default function FeedPage() {
                 {notifs.map((n: any) => (
                   <div
                     key={n.id}
-                    className={`flex items-start gap-3 px-5 py-4 cursor-pointer active:bg-[#1e1e1e] transition ${!n.read ? 'bg-[rgba(255,107,43,0.05)]' : ''}`}
-                    onClick={() => { setShowNotifs(false); if (n.link) window.location.href = n.link }}
+                    className={`flex items-start gap-3 px-5 py-4 ${!n.read ? 'bg-[rgba(255,107,43,0.05)]' : ''}`}
                   >
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-base flex-shrink-0">
-                      {n.type === 'like' ? '❤️' : n.type === 'comment' ? '💬' : n.type === 'follow' ? '👤' : '🔔'}
-                    </div>
-                    <div className="flex-1 min-w-0">
+                    {/* Sender avatar — tap to view their profile */}
+                    <button
+                      onClick={() => {
+                        setShowNotifs(false)
+                        if (n.sender_id) router.push(`/profile/${n.sender_id}`)
+                      }}
+                      className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white font-bold text-sm flex-shrink-0 overflow-hidden"
+                    >
+                      {n.sender_avatar_url
+                        ? <img src={n.sender_avatar_url} className="w-full h-full object-cover" />
+                        : n.sender_username?.[0]?.toUpperCase()
+                          ?? (n.type === 'like' ? '❤️' : n.type === 'comment' ? '💬' : n.type === 'follow' ? '👤' : '🔔')
+                      }
+                    </button>
+                    {/* Content — tap to go to the post/video */}
+                    <div
+                      className="flex-1 min-w-0 cursor-pointer active:opacity-80"
+                      onClick={() => { setShowNotifs(false); if (n.link) window.location.href = n.link }}
+                    >
                       <p className="text-white text-sm font-semibold">{n.title}</p>
                       <p className="text-[#888] text-xs mt-0.5 line-clamp-2">{n.body}</p>
                       <p className="text-[#444] text-xs mt-1">
