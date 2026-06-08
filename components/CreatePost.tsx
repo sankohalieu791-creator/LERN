@@ -40,41 +40,27 @@ async function uploadWithProgress(
   file: File,
   onProgress: (pct: number) => void,
 ): Promise<string> {
-  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  // Animate progress so the user sees movement during the actual SDK upload
+  let pct = 0
+  const ticker = setInterval(() => {
+    // Accelerate early, slow down near 90% to avoid hitting 100 before done
+    const step = pct < 40 ? 3 + Math.random() * 4 : pct < 75 ? 1 + Math.random() * 2 : Math.random() * 0.5
+    pct = Math.min(91, pct + step)
+    onProgress(Math.round(pct))
+  }, 350)
 
-  const { data: sessionData } = await supabase.auth.getSession()
-  const token = sessionData.session?.access_token ?? ANON_KEY
-
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    const url = `${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`
-
-    xhr.upload.addEventListener('progress', e => {
-      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
-    })
-
-    xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(`${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`)
-      } else {
-        try {
-          const body = JSON.parse(xhr.responseText)
-          reject(new Error(body.error || body.message || 'Upload failed'))
-        } catch {
-          reject(new Error(`Upload failed (${xhr.status})`))
-        }
-      }
-    })
-
-    xhr.addEventListener('error', () => reject(new Error('Network error during upload')))
-
-    xhr.open('POST', url)
-    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-    xhr.setRequestHeader('Content-Type', file.type || 'video/mp4')
-    xhr.setRequestHeader('x-upsert', 'true')
-    xhr.send(file)
-  })
+  try {
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, { upsert: true })
+    clearInterval(ticker)
+    if (error) throw error
+    onProgress(100)
+    return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl
+  } catch (e) {
+    clearInterval(ticker)
+    throw e
+  }
 }
 
 export default function CreatePost({ isOpen, onClose }: CreatePostProps) {

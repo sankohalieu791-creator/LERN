@@ -13,7 +13,7 @@ export default function ClientShell({ children }: { children: React.ReactNode })
       style={
         hideNav
           ? undefined
-          : { paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }
+          : { paddingBottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }
       }
     >
       {children}
