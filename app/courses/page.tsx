@@ -33,17 +33,80 @@ function VerifiedBadge({ size = 12 }: { size?: number }) {
 const LEVELS = ['beginner','intermediate','advanced']
 type Tab = 'courses' | 'workshops' | 'enrolled'
 
+// ── Timetable calendar ────────────────────────────────────────
+function TimetableCalendar({ sessions }: { sessions: any[] }) {
+  const datedSessions = sessions.filter(s => s.session_date)
+  if (datedSessions.length === 0) return null
+
+  const today = new Date()
+  const dates = datedSessions.map(s => new Date(s.session_date))
+  const defaultDate = dates.reduce((a, b) => a <= today ? b : a < b ? a : b, dates[0])
+
+  const [viewYear,  setViewYear]  = useState(defaultDate.getFullYear())
+  const [viewMonth, setViewMonth] = useState(defaultDate.getMonth())
+
+  const sessionSet = new Set(
+    datedSessions.map(s => {
+      const d = new Date(s.session_date)
+      return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+    })
+  )
+
+  const firstDay    = new Date(viewYear, viewMonth, 1).getDay()
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
+  const label = new Date(viewYear, viewMonth).toLocaleString('default', { month: 'long', year: 'numeric' })
+
+  const prev = () => viewMonth === 0 ? (setViewYear(y => y - 1), setViewMonth(11)) : setViewMonth(m => m - 1)
+  const next = () => viewMonth === 11 ? (setViewYear(y => y + 1), setViewMonth(0)) : setViewMonth(m => m + 1)
+
+  return (
+    <div className="bg-[#1e1e1e] rounded-2xl p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <button onClick={prev} className="w-7 h-7 flex items-center justify-center text-[#555] text-lg leading-none">‹</button>
+        <p className="text-white text-sm font-bold">{label}</p>
+        <button onClick={next} className="w-7 h-7 flex items-center justify-center text-[#555] text-lg leading-none">›</button>
+      </div>
+      <div className="grid grid-cols-7 gap-0.5 mb-1.5">
+        {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+          <p key={d} className="text-[#444] text-[9px] font-bold text-center">{d}</p>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-0.5">
+        {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const key  = `${viewYear}-${viewMonth}-${i + 1}`
+          const isSess = sessionSet.has(key)
+          const isToday = new Date(viewYear, viewMonth, i + 1).toDateString() === today.toDateString()
+          return (
+            <div key={i}
+              className={`aspect-square flex items-center justify-center rounded-full text-[11px] font-bold ${
+                isSess  ? 'bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] text-white' :
+                isToday ? 'border border-[rgba(255,255,255,0.3)] text-white' :
+                          'text-[#555]'
+              }`}>
+              {i + 1}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Enrolled course card ──────────────────────────────────────
 function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => void }) {
   const sessions = ((course.course_sessions || []) as any[])
     .slice()
     .sort((a, b) => (a.session_number ?? 999) - (b.session_number ?? 999))
 
+  const now          = new Date()
   const firstSession = sessions[0]
-  const isLive = sessions.some(s => s.is_live)
+  const firstDate    = firstSession?.session_date ? new Date(firstSession.session_date) : null
+  const isLive       = sessions.some(s => s.is_live && (!s.session_date || new Date(s.session_date) <= now))
+  const isStartingSoon = !isLive && firstDate && firstDate > now
 
-  const startDateStr = firstSession?.session_date
-    ? new Date(firstSession.session_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  const startDateStr = firstDate
+    ? firstDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : null
 
   return (
@@ -54,6 +117,8 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
           : <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] flex items-center justify-center">
               {isLive
                 ? <span className="text-white text-xs font-bold bg-red-500 px-3 py-1 rounded-full animate-pulse">LIVE NOW</span>
+                : isStartingSoon
+                ? <span className="text-white text-xs font-bold bg-[#FF6B2B]/80 px-3 py-1 rounded-full">STARTING SOON</span>
                 : <Lock className="w-8 h-8 text-white/20" />
               }
             </div>
@@ -64,9 +129,9 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
             LIVE
           </span>
         )}
-        {!isLive && startDateStr && (
+        {isStartingSoon && !isLive && startDateStr && (
           <div className="absolute top-2 left-2 bg-black/70 rounded-xl px-2 py-1 text-center">
-            <p className="text-[#888] text-[9px] font-bold uppercase">Starts</p>
+            <p className="text-[#FF6B2B] text-[9px] font-bold uppercase">Starting Soon</p>
             <p className="text-white text-xs font-bold">{startDateStr}</p>
           </div>
         )}
@@ -87,9 +152,9 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 text-[#555] text-xs">
             <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{course.duration_weeks}w</span>
-            {startDateStr && !isLive && (
-              <span className="flex items-center gap-1 text-[#444]">
-                <Lock className="w-3 h-3" />Locked
+            {isStartingSoon && (
+              <span className="flex items-center gap-1 text-[#FF6B2B]">
+                <Calendar className="w-3 h-3" />Starting Soon
               </span>
             )}
           </div>
@@ -100,7 +165,7 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
             </button>
           ) : (
             <span className="bg-[#1a1a1a] text-[#555] text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-[rgba(255,255,255,0.06)]">
-              <Lock className="w-3 h-3" />
+              <Calendar className="w-3 h-3" />
               {startDateStr ? `Starts ${startDateStr}` : 'Coming Soon'}
             </span>
           )}
@@ -364,6 +429,7 @@ function CourseDetailSheet({ courseId, onClose }: { courseId: string; onClose: (
                     </div>
                     <span className="text-[#555] text-xs">{sessions.length} sessions</span>
                   </div>
+                  <TimetableCalendar sessions={sessions} />
                   <div className="space-y-2">
                     {sessions.map((s: any) => {
                       const d = s.session_date ? new Date(s.session_date) : null

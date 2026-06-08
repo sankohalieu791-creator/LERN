@@ -43,7 +43,7 @@ function fmt(n: number) {
 }
 
 // Auto-plays video preview after 3 s of visible dwell — like YouTube
-function FeedCard({ video, userLikes, likeAnim, following, user, onOpen, onLike, onFollow }: {
+function FeedCard({ video, userLikes, likeAnim, following, user, onOpen, onLike, onFollow, onProfile }: {
   video: any
   userLikes: Set<string>
   likeAnim: Set<string>
@@ -52,6 +52,7 @@ function FeedCard({ video, userLikes, likeAnim, following, user, onOpen, onLike,
   onOpen: () => void
   onLike: (e: React.MouseEvent) => void
   onFollow: (e: React.MouseEvent) => void
+  onProfile: () => void
 }) {
   const [playing, setPlaying] = useState(false)
   const cardRef  = useRef<HTMLDivElement>(null)
@@ -117,7 +118,7 @@ function FeedCard({ video, userLikes, likeAnim, following, user, onOpen, onLike,
 
       <div className="px-4 pt-3 pb-1">
         <div className="flex items-center justify-between mb-2">
-          <button onClick={e => { e.stopPropagation() }} className="flex items-center gap-2.5 flex-1 min-w-0">
+          <button onClick={e => { e.stopPropagation(); onProfile() }} className="flex items-center gap-2.5 flex-1 min-w-0">
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-[11px] font-bold overflow-hidden flex-shrink-0">
               {video.users?.avatar_url
                 ? <img src={video.users.avatar_url} className="w-full h-full object-cover" />
@@ -415,6 +416,7 @@ export default function FeedPage() {
               onOpen={() => openVideo(video)}
               onLike={e => handleLike(video.id, e)}
               onFollow={e => handleFollow(video.user_id, e)}
+              onProfile={() => goToProfile(video.user_id)}
             />
           ))
         )}

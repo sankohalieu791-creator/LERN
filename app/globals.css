@@ -74,9 +74,13 @@ body {
 }
 
 /* overflow-x clip on the scroll wrapper only — NOT body/html/any element
-   with transform, as those break position:fixed on iOS Safari */
+   with transform, as those break position:fixed on iOS Safari.
+   min-height ensures the document always fills the viewport so that
+   position:fixed bottom:0 anchors to the viewport on short-content pages. */
 main {
   overflow-x: clip;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* ── Light-mode: full-app overrides ──────────────────────────

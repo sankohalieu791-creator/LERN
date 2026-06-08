@@ -39,11 +39,11 @@ async function uploadWithProgress(
   path: string,
   file: File,
   onProgress: (pct: number) => void,
+  cancelled: { current: boolean },
 ): Promise<string> {
-  // Animate progress so the user sees movement during the actual SDK upload
   let pct = 0
   const ticker = setInterval(() => {
-    // Accelerate early, slow down near 90% to avoid hitting 100 before done
+    if (cancelled.current) { clearInterval(ticker); return }
     const step = pct < 40 ? 3 + Math.random() * 4 : pct < 75 ? 1 + Math.random() * 2 : Math.random() * 0.5
     pct = Math.min(91, pct + step)
     onProgress(Math.round(pct))
@@ -54,6 +54,7 @@ async function uploadWithProgress(
       .from(bucket)
       .upload(path, file, { upsert: true })
     clearInterval(ticker)
+    if (cancelled.current) throw new Error('cancelled')
     if (error) throw error
     onProgress(100)
     return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl
@@ -77,8 +78,9 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
   const [uploadPct,    setUploadPct]     = useState(0)
   const [error,        setError]         = useState('')
 
-  const videoRef = useRef<HTMLInputElement>(null)
-  const thumbRef = useRef<HTMLInputElement>(null)
+  const videoRef    = useRef<HTMLInputElement>(null)
+  const thumbRef    = useRef<HTMLInputElement>(null)
+  const cancelledRef = useRef(false)
 
   const reset = () => {
     setTitle(''); setDescription(''); setSubject(''); setDuration('0:00')
@@ -86,7 +88,11 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
     setError(''); setIsPublic(true); setUploadPct(0)
   }
 
-  const handleClose = () => { reset(); onClose() }
+  const handleClose = () => {
+    cancelledRef.current = true
+    reset()
+    onClose()
+  }
 
   const handleVideoSelect = async (file: File) => {
     setVideo(file)
@@ -102,6 +108,7 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user || !title) return
+    cancelledRef.current = false
     setLoading(true)
     setError('')
     setUploadPct(0)
@@ -116,11 +123,15 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
         if (!e) thumbnailUrl = supabase.storage.from('thumbnails').getPublicUrl(path).data.publicUrl
       }
 
+      if (cancelledRef.current) return
+
       if (video) {
         const ext  = video.name.split('.').pop()
         const path = `${user.id}/${Date.now()}_video.${ext}`
-        videoUrl = await uploadWithProgress('videos', path, video, setUploadPct)
+        videoUrl = await uploadWithProgress('videos', path, video, setUploadPct, cancelledRef)
       }
+
+      if (cancelledRef.current) return
 
       const { error: createErr } = await createVideo(user.id, {
         title,
@@ -136,9 +147,9 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
       reset()
       onClose()
     } catch (err: any) {
-      setError(err.message || 'Failed to post')
+      if (!cancelledRef.current) setError(err.message || 'Failed to post')
     } finally {
-      setLoading(false)
+      if (!cancelledRef.current) setLoading(false)
     }
   }
 
