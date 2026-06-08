@@ -11,8 +11,6 @@ interface CreatePostProps {
   onClose: () => void
 }
 
-const SUBJECTS = ['TYPESCRIPT', 'JAVASCRIPT', 'REACT', 'PYTHON', 'FITNESS', 'MUSIC', 'BUSINESS', 'EXAM PREP', 'SPANISH']
-
 function detectDuration(file: File): Promise<string> {
   return new Promise(resolve => {
     const url = URL.createObjectURL(file)
@@ -30,25 +28,76 @@ function detectDuration(file: File): Promise<string> {
   })
 }
 
+function fmtSize(bytes: number) {
+  if (bytes >= 1_000_000_000) return (bytes / 1_000_000_000).toFixed(1) + ' GB'
+  if (bytes >= 1_000_000)     return (bytes / 1_000_000).toFixed(1) + ' MB'
+  return (bytes / 1_000).toFixed(0) + ' KB'
+}
+
+async function uploadWithProgress(
+  bucket: string,
+  path: string,
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<string> {
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token ?? ANON_KEY
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const url = `${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`
+
+    xhr.upload.addEventListener('progress', e => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+    })
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(`${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`)
+      } else {
+        try {
+          const body = JSON.parse(xhr.responseText)
+          reject(new Error(body.error || body.message || 'Upload failed'))
+        } catch {
+          reject(new Error(`Upload failed (${xhr.status})`))
+        }
+      }
+    })
+
+    xhr.addEventListener('error', () => reject(new Error('Network error during upload')))
+
+    xhr.open('POST', url)
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    xhr.setRequestHeader('Content-Type', file.type || 'video/mp4')
+    xhr.setRequestHeader('x-upsert', 'true')
+    xhr.send(file)
+  })
+}
+
 export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
   const { user } = useAuth()
-  const [title,       setTitle]       = useState('')
-  const [description, setDescription] = useState('')
-  const [subject,     setSubject]     = useState('')
-  const [duration,    setDuration]    = useState('0:00')
-  const [thumbnail,   setThumbnail]   = useState<File | null>(null)
-  const [video,       setVideo]       = useState<File | null>(null)
-  const [thumbPreview, setThumbPreview] = useState<string | null>(null)
-  const [isPublic,    setIsPublic]    = useState(true)
-  const [loading,     setLoading]     = useState(false)
-  const [error,       setError]       = useState('')
+  const [title,        setTitle]        = useState('')
+  const [description,  setDescription]  = useState('')
+  const [subject,      setSubject]       = useState('')
+  const [duration,     setDuration]      = useState('0:00')
+  const [thumbnail,    setThumbnail]     = useState<File | null>(null)
+  const [video,        setVideo]         = useState<File | null>(null)
+  const [thumbPreview, setThumbPreview]  = useState<string | null>(null)
+  const [isPublic,     setIsPublic]      = useState(true)
+  const [loading,      setLoading]       = useState(false)
+  const [uploadPct,    setUploadPct]     = useState(0)
+  const [error,        setError]         = useState('')
 
   const videoRef = useRef<HTMLInputElement>(null)
   const thumbRef = useRef<HTMLInputElement>(null)
 
   const reset = () => {
     setTitle(''); setDescription(''); setSubject(''); setDuration('0:00')
-    setThumbnail(null); setVideo(null); setThumbPreview(null); setError(''); setIsPublic(true)
+    setThumbnail(null); setVideo(null); setThumbPreview(null)
+    setError(''); setIsPublic(true); setUploadPct(0)
   }
 
   const handleClose = () => { reset(); onClose() }
@@ -66,9 +115,10 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user || !title || !subject) return
+    if (!user || !title) return
     setLoading(true)
     setError('')
+    setUploadPct(0)
     try {
       let thumbnailUrl: string | null = null
       let videoUrl:     string | null = null
@@ -76,22 +126,24 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
       if (thumbnail) {
         const ext  = thumbnail.name.split('.').pop()
         const path = `${user.id}/${Date.now()}_thumb.${ext}`
-        const { error: e } = await supabase.storage.from('thumbnails').upload(path, thumbnail)
+        const { error: e } = await supabase.storage.from('thumbnails').upload(path, thumbnail, { upsert: true })
         if (!e) thumbnailUrl = supabase.storage.from('thumbnails').getPublicUrl(path).data.publicUrl
       }
 
       if (video) {
         const ext  = video.name.split('.').pop()
         const path = `${user.id}/${Date.now()}_video.${ext}`
-        const { error: e } = await supabase.storage.from('videos').upload(path, video)
-        if (!e) videoUrl = supabase.storage.from('videos').getPublicUrl(path).data.publicUrl
+        videoUrl = await uploadWithProgress('videos', path, video, setUploadPct)
       }
 
       const { error: createErr } = await createVideo(user.id, {
-        title, description, subject, duration,
+        title,
+        description,
+        subject: subject || 'general',
+        duration,
         thumbnail_url: thumbnailUrl,
         video_url:     videoUrl,
-        views: 0,
+        views:    0,
         is_public: isPublic,
       })
       if (createErr) throw createErr
@@ -105,6 +157,8 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
   }
 
   if (!isOpen) return null
+
+  const isUploading = loading && video && uploadPct < 100
 
   return (
     <div className="fixed inset-0 bg-black/90 z-50 flex items-end sm:items-center justify-center">
@@ -157,15 +211,13 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
           </div>
 
           <div>
-            <label className="block text-[#888] text-xs font-semibold mb-1.5 uppercase tracking-wide">Subject *</label>
-            <select
+            <label className="block text-[#888] text-xs font-semibold mb-1.5 uppercase tracking-wide">Subject</label>
+            <input
               value={subject}
               onChange={e => setSubject(e.target.value)}
-              className="w-full bg-[#111] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-white text-sm outline-none appearance-none"
-            >
-              <option value="">Select subject</option>
-              {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+              placeholder="e.g. Python, Fitness, Business…"
+              className="w-full bg-[#111] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.2)]"
+            />
           </div>
 
           {/* PUBLIC / PRIVATE */}
@@ -200,25 +252,47 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
           {/* VIDEO UPLOAD */}
           <button
             type="button"
-            onClick={() => videoRef.current?.click()}
+            onClick={() => !loading && videoRef.current?.click()}
             className="w-full flex items-center justify-center gap-2 bg-[#111] border border-[rgba(255,255,255,0.08)] text-sm py-3 rounded-xl transition hover:border-[rgba(255,255,255,0.18)]"
           >
             <Upload className="w-4 h-4 text-[#888]" />
             {video
-              ? <span className="text-[#FF6B2B] font-semibold">{video.name.slice(0, 30)} · {duration}</span>
-              : <span className="text-[#888]">Upload video (duration auto-detected)</span>
+              ? <span className="text-[#FF6B2B] font-semibold truncate max-w-[220px]">
+                  {video.name.slice(0, 28)} · {duration} · {fmtSize(video.size)}
+                </span>
+              : <span className="text-[#888]">Select video file</span>
             }
           </button>
 
-          <input ref={thumbRef} type="file" accept="image/*"  className="hidden" onChange={e => e.target.files?.[0] && handleThumbSelect(e.target.files[0])} />
-          <input ref={videoRef} type="file" accept="video/*"  className="hidden" onChange={e => e.target.files?.[0] && handleVideoSelect(e.target.files[0])} />
+          {/* UPLOAD PROGRESS */}
+          {isUploading && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[#888] text-xs">Uploading video…</span>
+                <span className="text-[#FF6B2B] text-xs font-bold">{uploadPct}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-[#333] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] rounded-full transition-all duration-300"
+                  style={{ width: `${uploadPct}%` }}
+                />
+              </div>
+              <p className="text-[#444] text-[11px] mt-1.5">Large files may take a few minutes — keep this screen open</p>
+            </div>
+          )}
+
+          <input ref={thumbRef} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleThumbSelect(e.target.files[0])} />
+          <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={e => e.target.files?.[0] && handleVideoSelect(e.target.files[0])} />
 
           <button
             type="submit"
-            disabled={loading || !title || !subject}
+            disabled={loading || !title}
             className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-xl disabled:opacity-40 flex items-center justify-center gap-2"
           >
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Uploading…</> : 'Post Video'}
+            {loading
+              ? <><Loader2 className="w-4 h-4 animate-spin" />{isUploading ? `Uploading ${uploadPct}%…` : 'Saving…'}</>
+              : 'Post Video'
+            }
           </button>
         </form>
       </div>
