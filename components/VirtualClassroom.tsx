@@ -79,12 +79,11 @@ export default function VirtualClassroom({
   const clientRef        = useRef<IAgoraRTCClient | null>(null)
   const localAudioRef    = useRef<IMicrophoneAudioTrack | null>(null)
   const localCameraRef   = useRef<ICameraVideoTrack | null>(null)
-  const remoteVideoElRef = useRef<HTMLDivElement>(null)
-  const selfVideoElRef   = useRef<HTMLDivElement>(null)
+  const mainVideoRef     = useRef<HTMLDivElement>(null)   // remote OR instructor self-cam
+  const selfVideoRef     = useRef<HTMLDivElement>(null)   // instructor PiP
   const realtimeRef      = useRef<RealtimeChannel | null>(null)
   const chatRef          = useRef<HTMLDivElement>(null)
 
-  // Keep onClose stable so leaveAndClose never changes reference
   const onCloseRef = useRef(onClose)
   useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
@@ -100,7 +99,9 @@ export default function VirtualClassroom({
   // ── Waiting room state ────────────────────────────────────
   const [waitingForApproval, setWaitingForApproval] = useState(false)
   const [denied,             setDenied]             = useState(false)
+  const [admitted,           setAdmitted]           = useState(isInstructor)
   const [showDotPanel,       setShowDotPanel]        = useState(false)
+  const [acceptedIds,        setAcceptedIds]        = useState<Set<string>>(new Set())
 
   // ── Presence + chat ───────────────────────────────────────
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -116,7 +117,7 @@ export default function VirtualClassroom({
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight
   }, [messages])
 
-  // ── Leave and close — stable ref, no deps ─────────────────
+  // ── Leave and close ───────────────────────────────────────
   const leaveAndClose = useCallback(async () => {
     localAudioRef.current?.close()
     localAudioRef.current = null
@@ -128,9 +129,9 @@ export default function VirtualClassroom({
     try { await clientRef.current?.leave() } catch {}
     clientRef.current = null
     setJoined(false); setRemoteUsers([]); setMuted(true); setCameraOn(false); setRtcError('')
-    setWaitingForApproval(false); setDenied(false); setShowDotPanel(false)
+    setWaitingForApproval(false); setDenied(false); setShowDotPanel(false); setAdmitted(false)
     onCloseRef.current()
-  }, []) // stable — uses only refs and state setters
+  }, [])
 
   // ── Join Agora RTC ────────────────────────────────────────
   const joinAgoraRTC = useCallback(async () => {
@@ -138,9 +139,6 @@ export default function VirtualClassroom({
     setConnecting(true)
     setRtcError('')
 
-    // 1. Try server-generated token (needs AGORA_APP_CERTIFICATE in env)
-    // 2. Fall back to NEXT_PUBLIC_AGORA_TEMP_TOKEN (expires after 24h)
-    // 3. Fall back to null (only works if Agora project is in "App ID only / test" mode)
     let token: string | null = null
     try {
       const res = await fetch(`/api/agora-token?channel=${encodeURIComponent(channelName)}&uid=0`)
@@ -148,9 +146,7 @@ export default function VirtualClassroom({
         const data = await res.json()
         token = data.token ?? null
       }
-    } catch {
-      // API unreachable
-    }
+    } catch {}
     if (!token) {
       token = process.env.NEXT_PUBLIC_AGORA_TEMP_TOKEN ?? null
     }
@@ -160,11 +156,10 @@ export default function VirtualClassroom({
       AgoraRTC.setLogLevel(1)
       const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' })
 
-      // Set up listeners before join
       client.on('user-published', async (remoteUser, mediaType) => {
         await client.subscribe(remoteUser, mediaType)
-        if (mediaType === 'video' && remoteVideoElRef.current) {
-          remoteUser.videoTrack?.play(remoteVideoElRef.current)
+        if (mediaType === 'video' && mainVideoRef.current) {
+          remoteUser.videoTrack?.play(mainVideoRef.current)
         }
         if (mediaType === 'audio') remoteUser.audioTrack?.play()
         setRemoteUsers(prev =>
@@ -178,13 +173,11 @@ export default function VirtualClassroom({
         setRemoteUsers(prev => prev.filter(u => u.uid !== remoteUser.uid))
       })
 
-      // Only set ref after listeners are attached, before join
       clientRef.current = client
       await client.join(APP_ID, channelName, token, null)
       setJoined(true)
       setConnecting(false)
     } catch (err: any) {
-      // Clear ref so the user can retry
       try { await clientRef.current?.leave() } catch {}
       clientRef.current = null
       const code:   string = (err?.code    ?? '').toUpperCase()
@@ -268,10 +261,10 @@ export default function VirtualClassroom({
       }
     })
 
-    // Student: approval / denial
     channel.on('broadcast', { event: 'join_approve' }, ({ payload }) => {
       if (payload.targetUserId === myUserId) {
         setWaitingForApproval(false)
+        setAdmitted(true)
         channel.track({ username: myUsername, avatar_url: myAvatarUrl, handUp: false, status: 'joined' })
         joinAgoraRTC()
       }
@@ -299,19 +292,17 @@ export default function VirtualClassroom({
       channel.unsubscribe()
       realtimeRef.current = null
     }
-    // leaveAndClose intentionally excluded — it's stable (empty deps) and
-    // adding it would cause unnecessary re-subscriptions when parent re-renders
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, user, channelName, isInstructor, joinAgoraRTC])
 
-  // ── Update presence on hand/joined state change ───────────
+  // ── Update presence when hand raises (uses admitted, not joined) ──
   useEffect(() => {
-    if (!realtimeRef.current || !user || !joined) return
+    if (!realtimeRef.current || !user || !admitted) return
     const myUsername  = (user as any).username  ?? 'Participant'
     const myAvatarUrl = (user as any).avatar_url ?? null
     const myStatus    = isInstructor ? 'instructor' : 'joined'
     realtimeRef.current.track({ username: myUsername, avatar_url: myAvatarUrl, handUp, status: myStatus })
-  }, [handUp, user, joined, isInstructor])
+  }, [handUp, user, admitted, isInstructor])
 
   // ── Cleanup on unmount ────────────────────────────────────
   useEffect(() => {
@@ -322,14 +313,19 @@ export default function VirtualClassroom({
   }, [])
 
   // ── Derived ───────────────────────────────────────────────
-  const pendingRequests = participants.filter(p => p.status === 'waiting' && !p.isSelf)
+  // Optimistic: exclude accepted users from pending list until presence syncs
+  const pendingRequests = participants.filter(p =>
+    p.status === 'waiting' && !p.isSelf && !acceptedIds.has(p.userId)
+  )
 
   // ── Instructor controls ───────────────────────────────────
   const approveRequest = (targetUserId: string) => {
     realtimeRef.current?.send({ type: 'broadcast', event: 'join_approve', payload: { targetUserId } })
+    setAcceptedIds(prev => new Set([...prev, targetUserId]))
   }
   const denyRequest = (targetUserId: string) => {
     realtimeRef.current?.send({ type: 'broadcast', event: 'join_deny', payload: { targetUserId } })
+    setAcceptedIds(prev => new Set([...prev, targetUserId]))
   }
   const kickParticipant = (targetUserId: string) => {
     realtimeRef.current?.send({ type: 'broadcast', event: 'kick', payload: { targetUserId } })
@@ -341,16 +337,17 @@ export default function VirtualClassroom({
     realtimeRef.current?.send({ type: 'broadcast', event: 'accept_hand', payload: { targetUserId } })
   }
 
-  // ── Self controls ─────────────────────────────────────────
+  // ── Camera (instructor only) ──────────────────────────────
   const toggleCamera = async () => {
-    if (!joined || !clientRef.current) return
+    if (!joined || !clientRef.current || !isInstructor) return
     try {
       const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
       if (!cameraOn) {
         const video = await AgoraRTC.createCameraVideoTrack()
         localCameraRef.current = video
         await clientRef.current.publish([video])
-        if (selfVideoElRef.current) video.play(selfVideoElRef.current)
+        // Play self-view in the PiP overlay
+        if (selfVideoRef.current) video.play(selfVideoRef.current)
         setCameraOn(true)
       } else {
         if (localCameraRef.current) {
@@ -531,62 +528,65 @@ export default function VirtualClassroom({
         </div>
       )}
 
-      {/* SCROLLABLE BODY */}
-      <div className="flex-1 overflow-y-auto overscroll-contain">
+      {/* MAIN VIDEO AREA — fills as much space as possible */}
+      <div className="mx-4 rounded-2xl overflow-hidden bg-[#1a1a1a] relative flex-shrink-0" style={{ height: '42vh', minHeight: 220 }}>
+        {/* Remote video (instructor cam seen by students) */}
+        <div ref={mainVideoRef} className="w-full h-full" />
 
-        {/* MAIN VIDEO AREA */}
-        <div className="mx-4 rounded-2xl overflow-hidden aspect-video bg-[#1a1a1a] relative mb-4">
-          <div ref={remoteVideoElRef} className="w-full h-full" />
-
-          {connecting && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#111] gap-3">
-              <Loader2 className="w-8 h-8 text-[#444] animate-spin" />
-              <p className="text-[#555] text-sm">Joining classroom…</p>
-            </div>
-          )}
-
-          {!connecting && !joined && !rtcError && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#111] gap-3">
-              <Avatar name={instructorName} size={56} colorIndex={0} />
-              <p className="text-[#555] text-sm">Connecting…</p>
-            </div>
-          )}
-
-          {!connecting && joined && !hasRemoteVideo && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] gap-2">
-              <Avatar name={instructorName} size={64} colorIndex={0} />
-              <p className="text-white text-sm font-semibold mt-1">{instructorName}</p>
-              <p className="text-[#555] text-xs">
-                {isInstructor ? 'Turn on your camera to go live' : 'Waiting for instructor to go live…'}
-              </p>
-            </div>
-          )}
-
-          <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-black/60 rounded-full px-2.5 py-1">
-            <Users className="w-3 h-3 text-white" />
-            <span className="text-white text-xs font-bold">{admittedCount}</span>
-          </div>
-
-          {joined && (
-            <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-black/70 rounded-full px-3 py-1.5">
-              <Avatar name={instructorName} size={20} colorIndex={0} />
-              <span className="text-white text-xs font-semibold">{instructorName}</span>
-              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-            </div>
-          )}
-        </div>
-
-        {/* Self-camera preview */}
-        {cameraOn && (
-          <div className="mx-4 mb-3 rounded-xl overflow-hidden bg-black" style={{ height: 120 }}>
-            <div ref={selfVideoElRef} className="w-full h-full" />
+        {connecting && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#111] gap-3">
+            <Loader2 className="w-8 h-8 text-[#444] animate-spin" />
+            <p className="text-[#555] text-sm">Joining classroom…</p>
           </div>
         )}
 
+        {!connecting && !joined && !rtcError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#111] gap-3">
+            <Avatar name={instructorName} size={56} colorIndex={0} />
+            <p className="text-[#555] text-sm">Connecting…</p>
+          </div>
+        )}
+
+        {!connecting && joined && !hasRemoteVideo && !cameraOn && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] gap-2">
+            <Avatar name={instructorName} size={72} colorIndex={0} />
+            <p className="text-white text-sm font-semibold mt-1">{instructorName}</p>
+            <p className="text-[#555] text-xs">
+              {isInstructor ? 'Turn on your camera to go live' : 'Waiting for instructor to go live…'}
+            </p>
+          </div>
+        )}
+
+        {/* Participant count */}
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-black/60 rounded-full px-2.5 py-1">
+          <Users className="w-3 h-3 text-white" />
+          <span className="text-white text-xs font-bold">{admittedCount}</span>
+        </div>
+
+        {/* Live indicator */}
+        {joined && (
+          <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-black/70 rounded-full px-3 py-1.5">
+            <Avatar name={instructorName} size={20} colorIndex={0} />
+            <span className="text-white text-xs font-semibold">{instructorName}</span>
+            <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+          </div>
+        )}
+
+        {/* Instructor self-camera PiP (bottom-right corner of main video) */}
+        {isInstructor && cameraOn && (
+          <div className="absolute bottom-3 right-3 w-24 h-32 rounded-xl overflow-hidden bg-black border-2 border-white/20 z-10">
+            <div ref={selfVideoRef} className="w-full h-full" />
+          </div>
+        )}
+      </div>
+
+      {/* SCROLLABLE BODY */}
+      <div className="flex-1 overflow-y-auto overscroll-contain mt-3">
+
         {/* IN THE ROOM */}
         {participants.filter(p => p.status !== 'waiting').length > 0 && (
-          <div className="px-4 mb-4">
-            <p className="text-white text-xs font-bold uppercase tracking-wide mb-3">
+          <div className="px-4 mb-3">
+            <p className="text-white text-xs font-bold uppercase tracking-wide mb-2">
               In the Room · {admittedCount}
             </p>
             <div className="flex gap-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
@@ -595,27 +595,27 @@ export default function VirtualClassroom({
                 .map((p, i) => (
                   <div key={p.userId} className="flex flex-col items-center gap-1 flex-shrink-0">
                     <div className="relative">
-                      <Avatar name={p.username} avatarUrl={p.avatar_url} size={48} colorIndex={i} />
-                      {p.handUp && <span className="absolute -top-1 -right-1 text-sm">✋</span>}
+                      <Avatar name={p.username} avatarUrl={p.avatar_url} size={44} colorIndex={i} />
+                      {p.handUp && <span className="absolute -top-1 -right-1 text-base">✋</span>}
                     </div>
-                    <p className="text-[#888] text-[10px] max-w-[52px] truncate text-center">
+                    <p className="text-[#888] text-[10px] max-w-[48px] truncate text-center">
                       {p.isSelf ? 'You' : p.username.split(' ')[0]}
                     </p>
                     {isInstructor && !p.isSelf && (
                       <div className="flex gap-1 mt-0.5">
                         {p.handUp && (
                           <button onClick={() => acceptHand(p.userId)}
-                            className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center" title="Accept to speak">
-                            <Check className="w-3 h-3 text-white" />
+                            className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center" title="Accept to speak">
+                            <Check className="w-2.5 h-2.5 text-white" />
                           </button>
                         )}
                         <button onClick={() => muteParticipant(p.userId)}
-                          className="w-6 h-6 rounded-full bg-[#333] flex items-center justify-center" title="Mute">
-                          <VolumeX className="w-3 h-3 text-white" />
+                          className="w-5 h-5 rounded-full bg-[#333] flex items-center justify-center" title="Mute">
+                          <VolumeX className="w-2.5 h-2.5 text-white" />
                         </button>
                         <button onClick={() => kickParticipant(p.userId)}
-                          className="w-6 h-6 rounded-full bg-red-500/80 flex items-center justify-center" title="Remove">
-                          <UserX className="w-3 h-3 text-white" />
+                          className="w-5 h-5 rounded-full bg-red-500/80 flex items-center justify-center" title="Remove">
+                          <UserX className="w-2.5 h-2.5 text-white" />
                         </button>
                       </div>
                     )}
@@ -648,14 +648,18 @@ export default function VirtualClassroom({
             {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </button>
 
-          <button onClick={toggleCamera} disabled={!joined}
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition disabled:opacity-40 ${cameraOn ? 'bg-[#FF6B2B] text-white' : 'bg-[#333] text-white'}`}>
-            {cameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-          </button>
+          {/* Camera: instructor only */}
+          {isInstructor && (
+            <button onClick={toggleCamera} disabled={!joined}
+              className={`w-11 h-11 rounded-full flex items-center justify-center transition disabled:opacity-40 ${cameraOn ? 'bg-[#FF6B2B] text-white' : 'bg-[#333] text-white'}`}>
+              {cameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+            </button>
+          )}
 
+          {/* Raise hand: students only */}
           {!isInstructor && (
-            <button onClick={() => setHandUp(v => !v)}
-              className={`w-11 h-11 rounded-full flex items-center justify-center transition ${handUp ? 'bg-[#FF6B2B] text-white' : 'bg-[#333] text-white'}`}>
+            <button onClick={() => setHandUp(v => !v)} disabled={!admitted}
+              className={`w-11 h-11 rounded-full flex items-center justify-center transition disabled:opacity-40 ${handUp ? 'bg-[#FF6B2B] text-white' : 'bg-[#333] text-white'}`}>
               <Hand className="w-5 h-5" />
             </button>
           )}

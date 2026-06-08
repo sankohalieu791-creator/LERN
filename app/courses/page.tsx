@@ -103,6 +103,7 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
   const firstSession = sessions[0]
   const firstDate    = firstSession?.session_date ? new Date(firstSession.session_date) : null
   const isLive       = sessions.some(s => s.is_live && (!s.session_date || new Date(s.session_date) <= now))
+  const hasCompleted = sessions.some(s => s.is_completed)
   const isStartingSoon = !isLive && firstDate && firstDate > now
 
   const startDateStr = firstDate
@@ -163,10 +164,15 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
               <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
               Request
             </button>
+          ) : hasCompleted ? (
+            <span className="bg-green-500/10 text-green-400 text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-green-500/20">
+              <Check className="w-3 h-3" />
+              Finish
+            </span>
           ) : (
             <span className="bg-[#1a1a1a] text-[#555] text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-[rgba(255,255,255,0.06)]">
               <Calendar className="w-3 h-3" />
-              {startDateStr ? `Starts ${startDateStr}` : 'Coming Soon'}
+              {startDateStr ? `Starts ${startDateStr}` : 'Not Started'}
             </span>
           )}
         </div>
@@ -349,7 +355,7 @@ function WorkshopDetailSheet({ workshop, isJoined, isOwner, onJoin, onDelete, on
 }
 
 // ── Course detail bottom sheet ────────────────────────────────
-function CourseDetailSheet({ courseId, onClose }: { courseId: string; onClose: () => void }) {
+function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string; onClose: () => void; onEnrolled?: (course: any) => void }) {
   const { user } = useAuth()
   const router   = useRouter()
   const [course,     setCourse]     = useState<any>(null)
@@ -387,18 +393,19 @@ function CourseDetailSheet({ courseId, onClose }: { courseId: string; onClose: (
     setEnrolled(true)
     setSuccess(true)
     setEnrolling(false)
+    if (course) onEnrolled?.(course)
     setTimeout(() => setSuccess(false), 2000)
   }
 
   const handleStartClass = async () => {
     setStarting(true)
     const sessions = course?.course_sessions?.slice().sort((a: any, b: any) => (a.session_number ?? 999) - (b.session_number ?? 999)) ?? []
-    const nextSession = sessions.find((s: any) => !s.is_live && !s.is_project_day)
+    const nextSession = sessions.find((s: any) => !s.is_live && !s.is_completed)
     if (nextSession) {
       await setSessionLive(nextSession.id, true)
     }
     setStarting(false)
-    router.push(`/courses/${courseId}/classroom`)
+    router.push(`/courses/${courseId}/classroom${nextSession ? `?sessionId=${nextSession.id}` : ''}`)
   }
 
   const handleRate = async (stars: number) => {
@@ -498,7 +505,12 @@ function CourseDetailSheet({ courseId, onClose }: { courseId: string; onClose: (
                           {s.is_project_day && (
                             <span className="text-[9px] font-bold bg-red-500 text-white px-2 py-1 rounded-full flex-shrink-0">PROJECTS DAY</span>
                           )}
-                          {s.is_live && (
+                          {s.is_completed && (
+                            <span className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                              <Check className="w-3.5 h-3.5 text-green-400" />
+                            </span>
+                          )}
+                          {!s.is_completed && s.is_live && (
                             <span className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 animate-pulse" />
                           )}
                         </div>
@@ -777,7 +789,11 @@ export default function CoursesPage() {
     )}
 
     {detailCourseId && (
-      <CourseDetailSheet courseId={detailCourseId} onClose={() => setDetailCourseId(null)} />
+      <CourseDetailSheet
+        courseId={detailCourseId}
+        onClose={() => setDetailCourseId(null)}
+        onEnrolled={(course) => setEnrolled(prev => [...prev.filter(c => c.id !== course.id), course])}
+      />
     )}
 
     {detailWorkshop && (

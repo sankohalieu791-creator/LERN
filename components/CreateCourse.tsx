@@ -28,6 +28,7 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
   const [sessionCount, setSessionCount] = useState(8)
   const [projectName,  setProjectName]  = useState('')
   const [startDate,    setStartDate]    = useState('')
+  const [endDate,      setEndDate]      = useState('')
   const [loading,      setLoading]      = useState(false)
   const galleryRef = useRef<HTMLInputElement>(null)
 
@@ -64,6 +65,8 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
         title, description, subject, level,
         duration_weeks: parseInt(duration) || 0,
         thumbnail_url: thumbnailUrl,
+        start_date: startDate || null,
+        end_date: endDate || null,
         rating: 0,
       })
       const newCourseId = (courseData as any)?.[0]?.id
@@ -91,7 +94,7 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
         await createCourseSessions(newCourseId, sessions)
       }
       setTitle(''); setDescription(''); setSubject(''); setLevel('')
-      setDuration(''); setThumbnail(null); setSessionCount(8); setProjectName(''); setStartDate('')
+      setDuration(''); setThumbnail(null); setSessionCount(8); setProjectName(''); setStartDate(''); setEndDate('')
       onClose()
       router.push('/courses')
     } catch (err) {
@@ -173,6 +176,17 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
             {startDate && (
               <p className="text-[#444] text-xs mt-1">Sessions will be scheduled weekly from this date</p>
             )}
+          </div>
+
+          <div>
+            <label className={labelCls}>End Date <span className="text-[#444] normal-case font-normal">(optional)</span></label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              className={inputCls}
+              min={startDate || new Date().toISOString().split('T')[0]}
+            />
           </div>
 
           {/* Thumbnail */}

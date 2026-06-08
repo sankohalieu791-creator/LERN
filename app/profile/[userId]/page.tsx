@@ -141,8 +141,8 @@ export default function UserProfilePage() {
     setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status } : r))
   }
 
-  // Any logged-in user who isn't on their own profile can leave feedback
-  const canLeaveFeedback = !!user && !isOwnProfile
+  // Only non-instructors can leave feedback (instructors can't review each other)
+  const canLeaveFeedback = !!user && !isOwnProfile && myProfile?.account_type !== 'instructor'
 
   const handleSubmitFeedback = async () => {
     if (!user || fbRating === 0 || !fbText.trim()) return

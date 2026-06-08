@@ -734,6 +734,14 @@ export const setSessionLive = async (sessionId: string, isLive: boolean) => {
   return { error }
 }
 
+export const completeSession = async (sessionId: string) => {
+  const { error } = await supabase
+    .from('course_sessions')
+    .update({ is_live: false, is_completed: true })
+    .eq('id', sessionId)
+  return { error }
+}
+
 export const getEnrolledCourses = async (userId: string) => {
   const { data: enrollmentData } = await supabase
     .from('enrollments').select('course_id').eq('user_id', userId)
