@@ -17,6 +17,7 @@ import {
 } from '@/lib/supabase'
 import CreateCourse from '@/components/CreateCourse'
 import CreateWorkshop from '@/components/CreateWorkshop'
+import { useLanguage } from '@/context/LanguageContext'
 
 function VerifiedBadge({ size = 12 }: { size?: number }) {
   return (
@@ -95,6 +96,7 @@ function TimetableCalendar({ sessions }: { sessions: any[] }) {
 
 // ── Enrolled course card ──────────────────────────────────────
 function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => void }) {
+  const { t } = useLanguage()
   const sessions = ((course.course_sessions || []) as any[])
     .slice()
     .sort((a, b) => (a.session_number ?? 999) - (b.session_number ?? 999))
@@ -162,17 +164,17 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
           {isLive ? (
             <button onClick={onJoin} className="bg-red-500 text-white text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-              Request
+              {t('request')}
             </button>
           ) : hasCompleted ? (
             <span className="bg-green-500/10 text-green-400 text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-green-500/20">
               <Check className="w-3 h-3" />
-              Finish
+              {t('finish')}
             </span>
           ) : (
             <span className="bg-[#1a1a1a] text-[#555] text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-[rgba(255,255,255,0.06)]">
               <Calendar className="w-3 h-3" />
-              {startDateStr ? `Starts ${startDateStr}` : 'Not Started'}
+              {startDateStr ? `Starts ${startDateStr}` : t('not_started')}
             </span>
           )}
         </div>
@@ -358,6 +360,7 @@ function WorkshopDetailSheet({ workshop, isJoined, isOwner, onJoin, onDelete, on
 function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string; onClose: () => void; onEnrolled?: (course: any) => void }) {
   const { user } = useAuth()
   const router   = useRouter()
+  const { t } = useLanguage()
   const [course,     setCourse]     = useState<any>(null)
   const [loading,    setLoading]    = useState(true)
   const [enrolled,   setEnrolled]   = useState(false)
@@ -472,9 +475,9 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-[#FF6B2B]" />
-                      <p className="text-white text-sm font-bold uppercase tracking-wide">Your Timetable</p>
+                      <p className="text-white text-sm font-bold uppercase tracking-wide">{t('your_timetable')}</p>
                     </div>
-                    <span className="text-[#555] text-xs">{sessions.length} sessions</span>
+                    <span className="text-[#555] text-xs">{sessions.length} {t('sessions')}</span>
                   </div>
                   <TimetableCalendar sessions={sessions} />
                   <div className="space-y-2">
@@ -503,7 +506,7 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
                             </p>
                           </div>
                           {s.is_project_day && (
-                            <span className="text-[9px] font-bold bg-red-500 text-white px-2 py-1 rounded-full flex-shrink-0">PROJECTS DAY</span>
+                            <span className="text-[9px] font-bold bg-red-500 text-white px-2 py-1 rounded-full flex-shrink-0">{t('projects_day')}</span>
                           )}
                           {s.is_completed && (
                             <span className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
@@ -545,12 +548,12 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
                   disabled={starting}
                   className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
                 >
-                  {starting ? <><Loader2 className="w-4 h-4 animate-spin" />Starting…</> : '🔴 Start Class'}
+                  {starting ? <><Loader2 className="w-4 h-4 animate-spin" />Starting…</> : t('start_class')}
                 </button>
               ) : enrolled ? (
                 <div className="space-y-2">
                   <div className="bg-green-500/10 border border-green-500/25 rounded-2xl px-4 py-3 text-center">
-                    <p className="text-green-400 font-bold text-sm">✓ You're enrolled!</p>
+                    <p className="text-green-400 font-bold text-sm">{t('youre_enrolled')}</p>
                     <p className="text-green-400/70 text-xs mt-0.5">Check the Enrolled tab to join live classes</p>
                   </div>
                   <button
@@ -566,7 +569,7 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
                   disabled={enrolling}
                   className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
                 >
-                  {enrolling ? <><Loader2 className="w-4 h-4 animate-spin" />Enrolling…</> : success ? '✓ Enrolled!' : 'Enroll'}
+                  {enrolling ? <><Loader2 className="w-4 h-4 animate-spin" />…</> : success ? t('enrolled_label') : t('enroll')}
                 </button>
               )}
             </div>
@@ -581,6 +584,7 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
 export default function CoursesPage() {
   const { user } = useAuth()
   const router   = useRouter()
+  const { t } = useLanguage()
   const [activeTab,       setActiveTab]       = useState<Tab>('courses')
   const [courses,         setCourses]         = useState<any[]>([])
   const [workshops,       setWorkshops]       = useState<any[]>([])
@@ -659,7 +663,7 @@ export default function CoursesPage() {
             className={`flex-1 py-3.5 text-sm font-semibold capitalize border-b-2 transition ${
               activeTab === tab ? 'text-white border-white' : 'text-[#555] border-transparent'
             }`}>
-            {tab === 'enrolled' ? 'Enroll' : tab}
+            {tab === 'enrolled' ? t('enroll_tab') : tab === 'workshops' ? t('workshops') : t('courses')}
           </button>
         ))}
       </div>
@@ -683,7 +687,7 @@ export default function CoursesPage() {
             </div>
             <div className="px-4 space-y-4">
               {filtered.length === 0
-                ? <p className="text-center text-[#444] text-sm py-16">No courses found</p>
+                ? <p className="text-center text-[#444] text-sm py-16">{t('no_courses')}</p>
                 : filtered.map(c => (
                     <CourseCard key={c.id} course={c}
                       isEnrolled={enrolled.some(e => e.id === c.id)}
@@ -699,7 +703,7 @@ export default function CoursesPage() {
         {activeTab === 'workshops' && (
           <div className="px-4 py-4 space-y-3">
             {workshops.length === 0
-              ? <p className="text-center text-[#444] text-sm py-16">No workshops yet</p>
+              ? <p className="text-center text-[#444] text-sm py-16">{t('no_workshops')}</p>
               : workshops.map(w => (
                   <WorkshopCard key={w.id} workshop={w}
                     isJoined={joinedWorkshops.has(w.id)}
@@ -715,13 +719,13 @@ export default function CoursesPage() {
         {activeTab === 'enrolled' && (
           <div className="px-4 py-4 space-y-3">
             {!user ? (
-              <p className="text-center text-[#444] text-sm py-16">Sign in to see your enrolled courses</p>
+              <p className="text-center text-[#444] text-sm py-16">{t('sign_in_enrolled')}</p>
             ) : enrolled.length === 0 ? (
               <div className="text-center py-16">
-                <p className="text-[#444] text-sm mb-4">Not enrolled in anything yet</p>
+                <p className="text-[#444] text-sm mb-4">{t('not_enrolled')}</p>
                 <button onClick={() => setActiveTab('courses')}
                   className="bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white text-sm font-bold px-6 py-2.5 rounded-full">
-                  Browse Courses
+                  {t('browse_courses')}
                 </button>
               </div>
             ) : (
@@ -869,6 +873,7 @@ function CourseCard({ course, isEnrolled, isOwner, onTap }: {
   isOwner?: boolean
   onTap: () => void
 }) {
+  const { t } = useLanguage()
   return (
     <div onClick={onTap}
       className="bg-[#1a1a1a] rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.06)] active:opacity-90 transition cursor-pointer">
@@ -917,7 +922,7 @@ function CourseCard({ course, isEnrolled, isOwner, onTap }: {
           <div className={`w-full py-3 rounded-2xl text-center text-sm font-bold ${
             isEnrolled ? 'bg-[#252525] text-white' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
           }`}>
-            {isEnrolled ? 'Enrolled ✓' : 'Enroll'}
+            {isEnrolled ? t('enrolled_label') : t('enroll')}
           </div>
         )}
       </div>

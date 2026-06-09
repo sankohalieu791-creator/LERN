@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { updateUserProfile, submitInstructorApplication } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
@@ -28,7 +28,7 @@ function VerifiedBadge({ size = 16 }: { size?: number }) {
   )
 }
 
-function SectionLabel({ children }: { children: string }) {
+function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="px-4 pt-6 pb-2 text-[#555] theme-text-2 text-[11px] font-bold uppercase tracking-widest">
       {children}
@@ -148,7 +148,7 @@ export default function SettingsPage() {
         <Link href="/profile/me" className="text-[#888] hover:text-white transition">
           <ChevronLeft className="w-5 h-5" />
         </Link>
-        <h1 className="text-white theme-text-1 font-bold text-lg">Settings</h1>
+        <h1 className="text-white theme-text-1 font-bold text-lg">{t('settings')}</h1>
       </div>
 
       {/* SCROLLABLE CONTENT */}
@@ -167,14 +167,14 @@ export default function SettingsPage() {
             {user?.verified && <VerifiedBadge size={16} />}
           </div>
           <p className="text-[#555] theme-text-2 text-xs mt-0.5">
-            View profile · <span className="capitalize">{user?.account_type ?? 'student'}</span>
+            {t('view_profile')} · <span className="capitalize">{user?.account_type ?? 'student'}</span>
           </p>
         </div>
         <ChevronRight className="w-4 h-4 text-[#444]" />
       </Link>
 
       {/* CREATOR */}
-      <SectionLabel>Creator</SectionLabel>
+      <SectionLabel>{t('creator')}</SectionLabel>
       <div className="border-t border-[rgba(255,255,255,0.05)] theme-border">
         {user?.account_type === 'instructor' ? (
           <div className="flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)]">
@@ -183,10 +183,10 @@ export default function SettingsPage() {
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <p className="text-white theme-text-1 text-sm font-semibold">Verified Instructor</p>
+                <p className="text-white theme-text-1 text-sm font-semibold">{t('verified_instructor')}</p>
                 {user?.verified && <VerifiedBadge size={15} />}
               </div>
-              <p className="text-[#555] theme-text-2 text-xs mt-0.5">Your instructor application was accepted.</p>
+              <p className="text-[#555] theme-text-2 text-xs mt-0.5">{t('verified_instructor_sub')}</p>
             </div>
           </div>
         ) : (
@@ -198,8 +198,8 @@ export default function SettingsPage() {
               <CheckCircle2 className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1">
-              <p className="text-white theme-text-1 text-sm font-semibold">Apply to be an instructor</p>
-              <p className="text-[#555] theme-text-2 text-xs mt-0.5">All instructors are verified before going live.</p>
+              <p className="text-white theme-text-1 text-sm font-semibold">{t('apply_to_teach')}</p>
+              <p className="text-[#555] theme-text-2 text-xs mt-0.5">{t('apply_to_teach_sub')}</p>
             </div>
             <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
           </button>
@@ -207,15 +207,15 @@ export default function SettingsPage() {
       </div>
 
       {/* APPEARANCE */}
-      <SectionLabel>Appearance</SectionLabel>
+      <SectionLabel>{t('appearance')}</SectionLabel>
       <div className="border-t border-[rgba(255,255,255,0.05)] theme-border">
         <div className="flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)]">
           <div className="w-9 h-9 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
             <Moon className="w-4 h-4 text-[#888]" />
           </div>
           <div className="flex-1">
-            <p className="text-white theme-text-1 text-sm font-semibold">Dark mode</p>
-            <p className="text-[#555] theme-text-2 text-xs mt-0.5">Tap to switch theme</p>
+            <p className="text-white theme-text-1 text-sm font-semibold">{t('dark_mode')}</p>
+            <p className="text-[#555] theme-text-2 text-xs mt-0.5">{t('dark_mode_sub')}</p>
           </div>
           <button
             onClick={toggleDarkMode}
@@ -242,15 +242,15 @@ export default function SettingsPage() {
       </div>
 
       {/* ACCOUNT */}
-      <SectionLabel>Account</SectionLabel>
+      <SectionLabel>{t('account')}</SectionLabel>
       <div className="border-t border-[rgba(255,255,255,0.05)] theme-border">
         <Link href="/settings/account" className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition">
           <div className="w-9 h-9 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
             <Lock className="w-4 h-4 text-[#888]" />
           </div>
           <div className="flex-1">
-            <p className="text-white theme-text-1 text-sm font-semibold">Account & security</p>
-            <p className="text-[#555] theme-text-2 text-xs mt-0.5">Password, email, sessions</p>
+            <p className="text-white theme-text-1 text-sm font-semibold">{t('account_security')}</p>
+            <p className="text-[#555] theme-text-2 text-xs mt-0.5">{t('account_security_sub')}</p>
           </div>
           <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
         </Link>
@@ -259,23 +259,23 @@ export default function SettingsPage() {
             <Bell className="w-4 h-4 text-[#888]" />
           </div>
           <div className="flex-1">
-            <p className="text-white theme-text-1 text-sm font-semibold">Notifications</p>
-            <p className="text-[#555] theme-text-2 text-xs mt-0.5">Push, email, course reminders</p>
+            <p className="text-white theme-text-1 text-sm font-semibold">{t('notifications')}</p>
+            <p className="text-[#555] theme-text-2 text-xs mt-0.5">{t('notifications_sub')}</p>
           </div>
           <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
         </Link>
       </div>
 
       {/* LEGAL */}
-      <SectionLabel>Legal</SectionLabel>
+      <SectionLabel>{t('legal')}</SectionLabel>
       <div className="border-t border-[rgba(255,255,255,0.05)] theme-border">
         <Link href="/settings/privacy" className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition">
           <div className="w-9 h-9 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
             <Shield className="w-4 h-4 text-[#888]" />
           </div>
           <div className="flex-1">
-            <p className="text-white theme-text-1 text-sm font-semibold">Privacy &amp; Policy</p>
-            <p className="text-[#555] theme-text-2 text-xs mt-0.5">How we use and protect your data</p>
+            <p className="text-white theme-text-1 text-sm font-semibold">{t('privacy')}</p>
+            <p className="text-[#555] theme-text-2 text-xs mt-0.5">{t('privacy_sub')}</p>
           </div>
           <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
         </Link>
@@ -285,7 +285,7 @@ export default function SettingsPage() {
       <div className="mt-8 border-t border-[rgba(255,255,255,0.07)]">
         <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-4 py-4 text-red-400 hover:text-red-300 transition">
           <LogOut className="w-5 h-5" />
-          <span className="font-semibold">Sign out</span>
+          <span className="font-semibold">{t('sign_out')}</span>
         </button>
       </div>
 

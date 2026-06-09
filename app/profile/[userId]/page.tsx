@@ -14,6 +14,7 @@ import {
 import { sendPush } from '@/lib/push'
 import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin } from 'lucide-react'
 import Link from 'next/link'
+import { useLanguage } from '@/context/LanguageContext'
 
 function VerifiedBadge({ size = 16 }: { size?: number }) {
   return (
@@ -50,6 +51,7 @@ export default function UserProfilePage() {
   const { userId } = useParams()
   const { user } = useAuth()
   const router = useRouter()
+  const { t } = useLanguage()
 
   const [profile,       setProfile]       = useState<any>(null)
   const [myProfile,     setMyProfile]     = useState<any>(null)
@@ -177,16 +179,16 @@ export default function UserProfilePage() {
   const pendingCount = requests.filter(r => r.status === 'pending').length
 
   const tabs = [
-    { id: 'posts',    icon: Grid3X3,       label: 'Posts'    },
-    { id: 'projects', icon: FolderOpen,    label: 'Projects' },
-    { id: 'certs',    icon: Award,         label: 'Certs'    },
-    { id: 'feedback', icon: MessageSquare, label: 'Feedback' },
+    { id: 'posts',    icon: Grid3X3,       label: t('posts')    },
+    { id: 'projects', icon: FolderOpen,    label: t('projects') },
+    { id: 'certs',    icon: Award,         label: t('certs')    },
+    { id: 'feedback', icon: MessageSquare, label: t('feedback') },
     ...(isInstructor
-      ? [{ id: 'jobs', icon: Briefcase, label: 'Jobs' }]
+      ? [{ id: 'jobs', icon: Briefcase, label: t('jobs') }]
       : []
     ),
     ...(isOwnProfile && isInstructor
-      ? [{ id: 'requests', icon: Inbox, label: 'Requests' }]
+      ? [{ id: 'requests', icon: Inbox, label: t('requests') }]
       : []
     ),
   ]
@@ -211,9 +213,9 @@ export default function UserProfilePage() {
         </div>
         <div className="flex flex-1 justify-around">
           {[
-            { label: 'Posts',     value: videos.length               },
-            { label: 'Followers', value: profile.followers_count ?? 0 },
-            { label: 'Following', value: profile.following_count ?? 0 },
+            { label: t('posts'),     value: videos.length               },
+            { label: t('followers'), value: profile.followers_count ?? 0 },
+            { label: t('following'), value: profile.following_count ?? 0 },
           ].map(s => (
             <div key={s.label} className="text-center">
               <p className="text-white font-bold text-lg leading-none">{s.value.toLocaleString()}</p>
@@ -249,7 +251,7 @@ export default function UserProfilePage() {
                 : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
             } disabled:opacity-40`}
           >
-            {followLoading ? '…' : following ? 'Following' : 'Follow'}
+            {followLoading ? '…' : following ? t('unfollow') : t('follow')}
           </button>
           {canLeaveFeedback && (
             <button
@@ -257,7 +259,7 @@ export default function UserProfilePage() {
               className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white px-4 py-2.5 rounded-xl text-sm font-bold"
             >
               <MessageSquare className="w-4 h-4" />
-              Feedback
+              {t('feedback')}
             </button>
           )}
         </div>
@@ -295,7 +297,7 @@ export default function UserProfilePage() {
           videos.length === 0 ? (
             <div className="text-center py-16">
               <Grid3X3 className="w-10 h-10 text-[#2a2a2a] mx-auto mb-3" />
-              <p className="text-[#444] text-sm">No posts yet</p>
+              <p className="text-[#444] text-sm">{t('no_posts')}</p>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-1">
@@ -400,7 +402,7 @@ export default function UserProfilePage() {
                   </div>
                 ) : (
                   <>
-                    <p className="text-[#888] text-xs font-bold uppercase tracking-wider mb-3">Drop a feedback</p>
+                    <p className="text-[#888] text-xs font-bold uppercase tracking-wider mb-3">{t('drop_feedback')}</p>
                     <div className="flex gap-2 mb-3">
                       {[1,2,3,4,5].map(n => (
                         <button key={n} onClick={() => setFbRating(n)} className="transition active:scale-90">
@@ -421,7 +423,7 @@ export default function UserProfilePage() {
                       className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-3 rounded-xl text-sm disabled:opacity-40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
                     >
                       <Send className="w-4 h-4" />
-                      {fbSubmitting ? 'Sending…' : 'Send Feedback'}
+                      {fbSubmitting ? '…' : t('send_feedback')}
                     </button>
                   </>
                 )}
@@ -430,7 +432,7 @@ export default function UserProfilePage() {
             {feedback.length === 0 ? (
               <div className="text-center py-12">
                 <MessageSquare className="w-10 h-10 text-[#2a2a2a] mx-auto mb-3" />
-                <p className="text-[#444] text-sm">No feedback yet</p>
+                <p className="text-[#444] text-sm">{t('no_feedback')}</p>
               </div>
             ) : (
               <div className="space-y-3">

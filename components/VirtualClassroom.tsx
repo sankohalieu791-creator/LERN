@@ -6,6 +6,7 @@ import {
   Hand, X, Users, MoreVertical, Send, Loader2, WifiOff, UserX, VolumeX, Check, Bell,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useLanguage } from '@/context/LanguageContext'
 import { supabase } from '@/lib/supabase'
 import type {
   IAgoraRTCClient,
@@ -74,6 +75,7 @@ export default function VirtualClassroom({
   courseTitle, instructorName, channelName, isInstructor, isOpen, onClose,
 }: VirtualClassroomProps) {
   const { user } = useAuth()
+  const { t } = useLanguage()
 
   // ── Agora refs ────────────────────────────────────────────
   const clientRef        = useRef<IAgoraRTCClient | null>(null)
@@ -408,12 +410,12 @@ export default function VirtualClassroom({
           <Loader2 className="w-8 h-8 text-[#FF6B2B] animate-spin" />
         </div>
         <div className="text-center">
-          <p className="text-white font-bold text-lg mb-1">Waiting for admission</p>
-          <p className="text-[#555] text-sm">The instructor will let you in shortly</p>
+          <p className="text-white font-bold text-lg mb-1">{t('waiting_admission')}</p>
+          <p className="text-[#555] text-sm">{t('waiting_admission_sub')}</p>
         </div>
         <button onClick={leaveAndClose}
           className="mt-4 bg-[#1e1e1e] text-white px-6 py-3 rounded-full font-semibold text-sm border border-[rgba(255,255,255,0.08)]">
-          Cancel
+          {t('cancel')}
         </button>
       </div>
     )
@@ -428,12 +430,12 @@ export default function VirtualClassroom({
           <X className="w-8 h-8 text-red-400" />
         </div>
         <div className="text-center">
-          <p className="text-white font-bold text-lg mb-1">Request denied</p>
-          <p className="text-[#555] text-sm">The instructor has not admitted you to this class</p>
+          <p className="text-white font-bold text-lg mb-1">{t('request_denied')}</p>
+          <p className="text-[#555] text-sm">{t('request_denied_sub')}</p>
         </div>
         <button onClick={leaveAndClose}
           className="mt-4 bg-[#1e1e1e] text-white px-6 py-3 rounded-full font-semibold text-sm border border-[rgba(255,255,255,0.08)]">
-          Leave
+          {t('leave')}
         </button>
       </div>
     )
@@ -450,7 +452,7 @@ export default function VirtualClassroom({
         </button>
         <div className="text-center flex-1 px-3">
           <p className="text-[#555] text-[9px] font-bold uppercase tracking-widest">
-            {connecting ? 'Connecting…' : joined ? '🔴 Live' : 'Virtual Classroom'}
+            {connecting ? t('connecting') : joined ? `🔴 ${t('live')}` : t('virtual_classroom')}
           </p>
           <p className="text-white text-xs font-bold mt-0.5 line-clamp-1">{courseTitle}</p>
         </div>
@@ -475,7 +477,7 @@ export default function VirtualClassroom({
           <div className="px-4 py-3 border-b border-[rgba(255,255,255,0.07)] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bell className="w-4 h-4 text-[#FF6B2B]" />
-              <p className="text-white font-bold text-sm">Waiting Room</p>
+              <p className="text-white font-bold text-sm">{t('waiting_room')}</p>
               {pendingRequests.length > 0 && (
                 <span className="bg-[#FF6B2B] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                   {pendingRequests.length}
@@ -487,7 +489,7 @@ export default function VirtualClassroom({
             </button>
           </div>
           {pendingRequests.length === 0 ? (
-            <p className="px-4 py-4 text-[#444] text-sm text-center">No one waiting</p>
+            <p className="px-4 py-4 text-[#444] text-sm text-center">{t('no_one_waiting')}</p>
           ) : (
             <div className="divide-y divide-[rgba(255,255,255,0.05)]">
               {pendingRequests.map((p, i) => (
@@ -550,7 +552,7 @@ export default function VirtualClassroom({
             <Avatar name={instructorName} size={72} colorIndex={0} />
             <p className="text-white text-sm font-semibold mt-1">{instructorName}</p>
             <p className="text-[#555] text-xs">
-              {isInstructor ? 'Turn on your camera to go live' : 'Waiting for instructor to go live…'}
+              {isInstructor ? t('turn_on_camera') : t('waiting_instructor')}
             </p>
           </div>
         )}
@@ -579,7 +581,7 @@ export default function VirtualClassroom({
         {participants.filter(p => p.status !== 'waiting').length > 0 && (
           <div className="px-4 mb-3">
             <p className="text-white text-xs font-bold uppercase tracking-wide mb-2">
-              In the Room · {admittedCount}
+              {t('in_room')} · {admittedCount}
             </p>
             <div className="flex gap-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
               {participants
@@ -660,7 +662,7 @@ export default function VirtualClassroom({
 
           <button onClick={leaveAndClose}
             className="bg-red-500 text-white font-bold px-5 py-2.5 rounded-full text-sm hover:bg-red-600 transition">
-            Leave
+            {t('leave')}
           </button>
         </div>
 
@@ -668,7 +670,7 @@ export default function VirtualClassroom({
           <input
             value={chatInput}
             onChange={e => setChatInput(e.target.value)}
-            placeholder="Say something to the class…"
+            placeholder={t('say_something')}
             className="flex-1 bg-[#1e1e1e] border border-[rgba(255,255,255,0.08)] rounded-full px-4 py-2.5 text-white text-sm placeholder-[#444] outline-none"
           />
           <button type="submit" disabled={!chatInput.trim()}
