@@ -574,6 +574,36 @@ export default function VirtualClassroom({
 
       </div>
 
+      {/* RAISED HANDS — visible to instructor when participants raise hands */}
+      {isInstructor && (() => {
+        const raisedHands = participants.filter(p => p.handUp && !p.isSelf)
+        if (raisedHands.length === 0) return null
+        return (
+          <div className="mx-4 mt-3 flex-shrink-0">
+            <div className="bg-[#261a00] border border-amber-500/40 rounded-2xl overflow-hidden">
+              <div className="px-4 py-2.5 flex items-center gap-2.5 border-b border-amber-500/20">
+                <span className="text-sm">✋</span>
+                <p className="text-amber-400 font-bold text-xs uppercase tracking-wide flex-1">
+                  {raisedHands.length === 1 ? 'Hand Raised' : `${raisedHands.length} Hands Raised`}
+                </p>
+              </div>
+              {raisedHands.map((p, i) => (
+                <div key={p.userId} className="px-4 py-2.5 flex items-center gap-3 border-b border-[rgba(255,255,255,0.04)] last:border-0">
+                  <Avatar name={p.username} avatarUrl={p.avatar_url} size={28} colorIndex={i + 2} />
+                  <p className="text-white text-sm font-semibold flex-1 truncate">{p.username}</p>
+                  <button
+                    onClick={() => acceptHand(p.userId)}
+                    className="bg-amber-500 text-black text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1"
+                  >
+                    <Check className="w-2.5 h-2.5" /> Accept
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* SCROLLABLE BODY */}
       <div className="flex-1 overflow-y-auto overscroll-contain mt-3">
 

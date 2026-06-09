@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, ImageIcon } from 'lucide-react'
+import { X, ImageIcon, Globe, MapPin } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { createWorkshop, supabase } from '@/lib/supabase'
 
@@ -22,6 +22,7 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
   const [date,        setDate]        = useState('')
   const [time,        setTime]        = useState('')
   const [location,    setLocation]    = useState('')
+  const [isOnline,    setIsOnline]    = useState(false)
   const [thumbnail,   setThumbnail]   = useState<File | null>(null)
   const [loading,     setLoading]     = useState(false)
   const galleryRef = useRef<HTMLInputElement>(null)
@@ -41,7 +42,9 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
     )
   }
 
-  const canSubmit = !!(title && date && time && location)
+  const canSubmit = isOnline
+    ? !!(title && date && time)
+    : !!(title && date && time && location)
 
   const handleSubmit = async () => {
     if (!user || !canSubmit) return
@@ -59,12 +62,13 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
         description,
         workshop_date: date,
         workshop_time: time,
-        location,
-        is_online: false,
+        location: isOnline ? null : location,
+        is_online: isOnline,
         enrolled_count: 0,
         thumbnail_url: thumbnailUrl,
       })
-      setTitle(''); setDescription(''); setDate(''); setTime(''); setLocation(''); setThumbnail(null)
+      setTitle(''); setDescription(''); setDate(''); setTime('')
+      setLocation(''); setIsOnline(false); setThumbnail(null)
       onClose()
       router.push('/courses?tab=workshops')
     } catch (err) {
@@ -92,6 +96,36 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
 
         <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 space-y-5">
 
+          {/* Online / In-Person toggle */}
+          <div>
+            <label className={labelCls}>Format</label>
+            <div className="flex gap-2 bg-[#111] rounded-xl p-1">
+              <button
+                type="button"
+                onClick={() => setIsOnline(false)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition ${
+                  !isOnline ? 'bg-white text-black' : 'text-[#555]'
+                }`}
+              >
+                <MapPin className="w-4 h-4" /> In-Person
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsOnline(true)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition ${
+                  isOnline ? 'bg-white text-black' : 'text-[#555]'
+                }`}
+              >
+                <Globe className="w-4 h-4" /> Online
+              </button>
+            </div>
+            {isOnline && (
+              <p className="text-[#555] text-[11px] mt-2 px-1">
+                A virtual classroom will be available at the scheduled time.
+              </p>
+            )}
+          </div>
+
           <div>
             <label className={labelCls}>Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Workshop title" className={inputCls} />
@@ -113,10 +147,12 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
             </div>
           </div>
 
-          <div>
-            <label className={labelCls}>Location</label>
-            <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Address or Online" className={inputCls} />
-          </div>
+          {!isOnline && (
+            <div>
+              <label className={labelCls}>Location</label>
+              <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Address or venue" className={inputCls} />
+            </div>
+          )}
 
           <button type="button" onClick={() => galleryRef.current?.click()}
             className="w-full flex items-center justify-center gap-2 bg-[#1e1e1e] border border-[rgba(255,255,255,0.08)] text-[#888] text-sm py-3.5 rounded-2xl hover:text-white transition">

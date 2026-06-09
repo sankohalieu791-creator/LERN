@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import {
   SlidersHorizontal, Star, Clock, Users, X, Check,
   Calendar, Loader2, Lock,
-  UserCheck, Plus, BookOpen, Trash2, MapPin,
+  UserCheck, Plus, BookOpen, Trash2, MapPin, Globe, Monitor,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -192,9 +192,17 @@ function WorkshopDetailSheet({ workshop, isJoined, isOwner, onJoin, onDelete, on
   onDelete?: () => void
   onClose: () => void
 }) {
+  const router = useRouter()
   const [joining,   setJoining]   = useState(false)
   const [deleting,  setDeleting]  = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
+
+  const isLiveNow = !!(
+    workshop.is_online &&
+    workshop.workshop_date &&
+    workshop.workshop_time &&
+    new Date(`${workshop.workshop_date}T${workshop.workshop_time}`) <= new Date()
+  )
 
   const handleJoin = async () => {
     setJoining(true)
@@ -255,8 +263,22 @@ function WorkshopDetailSheet({ workshop, isJoined, isOwner, onJoin, onDelete, on
             </div>
           )}
 
-          {/* Location */}
-          {workshop.location && (
+          {/* Online / Location */}
+          {workshop.is_online ? (
+            <div className="flex items-center gap-3 bg-[#1e1e1e] rounded-2xl px-4 py-3 mb-3">
+              <Globe className="w-4 h-4 text-[#FF6B2B] flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[#555] text-[10px] font-bold uppercase tracking-wide">Format</p>
+                <p className="text-white text-sm font-semibold">Online · Virtual Classroom</p>
+              </div>
+              {isLiveNow && (
+                <span className="flex items-center gap-1.5 bg-red-500/15 border border-red-500/30 text-red-400 text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0">
+                  <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />
+                  LIVE
+                </span>
+              )}
+            </div>
+          ) : workshop.location ? (
             <div className="flex items-center gap-3 bg-[#1e1e1e] rounded-2xl px-4 py-3 mb-3">
               <MapPin className="w-4 h-4 text-[#FF6B2B] flex-shrink-0" />
               <div className="flex-1 min-w-0">
@@ -264,7 +286,7 @@ function WorkshopDetailSheet({ workshop, isJoined, isOwner, onJoin, onDelete, on
                 <p className="text-white text-sm font-semibold">{workshop.location}</p>
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* Capacity */}
           <div className="flex items-center gap-3 bg-[#1e1e1e] rounded-2xl px-4 py-3 mb-4">
@@ -310,33 +332,50 @@ function WorkshopDetailSheet({ workshop, isJoined, isOwner, onJoin, onDelete, on
         <div className="flex-shrink-0 px-5 py-4 border-t border-[rgba(255,255,255,0.07)] bg-[#141414] space-y-2"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
           {isOwner ? (
-            confirmDel ? (
-              <div className="space-y-2">
-                <p className="text-center text-[#888] text-sm">Delete this workshop? This cannot be undone.</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setConfirmDel(false)}
-                    className="flex-1 bg-[#252525] text-white font-bold py-3.5 rounded-2xl"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="flex-1 bg-red-500 text-white font-bold py-3.5 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
-                  >
-                    {deleting ? <><Loader2 className="w-4 h-4 animate-spin" />Deleting…</> : <><Trash2 className="w-4 h-4" />Delete</>}
-                  </button>
+            <>
+              {isLiveNow && (
+                <button
+                  onClick={() => router.push(`/workshops/${workshop.id}/classroom`)}
+                  className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2"
+                >
+                  <Monitor className="w-4 h-4" /> Start Workshop
+                </button>
+              )}
+              {confirmDel ? (
+                <div className="space-y-2">
+                  <p className="text-center text-[#888] text-sm">Delete this workshop? This cannot be undone.</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setConfirmDel(false)}
+                      className="flex-1 bg-[#252525] text-white font-bold py-3.5 rounded-2xl"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="flex-1 bg-red-500 text-white font-bold py-3.5 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
+                    >
+                      {deleting ? <><Loader2 className="w-4 h-4 animate-spin" />Deleting…</> : <><Trash2 className="w-4 h-4" />Delete</>}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => setConfirmDel(true)}
-                className="w-full bg-red-500/10 border border-red-500/20 text-red-400 font-bold py-4 rounded-2xl flex items-center justify-center gap-2"
-              >
-                <Trash2 className="w-4 h-4" />Delete Workshop
-              </button>
-            )
+              ) : (
+                <button
+                  onClick={() => setConfirmDel(true)}
+                  className="w-full bg-red-500/10 border border-red-500/20 text-red-400 font-bold py-4 rounded-2xl flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />Delete Workshop
+                </button>
+              )}
+            </>
+          ) : isLiveNow && isJoined ? (
+            <button
+              onClick={() => router.push(`/workshops/${workshop.id}/classroom`)}
+              className="w-full bg-red-500 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2"
+            >
+              <span className="w-2 h-2 bg-white rounded-full animate-pulse" /> Join Now
+            </button>
           ) : (
             <button
               onClick={handleJoin}
@@ -707,6 +746,7 @@ export default function CoursesPage() {
               : workshops.map(w => (
                   <WorkshopCard key={w.id} workshop={w}
                     isJoined={joinedWorkshops.has(w.id)}
+                    isOwner={user?.id === w.instructor_id}
                     joining={joiningId === w.id}
                     onJoin={() => handleWorkshopJoin(w.id)}
                     onTap={() => setDetailWorkshop(w)} />
@@ -931,17 +971,31 @@ function CourseCard({ course, isEnrolled, isOwner, onTap }: {
 }
 
 // ── WorkshopCard ──────────────────────────────────────────────
-function WorkshopCard({ workshop, isJoined, joining, onJoin, onTap }: {
+function WorkshopCard({ workshop, isJoined, joining, isOwner, onJoin, onTap }: {
   workshop: any
   isJoined?: boolean
   joining?: boolean
+  isOwner?: boolean
   onJoin: () => void
   onTap?: () => void
 }) {
+  const router = useRouter()
   const date = workshop.workshop_date ? new Date(workshop.workshop_date) : null
   const dateStr = date
     ? date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : null
+
+  const isLiveNow = !!(
+    workshop.is_online &&
+    workshop.workshop_date &&
+    workshop.workshop_time &&
+    new Date(`${workshop.workshop_date}T${workshop.workshop_time}`) <= new Date()
+  )
+
+  const goToClassroom = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push(`/workshops/${workshop.id}/classroom`)
+  }
 
   return (
     <div className="bg-[#1a1a1a] rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.06)] active:opacity-90 cursor-pointer" onClick={onTap}>
@@ -956,10 +1010,22 @@ function WorkshopCard({ workshop, isJoined, joining, onJoin, onTap }: {
             <p className="text-white text-xs font-bold">{dateStr}</p>
           </div>
         )}
-        {workshop.location && (
+        {/* Online/location badge */}
+        {workshop.is_online ? (
+          <span className="absolute top-2.5 right-2.5 text-[10px] font-bold bg-[#FF6B2B]/90 text-white px-2.5 py-1 rounded-full uppercase tracking-wide flex items-center gap-1">
+            <Globe className="w-2.5 h-2.5" /> Online
+          </span>
+        ) : workshop.location ? (
           <span className="absolute top-2.5 right-2.5 text-[10px] font-bold bg-black/80 text-white px-2.5 py-1 rounded-full uppercase tracking-wide">
             {workshop.location}
           </span>
+        ) : null}
+        {/* Live badge */}
+        {isLiveNow && (
+          <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 bg-red-500/90 rounded-full px-2.5 py-1">
+            <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+            <span className="text-white text-[10px] font-bold">LIVE NOW</span>
+          </div>
         )}
       </div>
 
@@ -990,14 +1056,33 @@ function WorkshopCard({ workshop, isJoined, joining, onJoin, onTap }: {
           <span className="flex items-center gap-1"><UserCheck className="w-3 h-3" />{workshop.enrolled_count || 0} joined</span>
         </div>
 
-        <button onClick={e => { e.stopPropagation(); onJoin() }} disabled={joining}
-          className={`w-full py-3 rounded-2xl text-sm font-bold transition active:scale-[0.98] disabled:opacity-40 ${
-            isJoined
-              ? 'bg-[#252525] text-white border border-[rgba(255,255,255,0.08)]'
-              : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
-          }`}>
-          {joining ? '…' : isJoined ? 'Joined ✓' : 'View & Join'}
-        </button>
+        {isLiveNow ? (
+          isOwner ? (
+            <button onClick={goToClassroom}
+              className="w-full py-3 rounded-2xl text-sm font-bold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white flex items-center justify-center gap-2 active:scale-[0.98] transition">
+              <Monitor className="w-4 h-4" /> Start Workshop
+            </button>
+          ) : isJoined ? (
+            <button onClick={goToClassroom}
+              className="w-full py-3 rounded-2xl text-sm font-bold bg-red-500 text-white flex items-center justify-center gap-2 active:scale-[0.98] transition">
+              <span className="w-2 h-2 bg-white rounded-full animate-pulse" /> Join Now
+            </button>
+          ) : (
+            <button onClick={e => { e.stopPropagation(); onJoin() }} disabled={joining}
+              className="w-full py-3 rounded-2xl text-sm font-bold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white disabled:opacity-40 active:scale-[0.98] transition">
+              {joining ? '…' : 'Join to Watch'}
+            </button>
+          )
+        ) : (
+          <button onClick={e => { e.stopPropagation(); onJoin() }} disabled={joining}
+            className={`w-full py-3 rounded-2xl text-sm font-bold transition active:scale-[0.98] disabled:opacity-40 ${
+              isJoined
+                ? 'bg-[#252525] text-white border border-[rgba(255,255,255,0.08)]'
+                : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
+            }`}>
+            {joining ? '…' : isJoined ? 'Joined ✓' : 'View & Join'}
+          </button>
+        )}
       </div>
     </div>
   )

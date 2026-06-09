@@ -1,226 +1,135 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { X } from 'lucide-react'
 
-const SLIDES = [
-  {
-    bg: 'linear-gradient(160deg, #FF6B2B 0%, #C026D3 60%, #7C3AED 100%)',
-    emoji: '🎓',
-    title: 'Welcome to LERN',
-    sub: 'The social learning platform',
-    body: 'Watch short educational videos, join live courses, and connect with world-class instructors — all in one place.',
+interface HintConfig {
+  icon: string
+  title: string
+  desc: string
+  cta: string
+}
+
+const PAGE_HINTS: Record<string, HintConfig> = {
+  '/feed': {
+    icon: '▶️',
+    title: 'Discover Educational Videos',
+    desc: 'Swipe through expert-led videos from top instructors. Like, save, and follow the creators you love.',
+    cta: 'Got it',
   },
-  {
-    bg: 'linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-    emoji: '▶️',
-    title: 'Discover & Watch',
-    sub: 'Bite-sized education',
-    body: 'Swipe through expert-led videos on maths, science, business, coding, and more. Learning that fits in your pocket.',
+  '/courses': {
+    icon: '📚',
+    title: 'Find Your Perfect Course',
+    desc: 'Discover courses that suit you — enroll to unlock your personal timetable and join live virtual sessions.',
+    cta: "Let's explore",
   },
-  {
-    bg: 'linear-gradient(160deg, #064e3b 0%, #065f46 50%, #059669 100%)',
-    emoji: '📅',
-    title: 'Join Live Courses',
-    sub: 'Structured, scheduled learning',
-    body: 'Enrol in courses with weekly live sessions. See your personal timetable and join the classroom with one tap.',
-  },
-  {
-    bg: 'linear-gradient(160deg, #1e1b4b 0%, #3730a3 60%, #4f46e5 100%)',
-    emoji: '🤝',
+  '/discovery': {
+    icon: '🤝',
     title: 'Find Your Mentor',
-    sub: 'Personalised guidance',
-    body: 'Browse instructors, professors, and coaches. Request 1-to-1 training and message them directly when accepted.',
+    desc: 'Browse verified instructors and coaches. Request 1-to-1 personalised training and message them directly.',
+    cta: 'Got it',
   },
-  {
-    bg: 'linear-gradient(160deg, #1a0533 0%, #4a1272 50%, #7C3AED 100%)',
-    emoji: '🎤',
-    title: 'Are you an expert?',
-    sub: 'Teach on LERN',
-    body: 'Share your knowledge, run live courses, and mentor the next generation. Apply to become a verified instructor in Settings.',
+  '/profile/me': {
+    icon: '✨',
+    title: 'Your Learning Profile',
+    desc: 'Your posts, courses, and achievements — all in one place. Build your reputation as a learner or instructor.',
+    cta: 'Nice',
   },
-  {
-    bg: 'linear-gradient(160deg, #0c1445 0%, #1a237e 50%, #283593 100%)',
-    emoji: '🚀',
-    title: "You're all set!",
-    sub: 'Start your journey',
-    body: 'Your learning community is waiting. Explore the feed, discover mentors, and enrol in your first course today.',
+  '/settings': {
+    icon: '🎤',
+    title: 'Are You an Expert?',
+    desc: 'Share your knowledge with thousands of learners. Tap "Apply to Teach" below to become a verified LERN instructor.',
+    cta: 'Got it',
   },
-]
+}
 
-const STORAGE_KEY = 'lern_onboarded_v1'
+const STORAGE_PREFIX = 'lern_hint_v2_'
+
+function hintKey(path: string) {
+  return STORAGE_PREFIX + path.replace(/\//g, '_').replace(/^_/, '')
+}
 
 export default function OnboardingFlow() {
   const { user, loading } = useAuth()
   const pathname = usePathname()
-  const [show, setShow] = useState(false)
-  const [slide, setSlide] = useState(0)
-  const [animDir, setAnimDir] = useState<'left' | 'right' | null>(null)
-  const [visible, setVisible] = useState(true)
-  const touchStartX = useRef(0)
-  const touchStartY = useRef(0)
+  const [hint, setHint]       = useState<HintConfig | null>(null)
+  const [visible, setVisible] = useState(false)
 
-  // Decide whether to show onboarding
   useEffect(() => {
-    if (loading) return
-    if (!user) return
-    if (pathname === '/' || pathname.startsWith('/auth')) return
-    const done = localStorage.getItem(STORAGE_KEY)
-    if (!done) setShow(true)
+    if (loading || !user) { setHint(null); return }
+    if (!pathname || pathname === '/' || pathname.startsWith('/auth')) { setHint(null); return }
+
+    const config = PAGE_HINTS[pathname]
+    if (!config) { setHint(null); return }
+
+    const seen = localStorage.getItem(hintKey(pathname))
+    if (seen) { setHint(null); return }
+
+    setHint(config)
+    setVisible(false)
+    const t = setTimeout(() => setVisible(true), 700)
+    return () => clearTimeout(t)
   }, [user, loading, pathname])
 
-  const done = () => {
-    localStorage.setItem(STORAGE_KEY, '1')
+  const dismiss = () => {
     setVisible(false)
-    setTimeout(() => setShow(false), 400)
+    localStorage.setItem(hintKey(pathname), '1')
+    setTimeout(() => setHint(null), 350)
   }
 
-  const goTo = (next: number, dir: 'left' | 'right') => {
-    setAnimDir(dir)
-    setTimeout(() => {
-      setSlide(next)
-      setAnimDir(null)
-    }, 180)
-  }
-
-  const next = () => {
-    if (slide < SLIDES.length - 1) goTo(slide + 1, 'left')
-    else done()
-  }
-
-  const prev = () => {
-    if (slide > 0) goTo(slide - 1, 'right')
-  }
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX
-    touchStartY.current = e.touches[0].clientY
-  }
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const dx = touchStartX.current - e.changedTouches[0].clientX
-    const dy = Math.abs(touchStartY.current - e.changedTouches[0].clientY)
-    if (Math.abs(dx) > 50 && dy < 80) {
-      if (dx > 0) next()
-      else prev()
-    }
-  }
-
-  if (!show) return null
-
-  const s = SLIDES[slide]
-  const isLast = slide === SLIDES.length - 1
+  if (!hint) return null
 
   return (
     <div
-      className="fixed inset-0 flex flex-col"
+      className="fixed left-4 right-4 z-[9998]"
       style={{
-        zIndex: 99999,
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 76px)',
         opacity: visible ? 1 : 0,
-        paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
-        background: s.bg,
-        transition: 'background 0.5s ease, opacity 0.4s ease',
+        transform: visible ? 'translateY(0)' : 'translateY(18px)',
+        transition: 'opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+        pointerEvents: visible ? 'auto' : 'none',
       }}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
     >
-      {/* Skip */}
-      <div className="flex justify-end px-6 pt-4 flex-shrink-0">
-        {slide < SLIDES.length - 1 && (
-          <button
-            onClick={done}
-            className="text-white/60 text-sm font-semibold px-3 py-1.5"
-          >
-            Skip
-          </button>
-        )}
-      </div>
-
-      {/* Main content */}
       <div
-        className="flex-1 flex flex-col items-center justify-center px-8 text-center"
-        style={{
-          opacity: animDir ? 0 : 1,
-          transform: animDir === 'left' ? 'translateX(-24px)' : animDir === 'right' ? 'translateX(24px)' : 'translateX(0)',
-          transition: 'opacity 0.18s ease, transform 0.18s ease',
-        }}
+        className="rounded-3xl overflow-hidden shadow-[0_8px_48px_rgba(0,0,0,0.7)]"
+        style={{ border: '1px solid rgba(255,255,255,0.11)', background: '#1a1a1a' }}
       >
-        {/* Emoji icon */}
-        <div
-          className="mb-8 flex items-center justify-center"
-          style={{
-            width: 100,
-            height: 100,
-            borderRadius: 28,
-            background: 'rgba(255,255,255,0.15)',
-            backdropFilter: 'blur(10px)',
-            fontSize: 48,
-          }}
-        >
-          {s.emoji}
-        </div>
+        {/* Gradient accent line */}
+        <div className="h-[3px] bg-gradient-to-r from-[#FF6B2B] to-[#C026D3]" />
 
-        <h1 className="text-white font-black text-[32px] leading-tight mb-2 tracking-tight">
-          {s.title}
-        </h1>
-        <p className="text-white/80 font-bold text-base mb-4 tracking-wide uppercase text-[11px]">
-          {s.sub}
-        </p>
-        <p className="text-white/70 text-[15px] leading-relaxed max-w-xs">
-          {s.body}
-        </p>
-      </div>
-
-      {/* Bottom controls */}
-      <div className="flex-shrink-0 px-6 pb-8">
-        {/* Progress dots */}
-        <div className="flex justify-center gap-2 mb-8">
-          {SLIDES.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => goTo(i, i > slide ? 'left' : 'right')}
-              style={{
-                width: i === slide ? 24 : 8,
-                height: 8,
-                borderRadius: 4,
-                background: i === slide ? '#fff' : 'rgba(255,255,255,0.35)',
-                transition: 'all 0.3s ease',
-              }}
-            />
-          ))}
-        </div>
-
-        {/* CTA button */}
-        <button
-          onClick={next}
-          style={{
-            width: '100%',
-            background: 'rgba(255,255,255,1)',
-            color: '#000',
-            fontWeight: 800,
-            fontSize: 16,
-            borderRadius: 100,
-            padding: '16px 0',
-            letterSpacing: '-0.2px',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-            transition: 'transform 0.1s ease, box-shadow 0.1s ease',
-          }}
-          onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
-          onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
-        >
-          {isLast ? 'Start learning →' : 'Continue'}
-        </button>
-
-        {slide > 0 && (
+        <div className="p-4 relative">
+          {/* Dismiss X */}
           <button
-            onClick={prev}
-            className="w-full text-center text-white/50 text-sm font-semibold mt-3 py-2"
+            onClick={dismiss}
+            className="absolute top-4 right-4 w-6 h-6 rounded-full bg-[#252525] flex items-center justify-center"
           >
-            Back
+            <X className="w-3 h-3 text-[#666]" />
           </button>
-        )}
+
+          {/* Icon + text */}
+          <div className="flex items-start gap-3 mb-3.5 pr-8">
+            <div
+              className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, rgba(255,107,43,0.18) 0%, rgba(192,38,211,0.18) 100%)' }}
+            >
+              {hint.icon}
+            </div>
+            <div className="flex-1 min-w-0 pt-0.5">
+              <p className="text-white font-bold text-sm leading-snug mb-1">{hint.title}</p>
+              <p className="text-[#777] text-[12px] leading-relaxed">{hint.desc}</p>
+            </div>
+          </div>
+
+          {/* CTA button */}
+          <button
+            onClick={dismiss}
+            className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold text-sm py-3 rounded-2xl"
+          >
+            {hint.cta} →
+          </button>
+        </div>
       </div>
     </div>
   )
