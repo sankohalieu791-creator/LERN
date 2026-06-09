@@ -57,7 +57,7 @@ export default function BottomNav() {
             onClick={() => { setShowMenu(false); setShowPost(true) }}
             className="flex items-center gap-2.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.12)] text-white text-sm font-semibold px-5 py-3 rounded-full shadow-2xl whitespace-nowrap"
           >
-            <Video className="w-4 h-4" /> Post Video
+            <Video className="w-4 h-4" /> Post
           </button>
         </div>
       )}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { X, Upload, Image as ImageIcon, Loader2, Globe, Lock } from 'lucide-react'
+import { X, Upload, Image as ImageIcon, Loader2, Globe, Lock, Video, Camera } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { createVideo } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
@@ -10,6 +10,8 @@ interface CreatePostProps {
   isOpen: boolean
   onClose: () => void
 }
+
+type PostType = 'video' | 'photo'
 
 function detectDuration(file: File): Promise<string> {
   return new Promise(resolve => {
@@ -66,6 +68,7 @@ async function uploadWithProgress(
 
 export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
   const { user } = useAuth()
+  const [postType,     setPostType]     = useState<PostType>('video')
   const [title,        setTitle]        = useState('')
   const [description,  setDescription]  = useState('')
   const [subject,      setSubject]       = useState('')
@@ -78,8 +81,9 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
   const [uploadPct,    setUploadPct]     = useState(0)
   const [error,        setError]         = useState('')
 
-  const videoRef    = useRef<HTMLInputElement>(null)
-  const thumbRef    = useRef<HTMLInputElement>(null)
+  const videoRef     = useRef<HTMLInputElement>(null)
+  const thumbRef     = useRef<HTMLInputElement>(null)
+  const photoRef     = useRef<HTMLInputElement>(null)
   const cancelledRef = useRef(false)
 
   const reset = () => {
@@ -94,6 +98,11 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
     onClose()
   }
 
+  const handleTypeSwitch = (type: PostType) => {
+    setPostType(type)
+    reset()
+  }
+
   const handleVideoSelect = async (file: File) => {
     setVideo(file)
     const dur = await detectDuration(file)
@@ -105,9 +114,15 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
     setThumbPreview(URL.createObjectURL(file))
   }
 
+  const handlePhotoSelect = (file: File) => {
+    setThumbnail(file)
+    setThumbPreview(URL.createObjectURL(file))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user || !title) return
+    if (postType === 'photo' && !thumbnail) { setError('Please select a photo'); return }
     cancelledRef.current = false
     setLoading(true)
     setError('')
@@ -116,19 +131,31 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
       let thumbnailUrl: string | null = null
       let videoUrl:     string | null = null
 
-      if (thumbnail) {
+      if (postType === 'photo' && thumbnail) {
+        // Upload photo as thumbnail_url; no video_url
         const ext  = thumbnail.name.split('.').pop()
-        const path = `${user.id}/${Date.now()}_thumb.${ext}`
+        const path = `${user.id}/${Date.now()}_photo.${ext}`
+        setUploadPct(30)
         const { error: e } = await supabase.storage.from('thumbnails').upload(path, thumbnail, { upsert: true })
-        if (!e) thumbnailUrl = supabase.storage.from('thumbnails').getPublicUrl(path).data.publicUrl
-      }
+        if (e) throw e
+        thumbnailUrl = supabase.storage.from('thumbnails').getPublicUrl(path).data.publicUrl
+        setUploadPct(100)
+      } else {
+        // Video mode
+        if (thumbnail) {
+          const ext  = thumbnail.name.split('.').pop()
+          const path = `${user.id}/${Date.now()}_thumb.${ext}`
+          const { error: e } = await supabase.storage.from('thumbnails').upload(path, thumbnail, { upsert: true })
+          if (!e) thumbnailUrl = supabase.storage.from('thumbnails').getPublicUrl(path).data.publicUrl
+        }
 
-      if (cancelledRef.current) return
+        if (cancelledRef.current) return
 
-      if (video) {
-        const ext  = video.name.split('.').pop()
-        const path = `${user.id}/${Date.now()}_video.${ext}`
-        videoUrl = await uploadWithProgress('videos', path, video, setUploadPct, cancelledRef)
+        if (video) {
+          const ext  = video.name.split('.').pop()
+          const path = `${user.id}/${Date.now()}_video.${ext}`
+          videoUrl = await uploadWithProgress('videos', path, video, setUploadPct, cancelledRef)
+        }
       }
 
       if (cancelledRef.current) return
@@ -137,7 +164,7 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
         title,
         description,
         subject: subject || 'general',
-        duration,
+        duration: postType === 'photo' ? '' : duration,
         thumbnail_url: thumbnailUrl,
         video_url:     videoUrl,
         views:    0,
@@ -155,43 +182,97 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
 
   if (!isOpen) return null
 
-  const isUploading = loading && video && uploadPct < 100
+  const isUploading = loading && uploadPct > 0 && uploadPct < 100
 
   return (
     <div className="fixed inset-0 bg-black/90 z-50 flex items-end sm:items-center justify-center">
       <div className="bg-[#1a1a1a] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto">
+
         {/* HEADER */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-[rgba(255,255,255,0.07)] sticky top-0 bg-[#1a1a1a] z-10">
-          <h2 className="text-white font-bold text-lg">Post Video</h2>
+          <h2 className="text-white font-bold text-lg">
+            {postType === 'photo' ? 'Post Photo' : 'Post Video'}
+          </h2>
           <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#252525]">
             <X className="w-4 h-4 text-white" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="px-4 py-4 space-y-4">
+
+          {/* TYPE TOGGLE */}
+          <div className="flex gap-2 bg-[#111] rounded-xl p-1">
+            <button
+              type="button"
+              onClick={() => handleTypeSwitch('video')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition ${
+                postType === 'video' ? 'bg-white text-black' : 'text-[#555]'
+              }`}
+            >
+              <Video className="w-4 h-4" /> Video
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTypeSwitch('photo')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition ${
+                postType === 'photo' ? 'bg-white text-black' : 'text-[#555]'
+              }`}
+            >
+              <Camera className="w-4 h-4" /> Photo
+            </button>
+          </div>
+
           {error && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-xl px-3 py-2">{error}</p>}
 
-          {/* THUMBNAIL PREVIEW */}
-          <button
-            type="button"
-            onClick={() => thumbRef.current?.click()}
-            className="relative w-full aspect-video bg-[#111] border-2 border-dashed border-[rgba(255,255,255,0.1)] rounded-xl overflow-hidden flex flex-col items-center justify-center gap-2 hover:border-[rgba(255,255,255,0.2)] transition"
-          >
-            {thumbPreview
-              ? <img src={thumbPreview} className="w-full h-full object-cover absolute inset-0" />
-              : <>
-                  <ImageIcon className="w-8 h-8 text-[#333]" />
-                  <p className="text-[#444] text-xs">Tap to add thumbnail</p>
-                </>
-            }
-          </button>
+          {/* PHOTO MODE — big image picker */}
+          {postType === 'photo' && (
+            <button
+              type="button"
+              onClick={() => photoRef.current?.click()}
+              className="relative w-full bg-[#111] border-2 border-dashed border-[rgba(255,255,255,0.1)] rounded-xl overflow-hidden flex flex-col items-center justify-center gap-2 hover:border-[rgba(255,255,255,0.2)] transition"
+              style={{ minHeight: 220 }}
+            >
+              {thumbPreview
+                ? <img src={thumbPreview} className="w-full h-full object-cover absolute inset-0" style={{ minHeight: 220 }} />
+                : <>
+                    <Camera className="w-10 h-10 text-[#333]" />
+                    <p className="text-[#555] text-sm font-semibold">Tap to select photo</p>
+                    <p className="text-[#333] text-xs">JPG, PNG, WEBP, HEIC</p>
+                  </>
+              }
+              {thumbPreview && (
+                <div className="absolute bottom-2 right-2 bg-black/60 rounded-full px-3 py-1 text-white text-xs font-semibold">
+                  Change
+                </div>
+              )}
+            </button>
+          )}
+
+          {/* VIDEO MODE — thumbnail + video picker */}
+          {postType === 'video' && (
+            <>
+              <button
+                type="button"
+                onClick={() => thumbRef.current?.click()}
+                className="relative w-full aspect-video bg-[#111] border-2 border-dashed border-[rgba(255,255,255,0.1)] rounded-xl overflow-hidden flex flex-col items-center justify-center gap-2 hover:border-[rgba(255,255,255,0.2)] transition"
+              >
+                {thumbPreview
+                  ? <img src={thumbPreview} className="w-full h-full object-cover absolute inset-0" />
+                  : <>
+                      <ImageIcon className="w-8 h-8 text-[#333]" />
+                      <p className="text-[#444] text-xs">Tap to add thumbnail</p>
+                    </>
+                }
+              </button>
+            </>
+          )}
 
           <div>
             <label className="block text-[#888] text-xs font-semibold mb-1.5 uppercase tracking-wide">Title *</label>
             <input
               value={title}
               onChange={e => setTitle(e.target.value)}
-              placeholder="What is this video about?"
+              placeholder={postType === 'photo' ? 'What is this photo about?' : 'What is this video about?'}
               className="w-full bg-[#111] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.2)]"
             />
           </div>
@@ -246,26 +327,30 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
             </div>
           </div>
 
-          {/* VIDEO UPLOAD */}
-          <button
-            type="button"
-            onClick={() => !loading && videoRef.current?.click()}
-            className="w-full flex items-center justify-center gap-2 bg-[#111] border border-[rgba(255,255,255,0.08)] text-sm py-3 rounded-xl transition hover:border-[rgba(255,255,255,0.18)]"
-          >
-            <Upload className="w-4 h-4 text-[#888]" />
-            {video
-              ? <span className="text-[#FF6B2B] font-semibold truncate max-w-[220px]">
-                  {video.name.slice(0, 28)} · {duration} · {fmtSize(video.size)}
-                </span>
-              : <span className="text-[#888]">Select video file</span>
-            }
-          </button>
+          {/* VIDEO UPLOAD (video mode only) */}
+          {postType === 'video' && (
+            <button
+              type="button"
+              onClick={() => !loading && videoRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 bg-[#111] border border-[rgba(255,255,255,0.08)] text-sm py-3 rounded-xl transition hover:border-[rgba(255,255,255,0.18)]"
+            >
+              <Upload className="w-4 h-4 text-[#888]" />
+              {video
+                ? <span className="text-[#FF6B2B] font-semibold truncate max-w-[220px]">
+                    {video.name.slice(0, 28)} · {duration} · {fmtSize(video.size)}
+                  </span>
+                : <span className="text-[#888]">Select video file</span>
+              }
+            </button>
+          )}
 
           {/* UPLOAD PROGRESS */}
           {isUploading && (
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[#888] text-xs">Uploading video…</span>
+                <span className="text-[#888] text-xs">
+                  {postType === 'photo' ? 'Uploading photo…' : 'Uploading video…'}
+                </span>
                 <span className="text-[#FF6B2B] text-xs font-bold">{uploadPct}%</span>
               </div>
               <div className="w-full h-1.5 bg-[#333] rounded-full overflow-hidden">
@@ -274,21 +359,24 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
                   style={{ width: `${uploadPct}%` }}
                 />
               </div>
-              <p className="text-[#444] text-[11px] mt-1.5">Large files may take a few minutes — keep this screen open</p>
+              {postType === 'video' && (
+                <p className="text-[#444] text-[11px] mt-1.5">Large files may take a few minutes — keep this screen open</p>
+              )}
             </div>
           )}
 
+          <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handlePhotoSelect(e.target.files[0])} />
           <input ref={thumbRef} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleThumbSelect(e.target.files[0])} />
           <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={e => e.target.files?.[0] && handleVideoSelect(e.target.files[0])} />
 
           <button
             type="submit"
-            disabled={loading || !title}
+            disabled={loading || !title || (postType === 'photo' && !thumbnail)}
             className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-xl disabled:opacity-40 flex items-center justify-center gap-2"
           >
             {loading
               ? <><Loader2 className="w-4 h-4 animate-spin" />{isUploading ? `Uploading ${uploadPct}%…` : 'Saving…'}</>
-              : 'Post Video'
+              : postType === 'photo' ? 'Post Photo' : 'Post Video'
             }
           </button>
         </form>

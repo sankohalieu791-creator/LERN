@@ -105,7 +105,7 @@ function FeedCard({ video, userLikes, following, user, onOpen, onLike, onFollow,
             {video.subject}
           </span>
         )}
-        {video.duration && (
+        {video.video_url && video.duration && video.duration !== '0:00' && (
           <span className="absolute top-2.5 right-2.5 bg-black/70 text-white text-[11px] px-2 py-1 rounded-full font-semibold flex items-center gap-1">
             <Clock className="w-3 h-3" />{video.duration}
           </span>
