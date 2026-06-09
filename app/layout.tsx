@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/context/AuthContext'
+import { LanguageProvider } from '@/context/LanguageContext'
 import ConditionalNavbar from '@/components/ConditionalNavbar'
 import BottomNav from '@/components/BottomNav'
 import ThemeProvider from '@/components/ThemeProvider'
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body>
+        <LanguageProvider>
         <AuthProvider>
           <ThemeProvider />
           <PushNotificationSetup />
@@ -51,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <BottomNav />
           <OnboardingFlow />
         </AuthProvider>
+        </LanguageProvider>
         <Analytics />
         <SpeedInsights />
       </body>

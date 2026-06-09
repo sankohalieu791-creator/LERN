@@ -79,8 +79,7 @@ export default function VirtualClassroom({
   const clientRef        = useRef<IAgoraRTCClient | null>(null)
   const localAudioRef    = useRef<IMicrophoneAudioTrack | null>(null)
   const localCameraRef   = useRef<ICameraVideoTrack | null>(null)
-  const mainVideoRef     = useRef<HTMLDivElement>(null)   // remote OR instructor self-cam
-  const selfVideoRef     = useRef<HTMLDivElement>(null)   // instructor PiP
+  const mainVideoRef     = useRef<HTMLDivElement>(null)   // remote video OR instructor self-cam
   const realtimeRef      = useRef<RealtimeChannel | null>(null)
   const chatRef          = useRef<HTMLDivElement>(null)
 
@@ -346,8 +345,7 @@ export default function VirtualClassroom({
         const video = await AgoraRTC.createCameraVideoTrack()
         localCameraRef.current = video
         await clientRef.current.publish([video])
-        // Play self-view in the PiP overlay
-        if (selfVideoRef.current) video.play(selfVideoRef.current)
+        if (mainVideoRef.current) video.play(mainVideoRef.current)
         setCameraOn(true)
       } else {
         if (localCameraRef.current) {
@@ -572,12 +570,6 @@ export default function VirtualClassroom({
           </div>
         )}
 
-        {/* Instructor self-camera PiP (bottom-right corner of main video) */}
-        {isInstructor && cameraOn && (
-          <div className="absolute bottom-3 right-3 w-24 h-32 rounded-xl overflow-hidden bg-black border-2 border-white/20 z-10">
-            <div ref={selfVideoRef} className="w-full h-full" />
-          </div>
-        )}
       </div>
 
       {/* SCROLLABLE BODY */}

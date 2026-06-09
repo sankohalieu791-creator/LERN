@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Home, BookOpen, Compass, User, Plus, Video, Users } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
+import { useLanguage } from '@/context/LanguageContext'
 import CreatePost from '@/components/CreatePost'
 import CreateCourse from '@/components/CreateCourse'
 import CreateWorkshop from '@/components/CreateWorkshop'
@@ -12,6 +13,7 @@ import CreateWorkshop from '@/components/CreateWorkshop'
 export default function BottomNav() {
   const pathname = usePathname()
   const { user } = useAuth()
+  const { t } = useLanguage()
   const [showMenu,   setShowMenu]   = useState(false)
   const [showPost,   setShowPost]   = useState(false)
   const [showCourse, setShowCourse] = useState(false)
@@ -72,11 +74,11 @@ export default function BottomNav() {
         <div className="flex items-center h-[60px]">
           <Link href="/feed" className={linkCls('/feed')}>
             <Home className="w-6 h-6" />
-            <span className="text-[10px] font-medium">Feed</span>
+            <span className="text-[10px] font-medium">{t('feed')}</span>
           </Link>
           <Link href="/courses" className={linkCls('/courses')}>
             <BookOpen className="w-6 h-6" />
-            <span className="text-[10px] font-medium">Courses</span>
+            <span className="text-[10px] font-medium">{t('courses')}</span>
           </Link>
 
           <div className="flex-shrink-0 flex items-center justify-center w-[72px]">
@@ -90,11 +92,11 @@ export default function BottomNav() {
 
           <Link href="/discovery" className={linkCls('/discovery')}>
             <Compass className="w-6 h-6" />
-            <span className="text-[10px] font-medium">Discover</span>
+            <span className="text-[10px] font-medium">{t('discover')}</span>
           </Link>
           <Link href="/profile/me" className={linkCls('/profile/me')}>
             <User className="w-6 h-6" />
-            <span className="text-[10px] font-medium">Profile</span>
+            <span className="text-[10px] font-medium">{t('profile')}</span>
           </Link>
         </div>
       </nav>

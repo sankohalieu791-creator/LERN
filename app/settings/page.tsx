@@ -6,9 +6,11 @@ import { updateUserProfile, submitInstructorApplication } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Moon, Lock, Bell, Shield,
-  LogOut, X, CheckCircle2, MapPin, Clock, Mail, Phone,
+  LogOut, X, CheckCircle2, MapPin, Clock, Mail, Phone, Languages, Check,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useLanguage } from '@/context/LanguageContext'
+import { LANGUAGES, type Language } from '@/lib/translations'
 
 // ── helpers ───────────────────────────────────────────────────
 function VerifiedBadge({ size = 16 }: { size?: number }) {
@@ -46,7 +48,9 @@ const ROLE_OPTIONS: { value: string; label: string; desc: string; color: string 
 export default function SettingsPage() {
   const { user, signOut, refreshUser } = useAuth()
   const router = useRouter()
+  const { language, setLanguage, t } = useLanguage()
 
+  const [showLangPicker, setShowLangPicker] = useState(false)
   const [darkMode,   setDarkMode]   = useState(true)
   const [showApply,  setShowApply]  = useState(false)
   const [applying,   setApplying]   = useState(false)
@@ -220,6 +224,21 @@ export default function SettingsPage() {
             <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-0.5'}`} />
           </button>
         </div>
+        <button
+          onClick={() => setShowLangPicker(true)}
+          className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition text-left"
+        >
+          <div className="w-9 h-9 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
+            <Languages className="w-4 h-4 text-[#888]" />
+          </div>
+          <div className="flex-1">
+            <p className="text-white theme-text-1 text-sm font-semibold">{t('language')}</p>
+            <p className="text-[#555] theme-text-2 text-xs mt-0.5">
+              {LANGUAGES.find(l => l.code === language)?.flag} {LANGUAGES.find(l => l.code === language)?.name}
+            </p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
+        </button>
       </div>
 
       {/* ACCOUNT */}
@@ -272,6 +291,39 @@ export default function SettingsPage() {
 
       </div>{/* end scrollable content */}
     </div>
+
+    {/* ── LANGUAGE PICKER ──────────────────────────────────── */}
+    {showLangPicker && (
+      <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowLangPicker(false)} />
+        <div className="relative bg-[#141414] rounded-t-3xl flex flex-col" style={{ maxHeight: '80vh' }}>
+          <div className="flex justify-center pt-3 flex-shrink-0">
+            <div className="w-10 h-1 bg-[#333] rounded-full" />
+          </div>
+          <div className="flex items-center justify-between px-5 pt-3 pb-4 flex-shrink-0 border-b border-[rgba(255,255,255,0.07)]">
+            <h2 className="text-white text-lg font-bold">{t('language')}</h2>
+            <button onClick={() => setShowLangPicker(false)} className="w-8 h-8 bg-[#222] rounded-full flex items-center justify-center">
+              <X className="w-4 h-4 text-white" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto overscroll-contain py-2" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
+            {LANGUAGES.map(lang => (
+              <button
+                key={lang.code}
+                onClick={() => { setLanguage(lang.code as Language); setShowLangPicker(false) }}
+                className="w-full flex items-center gap-3.5 px-5 py-4 hover:bg-[#1e1e1e] transition text-left border-b border-[rgba(255,255,255,0.04)]"
+              >
+                <span className="text-2xl">{lang.flag}</span>
+                <span className="text-white text-sm font-semibold flex-1">{lang.name}</span>
+                {language === lang.code && (
+                  <Check className="w-4 h-4 text-[#FF6B2B]" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* ── APPLY TO TEACH MODAL ─────────────────────────────── */}
       {showApply && (
