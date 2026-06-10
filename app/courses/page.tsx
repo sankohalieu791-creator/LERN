@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import {
   SlidersHorizontal, Star, Clock, Users, X, Check,
   Calendar, Loader2, Lock,
@@ -632,6 +632,14 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
 
 // ── Page ──────────────────────────────────────────────────────
 export default function CoursesPage() {
+  return (
+    <Suspense fallback={null}>
+      <CoursesPageInner />
+    </Suspense>
+  )
+}
+
+function CoursesPageInner() {
   const { user } = useAuth()
   const router       = useRouter()
   const searchParams = useSearchParams()
