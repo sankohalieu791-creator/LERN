@@ -496,16 +496,49 @@ export const getInstructorApplication = async (userId: string) => {
 }
 
 export const getInstructors = async (roleType?: string) => {
-  let q = supabase.from('instructor_applications').select('*').order('created_at', { ascending: false })
-  if (roleType) q = q.eq('role_type', roleType)
+  // Query users directly — avoids RLS restrictions on instructor_applications
+  let q = supabase
+    .from('users')
+    .select('id, username, avatar_url, verified, title, bio, work_description, experience_years, instructor_role, followers_count')
+    .eq('account_type', 'instructor')
+  if (roleType) q = (q as any).eq('instructor_role', roleType)
   const { data, error } = await q
   if (!data) return { data, error }
-  const ids = [...new Set(data.map((a: any) => a.user_id).filter(Boolean))]
-  const { data: usersData } = ids.length
-    ? await supabase.from('users').select('id, username, avatar_url, verified, account_type, title').in('id', ids)
+
+  // Best-effort: enrich with application data (contact info etc.) — may be empty if RLS blocks it
+  const userIds = (data as any[]).map((u: any) => u.id)
+  const { data: apps } = userIds.length
+    ? await supabase.from('instructor_applications').select('*').in('user_id', userIds)
     : { data: [] }
-  const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
-  return { data: data.map((a: any) => ({ ...a, users: map[a.user_id] ?? null })), error }
+  const appMap: Record<string, any> = Object.fromEntries(((apps || []) as any[]).map((a: any) => [a.user_id, a]))
+
+  const result = (data as any[]).map((u: any) => {
+    const app = appMap[u.id] ?? {}
+    return {
+      id: app.id ?? u.id,
+      user_id: u.id,
+      full_name: app.full_name || u.username,
+      role_type: app.role_type || u.instructor_role || 'mentor',
+      topic: app.topic || u.title || '',
+      bio: app.bio || u.bio || '',
+      location: app.location || u.work_description || '',
+      experience_years: app.experience_years ?? u.experience_years ?? null,
+      contact_email: app.contact_email || '',
+      contact_phone: app.contact_phone || '',
+      created_at: app.created_at || u.created_at,
+      users: {
+        id: u.id,
+        username: u.username,
+        avatar_url: u.avatar_url,
+        verified: u.verified,
+        account_type: 'instructor',
+        title: u.title,
+        followers_count: u.followers_count ?? 0,
+      },
+    }
+  })
+
+  return { data: result, error }
 }
 
 export const getFollowingIds = async (userId: string): Promise<string[]> => {

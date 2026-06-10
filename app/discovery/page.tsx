@@ -527,6 +527,9 @@ export default function DiscoveryPage() {
     getUnreadMessageCount(user.id).then(setUnreadMsgs)
   }, [user])
 
+  // Clear search when switching tabs so stale queries don't confuse results
+  useEffect(() => { setSearch('') }, [activeTab])
+
   useEffect(() => {
     if (activeTab === 'jobs') return
     const load = async () => {
@@ -689,8 +692,18 @@ export default function DiscoveryPage() {
             </div>
           ) : filteredJobs.length === 0 ? (
             <div className="text-center py-20">
-              <p className="text-[#444] text-sm">No jobs posted yet</p>
-              <p className="text-[#333] text-xs mt-1">Instructors can post jobs from their profile</p>
+              {search.trim() ? (
+                <>
+                  <Search className="w-10 h-10 text-[#2a2a2a] mx-auto mb-3" />
+                  <p className="text-[#444] text-sm">No jobs match "{search}"</p>
+                  <button onClick={() => setSearch('')} className="text-[#FF6B2B] text-xs font-semibold mt-2">Clear search</button>
+                </>
+              ) : (
+                <>
+                  <p className="text-[#444] text-sm">No jobs posted yet</p>
+                  <p className="text-[#333] text-xs mt-1">Instructors can post jobs from their profile</p>
+                </>
+              )}
             </div>
           ) : (
             filteredJobs.map(job => (
@@ -710,10 +723,20 @@ export default function DiscoveryPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-[#444] text-sm">
-              {activeTab === 'request' ? 'No instructors available yet' : `No ${activeTab}s found yet`}
-            </p>
-            <p className="text-[#333] text-xs mt-1">Apply in Settings → Apply to be an instructor</p>
+            {search.trim() ? (
+              <>
+                <Search className="w-10 h-10 text-[#2a2a2a] mx-auto mb-3" />
+                <p className="text-[#444] text-sm">No results for "{search}"</p>
+                <button onClick={() => setSearch('')} className="text-[#FF6B2B] text-xs font-semibold mt-2">Clear search</button>
+              </>
+            ) : (
+              <>
+                <p className="text-[#444] text-sm">
+                  {activeTab === 'request' ? 'No instructors available yet' : `No ${activeTab}s found yet`}
+                </p>
+                <p className="text-[#333] text-xs mt-1">Apply in Settings → Apply to be an instructor</p>
+              </>
+            )}
           </div>
         ) : (
           filtered.map(app => (
