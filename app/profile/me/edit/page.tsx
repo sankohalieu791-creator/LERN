@@ -6,9 +6,11 @@ import { updateUserProfile } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { Camera, ChevronLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function EditProfilePage() {
   const { user, refreshUser } = useAuth()
+  const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [form, setForm] = useState({
@@ -20,9 +22,8 @@ export default function EditProfilePage() {
   })
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const [saving,  setSaving]  = useState(false)
-  const [saved,   setSaved]   = useState(false)
-  const [error,   setError]   = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -82,8 +83,7 @@ export default function EditProfilePage() {
       })
       if (err) throw err
       await refreshUser()
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
+      router.back()
     } catch (e: any) {
       setError(e.message || 'Failed to save')
     } finally {
@@ -111,7 +111,7 @@ export default function EditProfilePage() {
           disabled={saving || uploadingAvatar}
           className="text-[#FF6B2B] font-semibold text-sm disabled:opacity-40"
         >
-          {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save'}
+          {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
 
@@ -190,8 +190,8 @@ export default function EditProfilePage() {
           className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 active:scale-[0.98] transition flex items-center justify-center gap-2"
         >
           {saving
-            ? <><Loader2 className="w-4 h-4 animate-spin" />Saving…</>
-            : saved ? '✓ Saved' : 'Save Changes'
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+            : 'Save Changes'
           }
         </button>
       </div>

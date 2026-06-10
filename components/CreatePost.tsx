@@ -67,7 +67,7 @@ async function uploadWithProgress(
 }
 
 export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
-  const { user } = useAuth()
+  const { user, authUser } = useAuth()
   const [postType,     setPostType]     = useState<PostType>('video')
   const [title,        setTitle]        = useState('')
   const [description,  setDescription]  = useState('')
@@ -121,7 +121,11 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user || !title) return
+    const userId = user?.id ?? authUser?.id
+    if (!userId || !title) {
+      if (!userId) setError('Please wait a moment and try again')
+      return
+    }
     if (postType === 'photo' && !thumbnail) { setError('Please select a photo'); return }
     cancelledRef.current = false
     setLoading(true)
@@ -134,7 +138,7 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
       if (postType === 'photo' && thumbnail) {
         // Upload photo as thumbnail_url; no video_url
         const ext  = thumbnail.name.split('.').pop()
-        const path = `${user.id}/${Date.now()}_photo.${ext}`
+        const path = `${userId}/${Date.now()}_photo.${ext}`
         setUploadPct(30)
         const { error: e } = await supabase.storage.from('thumbnails').upload(path, thumbnail, { upsert: true })
         if (e) throw e
@@ -144,7 +148,7 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
         // Video mode
         if (thumbnail) {
           const ext  = thumbnail.name.split('.').pop()
-          const path = `${user.id}/${Date.now()}_thumb.${ext}`
+          const path = `${userId}/${Date.now()}_thumb.${ext}`
           const { error: e } = await supabase.storage.from('thumbnails').upload(path, thumbnail, { upsert: true })
           if (!e) thumbnailUrl = supabase.storage.from('thumbnails').getPublicUrl(path).data.publicUrl
         }
@@ -153,14 +157,14 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
 
         if (video) {
           const ext  = video.name.split('.').pop()
-          const path = `${user.id}/${Date.now()}_video.${ext}`
+          const path = `${userId}/${Date.now()}_video.${ext}`
           videoUrl = await uploadWithProgress('videos', path, video, setUploadPct, cancelledRef)
         }
       }
 
       if (cancelledRef.current) return
 
-      const { error: createErr } = await createVideo(user.id, {
+      const { error: createErr } = await createVideo(userId, {
         title,
         description,
         subject: subject || 'general',
@@ -221,8 +225,6 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
               <Camera className="w-4 h-4" /> Photo
             </button>
           </div>
-
-          {error && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-xl px-3 py-2">{error}</p>}
 
           {/* PHOTO MODE — full-size image picker */}
           {postType === 'photo' && (
@@ -367,6 +369,12 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
           <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handlePhotoSelect(e.target.files[0])} />
           <input ref={thumbRef} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleThumbSelect(e.target.files[0])} />
           <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={e => e.target.files?.[0] && handleVideoSelect(e.target.files[0])} />
+
+          {error && (
+            <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-xl px-3 py-2.5 text-center">
+              {error}
+            </p>
+          )}
 
           <button
             type="submit"
