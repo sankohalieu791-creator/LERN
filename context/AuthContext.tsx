@@ -22,11 +22,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const authUser = await getUser()
-        setAuthUser(authUser)
-
-        if (authUser) {
-          const { data } = await getUserProfile(authUser.id)
+        // getSession() reads from localStorage — ~1ms, no network call
+        // getUser() makes a network round-trip to verify JWT — ~400-600ms
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) {
+          setAuthUser(session.user)
+          const { data } = await getUserProfile(session.user.id)
           setUser(data)
         }
       } catch (error) {
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'INITIAL_SESSION') return  // handled by initAuth above
       if (session?.user) {
         setAuthUser(session.user)
         const { data } = await getUserProfile(session.user.id)

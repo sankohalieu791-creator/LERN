@@ -10,6 +10,7 @@ interface HintConfig {
   title: string
   desc: string
   cta: string
+  arrow?: boolean
 }
 
 const PAGE_HINTS: Record<string, HintConfig> = {
@@ -26,22 +27,23 @@ const PAGE_HINTS: Record<string, HintConfig> = {
     cta: "Let's explore",
   },
   '/discovery': {
-    icon: '🤝',
-    title: 'Find Your Mentor',
-    desc: 'Browse verified instructors and coaches. Request 1-to-1 personalised training and message them directly.',
+    icon: '📤',
+    title: 'Request a Mentor',
+    desc: 'Tap the Request button on any instructor card above — once accepted, continue the conversation directly in Messages.',
     cta: 'Got it',
+    arrow: true,
   },
   '/profile/me': {
     icon: '✨',
-    title: 'Your Learning Profile',
-    desc: 'Your posts, courses, and achievements — all in one place. Build your reputation as a learner or instructor.',
-    cta: 'Nice',
+    title: 'Build Your Profile',
+    desc: 'Add certificates, projects, and a bio so instructors and learners can find and trust you. Explore other profiles to follow great creators.',
+    cta: 'Got it',
   },
   '/settings': {
     icon: '🎤',
-    title: 'Are You an Expert?',
-    desc: 'Share your knowledge with thousands of learners. Tap "Apply to Teach" below to become a verified LERN instructor.',
-    cta: 'Got it',
+    title: 'Want to Teach on LERN?',
+    desc: 'Scroll down and tap "Apply to Teach" — get verified as an instructor and start earning by sharing your expertise.',
+    cta: 'Show me',
   },
 }
 
@@ -92,6 +94,17 @@ export default function OnboardingFlow() {
         pointerEvents: visible ? 'auto' : 'none',
       }}
     >
+      {hint.arrow && (
+        <div className="flex justify-center -mb-px z-10 relative">
+          <div style={{
+            width: 0, height: 0,
+            borderLeft: '12px solid transparent',
+            borderRight: '12px solid transparent',
+            borderBottom: '14px solid #1a1a1a',
+            filter: 'drop-shadow(0 -1px 0 rgba(255,255,255,0.11))',
+          }} />
+        </div>
+      )}
       <div
         className="rounded-3xl overflow-hidden shadow-[0_8px_48px_rgba(0,0,0,0.7)]"
         style={{ border: '1px solid rgba(255,255,255,0.11)', background: '#1a1a1a' }}

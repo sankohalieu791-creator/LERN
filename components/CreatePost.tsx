@@ -224,16 +224,15 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
 
           {error && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-xl px-3 py-2">{error}</p>}
 
-          {/* PHOTO MODE — big image picker */}
+          {/* PHOTO MODE — full-size image picker */}
           {postType === 'photo' && (
             <button
               type="button"
               onClick={() => photoRef.current?.click()}
-              className="relative w-full bg-[#111] border-2 border-dashed border-[rgba(255,255,255,0.1)] rounded-xl overflow-hidden flex flex-col items-center justify-center gap-2 hover:border-[rgba(255,255,255,0.2)] transition"
-              style={{ minHeight: 220 }}
+              className="relative w-full aspect-square bg-[#111] border-2 border-dashed border-[rgba(255,255,255,0.1)] rounded-xl overflow-hidden flex flex-col items-center justify-center gap-2 hover:border-[rgba(255,255,255,0.2)] transition"
             >
               {thumbPreview
-                ? <img src={thumbPreview} className="w-full h-full object-cover absolute inset-0" style={{ minHeight: 220 }} />
+                ? <img src={thumbPreview} className="absolute inset-0 w-full h-full object-contain" />
                 : <>
                     <Camera className="w-10 h-10 text-[#333]" />
                     <p className="text-[#555] text-sm font-semibold">Tap to select photo</p>

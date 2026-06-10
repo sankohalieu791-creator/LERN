@@ -241,6 +241,25 @@ export const isFollowing = async (followerId: string, followingId: string) => {
   return { data: !!data, error }
 }
 
+// Bulk versions — single DB round-trip instead of N individual calls
+export const getLikedVideoIds = async (userId: string, videoIds: string[]): Promise<string[]> => {
+  if (!videoIds.length) return []
+  const { data } = await supabase
+    .from('video_likes')
+    .select('video_id')
+    .eq('user_id', userId)
+    .in('video_id', videoIds)
+  return (data || []).map((r: any) => r.video_id as string)
+}
+
+export const getFollowingUserIds = async (userId: string): Promise<string[]> => {
+  const { data } = await supabase
+    .from('followers')
+    .select('following_id')
+    .eq('follower_id', userId)
+  return (data || []).map((r: any) => r.following_id as string)
+}
+
 export const getFollowersList = async (userId: string) => {
   const { data, error } = await supabase
     .from('followers')

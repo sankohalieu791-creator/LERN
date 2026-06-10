@@ -12,7 +12,7 @@ import {
   getJobsByInstructor,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
-import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin } from 'lucide-react'
+import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin, Eye } from 'lucide-react'
 import Link from 'next/link'
 import { useLanguage } from '@/context/LanguageContext'
 
@@ -71,6 +71,7 @@ export default function UserProfilePage() {
   const [fbSubmitted,  setFbSubmitted]  = useState(false)
 
   const [jobs, setJobs] = useState<any[]>([])
+  const [certModal, setCertModal] = useState<any | null>(null)
 
   const profileId    = userId as string
   const isOwnProfile = user?.id === profileId
@@ -366,23 +367,34 @@ export default function UserProfilePage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {certs.map((c: any) => (
-                <div key={c.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
-                    <Award className="w-5 h-5 text-white" />
+              {certs.map((c: any) => {
+                const hasLink = !!(c.certificate_url || c.credential_url)
+                const openCert = () => {
+                  if (c.certificate_url) setCertModal(c)
+                  else if (c.credential_url) window.open(c.credential_url, '_blank')
+                }
+                return (
+                  <div
+                    key={c.id}
+                    onClick={hasLink ? openCert : undefined}
+                    className={`bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 flex items-center gap-3 ${hasLink ? 'cursor-pointer active:opacity-75 transition-opacity' : ''}`}
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
+                      <Award className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-bold text-sm truncate">{c.title}</p>
+                      {c.issuer && <p className="text-[#666] text-xs mt-0.5">{c.issuer}</p>}
+                      {c.issued_date && <p className="text-[#444] text-[11px] mt-0.5">{new Date(c.issued_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>}
+                    </div>
+                    {hasLink && (
+                      <div className="flex-shrink-0 text-[#FF6B2B]">
+                        {c.certificate_url ? <Eye className="w-4 h-4" /> : <ExternalLink className="w-4 h-4" />}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white font-bold text-sm truncate">{c.title}</p>
-                    {c.issuer && <p className="text-[#666] text-xs mt-0.5">{c.issuer}</p>}
-                    {c.issued_date && <p className="text-[#444] text-[11px] mt-0.5">{new Date(c.issued_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>}
-                  </div>
-                  {c.credential_url && (
-                    <a href={c.credential_url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 text-[#FF6B2B]">
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           )
         )}
@@ -524,6 +536,43 @@ export default function UserProfilePage() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* CERTIFICATE VIEWER MODAL */}
+        {certModal && (
+          <div className="fixed inset-0 z-[70] bg-black/95 flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+            <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0 border-b border-[rgba(255,255,255,0.07)]">
+              <button
+                onClick={() => setCertModal(null)}
+                className="w-9 h-9 bg-[#1e1e1e] border border-[rgba(255,255,255,0.07)] rounded-full flex items-center justify-center flex-shrink-0"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-bold text-sm truncate">{certModal.title}</p>
+                {certModal.issuer && <p className="text-[#666] text-xs truncate">{certModal.issuer}</p>}
+              </div>
+            </div>
+            <div className="flex-1 flex items-center justify-center px-4 py-6">
+              <img
+                src={certModal.certificate_url}
+                alt={certModal.title}
+                className="max-w-full max-h-full object-contain rounded-xl shadow-[0_8px_40px_rgba(0,0,0,0.6)]"
+              />
+            </div>
+            {certModal.credential_url && (
+              <div className="flex-shrink-0 px-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)' }}>
+                <a
+                  href={certModal.credential_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-3.5 rounded-2xl text-sm"
+                >
+                  <ExternalLink className="w-4 h-4" /> Verify Certificate
+                </a>
               </div>
             )}
           </div>

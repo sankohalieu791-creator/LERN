@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation'
 import { Search, Bell, ThumbsUp, MessageCircle, Share2, X, Send, Play, Trash2, Eye, Clock } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
-  getVideos, likeVideo, unlikeVideo, hasUserLiked,
-  followUser, unfollowUser, isFollowing,
+  getVideos, likeVideo, unlikeVideo,
+  followUser, unfollowUser,
   getComments, addComment, deleteComment, getNotifications,
   createNotification, markNotificationsRead,
   incrementProfileViews,
+  getLikedVideoIds, getFollowingUserIds,
 } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
@@ -201,37 +202,62 @@ export default function FeedPage() {
   const [comments,       setComments]       = useState<any[]>([])
   const [newComment,     setNewComment]     = useState('')
   const [commentLoading, setCommentLoading] = useState(false)
-  const searchRef  = useRef<HTMLInputElement>(null)
-  const commentRef = useRef<HTMLInputElement>(null)
+  const searchRef     = useRef<HTMLInputElement>(null)
+  const commentRef    = useRef<HTMLInputElement>(null)
+  const videosFetched = useRef(false)
 
+  // ── Load videos (once) + user-specific data (when user available) ──
   useEffect(() => {
     const load = async () => {
-      const { data } = await getVideos()
-      const vids = data || []
-      setVideos(vids)
-      if (user) {
-        const [likes, follows, notifRes] = await Promise.all([
-          Promise.all(vids.map(async (v: any) => {
-            const { data: liked } = await hasUserLiked(v.id, user.id)
-            return liked ? v.id : null
-          })),
-          Promise.all(vids.map(async (v: any) => {
-            if (v.user_id === user.id) return null
-            const { data: followed } = await isFollowing(user.id, v.user_id)
-            return followed ? v.user_id : null
-          })),
-          getNotifications(user.id),
-        ])
-        setUserLikes(new Set(likes.filter(Boolean) as string[]))
-        setFollowing(new Set(follows.filter(Boolean) as string[]))
-        const notifList = notifRes.data || []
-        setNotifs(notifList)
-        setNotifCount(notifList.filter((n: any) => !n.read).length)
+      let vids: any[]
+
+      if (!videosFetched.current) {
+        videosFetched.current = true
+        const { data } = await getVideos()
+        vids = data || []
+        setVideos(vids)
+        setLoading(false)          // show feed immediately — don't wait for likes
+      } else {
+        vids = videos              // already loaded; closure captures current state
       }
-      setLoading(false)
+
+      if (!user || !vids.length) return
+
+      // 3 queries total instead of 2×N individual queries
+      const [likedIds, followingIds, notifRes] = await Promise.all([
+        getLikedVideoIds(user.id, vids.map((v: any) => v.id)),
+        getFollowingUserIds(user.id),
+        getNotifications(user.id),
+      ])
+      setUserLikes(new Set(likedIds))
+      setFollowing(new Set(followingIds))
+      const notifList = notifRes.data || []
+      setNotifs(notifList)
+      setNotifCount(notifList.filter((n: any) => !n.read).length)
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
+
+  // ── Realtime: new post appears at top of feed immediately ──
+  useEffect(() => {
+    const channel = supabase
+      .channel('feed-inserts')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'videos' },
+        async (payload) => {
+          const raw = payload.new as any
+          const { data: userData } = await supabase
+            .from('users')
+            .select('id, username, avatar_url, verified, title')
+            .eq('id', raw.user_id)
+            .single()
+          const full = { ...raw, users: userData ?? null, likes_count: raw.likes_count ?? 0, comments_count: raw.comments_count ?? 0 }
+          setVideos(prev => prev.find(v => v.id === full.id) ? prev : [full, ...prev])
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   const goToProfile = async (userId: string, e?: React.MouseEvent) => {
     e?.stopPropagation()
