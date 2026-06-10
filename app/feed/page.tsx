@@ -350,8 +350,37 @@ export default function FeedPage() {
     : videos
 
   if (loading) return (
-    <div className="fixed inset-0 bg-[#0f0f0f] flex items-center justify-center z-10">
-      <div className="w-8 h-8 border-2 border-[#333] border-t-white rounded-full animate-spin" />
+    <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col z-10">
+      <div
+        className="flex-shrink-0 bg-[#0f0f0f] border-b border-[rgba(255,255,255,0.06)] px-4 py-3 flex items-center justify-between"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <span className="text-white font-black text-xl tracking-tight">LERN</span>
+        <div className="flex items-center gap-5">
+          <div className="w-5 h-5 bg-[#1e1e1e] rounded-full animate-pulse" />
+          <div className="w-5 h-5 bg-[#1e1e1e] rounded-full animate-pulse" />
+        </div>
+      </div>
+      <div className="flex-1 overflow-hidden">
+        {[0, 1].map(i => (
+          <div key={i} className="border-b border-[rgba(255,255,255,0.05)]">
+            <div className="w-full bg-[#141414] animate-pulse" style={{ height: 230 }} />
+            <div className="px-4 pt-3 pb-4">
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className="w-9 h-9 rounded-full bg-[#1e1e1e] animate-pulse flex-shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 bg-[#1e1e1e] animate-pulse rounded-full w-28" />
+                  <div className="h-2.5 bg-[#1e1e1e] animate-pulse rounded-full w-20" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 bg-[#1e1e1e] animate-pulse rounded-full w-full" />
+                <div className="h-3 bg-[#1e1e1e] animate-pulse rounded-full w-4/5" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 

@@ -23,16 +23,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initAuth = async () => {
       try {
         // getSession() reads from localStorage — ~1ms, no network call
-        // getUser() makes a network round-trip to verify JWT — ~400-600ms
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
           setAuthUser(session.user)
+        }
+        // Release the loading gate immediately — profile loads in the background
+        setLoading(false)
+        if (session?.user) {
           const { data } = await getUserProfile(session.user.id)
           setUser(data)
         }
       } catch (error) {
         console.error('Auth error:', error)
-      } finally {
         setLoading(false)
       }
     }
