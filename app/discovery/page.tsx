@@ -19,14 +19,7 @@ import {
 import { sendPush } from '@/lib/push'
 import type { InstructorApplication } from '@/lib/types'
 
-const ROLE_TABS = [
-  { id: 'mentor',    label: 'Mentors'    },
-  { id: 'coach',     label: 'Coaches'    },
-  { id: 'teacher',   label: 'Teachers'   },
-  { id: 'professor', label: 'Professors' },
-  { id: 'dr',        label: 'Dr.'        },
-] as const
-type TabId = typeof ROLE_TABS[number]['id'] | 'request' | 'jobs'
+type TabId = 'instructors' | 'jobs' | 'request'
 
 const ROLE_COLOUR: Record<string, string> = {
   coach: 'bg-orange-500', professor: 'bg-blue-600',
@@ -508,7 +501,7 @@ function JobCard({
 
 export default function DiscoveryPage() {
   const { user } = useAuth()
-  const [activeTab,     setActiveTab]     = useState<TabId>('mentor')
+  const [activeTab,     setActiveTab]     = useState<TabId>('instructors')
   const [search,        setSearch]        = useState('')
   const [instructors,   setInstructors]   = useState<InstructorApplication[]>([])
   const [loading,       setLoading]       = useState(false)
@@ -534,9 +527,9 @@ export default function DiscoveryPage() {
     if (activeTab === 'jobs') return
     const load = async () => {
       setLoading(true)
-      const roleFilter = activeTab === 'request' ? undefined : activeTab
+      // 'instructors' and 'request' both show all instructors (no role filter)
       const [{ data }, followIds, reqData] = await Promise.all([
-        getInstructors(roleFilter),
+        getInstructors(undefined),
         user ? getFollowingIds(user.id) : Promise.resolve([] as string[]),
         user ? getMyTrainingRequests(user.id) : Promise.resolve({ data: null }),
       ])
@@ -620,9 +613,9 @@ export default function DiscoveryPage() {
   })
 
   const allTabs: { id: TabId; label: string }[] = [
-    ...ROLE_TABS,
-    { id: 'jobs',    label: '💼 Jobs'    },
-    { id: 'request', label: '✉ Request' },
+    { id: 'instructors', label: 'Instructors' },
+    { id: 'jobs',        label: '💼 Jobs'     },
+    { id: 'request',     label: '✉ Request'  },
   ]
 
   return (
@@ -653,7 +646,7 @@ export default function DiscoveryPage() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder={activeTab === 'jobs' ? 'Search jobs…' : activeTab === 'request' ? 'Search instructors…' : 'Search mentors…'}
+              placeholder="Search…"
               className="flex-1 bg-transparent text-white text-sm placeholder-[#444] outline-none"
             />
             {search && (
@@ -687,8 +680,20 @@ export default function DiscoveryPage() {
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
         {activeTab === 'jobs' ? (
           jobsLoading ? (
-            <div className="flex justify-center py-20">
-              <Loader2 className="w-6 h-6 text-[#444] animate-spin" />
+            <div className="space-y-3 pt-1">
+              {[0,1,2].map(i => (
+                <div key={i} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-2xl bg-[#252525] animate-pulse flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-[#252525] animate-pulse rounded-lg w-3/4" />
+                      <div className="h-3 bg-[#1e1e1e] animate-pulse rounded-lg w-1/2" />
+                    </div>
+                  </div>
+                  <div className="h-3 bg-[#1e1e1e] animate-pulse rounded-lg w-full mb-2" />
+                  <div className="h-3 bg-[#1e1e1e] animate-pulse rounded-lg w-2/3" />
+                </div>
+              ))}
             </div>
           ) : filteredJobs.length === 0 ? (
             <div className="text-center py-20">
@@ -718,8 +723,23 @@ export default function DiscoveryPage() {
             ))
           )
         ) : loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="w-6 h-6 text-[#444] animate-spin" />
+          <div className="space-y-3 pt-1">
+            {[0,1,2].map(i => (
+              <div key={i} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4">
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="w-14 h-14 rounded-full bg-[#252525] animate-pulse flex-shrink-0" />
+                  <div className="flex-1 space-y-2 pt-1">
+                    <div className="h-4 bg-[#252525] animate-pulse rounded-lg w-2/3" />
+                    <div className="h-3 bg-[#1e1e1e] animate-pulse rounded-lg w-1/2" />
+                    <div className="h-3 bg-[#1e1e1e] animate-pulse rounded-lg w-1/3" />
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <div className="flex-1 h-9 bg-[#252525] animate-pulse rounded-full" />
+                  <div className="flex-1 h-9 bg-[#1e1e1e] animate-pulse rounded-full" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20">
@@ -731,9 +751,7 @@ export default function DiscoveryPage() {
               </>
             ) : (
               <>
-                <p className="text-[#444] text-sm">
-                  {activeTab === 'request' ? 'No instructors available yet' : `No ${activeTab}s found yet`}
-                </p>
+                <p className="text-[#444] text-sm">No instructors found yet</p>
                 <p className="text-[#333] text-xs mt-1">Apply in Settings → Apply to be an instructor</p>
               </>
             )}

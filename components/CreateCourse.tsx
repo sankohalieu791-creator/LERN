@@ -29,7 +29,9 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
   const [projectName,  setProjectName]  = useState('')
   const [startDate,    setStartDate]    = useState('')
   const [endDate,      setEndDate]      = useState('')
-  const [loading,      setLoading]      = useState(false)
+  const [sessionTime,     setSessionTime]     = useState('19:00')
+  const [sessionDuration, setSessionDuration] = useState(60)
+  const [loading,         setLoading]         = useState(false)
   const galleryRef = useRef<HTMLInputElement>(null)
 
   if (!isOpen) return null
@@ -70,31 +72,63 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
         rating: 0,
       })
       const newCourseId = (courseData as any)?.[0]?.id
-      if (newCourseId && sessionCount > 0) {
+      if (newCourseId) {
         const baseDate = startDate ? new Date(startDate + 'T12:00:00') : null
-        const sessions = Array.from({ length: sessionCount }, (_, i) => {
-          let sessionDate: string | null = null
-          if (baseDate) {
-            const d = new Date(baseDate)
-            d.setDate(d.getDate() + i * 7)
-            sessionDate = d.toISOString().split('T')[0]
+        const lastDate = endDate   ? new Date(endDate   + 'T12:00:00') : null
+        let sessionRows: any[]
+
+        if (baseDate && lastDate) {
+          // One session per calendar day from start date to end date
+          sessionRows = []
+          const d = new Date(baseDate)
+          let idx = 0
+          while (d <= lastDate) {
+            sessionRows.push({
+              course_id: newCourseId,
+              session_number: idx + 1,
+              title: `Session ${idx + 1}`,
+              session_date: d.toISOString().split('T')[0],
+              session_time: sessionTime,
+              duration_minutes: sessionDuration,
+              is_project_day: false,
+              is_live: false,
+            })
+            d.setDate(d.getDate() + 1)
+            idx++
           }
-          return {
-            course_id: newCourseId,
-            session_number: i + 1,
-            title: i === sessionCount - 1
-              ? `Projects Day${projectName ? ` — ${projectName}` : ''}`
-              : `Session ${i + 1}`,
-            session_date: sessionDate,
-            session_time: '19:00',
-            is_project_day: i === sessionCount - 1,
-            is_live: false,
+          if (sessionRows.length > 0) {
+            const last = sessionRows[sessionRows.length - 1]
+            last.title = `Projects Day${projectName ? ` — ${projectName}` : ''}`
+            last.is_project_day = true
           }
-        })
-        await createCourseSessions(newCourseId, sessions)
+        } else {
+          // No end date: use sessionCount, one session per day from startDate
+          sessionRows = Array.from({ length: sessionCount }, (_, i) => {
+            let sessionDate: string | null = null
+            if (baseDate) {
+              const d = new Date(baseDate)
+              d.setDate(d.getDate() + i)
+              sessionDate = d.toISOString().split('T')[0]
+            }
+            return {
+              course_id: newCourseId,
+              session_number: i + 1,
+              title: i === sessionCount - 1
+                ? `Projects Day${projectName ? ` — ${projectName}` : ''}`
+                : `Session ${i + 1}`,
+              session_date: sessionDate,
+              session_time: sessionTime,
+              duration_minutes: sessionDuration,
+              is_project_day: i === sessionCount - 1,
+              is_live: false,
+            }
+          })
+        }
+
+        if (sessionRows.length > 0) await createCourseSessions(newCourseId, sessionRows)
       }
       setTitle(''); setDescription(''); setSubject(''); setLevel('')
-      setDuration(''); setThumbnail(null); setSessionCount(8); setProjectName(''); setStartDate(''); setEndDate('')
+      setDuration(''); setThumbnail(null); setSessionCount(8); setProjectName(''); setStartDate(''); setEndDate(''); setSessionTime('19:00'); setSessionDuration(60)
       onClose()
       router.push('/courses')
     } catch (err) {
@@ -173,8 +207,8 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
               className={inputCls}
               min={new Date().toISOString().split('T')[0]}
             />
-            {startDate && (
-              <p className="text-[#444] text-xs mt-1">Sessions will be scheduled weekly from this date</p>
+            {startDate && endDate && (
+              <p className="text-[#444] text-xs mt-1">One session per day from {startDate} to {endDate}</p>
             )}
           </div>
 
@@ -189,7 +223,30 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
             />
           </div>
 
-          {/* Thumbnail */}
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className={labelCls}>Session Time</label>
+              <input
+                type="time"
+                value={sessionTime}
+                onChange={e => setSessionTime(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Session Duration</label>
+            <div className="flex gap-2">
+              {[30, 45, 60, 90, 120].map(n => (
+                <button key={n} type="button" onClick={() => setSessionDuration(n)}
+                  className={`flex-1 py-3 rounded-xl text-sm font-bold transition ${sessionDuration === n ? 'bg-white text-black' : 'bg-[#252525] text-[#888] border border-[rgba(255,255,255,0.07)]'}`}>
+                  {n < 60 ? `${n}m` : n === 60 ? '1h' : `${n / 60}h`}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Sessions */}
           <div>
             <label className={labelCls}>Number of Sessions</label>

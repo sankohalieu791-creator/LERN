@@ -215,7 +215,9 @@ export default function VirtualClassroom({
     })
     realtimeRef.current = channel
 
-    channel.on('presence', { event: 'sync' }, () => {
+    // Rebuild participant list from full presence state — called on sync, join, AND leave
+    // so raised hands and new joiners appear instantly without waiting for the next sync cycle
+    const rebuildParticipants = () => {
       const state = channel.presenceState<{
         username: string
         avatar_url: string | null
@@ -231,7 +233,11 @@ export default function VirtualClassroom({
         isSelf:     uid === myUserId,
       }))
       setParticipants(list)
-    })
+    }
+
+    channel.on('presence', { event: 'sync' },  rebuildParticipants)
+    channel.on('presence', { event: 'join' },  rebuildParticipants)
+    channel.on('presence', { event: 'leave' }, rebuildParticipants)
 
     channel.on('broadcast', { event: 'chat' }, ({ payload }) => {
       setMessages(prev => {

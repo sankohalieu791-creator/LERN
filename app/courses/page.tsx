@@ -7,7 +7,7 @@ import {
   UserCheck, Plus, BookOpen, Trash2, MapPin, Globe, Monitor,
 } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
   getCourses, getWorkshops, getCourseById, enrollCourse,
@@ -103,14 +103,18 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
 
   const now          = new Date()
   const firstSession = sessions[0]
-  const firstDate    = firstSession?.session_date ? new Date(firstSession.session_date) : null
-  const isLive       = sessions.some(s => s.is_live && (!s.session_date || new Date(s.session_date) <= now))
-  const hasCompleted = sessions.some(s => s.is_completed)
-  const isStartingSoon = !isLive && firstDate && firstDate > now
+  const firstDate    = firstSession?.session_date ? new Date(firstSession.session_date + 'T12:00:00') : null
+  const isLive         = sessions.some(s => s.is_live)
+  const allCompleted   = sessions.length > 0 && sessions.every(s => s.is_completed)
+  const hasStarted     = sessions.some(s => s.is_completed)
+  const isStartingSoon = !isLive && !hasStarted && firstDate && firstDate > now
 
-  const startDateStr = firstDate
-    ? firstDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  // Next session to attend: first that isn't completed and isn't currently live
+  const nextSession = sessions.find(s => !s.is_completed && !s.is_live)
+  const nextDate = nextSession?.session_date
+    ? new Date(nextSession.session_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     : null
+  const nextTime = nextSession?.session_time ? nextSession.session_time.slice(0, 5) : null
 
   return (
     <div className="bg-[#1a1a1a] rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.06)]">
@@ -132,10 +136,16 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
             LIVE
           </span>
         )}
-        {isStartingSoon && !isLive && startDateStr && (
+        {isStartingSoon && !isLive && nextDate && (
           <div className="absolute top-2 left-2 bg-black/70 rounded-xl px-2 py-1 text-center">
             <p className="text-[#FF6B2B] text-[9px] font-bold uppercase">Starting Soon</p>
-            <p className="text-white text-xs font-bold">{startDateStr}</p>
+            <p className="text-white text-xs font-bold">{nextDate}</p>
+          </div>
+        )}
+        {hasStarted && !isLive && !allCompleted && nextDate && (
+          <div className="absolute top-2 left-2 bg-black/70 rounded-xl px-2 py-1 text-center">
+            <p className="text-[#888] text-[9px] font-bold uppercase">Next Class</p>
+            <p className="text-white text-xs font-bold">{nextDate}</p>
           </div>
         )}
       </div>
@@ -155,26 +165,23 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 text-[#555] text-xs">
             <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{course.duration_weeks}w</span>
-            {isStartingSoon && (
-              <span className="flex items-center gap-1 text-[#FF6B2B]">
-                <Calendar className="w-3 h-3" />Starting Soon
-              </span>
-            )}
           </div>
           {isLive ? (
             <button onClick={onJoin} className="bg-red-500 text-white text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-              {t('request')}
+              Join Live
             </button>
-          ) : hasCompleted ? (
+          ) : allCompleted ? (
             <span className="bg-green-500/10 text-green-400 text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-green-500/20">
               <Check className="w-3 h-3" />
-              {t('finish')}
+              Completed
             </span>
           ) : (
             <span className="bg-[#1a1a1a] text-[#555] text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-[rgba(255,255,255,0.06)]">
               <Calendar className="w-3 h-3" />
-              {startDateStr ? `Starts ${startDateStr}` : t('not_started')}
+              {nextDate
+                ? `${hasStarted ? 'Next' : 'Starts'} ${nextDate}${nextTime ? ` · ${nextTime}` : ''}`
+                : t('not_started')}
             </span>
           )}
         </div>
@@ -463,6 +470,10 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
     new Date(a.session_date || 0).getTime() - new Date(b.session_date || 0).getTime()
   ) ?? []
 
+  const firstSessionDate = sessions[0]?.session_date
+    ? new Date(sessions[0].session_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    : null
+
   return (
     <div className="fixed inset-0 z-[60] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
@@ -540,8 +551,8 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
                             <p className="text-white text-sm font-semibold truncate">{s.title}</p>
                             <p className="text-[#555] text-xs mt-0.5">
                               {d?.toLocaleString('default', { weekday: 'short' })}
-                              {s.session_time && ` ${s.session_time.slice(0, 5)}`}
-                              {' · 60 min'}
+                              {s.session_time && ` · ${s.session_time.slice(0, 5)}`}
+                              {` · ${s.duration_minutes ?? 60} min`}
                             </p>
                           </div>
                           {s.is_project_day && (
@@ -608,7 +619,7 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
                   disabled={enrolling}
                   className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
                 >
-                  {enrolling ? <><Loader2 className="w-4 h-4 animate-spin" />…</> : success ? t('enrolled_label') : t('enroll')}
+                  {enrolling ? <><Loader2 className="w-4 h-4 animate-spin" />…</> : success ? t('enrolled_label') : firstSessionDate ? `Enroll · Starts ${firstSessionDate}` : t('enroll')}
                 </button>
               )}
             </div>
@@ -622,9 +633,14 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
 // ── Page ──────────────────────────────────────────────────────
 export default function CoursesPage() {
   const { user } = useAuth()
-  const router   = useRouter()
+  const router       = useRouter()
+  const searchParams = useSearchParams()
   const { t } = useLanguage()
-  const [activeTab,       setActiveTab]       = useState<Tab>('courses')
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const tab = searchParams?.get('tab')
+    if (tab === 'workshops' || tab === 'enrolled') return tab as Tab
+    return 'courses'
+  })
   const [courses,         setCourses]         = useState<any[]>([])
   const [workshops,       setWorkshops]       = useState<any[]>([])
   const [enrolled,        setEnrolled]        = useState<any[]>([])
@@ -686,8 +702,23 @@ export default function CoursesPage() {
   const hasFilter = !!(filterLevel || filterSubject)
 
   if (loading) return (
-    <div className="fixed inset-0 bg-[#0f0f0f] flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-[#333] border-t-white rounded-full animate-spin" />
+    <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div className="flex-shrink-0 flex border-b border-[rgba(255,255,255,0.07)]">
+        {['Courses','Workshops','Enrolled'].map(tab => (
+          <div key={tab} className="flex-1 py-3.5 text-sm font-semibold capitalize text-center text-[#555]">{tab}</div>
+        ))}
+      </div>
+      <div className="flex-1 overflow-hidden px-4 py-4 space-y-4">
+        {[0,1,2].map(i => (
+          <div key={i} className="bg-[#1a1a1a] rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.06)]">
+            <div className="w-full bg-[#252525] animate-pulse" style={{ paddingTop: '56.25%' }} />
+            <div className="p-4">
+              <div className="h-4 bg-[#252525] animate-pulse rounded-lg mb-2 w-3/4" />
+              <div className="h-3 bg-[#1e1e1e] animate-pulse rounded-lg w-1/2" />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 
