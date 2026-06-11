@@ -798,6 +798,14 @@ export const completeSession = async (sessionId: string) => {
   return { error }
 }
 
+export const getLiveSessions = async () => {
+  const { data, error } = await supabase
+    .from('course_sessions')
+    .select('*, courses(id, title, thumbnail_url, instructor_id, users:instructor_id(username, avatar_url))')
+    .eq('is_live', true)
+  return { data, error }
+}
+
 export const getEnrolledCourses = async (userId: string) => {
   const { data: enrollmentData } = await supabase
     .from('enrollments').select('course_id').eq('user_id', userId)

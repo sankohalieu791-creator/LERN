@@ -180,7 +180,7 @@ export default function CourseDetailPage() {
                       <p className="text-[#555] text-xs mt-0.5">
                         {d?.toLocaleString('default', { weekday: 'short' })}
                         {s.session_time && ` · ${s.session_time.slice(0, 5)}`}
-                        {' · 60 min'}
+                        {` · ${s.duration_minutes ?? 60} min`}
                       </p>
                     </div>
                     {s.is_project_day && (

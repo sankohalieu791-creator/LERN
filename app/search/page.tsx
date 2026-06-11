@@ -5,7 +5,19 @@ import { useSearchParams } from 'next/navigation'
 import { getVideos, getCourses } from '@/lib/supabase'
 import { Video, Course } from '@/lib/types'
 import Link from 'next/link'
-import { Star } from 'lucide-react'
+import { Star, Play } from 'lucide-react'
+
+function SkeletonCard() {
+  return (
+    <div className="flex gap-3 p-4 bg-[#111] rounded-2xl animate-pulse">
+      <div className="w-20 h-14 rounded-xl bg-[#1e1e1e] flex-shrink-0" />
+      <div className="flex-1 space-y-2 py-1">
+        <div className="h-3 bg-[#1e1e1e] rounded w-3/4" />
+        <div className="h-3 bg-[#1e1e1e] rounded w-1/2" />
+      </div>
+    </div>
+  )
+}
 
 function SearchResults() {
   const searchParams = useSearchParams()
@@ -16,136 +28,116 @@ function SearchResults() {
 
   useEffect(() => {
     const search = async () => {
-      if (!query) {
-        setLoading(false)
-        return
-      }
-
+      if (!query) { setLoading(false); return }
       try {
         const { data: videosData } = await getVideos()
         const { data: coursesData } = await getCourses()
 
-        const filteredVideos = videosData?.filter(v =>
-          v.title.toLowerCase().includes(query.toLowerCase()) ||
-          v.description?.toLowerCase().includes(query.toLowerCase())
-        ) || []
-
-        const filteredCourses = coursesData?.filter(c =>
-          c.title.toLowerCase().includes(query.toLowerCase()) ||
-          c.description?.toLowerCase().includes(query.toLowerCase())
-        ) || []
-
-        setVideos(filteredVideos)
-        setCourses(filteredCourses)
+        setVideos(
+          (videosData || []).filter(v =>
+            v.title.toLowerCase().includes(query.toLowerCase()) ||
+            v.description?.toLowerCase().includes(query.toLowerCase())
+          )
+        )
+        setCourses(
+          (coursesData || []).filter(c =>
+            c.title.toLowerCase().includes(query.toLowerCase()) ||
+            c.description?.toLowerCase().includes(query.toLowerCase())
+          )
+        )
       } catch (error) {
         console.error('Error searching:', error)
       } finally {
         setLoading(false)
       }
     }
-
     search()
   }, [query])
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin">
-          <div className="w-12 h-12 border-4 border-[#7C3AED] border-t-[#FF6B2B] rounded-full"></div>
-        </div>
+      <div className="px-4 pt-4 space-y-3">
+        {[...Array(5)].map((_, i) => <SkeletonCard key={i} />)}
       </div>
     )
   }
 
+  const total = videos.length + courses.length
+
   return (
-    <>
-      {/* HEADER */}
-      <div className="bg-[rgba(124,58,237,0.08)] border-b border-[rgba(124,58,237,0.15)] p-6 sticky top-16 z-40">
-        <h1 className="text-white text-2xl font-bold">Search Results</h1>
-        <p className="text-[#888] text-sm mt-1">
-          {videos.length + courses.length} results for &quot;{query}&quot;
-        </p>
-      </div>
+    <div className="px-4 pt-4 pb-24 space-y-6">
+      <p className="text-[#555] text-sm">
+        {query ? `${total} result${total !== 1 ? 's' : ''} for "${query}"` : 'Type something to search'}
+      </p>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {videos.length === 0 && courses.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-[#888]">No results found for &quot;{query}&quot;</p>
+      {total === 0 && query && (
+        <p className="text-center text-[#444] text-sm py-12">No results found</p>
+      )}
+
+      {videos.length > 0 && (
+        <div>
+          <p className="text-[#888] text-xs font-bold uppercase tracking-widest mb-3">Videos</p>
+          <div className="space-y-2">
+            {videos.map(video => (
+              <Link
+                key={video.id}
+                href={`/feed/${video.id}`}
+                className="flex gap-3 p-3 bg-[#111] rounded-2xl active:scale-[0.98] transition"
+              >
+                <div className="w-20 h-14 rounded-xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex-shrink-0 flex items-center justify-center">
+                  <Play className="w-5 h-5 text-white fill-white" />
+                </div>
+                <div className="flex-1 min-w-0 py-0.5">
+                  <p className="text-white text-sm font-semibold line-clamp-2 leading-snug">{video.title}</p>
+                  <p className="text-[#555] text-xs mt-1">{video.views ?? 0} views</p>
+                </div>
+              </Link>
+            ))}
           </div>
-        ) : (
-          <>
-            {/* VIDEOS */}
-            {videos.length > 0 && (
-              <div className="mb-12">
-                <h2 className="text-white text-xl font-bold mb-6">Videos</h2>
-                <div className="space-y-4">
-                  {videos.map(video => (
-                    <Link
-                      key={video.id}
-                      href={`/feed/${video.id}`}
-                      className="bg-[rgba(124,58,237,0.08)] border border-[rgba(124,58,237,0.15)] rounded-lg p-4 hover:border-[rgba(124,58,237,0.3)] transition flex gap-4 cursor-pointer"
-                    >
-                      <div className="w-32 h-20 rounded-lg bg-gradient-to-br from-[#FF6B2B] to-[#7C3AED] flex-shrink-0" />
-                      <div className="flex-1">
-                        <h3 className="text-white font-bold hover:text-[#00D9FF] transition">
-                          {video.title}
-                        </h3>
-                        <p className="text-[#888] text-sm mt-1 line-clamp-2">
-                          {video.description}
-                        </p>
-                        <div className="flex items-center gap-4 mt-3 text-[#888] text-xs">
-                          <span>{video.views} views</span>
-                          <span>{video.duration}</span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
+        </div>
+      )}
 
-            {/* COURSES */}
-            {courses.length > 0 && (
-              <div>
-                <h2 className="text-white text-xl font-bold mb-6">Courses</h2>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {courses.map(course => (
-                    <Link
-                      key={course.id}
-                      href={`/courses/${course.id}`}
-                      className="bg-[rgba(124,58,237,0.08)] border border-[rgba(124,58,237,0.15)] rounded-lg overflow-hidden hover:border-[rgba(124,58,237,0.3)] transition group cursor-pointer"
-                    >
-                      <div className="aspect-video bg-gradient-to-br from-[#FF6B2B] to-[#7C3AED]" />
-                      <div className="p-4">
-                        <h3 className="text-white font-bold text-sm mb-2 group-hover:text-[#00D9FF] transition line-clamp-2">
-                          {course.title}
-                        </h3>
-                        <div className="flex items-center justify-between text-xs text-[#888]">
-                          <span>{course.duration_weeks} weeks</span>
-                          <span className="flex items-center gap-1">
-                            <Star className="w-3 h-3 fill-yellow-400" />
-                            {course.rating.toFixed(1)}
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+      {courses.length > 0 && (
+        <div>
+          <p className="text-[#888] text-xs font-bold uppercase tracking-widest mb-3">Courses</p>
+          <div className="space-y-2">
+            {courses.map(course => (
+              <Link
+                key={course.id}
+                href={`/courses/${course.id}`}
+                className="flex gap-3 p-3 bg-[#111] rounded-2xl active:scale-[0.98] transition"
+              >
+                <div className="w-20 h-14 rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#FF6B2B] flex-shrink-0" />
+                <div className="flex-1 min-w-0 py-0.5">
+                  <p className="text-white text-sm font-semibold line-clamp-2 leading-snug">{course.title}</p>
+                  <div className="flex items-center gap-2 mt-1 text-[#555] text-xs">
+                    <span>{course.duration_weeks}w</span>
+                    {course.rating > 0 && (
+                      <>
+                        <span>·</span>
+                        <span className="flex items-center gap-0.5">
+                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                          {course.rating.toFixed(1)}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
 export default function SearchPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className="min-h-screen bg-[#0f0f0f]">
       <Suspense fallback={
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="w-12 h-12 border-4 border-[#7C3AED] border-t-[#FF6B2B] rounded-full animate-spin" />
+        <div className="px-4 pt-4 space-y-3">
+          {[...Array(5)].map((_, i) => <SkeletonCard key={i} />)}
         </div>
       }>
         <SearchResults />

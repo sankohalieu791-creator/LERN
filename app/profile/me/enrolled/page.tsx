@@ -23,12 +23,17 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
     .slice()
     .sort((a: any, b: any) => new Date(a.session_date || '9999').getTime() - new Date(b.session_date || '9999').getTime())
 
+  const isLive = sessions.some((s: any) => s.is_live)
+  const allCompleted = sessions.length > 0 && sessions.every((s: any) => s.is_completed)
+  const hasStarted = sessions.some((s: any) => s.is_completed)
+  const nextSession = sessions.find((s: any) => !s.is_completed && !s.is_live)
+  const nextDateStr = nextSession?.session_date
+    ? new Date(nextSession.session_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    : null
+  const nextTime = nextSession?.session_time ? nextSession.session_time.slice(0, 5) : null
   const firstSession = sessions[0]
-  const isLive = sessions.some((s: any) => s.is_live) ||
-    (firstSession?.session_date && new Date(firstSession.session_date) <= new Date())
-
   const startDateStr = firstSession?.session_date
-    ? new Date(firstSession.session_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    ? new Date(firstSession.session_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : null
 
   return (
@@ -85,7 +90,16 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
             <button onClick={onJoin}
               className="bg-red-500 text-white text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-              Join Now
+              Join Live
+            </button>
+          ) : allCompleted ? (
+            <span className="text-[#555] text-xs font-bold px-4 py-1.5 rounded-full bg-[#252525] border border-[rgba(255,255,255,0.07)]">
+              Completed
+            </span>
+          ) : nextDateStr ? (
+            <button onClick={onJoin}
+              className="bg-[#252525] text-[#888] text-xs font-bold px-4 py-1.5 rounded-full border border-[rgba(255,255,255,0.07)]">
+              {hasStarted ? 'Next' : 'Starts'} {nextDateStr}{nextTime ? ` · ${nextTime}` : ''}
             </button>
           ) : (
             <button onClick={onJoin}
@@ -122,8 +136,22 @@ export default function EnrolledCoursesPage() {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-[#0f0f0f] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#333] border-t-white rounded-full animate-spin" />
+      <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-[rgba(255,255,255,0.07)]">
+          <div className="h-3 bg-[#1e1e1e] rounded w-12 mb-2" />
+          <div className="h-5 bg-[#1e1e1e] rounded w-32" />
+        </div>
+        <div className="px-4 py-4 space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-[#1a1a1a] rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.06)] animate-pulse">
+              <div className="aspect-video bg-[#252525]" />
+              <div className="p-4 space-y-2">
+                <div className="h-3.5 bg-[#252525] rounded w-3/4" />
+                <div className="h-3 bg-[#252525] rounded w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
