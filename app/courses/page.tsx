@@ -946,7 +946,11 @@ function CoursesPageInner() {
     <CreateWorkshop
       isOpen={showCreateWorkshop}
       onClose={() => setShowCreateWorkshop(false)}
-      onSuccess={() => { setShowCreateWorkshop(false); setActiveTab('workshops'); reload() }}
+      onSuccess={(ws) => {
+        setShowCreateWorkshop(false)
+        setActiveTab('workshops')
+        if (ws?.id) setWorkshops(prev => [...prev, ws].sort((a, b) => new Date(a.workshop_date || '9999').getTime() - new Date(b.workshop_date || '9999').getTime()))
+      }}
     />
     </>
   )

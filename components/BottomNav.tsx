@@ -113,6 +113,7 @@ export default function BottomNav() {
         onClose={() => setShowWS(false)}
         onSuccess={() => { setShowWS(false); router.push('/courses?tab=workshops') }}
       />
+
     </>
   )
 }

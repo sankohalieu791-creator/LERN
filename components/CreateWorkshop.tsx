@@ -8,14 +8,14 @@ import { createWorkshop, notifyFollowers, supabase } from '@/lib/supabase'
 interface CreateWorkshopProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess?: () => void
+  onSuccess?: (workshop: any) => void
 }
 
 const inputCls = 'w-full bg-[#1e1e1e] border border-[rgba(255,255,255,0.08)] rounded-2xl px-4 py-3.5 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.2)] transition'
 const labelCls = 'block text-[#888] text-[11px] font-bold uppercase tracking-wider mb-2'
 
 export default function CreateWorkshop({ isOpen, onClose, onSuccess }: CreateWorkshopProps) {
-  const { user } = useAuth()
+  const { user } = useAuth() as any
   const [title,       setTitle]       = useState('')
   const [description, setDescription] = useState('')
   const [date,        setDate]        = useState('')
@@ -81,7 +81,11 @@ export default function CreateWorkshop({ isOpen, onClose, onSuccess }: CreateWor
       setTitle(''); setDescription(''); setDate(''); setTime('')
       setLocation(''); setIsOnline(false); setThumbnail(null)
       onClose()
-      onSuccess?.()
+      const created = (wsData as any)?.[0]
+      onSuccess?.({
+        ...(created ?? {}),
+        users: { id: user.id, username: user.username, avatar_url: user.avatar_url ?? null, verified: user.verified ?? false },
+      })
     } catch (err) {
       console.error(err)
     } finally {
