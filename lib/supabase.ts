@@ -55,6 +55,10 @@ export const updateUserProfile = async (userId: string, updates: any) => {
     .from('users')
     .update(updates)
     .eq('id', userId)
+    .select()
+  if (!error && (!data || (data as any[]).length === 0)) {
+    return { data: null, error: { message: 'Could not save profile — please sign out and back in, then try again.' } as any }
+  }
   return { data, error }
 }
 
