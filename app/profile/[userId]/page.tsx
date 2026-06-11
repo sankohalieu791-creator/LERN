@@ -147,8 +147,8 @@ export default function UserProfilePage() {
     setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status } : r))
   }
 
-  // Only instructors can leave feedback on other profiles
-  const canLeaveFeedback = !!user && !isOwnProfile && myProfile?.account_type === 'instructor'
+  // Only instructors can leave feedback, and not on other instructors
+  const canLeaveFeedback = !!user && !isOwnProfile && myProfile?.account_type === 'instructor' && !isInstructor
 
   const handleSubmitFeedback = async () => {
     if (!user || fbRating === 0 || !fbText.trim()) return
