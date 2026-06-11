@@ -405,6 +405,34 @@ export const markNotificationsRead = async (userId: string) => {
   await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false)
 }
 
+export const notifyFollowers = async (
+  instructorId: string,
+  type: string,
+  title: string,
+  body: string,
+  link: string,
+  sender: { id: string; username: string; avatar_url: string | null }
+) => {
+  const { data } = await supabase
+    .from('followers')
+    .select('follower_id')
+    .eq('following_id', instructorId)
+  const ids = ((data || []) as any[]).map((r: any) => r.follower_id).filter(Boolean)
+  if (!ids.length) return
+  await supabase.from('notifications').insert(
+    ids.map((followerId: string) => ({
+      user_id: followerId,
+      type,
+      title,
+      body,
+      link,
+      sender_id: sender.id,
+      sender_username: sender.username,
+      sender_avatar_url: sender.avatar_url,
+    }))
+  )
+}
+
 // Training requests
 export const sendTrainingRequest = async (
   fromUserId: string,

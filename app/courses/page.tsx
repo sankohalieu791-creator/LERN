@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import {
   SlidersHorizontal, Star, Clock, Users, X, Check,
   Calendar, Loader2, Lock,
@@ -666,25 +666,24 @@ function CoursesPageInner() {
   const [showCreateMenu,     setShowCreateMenu]     = useState(false)
   const isInstructor = user?.account_type === 'instructor'
 
-  useEffect(() => {
-    const load = async () => {
-      const [{ data: c }, { data: w }] = await Promise.all([getCourses(), getWorkshops()])
-      setCourses(c || [])
-      setWorkshops(w || [])
-      const subjects = [...new Set(((c || []) as any[]).map(course => course.subject).filter(Boolean))] as string[]
-      setAllSubjects(subjects)
-      if (user) {
-        const [enrolledCourses, joinIds] = await Promise.all([
-          getEnrolledCourses(user.id),
-          getMyWorkshopJoins(user.id),
-        ])
-        setEnrolled(enrolledCourses.data || [])
-        setJoinedWorkshops(new Set(joinIds))
-      }
-      setLoading(false)
+  const reload = useCallback(async () => {
+    const [{ data: c }, { data: w }] = await Promise.all([getCourses(), getWorkshops()])
+    setCourses(c || [])
+    setWorkshops(w || [])
+    const subjects = [...new Set(((c || []) as any[]).map(course => course.subject).filter(Boolean))] as string[]
+    setAllSubjects(subjects)
+    if (user) {
+      const [enrolledCourses, joinIds] = await Promise.all([
+        getEnrolledCourses(user.id),
+        getMyWorkshopJoins(user.id),
+      ])
+      setEnrolled(enrolledCourses.data || [])
+      setJoinedWorkshops(new Set(joinIds))
     }
-    load()
+    setLoading(false)
   }, [user])
+
+  useEffect(() => { reload() }, [reload])
 
   const handleWorkshopJoin = async (workshopId: string) => {
     if (!user) { router.push('/auth/login'); return }
@@ -939,8 +938,16 @@ function CoursesPageInner() {
       </>
     )}
 
-    <CreateCourse   isOpen={showCreateCourse}   onClose={() => setShowCreateCourse(false)} />
-    <CreateWorkshop isOpen={showCreateWorkshop} onClose={() => setShowCreateWorkshop(false)} />
+    <CreateCourse
+      isOpen={showCreateCourse}
+      onClose={() => setShowCreateCourse(false)}
+      onSuccess={() => { setShowCreateCourse(false); setActiveTab('courses'); reload() }}
+    />
+    <CreateWorkshop
+      isOpen={showCreateWorkshop}
+      onClose={() => setShowCreateWorkshop(false)}
+      onSuccess={() => { setShowCreateWorkshop(false); setActiveTab('workshops'); reload() }}
+    />
     </>
   )
 }

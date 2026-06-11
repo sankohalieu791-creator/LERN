@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import { X, ImageIcon } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import { createCourse, createCourseSessions, supabase } from '@/lib/supabase'
+import { createCourse, createCourseSessions, notifyFollowers, supabase } from '@/lib/supabase'
 
 interface CreateCourseProps {
   isOpen: boolean
   onClose: () => void
+  onSuccess?: () => void
 }
 
 const inputCls = 'w-full bg-[#1e1e1e] border border-[rgba(255,255,255,0.08)] rounded-2xl px-4 py-3.5 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.2)] transition'
@@ -16,9 +16,8 @@ const labelCls = 'block text-[#888] text-[11px] font-bold uppercase tracking-wid
 
 const LEVELS = ['beginner','intermediate','advanced']
 
-export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
+export default function CreateCourse({ isOpen, onClose, onSuccess }: CreateCourseProps) {
   const { user } = useAuth()
-  const router = useRouter()
   const [title,       setTitle]       = useState('')
   const [description, setDescription] = useState('')
   const [subject,     setSubject]     = useState('')
@@ -126,11 +125,20 @@ export default function CreateCourse({ isOpen, onClose }: CreateCourseProps) {
         }
 
         if (sessionRows.length > 0) await createCourseSessions(newCourseId, sessionRows)
+        // Notify followers
+        notifyFollowers(
+          user.id,
+          'new_course',
+          `New course from ${user.username ?? 'an instructor'}`,
+          `"${title}" just dropped — enroll now`,
+          `/courses/${newCourseId}`,
+          { id: user.id, username: user.username ?? '', avatar_url: user.avatar_url ?? null }
+        )
       }
       setTitle(''); setDescription(''); setSubject(''); setLevel('')
       setDuration(''); setThumbnail(null); setSessionCount(8); setProjectName(''); setStartDate(''); setEndDate(''); setSessionTime('19:00'); setSessionDuration(60)
       onClose()
-      router.push('/courses')
+      onSuccess?.()
     } catch (err) {
       console.error(err)
     } finally {

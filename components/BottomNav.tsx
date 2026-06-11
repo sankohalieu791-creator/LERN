@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Home, BookOpen, Compass, User, Plus, Video, Users } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
@@ -12,6 +12,7 @@ import CreateWorkshop from '@/components/CreateWorkshop'
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const { user } = useAuth()
   const { t } = useLanguage()
   const [showMenu,   setShowMenu]   = useState(false)
@@ -102,8 +103,16 @@ export default function BottomNav() {
       </nav>
 
       <CreatePost     isOpen={showPost}   onClose={() => setShowPost(false)}   />
-      <CreateCourse   isOpen={showCourse} onClose={() => setShowCourse(false)} />
-      <CreateWorkshop isOpen={showWS}     onClose={() => setShowWS(false)}     />
+      <CreateCourse
+        isOpen={showCourse}
+        onClose={() => setShowCourse(false)}
+        onSuccess={() => { setShowCourse(false); router.push('/courses') }}
+      />
+      <CreateWorkshop
+        isOpen={showWS}
+        onClose={() => setShowWS(false)}
+        onSuccess={() => { setShowWS(false); router.push('/courses?tab=workshops') }}
+      />
     </>
   )
 }

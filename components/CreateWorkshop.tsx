@@ -1,22 +1,21 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import { X, ImageIcon, Globe, MapPin } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import { createWorkshop, supabase } from '@/lib/supabase'
+import { createWorkshop, notifyFollowers, supabase } from '@/lib/supabase'
 
 interface CreateWorkshopProps {
   isOpen: boolean
   onClose: () => void
+  onSuccess?: () => void
 }
 
 const inputCls = 'w-full bg-[#1e1e1e] border border-[rgba(255,255,255,0.08)] rounded-2xl px-4 py-3.5 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.2)] transition'
 const labelCls = 'block text-[#888] text-[11px] font-bold uppercase tracking-wider mb-2'
 
-export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps) {
+export default function CreateWorkshop({ isOpen, onClose, onSuccess }: CreateWorkshopProps) {
   const { user } = useAuth()
-  const router = useRouter()
   const [title,       setTitle]       = useState('')
   const [description, setDescription] = useState('')
   const [date,        setDate]        = useState('')
@@ -57,7 +56,7 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
         const { error: upErr } = await supabase.storage.from('course-thumbnails').upload(path, thumbnail)
         if (!upErr) thumbnailUrl = supabase.storage.from('course-thumbnails').getPublicUrl(path).data.publicUrl
       }
-      await createWorkshop(user.id, {
+      const { data: wsData } = await createWorkshop(user.id, {
         title,
         description,
         workshop_date: date,
@@ -67,10 +66,22 @@ export default function CreateWorkshop({ isOpen, onClose }: CreateWorkshopProps)
         enrolled_count: 0,
         thumbnail_url: thumbnailUrl,
       })
+      const newWorkshopId = (wsData as any)?.[0]?.id
+      if (newWorkshopId) {
+        const dateStr = date ? new Date(date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''
+        notifyFollowers(
+          user.id,
+          'new_workshop',
+          `New workshop from ${user.username ?? 'an instructor'}`,
+          `"${title}"${dateStr ? ` · ${dateStr}` : ''} — join now`,
+          `/courses`,
+          { id: user.id, username: user.username ?? '', avatar_url: user.avatar_url ?? null }
+        )
+      }
       setTitle(''); setDescription(''); setDate(''); setTime('')
       setLocation(''); setIsOnline(false); setThumbnail(null)
       onClose()
-      router.push('/courses?tab=workshops')
+      onSuccess?.()
     } catch (err) {
       console.error(err)
     } finally {
