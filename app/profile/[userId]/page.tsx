@@ -9,10 +9,10 @@ import {
   addFeedback, createNotification,
   getInstructorRequests, updateRequestStatus,
   getProjectsByUser, getCertificatesByUser,
-  getJobsByInstructor,
+  getJobsByInstructor, getInstructorWorkshops,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
-import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin, Eye } from 'lucide-react'
+import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin, Eye, Globe, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { useLanguage } from '@/context/LanguageContext'
 
@@ -63,7 +63,7 @@ export default function UserProfilePage() {
   const [following,     setFollowing]     = useState(false)
   const [loading,       setLoading]       = useState(true)
   const [followLoading, setFollowLoading] = useState(false)
-  const [activeTab,     setActiveTab]     = useState<'posts' | 'projects' | 'certs' | 'feedback' | 'requests' | 'jobs'>('posts')
+  const [activeTab,     setActiveTab]     = useState<'posts' | 'projects' | 'certs' | 'feedback' | 'requests' | 'jobs' | 'workshops'>('posts')
 
   const [fbRating,     setFbRating]     = useState(0)
   const [fbText,       setFbText]       = useState('')
@@ -71,6 +71,7 @@ export default function UserProfilePage() {
   const [fbSubmitted,  setFbSubmitted]  = useState(false)
 
   const [jobs, setJobs] = useState<any[]>([])
+  const [workshops, setWorkshops] = useState<any[]>([])
   const [certModal, setCertModal] = useState<any | null>(null)
 
   const profileId    = userId as string
@@ -82,18 +83,20 @@ export default function UserProfilePage() {
     const load = async () => {
       setLoading(true)
 
-      const [profileRes, videosRes, feedbackRes, projectsRes, certsRes, jobsRes] = await Promise.all([
+      const [profileRes, videosRes, feedbackRes, projectsRes, certsRes, jobsRes, wsRes] = await Promise.all([
         getUserProfile(profileId),
         getUserVideos(profileId),
         getFeedback(profileId),
         getProjectsByUser(profileId),
         getCertificatesByUser(profileId),
         getJobsByInstructor(profileId),
+        getInstructorWorkshops(profileId),
       ])
       setProfile(profileRes.data)
       setVideos(videosRes.data ?? [])
       setFeedback(feedbackRes.data ?? [])
       setJobs(jobsRes.data ?? [])
+      setWorkshops(wsRes.data ?? [])
       // Respect public/private: when viewing someone else's profile, only show public items
       const viewerIsOwner = user?.id === profileId
       const rawProjects = (projectsRes.data ?? []) as any[]
@@ -185,7 +188,10 @@ export default function UserProfilePage() {
     { id: 'certs',    icon: Award,         label: t('certs')    },
     { id: 'feedback', icon: MessageSquare, label: t('feedback') },
     ...(isInstructor
-      ? [{ id: 'jobs', icon: Briefcase, label: t('jobs') }]
+      ? [
+          { id: 'workshops', icon: Globe,     label: 'Workshops' },
+          { id: 'jobs',      icon: Briefcase, label: t('jobs')   },
+        ]
       : []
     ),
     ...(isOwnProfile && isInstructor
@@ -576,6 +582,63 @@ export default function UserProfilePage() {
               </div>
             )}
           </div>
+        )}
+
+        {/* WORKSHOPS */}
+        {activeTab === 'workshops' && (
+          workshops.length === 0 ? (
+            <div className="text-center py-16">
+              <Globe className="w-10 h-10 text-[#2a2a2a] mx-auto mb-3" />
+              <p className="text-[#444] text-sm">No workshops yet</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {workshops.map((w: any) => {
+                const dateStr = w.workshop_date
+                  ? new Date(w.workshop_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                  : null
+                return (
+                  <div key={w.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl overflow-hidden">
+                    {w.thumbnail_url && (
+                      <div className="aspect-video relative">
+                        <img src={w.thumbnail_url} alt={w.title} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <p className="text-white font-bold text-sm flex-1 min-w-0">{w.title}</p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                          w.is_online
+                            ? 'bg-blue-500/20 text-blue-400'
+                            : 'bg-[#252525] text-[#888]'
+                        }`}>
+                          {w.is_online ? '🌐 Online' : '📍 In-Person'}
+                        </span>
+                      </div>
+                      {w.description && (
+                        <p className="text-[#666] text-xs leading-relaxed line-clamp-2 mb-2">{w.description}</p>
+                      )}
+                      <div className="flex items-center gap-3 text-[#555] text-xs">
+                        {dateStr && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />{dateStr}
+                          </span>
+                        )}
+                        {w.workshop_time && (
+                          <span>{w.workshop_time.slice(0, 5)}</span>
+                        )}
+                        {!w.is_online && w.location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />{w.location}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )
         )}
 
         {/* JOBS */}
