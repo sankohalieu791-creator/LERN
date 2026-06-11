@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { signUp } from '@/lib/supabase'
+import { signUp, signIn } from '@/lib/supabase'
 import { Eye, EyeOff } from 'lucide-react'
 
 export default function SignupPage() {
@@ -20,9 +20,12 @@ export default function SignupPage() {
     setError('')
     setLoading(true)
     try {
-      const { error } = await signUp(email, password, username)
-      if (error) setError(error.message)
-      else router.push('/feed')
+      const { error: signUpError } = await signUp(email, password, username)
+      if (signUpError) { setError(signUpError.message); return }
+      // Sign in immediately so the user lands on /feed already authenticated
+      const { error: signInError } = await signIn(email, password)
+      if (signInError) { setError(signInError.message); return }
+      router.push('/feed')
     } catch (err: any) {
       setError(err.message)
     } finally {
