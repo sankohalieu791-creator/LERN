@@ -24,6 +24,7 @@ export default function CreateWorkshop({ isOpen, onClose, onSuccess }: CreateWor
   const [isOnline,    setIsOnline]    = useState(false)
   const [thumbnail,   setThumbnail]   = useState<File | null>(null)
   const [loading,     setLoading]     = useState(false)
+  const [error,       setError]       = useState('')
   const galleryRef = useRef<HTMLInputElement>(null)
 
   if (!isOpen) return null
@@ -48,6 +49,7 @@ export default function CreateWorkshop({ isOpen, onClose, onSuccess }: CreateWor
   const handleSubmit = async () => {
     if (!user || !canSubmit) return
     setLoading(true)
+    setError('')
     try {
       let thumbnailUrl: string | null = null
       if (thumbnail) {
@@ -56,7 +58,8 @@ export default function CreateWorkshop({ isOpen, onClose, onSuccess }: CreateWor
         const { error: upErr } = await supabase.storage.from('course-thumbnails').upload(path, thumbnail)
         if (!upErr) thumbnailUrl = supabase.storage.from('course-thumbnails').getPublicUrl(path).data.publicUrl
       }
-      const { data: wsData } = await createWorkshop(user.id, {
+
+      const { data: wsData, error: wsErr } = await createWorkshop(user.id, {
         title,
         description,
         workshop_date: date,
@@ -66,8 +69,26 @@ export default function CreateWorkshop({ isOpen, onClose, onSuccess }: CreateWor
         enrolled_count: 0,
         thumbnail_url: thumbnailUrl,
       })
-      const newWorkshopId = (wsData as any)?.[0]?.id
-      if (newWorkshopId) {
+
+      if (wsErr) {
+        setError('Could not save workshop — please run the RLS fix SQL in Supabase and try again.')
+        return
+      }
+
+      // Build the workshop object to return — use DB row if available, otherwise construct from form data
+      const created = (wsData as any)?.[0] ?? {
+        id: null,
+        title,
+        description,
+        workshop_date: date || null,
+        workshop_time: time || null,
+        location: isOnline ? null : location,
+        is_online: isOnline,
+        thumbnail_url: thumbnailUrl,
+        enrolled_count: 0,
+      }
+
+      if (created.id) {
         const dateStr = date ? new Date(date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''
         notifyFollowers(
           user.id,
@@ -78,16 +99,17 @@ export default function CreateWorkshop({ isOpen, onClose, onSuccess }: CreateWor
           { id: user.id, username: user.username ?? '', avatar_url: user.avatar_url ?? null }
         )
       }
+
       setTitle(''); setDescription(''); setDate(''); setTime('')
       setLocation(''); setIsOnline(false); setThumbnail(null)
       onClose()
-      const created = (wsData as any)?.[0]
       onSuccess?.({
-        ...(created ?? {}),
+        ...created,
         users: { id: user.id, username: user.username, avatar_url: user.avatar_url ?? null, verified: user.verified ?? false },
       })
     } catch (err) {
       console.error(err)
+      setError('Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -180,6 +202,9 @@ export default function CreateWorkshop({ isOpen, onClose, onSuccess }: CreateWor
 
         <div className="flex-shrink-0 px-5 py-4 border-t border-[rgba(255,255,255,0.07)] bg-[#141414]"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
+          {error && (
+            <p className="text-red-400 text-xs text-center mb-3 bg-red-400/10 rounded-xl px-3 py-2">{error}</p>
+          )}
           <button
             onClick={handleSubmit}
             disabled={loading || !canSubmit}

@@ -52,6 +52,24 @@ export async function sendPush(
       body: JSON.stringify({ targetUserId, title, body, url }),
     })
   } catch {
-    // Non-critical — don't surface to user
+    // Non-critical
+  }
+}
+
+export async function sendPushToMany(
+  targetUserIds: string[],
+  title: string,
+  body: string,
+  url = '/feed'
+): Promise<void> {
+  if (!targetUserIds.length) return
+  try {
+    await fetch('/api/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetUserIds, title, body, url }),
+    })
+  } catch {
+    // Non-critical
   }
 }

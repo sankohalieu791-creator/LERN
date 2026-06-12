@@ -431,6 +431,12 @@ export const notifyFollowers = async (
       sender_avatar_url: sender.avatar_url,
     }))
   )
+  // Push notification to followers who are outside the app
+  if (typeof window !== 'undefined') {
+    import('@/lib/push').then(({ sendPushToMany }) => {
+      sendPushToMany(ids, title, body, link)
+    })
+  }
 }
 
 // Training requests

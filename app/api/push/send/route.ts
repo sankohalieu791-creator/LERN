@@ -5,34 +5,41 @@ import { createClient } from '@supabase/supabase-js'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  const subject   = process.env.VAPID_SUBJECT
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+  const subject    = process.env.VAPID_SUBJECT
+  const publicKey  = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
   const privateKey = process.env.VAPID_PRIVATE_KEY
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const supabaseUrl  = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey   = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!subject || !publicKey || !privateKey || !supabaseUrl || !serviceKey) {
     return NextResponse.json({ ok: false, error: 'Push not configured' }, { status: 200 })
   }
 
   webpush.setVapidDetails(subject, publicKey, privateKey)
-
   const service = createClient(supabaseUrl, serviceKey)
 
-  const { targetUserId, title, body, url } = await req.json()
-  if (!targetUserId) return NextResponse.json({ error: 'Missing targetUserId' }, { status: 400 })
+  const body = await req.json()
+  // Support both single targetUserId and array targetUserIds
+  const userIds: string[] = body.targetUserIds
+    ?? (body.targetUserId ? [body.targetUserId] : [])
+
+  if (!userIds.length) return NextResponse.json({ error: 'Missing targetUserId(s)' }, { status: 400 })
 
   const { data: subs } = await service
     .from('push_subscriptions')
     .select('*')
-    .eq('user_id', targetUserId)
+    .in('user_id', userIds)
 
   if (!subs?.length) return NextResponse.json({ ok: true, sent: 0 })
 
-  const payload = JSON.stringify({ title, body, url: url ?? '/feed' })
+  const payload = JSON.stringify({
+    title: body.title ?? 'LERN',
+    body:  body.body  ?? '',
+    url:   body.url   ?? '/feed',
+  })
 
   const results = await Promise.allSettled(
-    subs.map(sub =>
+    subs.map((sub: any) =>
       webpush
         .sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth_key } },

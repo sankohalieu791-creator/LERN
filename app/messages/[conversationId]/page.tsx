@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { getMessages, sendMessage, markMessagesRead, deleteMessage, supabase } from '@/lib/supabase'
+import { sendPush } from '@/lib/push'
 import { ArrowLeft, Send, Loader2, Copy, Trash2, Check } from 'lucide-react'
 
 interface CtxMenu {
@@ -77,6 +78,14 @@ export default function ConversationPage() {
     await sendMessage(convId, user.id, content)
     setSending(false)
     inputRef.current?.focus()
+    if (otherUser?.id) {
+      sendPush(
+        otherUser.id,
+        `💬 ${(user as any).username ?? 'Someone'}`,
+        content.slice(0, 100),
+        `/messages/${convId}`
+      )
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

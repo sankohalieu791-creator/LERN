@@ -782,7 +782,7 @@ function CoursesPageInner() {
             {workshops.length === 0
               ? <p className="text-center text-[#444] text-sm py-16">{t('no_workshops')}</p>
               : workshops.map(w => (
-                  <WorkshopCard key={w.id} workshop={w}
+                  <WorkshopCard key={w.id ?? w._tempKey} workshop={w}
                     isJoined={joinedWorkshops.has(w.id)}
                     isOwner={user?.id === w.instructor_id}
                     joining={joiningId === w.id}
@@ -949,7 +949,10 @@ function CoursesPageInner() {
       onSuccess={(ws) => {
         setShowCreateWorkshop(false)
         setActiveTab('workshops')
-        if (ws?.id) setWorkshops(prev => [...prev, ws].sort((a, b) => new Date(a.workshop_date || '9999').getTime() - new Date(b.workshop_date || '9999').getTime()))
+        if (ws) {
+          const withKey = { ...ws, _tempKey: Date.now() }
+          setWorkshops(prev => [...prev, withKey].sort((a, b) => new Date(a.workshop_date || '9999').getTime() - new Date(b.workshop_date || '9999').getTime()))
+        }
       }}
     />
     </>
