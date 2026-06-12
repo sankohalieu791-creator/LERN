@@ -8,6 +8,7 @@ import ThemeProvider from '@/components/ThemeProvider'
 import ClientShell from '@/components/ClientShell'
 import PushNotificationSetup from '@/components/PushNotificationSetup'
 import OnboardingFlow from '@/components/OnboardingFlow'
+import Onboarding from '@/components/Onboarding'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </ClientShell>
           <BottomNav />
+          <Onboarding />
           <OnboardingFlow />
         </AuthProvider>
         </LanguageProvider>
