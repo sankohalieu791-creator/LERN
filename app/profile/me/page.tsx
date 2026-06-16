@@ -247,6 +247,29 @@ export default function ProfileMePage() {
     setDeleteTarget(null)
   }
 
+  if (!user) {
+    return (
+      <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="px-4 pt-5 flex items-center gap-4 mb-4">
+          <div className="w-20 h-20 rounded-full bg-[#1e1e1e] animate-pulse flex-shrink-0" />
+          <div className="flex flex-1 justify-around">
+            {['Posts','Followers','Following'].map(l => (
+              <div key={l} className="text-center">
+                <div className="w-8 h-5 bg-[#1e1e1e] rounded animate-pulse mx-auto mb-1" />
+                <p className="text-[#555] text-xs">{l}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="px-4 space-y-2">
+          <div className="w-32 h-5 bg-[#1e1e1e] rounded animate-pulse" />
+          <div className="w-48 h-4 bg-[#1e1e1e] rounded animate-pulse" />
+          <div className="w-full h-16 bg-[#1e1e1e] rounded-xl animate-pulse mt-3" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
     <div className="fixed inset-0 bg-[#0f0f0f] theme-bg flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>

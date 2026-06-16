@@ -22,17 +22,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        // getSession() reads from localStorage — ~1ms, no network call
         const { data: { session } } = await supabase.auth.getSession()
-        if (session?.user) {
-          setAuthUser(session.user)
+        if (!session?.user) {
+          setLoading(false)
+          return
         }
-        // Release the loading gate immediately — profile loads in the background
+
+        // If the access token is expired or expiring within 5 minutes, refresh it
+        // before fetching the profile — stale tokens cause silent empty responses
+        const expiresAt = (session.expires_at ?? 0) * 1000
+        const needsRefresh = Date.now() > expiresAt - 5 * 60 * 1000
+        let activeUser = session.user
+
+        if (needsRefresh) {
+          const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession()
+          if (refreshErr || !refreshed.session) {
+            // Refresh token also expired — clear state, user must sign in again
+            setLoading(false)
+            return
+          }
+          activeUser = refreshed.session.user
+        }
+
+        setAuthUser(activeUser)
+        const { data } = await getUserProfile(activeUser.id)
+        setUser(data)
         setLoading(false)
-        if (session?.user) {
-          const { data } = await getUserProfile(session.user.id)
-          setUser(data)
-        }
       } catch (error) {
         console.error('Auth error:', error)
         setLoading(false)
@@ -54,7 +69,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    // When the user returns to the app after it's been in the background,
+    // Supabase auto-refreshes the token via its own visibilitychange listener.
+    // We re-fetch the profile here so stale data never persists on return.
+    const handleVisibility = async () => {
+      if (document.visibilityState !== 'visible') return
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const { data } = await getUserProfile(session.user.id)
+        if (data) setUser(data)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      subscription.unsubscribe()
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [])
 
   const refreshUser = async () => {
