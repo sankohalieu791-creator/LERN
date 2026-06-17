@@ -7,6 +7,7 @@ import {
   getConversations,
   deleteConversationForUser,
   setConversationFavorite,
+  supabase,
 } from '@/lib/supabase'
 import { ArrowLeft, MessageCircle, Loader2, MoreVertical, Star, Trash2 } from 'lucide-react'
 
@@ -27,17 +28,52 @@ export default function MessagesPage() {
   const [menuFor, setMenuFor]             = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
+  const load = async () => {
+    if (!user) return
+    setLoading(true)
+    const { data } = await getConversations(user.id)
+    const sorted = [...(data || [])].sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0))
+    setConversations(sorted)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    load()
+  }, [user])
+
+  // Realtime — update last message preview when a new message arrives in any conversation
   useEffect(() => {
     if (!user) return
-    const load = async () => {
-      setLoading(true)
-      const { data } = await getConversations(user.id)
-      // favourites first
-      const sorted = [...(data || [])].sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0))
-      setConversations(sorted)
-      setLoading(false)
-    }
-    load()
+    const channel = supabase
+      .channel('messages-list-rt')
+      .on(
+        'postgres_changes' as any,
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload: any) => {
+          const msg = payload.new
+          setConversations(prev => {
+            const idx = prev.findIndex(c => c.id === msg.conversation_id)
+            if (idx === -1) return prev
+            const updated = [...prev]
+            updated[idx] = {
+              ...updated[idx],
+              lastMessage: {
+                content:    msg.content,
+                created_at: msg.created_at,
+                sender_id:  msg.sender_id,
+              },
+            }
+            // Move conversation with new message to top (unless favourites pinned)
+            const [conv] = updated.splice(idx, 1)
+            const firstNonFav = updated.findIndex(c => !c.isFavorite)
+            const insertAt = conv.isFavorite ? 0 : (firstNonFav === -1 ? 0 : firstNonFav)
+            updated.splice(insertAt, 0, conv)
+            return updated
+          })
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [user])
 
   // Close menu when clicking outside
@@ -85,7 +121,7 @@ export default function MessagesPage() {
           <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
             <MessageCircle className="w-12 h-12 text-[#2a2a2a] mb-4" />
             <p className="text-[#444] text-sm font-semibold">No messages yet</p>
-            <p className="text-[#333] text-xs mt-1">Start a conversation from someone's profile</p>
+            <p className="text-[#333] text-xs mt-1">Start a conversation from someone&apos;s profile</p>
           </div>
         ) : (
           <div>
@@ -94,14 +130,18 @@ export default function MessagesPage() {
               const last    = c.lastMessage
               const initial = other?.username?.[0]?.toUpperCase() ?? '?'
               const isOpen  = menuFor === c.id
+              const preview = last
+                ? (last.sender_id === user?.id ? 'You: ' : '') + last.content
+                : 'Start a conversation'
               return (
                 <div key={c.id} className="relative flex items-center border-b border-[rgba(255,255,255,0.05)]">
                   {/* Conversation row */}
                   <button
                     onClick={() => router.push(`/messages/${c.id}`)}
-                    className="flex-1 flex items-center gap-3 px-4 py-4 active:bg-[#1a1a1a] transition text-left"
+                    className="flex-1 flex items-start gap-3 px-4 py-3.5 active:bg-[#1a1a1a] transition text-left min-w-0"
                   >
-                    <div className="relative flex-shrink-0">
+                    {/* Avatar */}
+                    <div className="relative flex-shrink-0 mt-0.5">
                       <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-base font-bold overflow-hidden">
                         {other?.avatar_url
                           ? <img src={other.avatar_url} alt={other.username} className="w-full h-full object-cover" />
@@ -114,24 +154,24 @@ export default function MessagesPage() {
                         </span>
                       )}
                     </div>
+
+                    {/* Text */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <p className="text-white font-bold text-sm">{other?.username ?? 'User'}</p>
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <p className="text-white font-bold text-sm truncate">{other?.username ?? 'User'}</p>
                         {last && (
-                          <p className="text-[#444] text-xs flex-shrink-0 ml-2">{timeAgo(last.created_at)}</p>
+                          <p className="text-[#444] text-xs flex-shrink-0">{timeAgo(last.created_at)}</p>
                         )}
                       </div>
-                      <p className="text-[#555] text-sm truncate">
-                        {last
-                          ? (last.sender_id === user?.id ? 'You: ' : '') + last.content
-                          : 'Start a conversation'
-                        }
+                      {/* Show up to 2 lines so short messages are fully visible */}
+                      <p className="text-[#888] text-sm line-clamp-2 leading-snug break-words">
+                        {preview}
                       </p>
                     </div>
                   </button>
 
                   {/* Three-dot button */}
-                  <div className="relative flex-shrink-0 pr-2" ref={isOpen ? menuRef : undefined}>
+                  <div className="relative flex-shrink-0 pr-2 self-center" ref={isOpen ? menuRef : undefined}>
                     <button
                       onClick={e => { e.stopPropagation(); setMenuFor(isOpen ? null : c.id) }}
                       className="w-8 h-8 flex items-center justify-center text-[#444] hover:text-[#888] transition rounded-full hover:bg-[#1a1a1a]"

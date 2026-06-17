@@ -67,7 +67,7 @@ export default function ConversationPage() {
   }, [convId, user])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    bottomRef.current?.scrollIntoView({ behavior: messages.length <= 1 ? 'instant' : 'smooth' })
   }, [messages])
 
   const handleSend = async () => {
