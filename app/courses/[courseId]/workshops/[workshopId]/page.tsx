@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { supabase, setWorkshopLive } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
-import { Calendar, Clock, MapPin, Users, ChevronLeft, Loader2 } from 'lucide-react'
+import { Calendar, Clock, MapPin, Users, ChevronLeft, Loader2, Radio } from 'lucide-react'
 
 function VerifiedBadge({ size = 14 }: { size?: number }) {
   return (
@@ -26,6 +26,7 @@ export default function WorkshopDetailPage() {
   const [loading, setLoading] = useState(true)
   const [enrolled, setEnrolled] = useState(false)
   const [enrolling, setEnrolling] = useState(false)
+  const [goingLive, setGoingLive] = useState(false)
 
   useEffect(() => {
     const fetch = async () => {
@@ -39,10 +40,10 @@ export default function WorkshopDetailPage() {
       if (user) {
         const { data: e } = await supabase
           .from('enrollments')
-          .select('*')
+          .select('id')
           .eq('workshop_id', workshopId)
           .eq('user_id', user.id)
-          .single()
+          .maybeSingle()
         setEnrolled(!!e)
       }
       setLoading(false)
@@ -50,12 +51,44 @@ export default function WorkshopDetailPage() {
     fetch()
   }, [workshopId, user])
 
+  // Realtime: update is_live when instructor starts/stops
+  useEffect(() => {
+    if (!workshopId) return
+    const channel = supabase
+      .channel(`workshop-live-${workshopId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'workshops',
+        filter: `id=eq.${workshopId}`,
+      }, (payload: any) => {
+        setWorkshop((prev: any) => prev ? { ...prev, is_live: payload.new.is_live } : prev)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [workshopId])
+
   const handleEnroll = async () => {
     if (!user) { router.push('/auth/login'); return }
     setEnrolling(true)
     await supabase.from('enrollments').insert([{ workshop_id: workshopId, user_id: user.id }])
     setEnrolled(true)
     setEnrolling(false)
+  }
+
+  const handleGoLive = async () => {
+    if (!workshopId) return
+    setGoingLive(true)
+    const { error } = await setWorkshopLive(workshopId as string, true)
+    if (!error) {
+      setWorkshop((prev: any) => ({ ...prev, is_live: true }))
+      router.push(`/workshops/${workshopId}/classroom`)
+    }
+    setGoingLive(false)
+  }
+
+  const handleEndLive = async () => {
+    if (!workshopId) return
+    await setWorkshopLive(workshopId as string, false)
+    setWorkshop((prev: any) => ({ ...prev, is_live: false }))
   }
 
   if (loading) return (
@@ -71,6 +104,8 @@ export default function WorkshopDetailPage() {
   )
 
   const date = workshop.workshop_date ? new Date(workshop.workshop_date) : null
+  const instructorId = workshop.instructor_id || workshop.user_id
+  const isInstructor = !!(user && user.id === instructorId)
 
   return (
     <div className="fixed inset-0 bg-[#0f0f0f] overflow-y-auto">
@@ -125,7 +160,9 @@ export default function WorkshopDetailPage() {
         </div>
 
         {/* Description */}
-        <p className="text-[#888] text-sm leading-relaxed mb-5">{workshop.description}</p>
+        {workshop.description && (
+          <p className="text-[#888] text-sm leading-relaxed mb-5">{workshop.description}</p>
+        )}
 
         {/* Details grid */}
         <div className="grid grid-cols-2 gap-3 mb-6">
@@ -175,25 +212,61 @@ export default function WorkshopDetailPage() {
         className="fixed bottom-0 left-0 right-0 px-4 py-4 bg-[#0f0f0f] border-t border-[rgba(255,255,255,0.07)]"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
       >
-        {enrolled ? (
+        {isInstructor ? (
+          // ── Instructor controls ──────────────────────────────
           workshop.is_live ? (
-            <button className="w-full bg-red-500 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2">
-              <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-              Join Workshop Now
-            </button>
-          ) : (
-            <div className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] text-white font-bold py-4 rounded-2xl text-center">
-              ✓ You're Enrolled
+            <div className="flex gap-3">
+              <button
+                onClick={() => router.push(`/workshops/${workshopId}/classroom`)}
+                className="flex-1 bg-red-500 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2"
+              >
+                <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                Rejoin Live
+              </button>
+              <button
+                onClick={handleEndLive}
+                className="px-5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-[#888] font-bold py-4 rounded-2xl text-sm"
+              >
+                End
+              </button>
             </div>
+          ) : (
+            <button
+              onClick={handleGoLive}
+              disabled={goingLive}
+              className="w-full bg-gradient-to-r from-red-500 to-[#FF6B2B] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.98] transition"
+            >
+              {goingLive
+                ? <><Loader2 className="w-4 h-4 animate-spin" />Starting…</>
+                : <><Radio className="w-4 h-4" />Start Workshop Live</>
+              }
+            </button>
           )
         ) : (
-          <button
-            onClick={handleEnroll}
-            disabled={enrolling}
-            className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
-          >
-            {enrolling ? <><Loader2 className="w-4 h-4 animate-spin" />Enrolling…</> : 'Join Workshop — Free'}
-          </button>
+          // ── Student controls ─────────────────────────────────
+          enrolled ? (
+            workshop.is_live ? (
+              <button
+                onClick={() => router.push(`/workshops/${workshopId}/classroom`)}
+                className="w-full bg-red-500 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2"
+              >
+                <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                Join Workshop Now
+              </button>
+            ) : (
+              <div className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] text-white font-bold py-4 rounded-2xl text-center">
+                ✓ You&apos;re Enrolled
+              </div>
+            )
+          ) : (
+            <button
+              onClick={handleEnroll}
+              disabled={enrolling}
+              className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              {enrolling ? <><Loader2 className="w-4 h-4 animate-spin" />Enrolling…</> : 'Join Workshop — Free'}
+            </button>
+          )
         )}
       </div>
     </div>

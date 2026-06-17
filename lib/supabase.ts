@@ -871,6 +871,14 @@ export const deleteWorkshop = async (workshopId: string, instructorId: string) =
   return { error }
 }
 
+export const setWorkshopLive = async (workshopId: string, isLive: boolean) => {
+  const { error } = await supabase
+    .from('workshops')
+    .update({ is_live: isLive })
+    .eq('id', workshopId)
+  return { error }
+}
+
 export const getInstructorWorkshops = async (instructorId: string) => {
   const { data, error } = await supabase
     .from('workshops')
