@@ -71,7 +71,8 @@ export default function CreateWorkshop({ isOpen, onClose, onSuccess }: CreateWor
       })
 
       if (wsErr) {
-        setError('Could not save workshop — please run the RLS fix SQL in Supabase and try again.')
+        setError(`Error: ${wsErr.message} (code: ${wsErr.code})`)
+        console.error('createWorkshop error:', wsErr)
         return
       }
 
