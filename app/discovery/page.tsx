@@ -8,13 +8,14 @@ import {
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
-import { getUnreadMessageCount } from '@/lib/supabase'
 import {
+  getUnreadMessageCount,
   getInstructors, getFollowingIds,
   followUser, unfollowUser,
   sendTrainingRequest, getMyTrainingRequests,
   createNotification, getOrCreateConversation,
   getJobs, saveJob, unsaveJob, getSavedJobIds,
+  supabase,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import type { InstructorApplication } from '@/lib/types'
@@ -518,6 +519,17 @@ export default function DiscoveryPage() {
   useEffect(() => {
     if (!user) return
     getUnreadMessageCount(user.id).then(setUnreadMsgs)
+    // Refresh count on message changes (new messages or conversations deleted)
+    const channel = supabase
+      .channel(`unread-badge-${user.id}`)
+      .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'messages' }, () => {
+        getUnreadMessageCount(user.id).then(setUnreadMsgs)
+      })
+      .on('postgres_changes' as any, { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => {
+        getUnreadMessageCount(user.id).then(setUnreadMsgs)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [user])
 
   // Clear search when switching tabs so stale queries don't confuse results

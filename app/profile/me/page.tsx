@@ -360,7 +360,7 @@ export default function ProfileMePage() {
       </div>
 
       {/* ── ACTION BUTTONS ───────────────────────────────────── */}
-      <div className="px-4 flex gap-2 mb-5">
+      <div className="px-4 flex gap-2 mb-3">
         <Link
           href="/profile/me/edit"
           className="flex-1 bg-[#1a1a1a] theme-card border border-[rgba(255,255,255,0.1)] theme-border text-white theme-text-1 py-2.5 rounded-xl text-sm font-semibold text-center hover:bg-[#222] transition"
@@ -374,6 +374,25 @@ export default function ProfileMePage() {
           <Settings className="w-4 h-4" />
         </Link>
       </div>
+
+      {/* ── INSTRUCTOR DASHBOARD SHORTCUT ─────────────────────── */}
+      {isInstructor && (
+        <div className="px-4 mb-5">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-3 w-full bg-gradient-to-r from-[#FF6B2B]/10 to-[#C026D3]/10 border border-[#FF6B2B]/25 rounded-xl px-4 py-3 hover:from-[#FF6B2B]/15 hover:to-[#C026D3]/15 transition"
+          >
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
+              <MessageSquare className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-white text-sm font-bold">Instructor Dashboard</p>
+              <p className="text-[#555] text-xs">Analytics, submissions &amp; more</p>
+            </div>
+            <BookOpen className="w-4 h-4 text-[#555]" />
+          </Link>
+        </div>
+      )}
 
       {/* ── TABS ─────────────────────────────────────────────── */}
       <div className="flex border-b border-[rgba(255,255,255,0.07)] theme-border">

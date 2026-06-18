@@ -807,8 +807,15 @@ export const markMessagesRead = async (conversationId: string, userId: string) =
 
 export const getUnreadMessageCount = async (userId: string): Promise<number> => {
   const { data: convs } = await supabase
-    .from('conversations').select('id').or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
-  const convIds = (convs || []).map((c: any) => c.id)
+    .from('conversations')
+    .select('id, user1_id, deleted_by_user1, deleted_by_user2')
+    .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+  const convIds = (convs || [])
+    .filter((c: any) => {
+      const isUser1 = c.user1_id === userId
+      return isUser1 ? !c.deleted_by_user1 : !c.deleted_by_user2
+    })
+    .map((c: any) => c.id)
   if (!convIds.length) return 0
   const { count } = await supabase
     .from('messages').select('id', { count: 'exact', head: true })
@@ -952,4 +959,118 @@ export const getSavedJobIds = async (userId: string) => {
   const { data } = await supabase
     .from('saved_jobs').select('job_id').eq('user_id', userId)
   return data?.map((r: any) => r.job_id) ?? []
+}
+
+// ── Course Projects ───────────────────────────────────────────
+
+export const getCourseProject = async (courseId: string) => {
+  const { data, error } = await supabase
+    .from('course_projects')
+    .select('*')
+    .eq('course_id', courseId)
+    .maybeSingle()
+  return { data, error }
+}
+
+export const createCourseProject = async (
+  instructorId: string,
+  courseId: string,
+  payload: { title: string; description?: string; due_date?: string }
+) => {
+  const { data, error } = await supabase
+    .from('course_projects')
+    .insert([{ instructor_id: instructorId, course_id: courseId, ...payload }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const getProjectSubmissions = async (projectId: string) => {
+  const { data, error } = await supabase
+    .from('project_submissions')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('submitted_at', { ascending: false })
+  if (!data) return { data, error }
+  const ids = [...new Set(data.map((s: any) => s.user_id).filter(Boolean))]
+  const { data: usersData } = ids.length
+    ? await supabase.from('users').select('id, username, avatar_url').in('id', ids)
+    : { data: [] }
+  const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  return { data: data.map((s: any) => ({ ...s, user: map[s.user_id] ?? null })), error }
+}
+
+export const getMyProjectSubmission = async (userId: string, projectId: string) => {
+  const { data, error } = await supabase
+    .from('project_submissions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('project_id', projectId)
+    .maybeSingle()
+  return { data, error }
+}
+
+export const submitCourseProject = async (
+  userId: string,
+  projectId: string,
+  courseId: string,
+  payload: { file_url?: string; file_type?: string; description?: string }
+) => {
+  const { data, error } = await supabase
+    .from('project_submissions')
+    .upsert([{ user_id: userId, project_id: projectId, course_id: courseId, status: 'pending', ...payload }],
+      { onConflict: 'project_id,user_id' })
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const updateSubmissionStatus = async (
+  submissionId: string,
+  status: 'accepted' | 'declined',
+  feedback?: string
+) => {
+  const { data, error } = await supabase
+    .from('project_submissions')
+    .update({ status, feedback: feedback ?? null })
+    .eq('id', submissionId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const getInstructorDashboardStats = async (instructorId: string) => {
+  const [{ data: courses }, { data: workshops }] = await Promise.all([
+    supabase.from('courses').select('id, title, enrolled_count, thumbnail_url').eq('instructor_id', instructorId),
+    supabase.from('workshops').select('id, title, enrolled_count, thumbnail_url').eq('instructor_id', instructorId),
+  ])
+  const courseIds = (courses || []).map((c: any) => c.id)
+  const { data: projects } = courseIds.length
+    ? await supabase.from('course_projects').select('*').in('course_id', courseIds)
+    : { data: [] }
+  const projectIds = (projects || []).map((p: any) => p.id)
+  const { data: submissions } = projectIds.length
+    ? await supabase.from('project_submissions').select('*').in('project_id', projectIds)
+    : { data: [] }
+  const submitterIds = [...new Set((submissions || []).map((s: any) => s.user_id))]
+  const { data: submitters } = submitterIds.length
+    ? await supabase.from('users').select('id, username, avatar_url').in('id', submitterIds)
+    : { data: [] }
+  const userMap = Object.fromEntries(((submitters || []) as any[]).map(u => [u.id, u]))
+  const projectMap = Object.fromEntries(((projects || []) as any[]).map(p => [p.id, p]))
+  const submissionsWithUser = (submissions || []).map((s: any) => ({
+    ...s,
+    user: userMap[s.user_id] ?? null,
+    project: projectMap[s.project_id] ?? null,
+  }))
+  const totalEnrolled = (courses || []).reduce((s: number, c: any) => s + (c.enrolled_count || 0), 0)
+  const totalWorkshopJoins = (workshops || []).reduce((s: number, w: any) => s + (w.enrolled_count || 0), 0)
+  return {
+    courses: courses || [],
+    workshops: workshops || [],
+    projects: projects || [],
+    submissions: submissionsWithUser,
+    totalEnrolled,
+    totalWorkshopJoins,
+  }
 }

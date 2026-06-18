@@ -14,6 +14,7 @@ import {
   isEnrolled, rateCourse, getUserCourseRating,
   joinWorkshop, leaveWorkshop, getMyWorkshopJoins,
   setSessionLive, getEnrolledCourses, deleteWorkshop,
+  supabase,
 } from '@/lib/supabase'
 import CreateCourse from '@/components/CreateCourse'
 import CreateWorkshop from '@/components/CreateWorkshop'
@@ -95,8 +96,9 @@ function TimetableCalendar({ sessions }: { sessions: any[] }) {
 }
 
 // ── Enrolled course card ──────────────────────────────────────
-function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => void }) {
+function EnrolledCourseCard({ course, onJoin, projectStatus }: { course: any; onJoin: () => void; projectStatus?: string }) {
   const { t } = useLanguage()
+  const router = useRouter()
   const sessions = ((course.course_sessions || []) as any[])
     .slice()
     .sort((a, b) => (a.session_number ?? 999) - (b.session_number ?? 999))
@@ -109,15 +111,27 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
   const hasStarted     = sessions.some(s => s.is_completed)
   const isStartingSoon = !isLive && !hasStarted && firstDate && firstDate > now
 
-  // Next session to attend: first that isn't completed and isn't currently live
   const nextSession = sessions.find(s => !s.is_completed && !s.is_live)
   const nextDate = nextSession?.session_date
     ? new Date(nextSession.session_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     : null
   const nextTime = nextSession?.session_time ? nextSession.session_time.slice(0, 5) : null
 
+  const projBadge = projectStatus === 'accepted'
+    ? { label: 'Project Accepted', cls: 'bg-green-500/15 text-green-400 border-green-500/25' }
+    : projectStatus === 'declined'
+    ? { label: 'Project — Try Again', cls: 'bg-red-500/15 text-red-400 border-red-500/25' }
+    : projectStatus === 'pending'
+    ? { label: 'Project Submitted', cls: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/25' }
+    : projectStatus === 'due'
+    ? { label: 'Project Due', cls: 'bg-[#FF6B2B]/15 text-[#FF6B2B] border-[#FF6B2B]/25' }
+    : null
+
   return (
-    <div className="bg-[#1a1a1a] rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.06)]">
+    <div
+      className="bg-[#1a1a1a] rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.06)] active:opacity-90 transition cursor-pointer"
+      onClick={() => router.push(`/courses/${course.id}`)}
+    >
       <div className="aspect-video relative bg-[#252525]">
         {course.thumbnail_url
           ? <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
@@ -161,13 +175,21 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
             {course.users?.username}
             {course.users?.verified && <VerifiedBadge size={10} />}
           </span>
+          {projBadge && (
+            <span className={`ml-auto text-[9px] font-bold px-2 py-0.5 rounded-full border ${projBadge.cls}`}>
+              {projBadge.label}
+            </span>
+          )}
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 text-[#555] text-xs">
             <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{course.duration_weeks}w</span>
           </div>
           {isLive ? (
-            <button onClick={onJoin} className="bg-red-500 text-white text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1">
+            <button
+              onClick={e => { e.stopPropagation(); onJoin() }}
+              className="bg-red-500 text-white text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1"
+            >
               <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
               Join Live
             </button>
@@ -652,6 +674,7 @@ function CoursesPageInner() {
   const [courses,         setCourses]         = useState<any[]>([])
   const [workshops,       setWorkshops]       = useState<any[]>([])
   const [enrolled,        setEnrolled]        = useState<any[]>([])
+  const [projectStatuses, setProjectStatuses] = useState<Record<string, string>>({})
   const [loading,         setLoading]         = useState(true)
   const [showFilter,      setShowFilter]      = useState(false)
   const [filterLevel,     setFilterLevel]     = useState('')
@@ -677,8 +700,32 @@ function CoursesPageInner() {
         getEnrolledCourses(user.id),
         getMyWorkshopJoins(user.id),
       ])
-      setEnrolled(enrolledCourses.data || [])
+      const enrolledData = enrolledCourses.data || []
+      setEnrolled(enrolledData)
       setJoinedWorkshops(new Set(joinIds))
+      // Fetch project submission statuses for enrolled courses
+      if (enrolledData.length > 0) {
+        const courseIds = enrolledData.map((c: any) => c.id)
+        const { data: projects } = await supabase
+          .from('course_projects').select('id, course_id').in('course_id', courseIds)
+        if (projects && projects.length > 0) {
+          const projectIds = projects.map((p: any) => p.id)
+          const { data: subs } = await supabase
+            .from('project_submissions').select('project_id, status')
+            .eq('user_id', user.id).in('project_id', projectIds)
+          const subMap: Record<string, string> = {}
+          const projToCourse: Record<string, string> = Object.fromEntries(projects.map((p: any) => [p.id, p.course_id]))
+          for (const sub of subs || []) {
+            const cid = projToCourse[sub.project_id]
+            if (cid) subMap[cid] = sub.status
+          }
+          // Mark courses with a project but no submission as 'due'
+          for (const p of projects) {
+            if (!subMap[p.course_id]) subMap[p.course_id] = 'due'
+          }
+          setProjectStatuses(subMap)
+        }
+      }
     }
     setLoading(false)
   }, [user])
@@ -809,6 +856,7 @@ function CoursesPageInner() {
             ) : (
               enrolled.map(c => (
                 <EnrolledCourseCard key={c.id} course={c}
+                  projectStatus={projectStatuses[c.id]}
                   onJoin={() => router.push(`/courses/${c.id}/classroom`)} />
               ))
             )}
