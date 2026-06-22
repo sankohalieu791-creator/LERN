@@ -62,6 +62,7 @@ function WorkshopClassroomInner() {
       isInstructor={isInstructor}
       isOpen={true}
       onClose={() => router.back()}
+      courseId={workshopId}
     />
   )
 }

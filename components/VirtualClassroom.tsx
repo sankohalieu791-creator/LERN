@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
-import { supabase } from '@/lib/supabase'
+import { supabase, notifyFollowers, createVideo } from '@/lib/supabase'
 import type {
   IAgoraRTCClient,
   IMicrophoneAudioTrack,
@@ -23,6 +23,7 @@ interface VirtualClassroomProps {
   isInstructor:   boolean
   isOpen:         boolean
   onClose:        () => void
+  courseId?:      string
 }
 
 interface Participant {
@@ -71,8 +72,17 @@ function Avatar({ name, avatarUrl, size = 48, colorIndex = 0 }: {
   )
 }
 
+function formatDuration(secs: number): string {
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  const s = secs % 60
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m ${s > 0 ? ` ${s}s` : ''}`
+  return `${s}s`
+}
+
 export default function VirtualClassroom({
-  courseTitle, instructorName, channelName, isInstructor, isOpen, onClose,
+  courseTitle, instructorName, channelName, isInstructor, isOpen, onClose, courseId,
 }: VirtualClassroomProps) {
   const { user } = useAuth()
   const { t } = useLanguage()
@@ -81,9 +91,14 @@ export default function VirtualClassroom({
   const clientRef        = useRef<IAgoraRTCClient | null>(null)
   const localAudioRef    = useRef<IMicrophoneAudioTrack | null>(null)
   const localCameraRef   = useRef<ICameraVideoTrack | null>(null)
-  const mainVideoRef     = useRef<HTMLDivElement>(null)   // remote video OR instructor self-cam
+  const mainVideoRef     = useRef<HTMLDivElement>(null)
   const realtimeRef      = useRef<RealtimeChannel | null>(null)
   const chatRef          = useRef<HTMLDivElement>(null)
+
+  // ── Recording refs ────────────────────────────────────────
+  const mediaRecorderRef  = useRef<MediaRecorder | null>(null)
+  const recordedChunksRef = useRef<Blob[]>([])
+  const sessionStartRef   = useRef<Date | null>(null)
 
   const onCloseRef = useRef(onClose)
   useEffect(() => { onCloseRef.current = onClose }, [onClose])
@@ -114,12 +129,54 @@ export default function VirtualClassroom({
   ])
   const [chatInput, setChatInput] = useState('')
 
+  // ── Countdown + end screen + recording ───────────────────
+  const [countdown,          setCountdown]          = useState<number | null>(null)
+  const [showEndScreen,      setShowEndScreen]      = useState(false)
+  const [sessionDurationSecs, setSessionDurationSecs] = useState(0)
+  const [peakViewers,        setPeakViewers]        = useState(1)
+  const [recording,          setRecording]          = useState(false)
+  const [recordingBlob,      setRecordingBlob]      = useState<Blob | null>(null)
+  const [uploadingRecording, setUploadingRecording] = useState(false)
+
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight
   }, [messages])
 
-  // ── Leave and close ───────────────────────────────────────
-  const leaveAndClose = useCallback(async () => {
+  // ── Track peak viewers ────────────────────────────────────
+  useEffect(() => {
+    const count = participants.filter(p => p.status !== 'waiting').length
+    if (count > peakViewers) setPeakViewers(count)
+  }, [participants]) // eslint-disable-line
+
+  // ── Countdown tick ────────────────────────────────────────
+  useEffect(() => {
+    if (countdown === null) return
+    if (countdown === 0) {
+      const timer = setTimeout(() => {
+        setCountdown(null)
+        sessionStartRef.current = new Date()
+        joinAgoraRTC()
+        if (user) {
+          const username  = (user as any).username  ?? 'Instructor'
+          const avatarUrl = (user as any).avatar_url ?? null
+          notifyFollowers(
+            user.id,
+            'live_class',
+            `${username} is going live!`,
+            `"${courseTitle}" is now live — join now`,
+            courseId ? `/courses/${courseId}/classroom` : '/courses',
+            { id: user.id, username, avatar_url: avatarUrl },
+          )
+        }
+      }, 600)
+      return () => clearTimeout(timer)
+    }
+    const timer = setTimeout(() => setCountdown(c => c !== null ? c - 1 : null), 1000)
+    return () => clearTimeout(timer)
+  }, [countdown]) // eslint-disable-line
+
+  // ── Cleanup Agora without calling onClose ─────────────────
+  const cleanupAgora = useCallback(async () => {
     localAudioRef.current?.close()
     localAudioRef.current = null
     if (localCameraRef.current) {
@@ -129,10 +186,22 @@ export default function VirtualClassroom({
     }
     try { await clientRef.current?.leave() } catch {}
     clientRef.current = null
-    setJoined(false); setRemoteUsers([]); setMuted(true); setCameraOn(false); setRtcError('')
-    setWaitingForApproval(false); setDenied(false); setShowDotPanel(false); setAdmitted(false)
-    onCloseRef.current()
+    setJoined(false)
+    setRemoteUsers([])
+    setMuted(true)
+    setCameraOn(false)
   }, [])
+
+  // ── Leave and close ───────────────────────────────────────
+  const leaveAndClose = useCallback(async () => {
+    await cleanupAgora()
+    setRtcError('')
+    setWaitingForApproval(false)
+    setDenied(false)
+    setShowDotPanel(false)
+    setAdmitted(false)
+    onCloseRef.current()
+  }, [cleanupAgora])
 
   // ── Join Agora RTC ────────────────────────────────────────
   const joinAgoraRTC = useCallback(async () => {
@@ -215,8 +284,6 @@ export default function VirtualClassroom({
     })
     realtimeRef.current = channel
 
-    // Rebuild participant list from full presence state — called on sync, join, AND leave
-    // so raised hands and new joiners appear instantly without waiting for the next sync cycle
     const rebuildParticipants = () => {
       const state = channel.presenceState<{
         username: string
@@ -288,7 +355,7 @@ export default function VirtualClassroom({
       if (status === 'SUBSCRIBED') {
         await channel.track({ username: myUsername, avatar_url: myAvatarUrl, handUp: false, status: myStatus })
         if (isInstructor) {
-          joinAgoraRTC()
+          setCountdown(3)
         } else {
           setWaitingForApproval(true)
         }
@@ -302,7 +369,7 @@ export default function VirtualClassroom({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, user, channelName, isInstructor, joinAgoraRTC])
 
-  // ── Update presence when hand raises (uses admitted, not joined) ──
+  // ── Update presence when hand raises ─────────────────────
   useEffect(() => {
     if (!realtimeRef.current || !user || !admitted) return
     const myUsername  = (user as any).username  ?? 'Participant'
@@ -316,16 +383,106 @@ export default function VirtualClassroom({
     return () => {
       localAudioRef.current?.close()
       clientRef.current?.leave().catch(() => {})
+      if (mediaRecorderRef.current?.state !== 'inactive') {
+        mediaRecorderRef.current?.stop()
+      }
     }
   }, [])
 
-  // ── Derived ───────────────────────────────────────────────
-  // Optimistic: exclude accepted users from pending list until presence syncs
+  // ── Recording ─────────────────────────────────────────────
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: cameraOn })
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+        ? 'video/webm;codecs=vp9,opus'
+        : MediaRecorder.isTypeSupported('video/webm')
+        ? 'video/webm'
+        : ''
+      recordedChunksRef.current = []
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data)
+      }
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || 'video/webm' })
+        setRecordingBlob(blob)
+        setRecording(false)
+        stream.getTracks().forEach(t => t.stop())
+      }
+      recorder.start(1000)
+      mediaRecorderRef.current = recorder
+      setRecording(true)
+      setRecordingBlob(null)
+    } catch (e: any) {
+      setRtcError('Recording unavailable: ' + (e.message || 'Permission denied'))
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+  }
+
+  const stopRecordingAsync = (): Promise<void> => new Promise(resolve => {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
+      resolve(); return
+    }
+    mediaRecorderRef.current.addEventListener('stop', () => resolve(), { once: true })
+    mediaRecorderRef.current.stop()
+  })
+
+  // ── End class (instructor) ────────────────────────────────
+  const handleEndClass = async () => {
+    if (recording) await stopRecordingAsync()
+    const duration = sessionStartRef.current
+      ? Math.floor((Date.now() - sessionStartRef.current.getTime()) / 1000)
+      : 0
+    setSessionDurationSecs(duration)
+    setShowEndScreen(true)
+    await cleanupAgora()
+  }
+
+  // ── Post recording to feed ────────────────────────────────
+  const handlePostToFeed = async () => {
+    if (!recordingBlob || !user) return
+    setUploadingRecording(true)
+    try {
+      const ext  = recordingBlob.type.includes('mp4') ? 'mp4' : 'webm'
+      const path = `${user.id}/${Date.now()}_class.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('recordings')
+        .upload(path, recordingBlob, { contentType: recordingBlob.type })
+      if (upErr) throw new Error(upErr.message)
+      const { data: { publicUrl } } = supabase.storage.from('recordings').getPublicUrl(path)
+      await createVideo(user.id, {
+        video_url: publicUrl,
+        caption:   `Class recording: ${courseTitle}`,
+        title:     courseTitle,
+      })
+      onCloseRef.current()
+    } catch (e: any) {
+      setRtcError(e.message)
+      setUploadingRecording(false)
+    }
+  }
+
+  const handleDownloadRecording = () => {
+    if (!recordingBlob) return
+    const ext = recordingBlob.type.includes('mp4') ? 'mp4' : 'webm'
+    const url = URL.createObjectURL(recordingBlob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${courseTitle.replace(/\s+/g, '_')}_recording.${ext}`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // ── Instructor controls ───────────────────────────────────
   const pendingRequests = participants.filter(p =>
     p.status === 'waiting' && !p.isSelf && !acceptedIds.has(p.userId)
   )
 
-  // ── Instructor controls ───────────────────────────────────
   const approveRequest = (targetUserId: string) => {
     realtimeRef.current?.send({ type: 'broadcast', event: 'join_approve', payload: { targetUserId } })
     setAcceptedIds(prev => new Set([...prev, targetUserId]))
@@ -344,7 +501,7 @@ export default function VirtualClassroom({
     realtimeRef.current?.send({ type: 'broadcast', event: 'accept_hand', payload: { targetUserId } })
   }
 
-  // ── Camera (instructor only) ──────────────────────────────
+  // ── Camera ────────────────────────────────────────────────
   const toggleCamera = async () => {
     if (!joined || !clientRef.current || !isInstructor) return
     try {
@@ -451,12 +608,131 @@ export default function VirtualClassroom({
   return (
     <div className="fixed inset-0 bg-[#0a0a0a] z-50 flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
+      {/* ── CSS for countdown animation ── */}
+      <style>{`
+        @keyframes countdownPop {
+          0%   { transform: scale(1.6); opacity: 0; }
+          55%  { transform: scale(0.92); opacity: 1; }
+          100% { transform: scale(1);   opacity: 1; }
+        }
+        .countdown-num { animation: countdownPop 0.45s cubic-bezier(.22,1,.36,1) forwards; }
+        @keyframes liveFlash {
+          0%,100% { opacity: 1; transform: scale(1); }
+          50%     { opacity: 0.6; transform: scale(1.08); }
+        }
+        .live-flash { animation: liveFlash 0.4s ease-in-out 2; }
+      `}</style>
+
+      {/* ── COUNTDOWN OVERLAY ── */}
+      {countdown !== null && (
+        <div className="absolute inset-0 z-20 bg-black flex flex-col items-center justify-center gap-5">
+          <p className="text-[#FF6B2B] text-xs font-bold uppercase tracking-[0.2em]">Going Live</p>
+          <div className="relative flex items-center justify-center" style={{ width: 160, height: 160 }}>
+            <svg className="absolute inset-0" viewBox="0 0 160 160">
+              <circle cx="80" cy="80" r="72" fill="none" stroke="rgba(255,107,43,0.15)" strokeWidth="4" />
+              <circle cx="80" cy="80" r="72" fill="none" stroke="#FF6B2B" strokeWidth="4"
+                strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 72}`}
+                strokeDashoffset={`${2 * Math.PI * 72 * (1 - (countdown > 0 ? countdown / 3 : 0))}`}
+                style={{ transition: 'stroke-dashoffset 0.9s linear', transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+              />
+            </svg>
+            {countdown === 0 ? (
+              <span className="live-flash text-[#FF6B2B] font-black text-3xl tracking-widest">LIVE</span>
+            ) : (
+              <span key={countdown} className="countdown-num text-white font-black"
+                style={{ fontSize: '5.5rem', lineHeight: 1 }}>
+                {countdown}
+              </span>
+            )}
+          </div>
+          <p className="text-[#444] text-sm font-medium line-clamp-1 px-8 text-center">{courseTitle}</p>
+        </div>
+      )}
+
+      {/* ── END SCREEN ── */}
+      {showEndScreen && (
+        <div className="absolute inset-0 z-20 bg-gradient-to-b from-[#0a0a0a] via-[#0f0f0f] to-[#111] flex flex-col items-center justify-center px-6 gap-6">
+          {/* Icon */}
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center shadow-[0_0_40px_rgba(255,107,43,0.3)]">
+            <span style={{ fontSize: 36 }}>🎓</span>
+          </div>
+
+          {/* Title */}
+          <div className="text-center">
+            <p className="text-[#FF6B2B] text-xs font-bold uppercase tracking-[0.2em] mb-2">Class Ended</p>
+            <p className="text-white text-xl font-black line-clamp-2 text-center">{courseTitle}</p>
+          </div>
+
+          {/* Stats card */}
+          <div className="w-full bg-[#161616] rounded-2xl border border-[rgba(255,255,255,0.07)] overflow-hidden">
+            <div className="grid grid-cols-2 divide-x divide-[rgba(255,255,255,0.07)]">
+              <div className="p-5 text-center">
+                <p className="text-white text-3xl font-black">{formatDuration(sessionDurationSecs)}</p>
+                <p className="text-[#555] text-xs mt-1 font-medium">Duration</p>
+              </div>
+              <div className="p-5 text-center">
+                <p className="text-white text-3xl font-black">{peakViewers}</p>
+                <p className="text-[#555] text-xs mt-1 font-medium">Peak Viewers</p>
+              </div>
+            </div>
+            {recordingBlob && (
+              <div className="px-4 py-3 border-t border-[rgba(255,255,255,0.06)] flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                <p className="text-[#888] text-xs">
+                  Recording saved · {(recordingBlob.size / 1024 / 1024).toFixed(1)} MB
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Recording actions */}
+          {recordingBlob ? (
+            <div className="w-full space-y-3">
+              <button
+                onClick={handlePostToFeed}
+                disabled={uploadingRecording}
+                className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition-transform"
+              >
+                {uploadingRecording
+                  ? <><Loader2 className="w-5 h-5 animate-spin" /> Uploading…</>
+                  : '📤  Post Recording to Feed'}
+              </button>
+              <button
+                onClick={handleDownloadRecording}
+                className="w-full bg-[#1e1e1e] border border-[rgba(255,255,255,0.08)] text-white font-bold py-4 rounded-2xl active:scale-[0.98] transition-transform"
+              >
+                💾  Save to Device
+              </button>
+            </div>
+          ) : (
+            <div className="w-full bg-[#161616] rounded-2xl border border-[rgba(255,255,255,0.06)] px-4 py-3 text-center">
+              <p className="text-[#444] text-sm">No recording was made this session.</p>
+              <p className="text-[#333] text-xs mt-0.5">Use the Record button next time to capture your class.</p>
+            </div>
+          )}
+
+          <button
+            onClick={() => { setShowEndScreen(false); onCloseRef.current() }}
+            className="text-[#444] text-sm font-semibold py-2 px-6 active:text-white transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      )}
+
       {/* HEADER */}
       <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
         <button onClick={leaveAndClose} className="w-9 h-9 bg-[#1e1e1e] rounded-full flex items-center justify-center">
           <X className="w-4 h-4 text-white" />
         </button>
         <div className="text-center flex-1 px-3">
+          {recording && (
+            <div className="flex items-center justify-center gap-1.5 mb-0.5">
+              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+              <span className="text-red-400 text-[9px] font-bold uppercase tracking-widest">Recording</span>
+            </div>
+          )}
           <p className="text-[#555] text-[9px] font-bold uppercase tracking-widest">
             {connecting ? t('connecting') : joined ? `🔴 ${t('live')}` : t('virtual_classroom')}
           </p>
@@ -534,9 +810,8 @@ export default function VirtualClassroom({
         </div>
       )}
 
-      {/* MAIN VIDEO AREA — fills as much space as possible */}
+      {/* MAIN VIDEO AREA */}
       <div className="mx-4 rounded-2xl overflow-hidden bg-[#1a1a1a] relative flex-shrink-0" style={{ height: '42vh', minHeight: 220 }}>
-        {/* Remote video (instructor cam seen by students) */}
         <div ref={mainVideoRef} className="w-full h-full" />
 
         {connecting && (
@@ -546,7 +821,7 @@ export default function VirtualClassroom({
           </div>
         )}
 
-        {!connecting && !joined && !rtcError && (
+        {!connecting && !joined && !rtcError && countdown === null && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#111] gap-3">
             <Avatar name={instructorName} size={56} colorIndex={0} />
             <p className="text-[#555] text-sm">Connecting…</p>
@@ -577,10 +852,9 @@ export default function VirtualClassroom({
             <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
           </div>
         )}
-
       </div>
 
-      {/* RAISED HANDS — visible to instructor when participants raise hands */}
+      {/* RAISED HANDS */}
       {isInstructor && (() => {
         const raisedHands = participants.filter(p => p.handUp && !p.isSelf)
         if (raisedHands.length === 0) return null
@@ -673,6 +947,7 @@ export default function VirtualClassroom({
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}>
         <div className="flex items-center gap-3 mb-3">
 
+          {/* Mic */}
           <button onClick={toggleMic} disabled={!joined}
             className={`w-11 h-11 rounded-full flex items-center justify-center transition disabled:opacity-40 ${muted ? 'bg-[#333] text-white' : 'bg-[#FF6B2B] text-white'}`}>
             {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
@@ -686,6 +961,26 @@ export default function VirtualClassroom({
             </button>
           )}
 
+          {/* Record: instructor only */}
+          {isInstructor && (
+            <button
+              onClick={recording ? stopRecording : startRecording}
+              disabled={!joined}
+              title={recording ? 'Stop recording' : 'Start recording'}
+              className={`w-11 h-11 rounded-full flex items-center justify-center transition disabled:opacity-40 ${
+                recording ? 'bg-red-500 text-white' : 'bg-[#333] text-white'
+              }`}
+            >
+              {recording ? (
+                <span className="w-3.5 h-3.5 bg-white rounded-sm" />
+              ) : (
+                <span className="w-5 h-5 rounded-full border-2 border-white flex items-center justify-center">
+                  <span className="w-2 h-2 rounded-full bg-red-500" />
+                </span>
+              )}
+            </button>
+          )}
+
           {/* Raise hand: students only */}
           {!isInstructor && (
             <button onClick={() => setHandUp(v => !v)} disabled={!admitted}
@@ -696,10 +991,21 @@ export default function VirtualClassroom({
 
           <div className="flex-1" />
 
-          <button onClick={leaveAndClose}
-            className="bg-red-500 text-white font-bold px-5 py-2.5 rounded-full text-sm hover:bg-red-600 transition">
-            {t('leave')}
-          </button>
+          {/* End Class (instructor) / Leave (student) */}
+          {isInstructor ? (
+            <button
+              onClick={handleEndClass}
+              disabled={!joined}
+              className="bg-red-500 text-white font-bold px-5 py-2.5 rounded-full text-sm hover:bg-red-600 transition disabled:opacity-40"
+            >
+              End Class
+            </button>
+          ) : (
+            <button onClick={leaveAndClose}
+              className="bg-red-500 text-white font-bold px-5 py-2.5 rounded-full text-sm hover:bg-red-600 transition">
+              {t('leave')}
+            </button>
+          )}
         </div>
 
         <form onSubmit={sendMessage} className="flex items-center gap-2">

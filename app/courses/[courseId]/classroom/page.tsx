@@ -51,6 +51,7 @@ function ClassroomInner() {
       isInstructor={isInstructor}
       isOpen={true}
       onClose={handleClose}
+      courseId={courseId}
     />
   )
 }
