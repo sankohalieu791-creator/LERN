@@ -10,11 +10,22 @@ export default function LivePage() {
   const [sessions, setSessions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const fetchSessions = () => {
+    setLoading(true)
     getLiveSessions().then(({ data }) => {
       setSessions(data || [])
       setLoading(false)
     })
+  }
+
+  useEffect(() => {
+    fetchSessions()
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchSessions()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [])
 
   return (

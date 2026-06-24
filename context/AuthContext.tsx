@@ -92,7 +92,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'INITIAL_SESSION') return  // handled by initAuth above
+      if (event === 'INITIAL_SESSION') return   // handled by initAuth above
+      if (event === 'TOKEN_REFRESHED') return   // handled by handleVisibility above
       if (session?.user) {
         setAuthUser(session.user)
         const { data } = await getUserProfile(session.user.id)
@@ -108,14 +109,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    // When the user returns to the app after it's been in the background,
-    // Supabase auto-refreshes the token via its own visibilitychange listener.
-    // We re-fetch the profile here so stale data never persists on return.
+    // When the user returns after a long background period the access token may
+    // have expired (browsers suspend JS timers for backgrounded tabs/PWAs, so
+    // Supabase's own auto-refresh timer never fires). We call refreshSession()
+    // explicitly — not getSession() — so the SDK fetches a fresh token from the
+    // server before any page-level queries run. This prevents the "no internet"
+    // blank-page symptom caused by stale tokens silently failing.
     const handleVisibility = async () => {
       if (document.visibilityState !== 'visible') return
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        const { data } = await getUserProfile(session.user.id)
+      const { data: refreshed } = await supabase.auth.refreshSession()
+      if (refreshed.session?.user) {
+        const { data } = await getUserProfile(refreshed.session.user.id)
         if (data) {
           setUser(data)
           setCachedProfile(data)
