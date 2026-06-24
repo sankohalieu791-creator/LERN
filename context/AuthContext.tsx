@@ -14,16 +14,45 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+const PROFILE_CACHE_KEY = 'lern_profile_cache'
+
+function getCachedProfile(): User | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function setCachedProfile(profile: User | null) {
+  try {
+    if (profile) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile))
+    else localStorage.removeItem(PROFILE_CACHE_KEY)
+  } catch {}
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [authUser, setAuthUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Serve the cached profile immediately so the app opens without a blank screen.
+    // The session check below will clear it if the session has actually expired.
+    const cached = getCachedProfile()
+    if (cached) {
+      setUser(cached)
+      setLoading(false)
+    }
+
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (!session?.user) {
+          setUser(null)
+          setAuthUser(null)
+          setCachedProfile(null)
           setLoading(false)
           return
         }
@@ -38,6 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession()
           if (refreshErr || !refreshed.session) {
             // Refresh token also expired — clear state, user must sign in again
+            setUser(null)
+            setAuthUser(null)
+            setCachedProfile(null)
             setLoading(false)
             return
           }
@@ -46,7 +78,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setAuthUser(activeUser)
         const { data } = await getUserProfile(activeUser.id)
-        setUser(data)
+        if (data) {
+          setUser(data)
+          setCachedProfile(data)
+        }
         setLoading(false)
       } catch (error) {
         console.error('Auth error:', error)
@@ -61,10 +96,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         setAuthUser(session.user)
         const { data } = await getUserProfile(session.user.id)
-        setUser(data)
+        if (data) {
+          setUser(data)
+          setCachedProfile(data)
+        }
       } else {
         setAuthUser(null)
         setUser(null)
+        setCachedProfile(null)
       }
       setLoading(false)
     })
@@ -77,7 +116,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         const { data } = await getUserProfile(session.user.id)
-        if (data) setUser(data)
+        if (data) {
+          setUser(data)
+          setCachedProfile(data)
+        }
       }
     }
     document.addEventListener('visibilitychange', handleVisibility)
@@ -94,7 +136,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const fresh = await getUser()
       if (fresh) {
         const { data } = await getUserProfile(fresh.id)
-        if (data) setUser(data)
+        if (data) {
+          setUser(data)
+          setCachedProfile(data)
+        }
       }
     } catch (e) {
       console.error('refreshUser error:', e)
@@ -105,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
     setUser(null)
     setAuthUser(null)
+    setCachedProfile(null)
   }
 
   return (
