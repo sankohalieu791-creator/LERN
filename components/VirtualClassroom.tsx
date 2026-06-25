@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Mic, MicOff, Video, VideoOff,
-  Hand, X, Users, MoreVertical, Send, Loader2, WifiOff, UserX, VolumeX, Check, Bell,
+  Hand, X, Users, MoreVertical, Send, Loader2, WifiOff, UserX, VolumeX, Check, Bell, Monitor, MonitorOff, Paperclip, FileText, Download,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
@@ -41,6 +41,9 @@ interface ChatMessage {
   username:   string
   text:       string
   instructor: boolean
+  fileUrl?:   string
+  fileName?:  string
+  fileType?:  string
 }
 
 const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!
@@ -91,6 +94,7 @@ export default function VirtualClassroom({
   const clientRef        = useRef<IAgoraRTCClient | null>(null)
   const localAudioRef    = useRef<IMicrophoneAudioTrack | null>(null)
   const localCameraRef   = useRef<ICameraVideoTrack | null>(null)
+  const localScreenRef   = useRef<any>(null)
   const mainVideoRef     = useRef<HTMLDivElement>(null)
   const realtimeRef      = useRef<RealtimeChannel | null>(null)
   const chatRef          = useRef<HTMLDivElement>(null)
@@ -104,13 +108,14 @@ export default function VirtualClassroom({
   useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
   // ── Agora state ───────────────────────────────────────────
-  const [joined,      setJoined]      = useState(false)
-  const [connecting,  setConnecting]  = useState(false)
-  const [muted,       setMuted]       = useState(true)
-  const [cameraOn,    setCameraOn]    = useState(false)
-  const [handUp,      setHandUp]      = useState(false)
-  const [rtcError,    setRtcError]    = useState('')
-  const [remoteUsers, setRemoteUsers] = useState<IAgoraRTCRemoteUser[]>([])
+  const [joined,       setJoined]       = useState(false)
+  const [connecting,   setConnecting]   = useState(false)
+  const [muted,        setMuted]        = useState(true)
+  const [cameraOn,     setCameraOn]     = useState(false)
+  const [screenSharing, setScreenSharing] = useState(false)
+  const [handUp,       setHandUp]       = useState(false)
+  const [rtcError,     setRtcError]     = useState('')
+  const [remoteUsers,  setRemoteUsers]  = useState<IAgoraRTCRemoteUser[]>([])
 
   // ── Waiting room state ────────────────────────────────────
   const [waitingForApproval, setWaitingForApproval] = useState(false)
@@ -127,11 +132,14 @@ export default function VirtualClassroom({
       text: "Welcome — we'll start in a moment.", instructor: true,
     },
   ])
-  const [chatInput, setChatInput] = useState('')
+  const [chatInput,      setChatInput]      = useState('')
+  const [uploadingFile,  setUploadingFile]  = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // ── Countdown + end screen + recording ───────────────────
-  const [countdown,          setCountdown]          = useState<number | null>(null)
-  const [showEndScreen,      setShowEndScreen]      = useState(false)
+  const [countdown,               setCountdown]               = useState<number | null>(null)
+  const [showEndScreen,           setShowEndScreen]           = useState(false)
+  const [classEndedByInstructor,  setClassEndedByInstructor]  = useState(false)
   const [sessionDurationSecs, setSessionDurationSecs] = useState(0)
   const [peakViewers,        setPeakViewers]        = useState(1)
   const [recording,          setRecording]          = useState(false)
@@ -184,12 +192,18 @@ export default function VirtualClassroom({
       localCameraRef.current.close()
       localCameraRef.current = null
     }
+    if (localScreenRef.current) {
+      localScreenRef.current.stop()
+      localScreenRef.current.close()
+      localScreenRef.current = null
+    }
     try { await clientRef.current?.leave() } catch {}
     clientRef.current = null
     setJoined(false)
     setRemoteUsers([])
     setMuted(true)
     setCameraOn(false)
+    setScreenSharing(false)
   }, [])
 
   // ── Leave and close ───────────────────────────────────────
@@ -291,14 +305,19 @@ export default function VirtualClassroom({
         handUp: boolean
         status: 'waiting' | 'joined' | 'instructor'
       }>()
-      const list: Participant[] = Object.entries(state).map(([uid, presences]) => ({
-        userId:     uid,
-        username:   presences[0].username,
-        avatar_url: presences[0].avatar_url,
-        handUp:     presences[0].handUp ?? false,
-        status:     presences[0].status ?? 'waiting',
-        isSelf:     uid === myUserId,
-      }))
+      const list: Participant[] = Object.entries(state).map(([uid, presences]) => {
+        // Supabase stacks multiple presence entries per key when track() is called
+        // more than once. Merge them so the latest handUp/status wins.
+        const merged = presences.reduce((acc, p) => ({ ...acc, ...p }))
+        return {
+          userId:     uid,
+          username:   merged.username,
+          avatar_url: merged.avatar_url,
+          handUp:     merged.handUp ?? false,
+          status:     merged.status ?? 'waiting',
+          isSelf:     uid === myUserId,
+        }
+      })
       setParticipants(list)
     }
 
@@ -311,6 +330,13 @@ export default function VirtualClassroom({
         if (prev.find(m => m.id === payload.id)) return prev
         return [...prev, payload as ChatMessage]
       })
+    })
+
+    channel.on('broadcast', { event: 'class_ended' }, () => {
+      if (!isInstructor) {
+        setClassEndedByInstructor(true)
+        cleanupAgora()
+      }
     })
 
     channel.on('broadcast', { event: 'kick' }, ({ payload }) => {
@@ -434,6 +460,8 @@ export default function VirtualClassroom({
 
   // ── End class (instructor) ────────────────────────────────
   const handleEndClass = async () => {
+    // Tell all students the class is over before we clean up
+    realtimeRef.current?.send({ type: 'broadcast', event: 'class_ended', payload: {} })
     if (recording) await stopRecordingAsync()
     const duration = sessionStartRef.current
       ? Math.floor((Date.now() - sessionStartRef.current.getTime()) / 1000)
@@ -524,6 +552,45 @@ export default function VirtualClassroom({
     } catch { setRtcError('Camera access denied.') }
   }
 
+  const toggleScreenShare = async () => {
+    if (!joined || !clientRef.current) return
+    try {
+      const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
+      if (!screenSharing) {
+        // createScreenVideoTrack returns a single track or [video, audio] tuple
+        const result = await AgoraRTC.createScreenVideoTrack(
+          { encoderConfig: '1080p_1', optimizationMode: 'detail' },
+          'disable'
+        )
+        const screenTrack = Array.isArray(result) ? result[0] : result
+        localScreenRef.current = screenTrack
+        await clientRef.current.publish([screenTrack])
+        if (mainVideoRef.current) screenTrack.play(mainVideoRef.current)
+        setScreenSharing(true)
+        // Stop screen share if the browser's built-in "Stop sharing" button is clicked
+        screenTrack.on('track-ended', async () => {
+          await clientRef.current?.unpublish([screenTrack])
+          screenTrack.stop()
+          screenTrack.close()
+          localScreenRef.current = null
+          setScreenSharing(false)
+        })
+      } else {
+        if (localScreenRef.current) {
+          await clientRef.current.unpublish([localScreenRef.current])
+          localScreenRef.current.stop()
+          localScreenRef.current.close()
+          localScreenRef.current = null
+        }
+        setScreenSharing(false)
+      }
+    } catch (e: any) {
+      if (e?.name !== 'NotAllowedError') {
+        setRtcError('Screen sharing unavailable: ' + (e?.message || 'Permission denied'))
+      }
+    }
+  }
+
   const toggleMic = async () => {
     if (!joined || !clientRef.current) return
     try {
@@ -557,6 +624,44 @@ export default function VirtualClassroom({
     setMessages(prev => [...prev, msg])
     realtimeRef.current?.send({ type: 'broadcast', event: 'chat', payload: msg })
     setChatInput('')
+  }
+
+  const handleFileShare = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+    if (file.size > 25 * 1024 * 1024) {
+      setRtcError('File too large — maximum 25 MB')
+      return
+    }
+    setUploadingFile(true)
+    try {
+      const ext  = file.name.split('.').pop() ?? 'bin'
+      const path = `classroom/${channelName}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`
+      const { error: upErr } = await supabase.storage
+        .from('classroom-files')
+        .upload(path, file, { contentType: file.type })
+      if (upErr) throw new Error(upErr.message)
+      const { data: { publicUrl } } = supabase.storage
+        .from('classroom-files')
+        .getPublicUrl(path)
+      const msg: ChatMessage = {
+        id:         String(Date.now()),
+        userId:     user.id,
+        username:   (user as any).username ?? 'You',
+        text:       '',
+        instructor: isInstructor,
+        fileUrl:    publicUrl,
+        fileName:   file.name,
+        fileType:   file.type,
+      }
+      setMessages(prev => [...prev, msg])
+      realtimeRef.current?.send({ type: 'broadcast', event: 'chat', payload: msg })
+    } catch (err: any) {
+      setRtcError('File upload failed: ' + (err?.message ?? 'Unknown error'))
+    } finally {
+      setUploadingFile(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
   }
 
   if (!isOpen) return null
@@ -599,6 +704,27 @@ export default function VirtualClassroom({
         <button onClick={leaveAndClose}
           className="mt-4 bg-[#1e1e1e] text-white px-6 py-3 rounded-full font-semibold text-sm border border-[rgba(255,255,255,0.08)]">
           {t('leave')}
+        </button>
+      </div>
+    )
+  }
+
+  // ── Class ended by instructor (students only) ─────────────
+  if (classEndedByInstructor) {
+    return (
+      <div className="fixed inset-0 bg-[#0a0a0a] z-50 flex flex-col items-center justify-center gap-6 px-8"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center">
+          <span style={{ fontSize: 36 }}>🎓</span>
+        </div>
+        <div className="text-center">
+          <p className="text-[#FF6B2B] text-xs font-bold uppercase tracking-[0.2em] mb-2">Class Ended</p>
+          <p className="text-white font-bold text-lg mb-1">{courseTitle}</p>
+          <p className="text-[#555] text-sm">The instructor has ended this session.</p>
+        </div>
+        <button onClick={leaveAndClose}
+          className="mt-2 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold px-8 py-3 rounded-full text-sm">
+          Back
         </button>
       </div>
     )
@@ -936,7 +1062,27 @@ export default function VirtualClassroom({
               <p className={`text-xs font-bold mb-0.5 ${m.instructor ? 'text-[#FF6B2B]' : 'text-[#1d9bf0]'}`}>
                 {m.username}
               </p>
-              <p className="text-white text-sm">{m.text}</p>
+              {m.fileUrl ? (
+                m.fileType?.startsWith('image/') ? (
+                  <a href={m.fileUrl} target="_blank" rel="noopener noreferrer">
+                    <img src={m.fileUrl} alt={m.fileName} className="max-w-[200px] rounded-xl mt-1 border border-[rgba(255,255,255,0.1)]" />
+                  </a>
+                ) : (
+                  <a
+                    href={m.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download={m.fileName}
+                    className="flex items-center gap-2.5 mt-1 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-3 py-2.5 max-w-[220px] active:opacity-80"
+                  >
+                    <FileText className="w-5 h-5 text-[#FF6B2B] flex-shrink-0" />
+                    <span className="text-white text-xs font-semibold truncate flex-1">{m.fileName}</span>
+                    <Download className="w-4 h-4 text-[#555] flex-shrink-0" />
+                  </a>
+                )
+              ) : (
+                <p className="text-white text-sm">{m.text}</p>
+              )}
             </div>
           ))}
         </div>
@@ -960,6 +1106,16 @@ export default function VirtualClassroom({
               {cameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
             </button>
           )}
+
+          {/* Screen share: everyone admitted */}
+          <button
+            onClick={toggleScreenShare}
+            disabled={!joined}
+            title={screenSharing ? 'Stop sharing screen' : 'Share your screen'}
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition disabled:opacity-40 ${screenSharing ? 'bg-[#1d9bf0] text-white' : 'bg-[#333] text-white'}`}
+          >
+            {screenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+          </button>
 
           {/* Record: instructor only */}
           {isInstructor && (
@@ -1009,6 +1165,26 @@ export default function VirtualClassroom({
         </div>
 
         <form onSubmit={sendMessage} className="flex items-center gap-2">
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip"
+            className="hidden"
+            onChange={handleFileShare}
+          />
+          {/* Paperclip button */}
+          <button
+            type="button"
+            disabled={uploadingFile || !admitted}
+            onClick={() => fileInputRef.current?.click()}
+            className="w-9 h-9 bg-[#1e1e1e] border border-[rgba(255,255,255,0.08)] rounded-full flex items-center justify-center disabled:opacity-30 flex-shrink-0"
+          >
+            {uploadingFile
+              ? <Loader2 className="w-4 h-4 text-[#888] animate-spin" />
+              : <Paperclip className="w-4 h-4 text-[#888]" />
+            }
+          </button>
           <input
             value={chatInput}
             onChange={e => setChatInput(e.target.value)}

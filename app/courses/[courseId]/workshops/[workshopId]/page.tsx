@@ -107,6 +107,13 @@ export default function WorkshopDetailPage() {
   const instructorId = workshop.instructor_id || workshop.user_id
   const isInstructor = !!(user && user.id === instructorId)
 
+  // Build a scheduled datetime for time-gating
+  let scheduledAt: Date | null = null
+  if (workshop.workshop_date && workshop.workshop_time) {
+    scheduledAt = new Date(`${workshop.workshop_date}T${workshop.workshop_time}`)
+  }
+  const tooEarly = scheduledAt ? Date.now() < scheduledAt.getTime() : false
+
   return (
     <div className="fixed inset-0 bg-[#0f0f0f] overflow-y-auto">
 
@@ -253,9 +260,18 @@ export default function WorkshopDetailPage() {
                 <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
                 Join Workshop Now
               </button>
+            ) : tooEarly ? (
+              <div className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl px-4 py-3 text-center">
+                <p className="text-white font-bold text-sm mb-0.5">✓ You&apos;re Enrolled</p>
+                <p className="text-[#555] text-xs">
+                  Starts {scheduledAt?.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  {' at '}
+                  {scheduledAt?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
             ) : (
               <div className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] text-white font-bold py-4 rounded-2xl text-center">
-                ✓ You&apos;re Enrolled
+                ✓ Enrolled — Waiting for instructor to start
               </div>
             )
           ) : (
