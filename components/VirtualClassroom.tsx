@@ -100,9 +100,10 @@ export default function VirtualClassroom({
   const chatRef          = useRef<HTMLDivElement>(null)
 
   // ── Recording refs ────────────────────────────────────────
-  const mediaRecorderRef  = useRef<MediaRecorder | null>(null)
-  const recordedChunksRef = useRef<Blob[]>([])
-  const sessionStartRef   = useRef<Date | null>(null)
+  const mediaRecorderRef    = useRef<MediaRecorder | null>(null)
+  const recordedChunksRef   = useRef<Blob[]>([])
+  const sessionStartRef     = useRef<Date | null>(null)
+  const hasInitializedRef   = useRef(false)
 
   const onCloseRef = useRef(onClose)
   useEffect(() => { onCloseRef.current = onClose }, [onClose])
@@ -377,19 +378,26 @@ export default function VirtualClassroom({
       }
     })
 
+    hasInitializedRef.current = false
+
     channel.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await channel.track({ username: myUsername, avatar_url: myAvatarUrl, handUp: false, status: myStatus })
-        if (isInstructor) {
-          setCountdown(3)
-        } else {
-          setWaitingForApproval(true)
-        }
+      if (status !== 'SUBSCRIBED') return
+      // Always re-track presence on reconnect so our state is visible to others
+      await channel.track({ username: myUsername, avatar_url: myAvatarUrl, handUp: false, status: myStatus })
+      // Only run the first-time setup once — reconnects (e.g. after photo picker
+      // or brief background) must NOT restart the countdown or waiting screen
+      if (hasInitializedRef.current) return
+      hasInitializedRef.current = true
+      if (isInstructor) {
+        setCountdown(3)
+      } else {
+        setWaitingForApproval(true)
       }
     })
 
     return () => {
       channel.unsubscribe()
+      hasInitializedRef.current = false
       realtimeRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -417,30 +425,62 @@ export default function VirtualClassroom({
 
   // ── Recording ─────────────────────────────────────────────
   const startRecording = async () => {
+    if (typeof MediaRecorder === 'undefined') {
+      setRtcError('Recording is not supported on this browser.')
+      return
+    }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: cameraOn })
-      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-        ? 'video/webm;codecs=vp9,opus'
-        : MediaRecorder.isTypeSupported('video/webm')
-        ? 'video/webm'
-        : ''
+      // Build a MediaStream from Agora's live tracks so the recording
+      // captures the actual class audio/video without opening a second
+      // device — which conflicts on mobile.
+      const mediaTracks: MediaStreamTrack[] = []
+
+      if (localAudioRef.current) {
+        mediaTracks.push(localAudioRef.current.getMediaStreamTrack())
+      }
+      if (localCameraRef.current) {
+        mediaTracks.push(localCameraRef.current.getMediaStreamTrack())
+      }
+      if (localScreenRef.current) {
+        mediaTracks.push(localScreenRef.current.getMediaStreamTrack())
+      }
+
+      // Fall back to getUserMedia (audio only) if no Agora tracks are live yet
+      let stream: MediaStream
+      if (mediaTracks.length > 0) {
+        stream = new MediaStream(mediaTracks)
+      } else {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      }
+
+      // Pick the best supported MIME type — Safari/iOS only supports mp4
+      const mimeType = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm',
+        'video/mp4',
+        'audio/webm',
+        'audio/mp4',
+      ].find(t => MediaRecorder.isTypeSupported(t)) ?? ''
+
       recordedChunksRef.current = []
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) recordedChunksRef.current.push(e.data)
       }
       recorder.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || 'video/webm' })
+        const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || mimeType || 'video/webm' })
         setRecordingBlob(blob)
         setRecording(false)
-        stream.getTracks().forEach(t => t.stop())
+        // Only stop tracks we opened ourselves (not Agora's)
+        if (mediaTracks.length === 0) stream.getTracks().forEach(t => t.stop())
       }
       recorder.start(1000)
       mediaRecorderRef.current = recorder
       setRecording(true)
       setRecordingBlob(null)
     } catch (e: any) {
-      setRtcError('Recording unavailable: ' + (e.message || 'Permission denied'))
+      setRtcError('Recording failed: ' + (e?.message || 'Permission denied'))
     }
   }
 
@@ -497,10 +537,11 @@ export default function VirtualClassroom({
 
   const handleDownloadRecording = () => {
     if (!recordingBlob) return
-    const ext = recordingBlob.type.includes('mp4') ? 'mp4' : 'webm'
-    const url = URL.createObjectURL(recordingBlob)
-    const a = document.createElement('a')
-    a.href = url
+    const type = recordingBlob.type || ''
+    const ext  = type.includes('mp4') ? 'mp4' : type.includes('ogg') ? 'ogg' : 'webm'
+    const url  = URL.createObjectURL(recordingBlob)
+    const a    = document.createElement('a')
+    a.href     = url
     a.download = `${courseTitle.replace(/\s+/g, '_')}_recording.${ext}`
     a.click()
     URL.revokeObjectURL(url)
