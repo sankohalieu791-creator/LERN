@@ -146,6 +146,7 @@ function ClassroomInner() {
       isOpen={true}
       onClose={handleClose}
       courseId={courseId}
+      courseSubject={course.subject}
     />
   )
 }

@@ -24,6 +24,7 @@ interface VirtualClassroomProps {
   isOpen:         boolean
   onClose:        () => void
   courseId?:      string
+  courseSubject?: string
 }
 
 interface Participant {
@@ -85,7 +86,7 @@ function formatDuration(secs: number): string {
 }
 
 export default function VirtualClassroom({
-  courseTitle, instructorName, channelName, isInstructor, isOpen, onClose, courseId,
+  courseTitle, instructorName, channelName, isInstructor, isOpen, onClose, courseId, courseSubject,
 }: VirtualClassroomProps) {
   const { user } = useAuth()
   const { t } = useLanguage()
@@ -516,21 +517,28 @@ export default function VirtualClassroom({
     if (!recordingBlob || !user) return
     setUploadingRecording(true)
     try {
-      const ext  = recordingBlob.type.includes('mp4') ? 'mp4' : 'webm'
+      const type = recordingBlob.type || ''
+      const ext  = type.includes('mp4') ? 'mp4' : type.includes('ogg') ? 'ogg' : 'webm'
       const path = `${user.id}/${Date.now()}_class.${ext}`
+
       const { error: upErr } = await supabase.storage
         .from('recordings')
-        .upload(path, recordingBlob, { contentType: recordingBlob.type })
+        .upload(path, recordingBlob, { contentType: type || 'video/webm' })
       if (upErr) throw new Error(upErr.message)
+
       const { data: { publicUrl } } = supabase.storage.from('recordings').getPublicUrl(path)
-      await createVideo(user.id, {
-        video_url: publicUrl,
-        caption:   `Class recording: ${courseTitle}`,
-        title:     courseTitle,
+
+      const { error: videoErr } = await createVideo(user.id, {
+        title:       `Class recording: ${courseTitle}`,
+        description: `Recorded live class from ${courseTitle}`,
+        video_url:   publicUrl,
+        subject:     courseSubject || 'Other',
       })
+      if (videoErr) throw new Error(videoErr.message)
+
       onCloseRef.current()
     } catch (e: any) {
-      setRtcError(e.message)
+      setRtcError('Failed to post recording: ' + (e?.message || 'Unknown error'))
       setUploadingRecording(false)
     }
   }

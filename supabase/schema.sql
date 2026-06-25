@@ -718,6 +718,18 @@ CREATE POLICY "certificates storage: owner upload" ON storage.objects FOR INSERT
 CREATE POLICY "certificates storage: owner delete" ON storage.objects FOR DELETE
   USING (bucket_id = 'certificates' AND auth.uid()::text = (storage.foldername(name))[1]);
 
+-- recordings (class recordings posted to feed — public read, uploader owns their file)
+INSERT INTO storage.buckets (id, name, public) VALUES ('recordings', 'recordings', TRUE) ON CONFLICT (id) DO NOTHING;
+DROP POLICY IF EXISTS "recordings: public read"          ON storage.objects;
+DROP POLICY IF EXISTS "recordings: authenticated upload" ON storage.objects;
+DROP POLICY IF EXISTS "recordings: owner delete"         ON storage.objects;
+CREATE POLICY "recordings: public read" ON storage.objects FOR SELECT
+  USING (bucket_id = 'recordings');
+CREATE POLICY "recordings: authenticated upload" ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'recordings' AND auth.role() = 'authenticated');
+CREATE POLICY "recordings: owner delete" ON storage.objects FOR DELETE
+  USING (bucket_id = 'recordings' AND auth.uid()::text = (storage.foldername(name))[1]);
+
 -- classroom-files (shared within a classroom session — public read, authenticated upload)
 INSERT INTO storage.buckets (id, name, public) VALUES ('classroom-files', 'classroom-files', TRUE) ON CONFLICT (id) DO NOTHING;
 DROP POLICY IF EXISTS "classroom-files: public read"          ON storage.objects;
