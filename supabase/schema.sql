@@ -717,3 +717,15 @@ CREATE POLICY "certificates storage: owner upload" ON storage.objects FOR INSERT
   WITH CHECK (bucket_id = 'certificates' AND auth.uid()::text = (storage.foldername(name))[1]);
 CREATE POLICY "certificates storage: owner delete" ON storage.objects FOR DELETE
   USING (bucket_id = 'certificates' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- classroom-files (shared within a classroom session — public read, authenticated upload)
+INSERT INTO storage.buckets (id, name, public) VALUES ('classroom-files', 'classroom-files', TRUE) ON CONFLICT (id) DO NOTHING;
+DROP POLICY IF EXISTS "classroom-files: public read"          ON storage.objects;
+DROP POLICY IF EXISTS "classroom-files: authenticated upload" ON storage.objects;
+DROP POLICY IF EXISTS "classroom-files: owner delete"         ON storage.objects;
+CREATE POLICY "classroom-files: public read" ON storage.objects FOR SELECT
+  USING (bucket_id = 'classroom-files');
+CREATE POLICY "classroom-files: authenticated upload" ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'classroom-files' AND auth.role() = 'authenticated');
+CREATE POLICY "classroom-files: owner delete" ON storage.objects FOR DELETE
+  USING (bucket_id = 'classroom-files' AND auth.uid()::text = (storage.foldername(name))[1]);
