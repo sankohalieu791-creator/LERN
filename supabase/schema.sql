@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS public.instructor_applications (
   full_name        TEXT NOT NULL,
   topic            TEXT NOT NULL,
   bio              TEXT NOT NULL,
-  role_type        TEXT CHECK (role_type IN ('mentor','professor','teacher','coach')),
+  role_type        TEXT CHECK (role_type IN ('mentor','professor','teacher','coach','dr')),
   location         TEXT,
   experience_years INTEGER,
   contact_email    TEXT,
@@ -70,6 +70,10 @@ ALTER TABLE public.instructor_applications ADD COLUMN IF NOT EXISTS location    
 ALTER TABLE public.instructor_applications ADD COLUMN IF NOT EXISTS experience_years INTEGER;
 ALTER TABLE public.instructor_applications ADD COLUMN IF NOT EXISTS contact_email    TEXT;
 ALTER TABLE public.instructor_applications ADD COLUMN IF NOT EXISTS contact_phone    TEXT;
+-- Fix role_type CHECK constraint to include 'dr'
+ALTER TABLE public.instructor_applications DROP CONSTRAINT IF EXISTS instructor_applications_role_type_check;
+ALTER TABLE public.instructor_applications ADD CONSTRAINT instructor_applications_role_type_check
+  CHECK (role_type IN ('mentor','professor','teacher','coach','dr'));
 
 
 -- ── VIDEOS ───────────────────────────────────────────────────
