@@ -516,12 +516,10 @@ export const submitInstructorApplication = async (
     contact_phone?: string
   }
 ) => {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('instructor_applications')
     .upsert([{ user_id: userId, ...payload, status: 'pending' }], { onConflict: 'user_id' })
-    .select()
-    .single()
-  return { data, error }
+  return { error }
 }
 
 export const getInstructorApplication = async (userId: string) => {

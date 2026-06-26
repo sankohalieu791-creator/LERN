@@ -118,13 +118,17 @@ export default function SettingsPage() {
     })
     setApplying(false)
     if (error) {
-      setApplyError(error.message || 'Submission failed')
-    } else {
-      // Grant instructor access immediately + verified badge
-      await updateUserProfile(user.id, { account_type: 'instructor', verified: true })
-      await refreshUser()
-      setApplied(true)
+      setApplyError(error.message || 'Submission failed. Please try again.')
+      return
     }
+    // Grant instructor access immediately + verified badge
+    const { error: profileErr } = await updateUserProfile(user.id, { account_type: 'instructor', verified: true })
+    if (profileErr) {
+      setApplyError('Application saved but could not activate instructor access. Please sign out and back in.')
+      return
+    }
+    await refreshUser()
+    setApplied(true)
   }
 
   const closeApply = () => {
