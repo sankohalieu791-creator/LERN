@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { getCourseById, enrollCourse, isEnrolled, getCourseProject, createCourseProject, getMyProjectSubmission, submitCourseProject, supabase, setSessionLive } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import { useAuth } from '@/context/AuthContext'
-import { Calendar, ChevronLeft, Loader2, AlertTriangle, FileText, Upload, CheckCircle, XCircle, RefreshCw, Plus, X, ImageIcon, Film, File } from 'lucide-react'
+import { Clock, Calendar, ChevronLeft, Loader2, AlertTriangle, FileText, Upload, CheckCircle, XCircle, RefreshCw, Plus, X, ImageIcon, Film, File } from 'lucide-react'
 import Link from 'next/link'
 
 function VerifiedBadge({ size = 14 }: { size?: number }) {
