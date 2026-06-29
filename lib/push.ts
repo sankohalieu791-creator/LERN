@@ -28,13 +28,15 @@ export async function registerPushSubscription(userId: string): Promise<void> {
     const p256dh = btoa(String.fromCharCode(...new Uint8Array(p256dhKey)))
     const auth   = btoa(String.fromCharCode(...new Uint8Array(authKey)))
 
-    await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, endpoint: sub.endpoint, p256dh, auth }),
-    })
+    // Save directly via client supabase — user is authenticated so RLS allows it.
+    // This avoids needing SUPABASE_SERVICE_ROLE_KEY on the server for subscriptions.
+    const { supabase } = await import('./supabase')
+    const { error } = await supabase.from('push_subscriptions').upsert(
+      { user_id: userId, endpoint: sub.endpoint, p256dh, auth_key: auth },
+      { onConflict: 'endpoint' }
+    )
+    if (error) console.warn('[push] subscribe DB error:', error.message)
   } catch (err) {
-    // Silently ignore — push is non-critical
     console.warn('[push] registration failed:', err)
   }
 }

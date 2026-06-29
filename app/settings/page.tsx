@@ -148,11 +148,16 @@ export default function SettingsPage() {
     setTestingPush(true)
     setTestPushMsg('')
     try {
-      // Re-register subscription in case it wasn't stored yet
+      // 1. Check notification permission
+      if (Notification.permission === 'denied') {
+        setTestPushMsg('Notifications blocked — enable them in your browser/phone settings.')
+        return
+      }
+      // 2. Register / refresh subscription (saved directly to DB via client supabase)
       const { registerPushSubscription } = await import('@/lib/push')
       await registerPushSubscription(user.id)
-      // Small delay to let subscription save
-      await new Promise(r => setTimeout(r, 1000))
+      await new Promise(r => setTimeout(r, 800))
+      // 3. Ask server to send test notification
       const res = await fetch('/api/push/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -160,12 +165,12 @@ export default function SettingsPage() {
       })
       const data = await res.json()
       if (data.ok) {
-        setTestPushMsg('Sent! Close the app and check your notifications.')
+        setTestPushMsg('✓ Sent! Lock your screen and check notifications.')
       } else {
-        setTestPushMsg(data.error ?? 'Failed. Make sure you allowed notifications.')
+        setTestPushMsg(data.error ?? 'Failed — check Vercel env vars.')
       }
     } catch {
-      setTestPushMsg('Error sending test push.')
+      setTestPushMsg('Error — check your connection.')
     } finally {
       setTestingPush(false)
     }

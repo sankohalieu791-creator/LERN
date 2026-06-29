@@ -12,7 +12,12 @@ export async function POST(req: NextRequest) {
   const serviceKey   = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!subject || !publicKey || !privateKey || !supabaseUrl || !serviceKey) {
-    return NextResponse.json({ ok: false, error: 'Push not configured' }, { status: 200 })
+    const missing = [
+      !subject     && 'VAPID_SUBJECT',
+      !privateKey  && 'VAPID_PRIVATE_KEY',
+      !serviceKey  && 'SUPABASE_SERVICE_ROLE_KEY',
+    ].filter(Boolean).join(', ')
+    return NextResponse.json({ ok: false, error: `Missing Vercel env vars: ${missing}` }, { status: 200 })
   }
 
   const { userId } = await req.json()
