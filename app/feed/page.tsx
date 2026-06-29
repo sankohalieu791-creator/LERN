@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Bell, ThumbsUp, MessageCircle, Share2, X, Send, Play, Trash2, Eye, Clock } from 'lucide-react'
+import { Search, Bell, ThumbsUp, MessageCircle, Share2, X, Send, Play, Trash2, Eye, Clock, User } from 'lucide-react'
+import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import {
   getVideos, likeVideo, unlikeVideo,
@@ -196,6 +197,8 @@ export default function FeedPage() {
   const [selectedVideo,  setSelectedVideo]  = useState<any>(null)
   const [searchOpen,     setSearchOpen]     = useState(false)
   const [searchQuery,    setSearchQuery]    = useState('')
+  const [searchPeople,   setSearchPeople]   = useState<any[]>([])
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [notifCount,     setNotifCount]     = useState(0)
   const [notifs,         setNotifs]         = useState<any[]>([])
   const [showNotifs,     setShowNotifs]     = useState(false)
@@ -341,6 +344,22 @@ export default function FeedPage() {
     }
   }
 
+  // Search users when query changes
+  useEffect(() => {
+    if (!searchQuery.trim()) { setSearchPeople([]); return }
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+    searchDebounce.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('id, username, avatar_url, title, verified, account_type, followers_count')
+        .or(`username.ilike.%${searchQuery}%,title.ilike.%${searchQuery}%`)
+        .order('followers_count', { ascending: false })
+        .limit(10)
+      setSearchPeople(data || [])
+    }, 300)
+    return () => { if (searchDebounce.current) clearTimeout(searchDebounce.current) }
+  }, [searchQuery])
+
   const filteredVideos = searchQuery.trim()
     ? videos.filter(v =>
         v.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -399,11 +418,11 @@ export default function FeedPage() {
               ref={searchRef}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search videos…"
+              placeholder="Search people, videos…"
               autoFocus
               className="flex-1 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] rounded-full px-4 py-2.5 text-white text-sm placeholder-[#444] outline-none"
             />
-            <button onClick={() => { setSearchOpen(false); setSearchQuery('') }}
+            <button onClick={() => { setSearchOpen(false); setSearchQuery(''); setSearchPeople([]) }}
               className="text-[#888] text-sm font-semibold">Cancel</button>
           </div>
         ) : (
@@ -436,7 +455,70 @@ export default function FeedPage() {
         )}
       </div>
 
-      {/* FEED */}
+      {/* SEARCH RESULTS — shown when search is active */}
+      {searchOpen && searchQuery.trim() ? (
+        <div className="flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-24 space-y-5">
+          {/* People */}
+          {searchPeople.length > 0 && (
+            <div>
+              <p className="text-[#555] text-[11px] font-bold uppercase tracking-widest mb-3">People</p>
+              <div className="space-y-1">
+                {searchPeople.map(person => (
+                  <Link key={person.id} href={`/profile/${person.id}`}
+                    className="flex items-center gap-3 py-2.5 border-b border-[rgba(255,255,255,0.04)] last:border-0 active:opacity-70 transition"
+                    onClick={() => { setSearchOpen(false); setSearchQuery(''); setSearchPeople([]) }}
+                  >
+                    {person.avatar_url
+                      ? <img src={person.avatar_url} alt="" className="w-11 h-11 rounded-full object-cover flex-shrink-0" />
+                      : <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
+                          <span className="text-white font-bold">{person.username?.[0]?.toUpperCase() ?? '?'}</span>
+                        </div>
+                    }
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-bold flex items-center gap-1">
+                        {person.username}
+                        {person.verified && <span className="text-[#1d9bf0] text-xs">✓</span>}
+                      </p>
+                      {person.title && <p className="text-[#555] text-xs truncate">{person.title}</p>}
+                      <p className="text-[#444] text-xs">
+                        {person.account_type === 'instructor'
+                          ? <span className="text-[#FF6B2B] font-semibold">Instructor</span>
+                          : `${(person.followers_count ?? 0).toLocaleString()} followers`}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Videos */}
+          {filteredVideos.length > 0 && (
+            <div>
+              <p className="text-[#555] text-[11px] font-bold uppercase tracking-widest mb-3">Videos</p>
+              <div className="space-y-2">
+                {filteredVideos.map(video => (
+                  <button key={video.id} onClick={() => { openVideo(video); setSearchOpen(false); setSearchQuery(''); setSearchPeople([]) }}
+                    className="flex gap-3 items-center w-full text-left active:opacity-70 transition">
+                    <div className="w-16 h-12 rounded-xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex-shrink-0 flex items-center justify-center overflow-hidden">
+                      {video.thumbnail_url
+                        ? <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                        : <Play className="w-4 h-4 text-white fill-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-semibold line-clamp-1">{video.title}</p>
+                      <p className="text-[#555] text-xs mt-0.5">{(video.views ?? 0).toLocaleString()} views · {video.users?.username}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {searchPeople.length === 0 && filteredVideos.length === 0 && (
+            <p className="text-center text-[#444] text-sm py-16">No results for &ldquo;{searchQuery}&rdquo;</p>
+          )}
+        </div>
+      ) : (
+      /* FEED */
       <div
         className="flex-1 overflow-y-auto overscroll-contain"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}
@@ -446,12 +528,8 @@ export default function FeedPage() {
             <div className="w-16 h-16 rounded-full bg-[#1a1a1a] flex items-center justify-center mb-4">
               <Play className="w-7 h-7 text-[#333]" />
             </div>
-            <p className="text-white font-bold text-lg mb-2">
-              {searchQuery ? 'No results' : 'No posts yet'}
-            </p>
-            <p className="text-[#444] text-sm">
-              {searchQuery ? 'Try a different search' : 'Be the first to post a video'}
-            </p>
+            <p className="text-white font-bold text-lg mb-2">No posts yet</p>
+            <p className="text-[#444] text-sm">Be the first to post a video</p>
           </div>
         ) : (
           filteredVideos.map(video => (
@@ -469,6 +547,7 @@ export default function FeedPage() {
           ))
         )}
       </div>
+      )}
     </div>
 
     {/* NOTIFICATIONS PANEL */}
