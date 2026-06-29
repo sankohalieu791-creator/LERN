@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Search, MapPin, Users, X, Mail, Phone,
-  Check, Loader2, Send, MessageCircle,
+  Check, Loader2, Send, MessageCircle, Play, Star, User,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
@@ -516,6 +516,12 @@ export default function DiscoveryPage() {
   const [savedJobIds,  setSavedJobIds]  = useState<Set<string>>(new Set())
   const [jobsLoading,  setJobsLoading]  = useState(false)
 
+  // Global search (people + videos) — triggered when search is non-empty
+  const [searchPeople,   setSearchPeople]   = useState<any[]>([])
+  const [searchVideos,   setSearchVideos]   = useState<any[]>([])
+  const [searchLoading,  setSearchLoading]  = useState(false)
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     if (!user) return
     getUnreadMessageCount(user.id).then(setUnreadMsgs)
@@ -533,7 +539,32 @@ export default function DiscoveryPage() {
   }, [user])
 
   // Clear search when switching tabs so stale queries don't confuse results
-  useEffect(() => { setSearch('') }, [activeTab])
+  useEffect(() => { setSearch(''); setSearchPeople([]); setSearchVideos([]) }, [activeTab])
+
+  // Global search: people + videos
+  useEffect(() => {
+    if (!search.trim()) { setSearchPeople([]); setSearchVideos([]); return }
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+    searchDebounce.current = setTimeout(async () => {
+      setSearchLoading(true)
+      const [{ data: people }, { data: videos }] = await Promise.all([
+        supabase.from('users')
+          .select('id, username, avatar_url, title, verified, account_type, followers_count')
+          .or(`username.ilike.%${search}%,title.ilike.%${search}%`)
+          .order('followers_count', { ascending: false })
+          .limit(15),
+        supabase.from('videos')
+          .select('id, title, views, thumbnail_url')
+          .ilike('title', `%${search}%`)
+          .order('views', { ascending: false })
+          .limit(10),
+      ])
+      setSearchPeople(people || [])
+      setSearchVideos(videos || [])
+      setSearchLoading(false)
+    }, 300)
+    return () => { if (searchDebounce.current) clearTimeout(searchDebounce.current) }
+  }, [search])
 
   useEffect(() => {
     if (activeTab === 'jobs') return
@@ -634,7 +665,7 @@ export default function DiscoveryPage() {
     <>
     <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
-      <div className="flex-shrink-0">
+      <div className="flex-shrink-0 relative">
         <div className="flex items-start justify-between px-4 pt-4 pb-3">
           <div>
             <h1 className="text-white text-2xl font-bold">Discover</h1>
@@ -668,6 +699,71 @@ export default function DiscoveryPage() {
             )}
           </div>
         </div>
+
+        {/* Global search results — shown when user types, overlays tab content */}
+        {search.trim() && (
+          <div className="absolute left-0 right-0 top-full bg-[#0f0f0f] z-30 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+            {searchLoading ? (
+              <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 text-[#444] animate-spin" /></div>
+            ) : (searchPeople.length + searchVideos.length === 0) ? (
+              <p className="text-center text-[#444] text-sm py-10">No results for &ldquo;{search}&rdquo;</p>
+            ) : (
+              <div className="px-4 pb-6 space-y-5">
+                {searchPeople.length > 0 && (
+                  <div>
+                    <p className="text-[#555] text-[11px] font-bold uppercase tracking-widest py-3">People</p>
+                    <div className="space-y-1">
+                      {searchPeople.map(person => (
+                        <Link key={person.id} href={`/profile/${person.id}`}
+                          className="flex items-center gap-3 py-2.5 border-b border-[rgba(255,255,255,0.04)] last:border-0 active:opacity-70 transition">
+                          {person.avatar_url
+                            ? <img src={person.avatar_url} alt="" className="w-11 h-11 rounded-full object-cover flex-shrink-0" />
+                            : <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
+                                <span className="text-white font-bold">{person.username?.[0]?.toUpperCase() ?? <User className="w-4 h-4" />}</span>
+                              </div>
+                          }
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-bold flex items-center gap-1">
+                              {person.username}
+                              {person.verified && <span className="text-[#1d9bf0] text-xs">✓</span>}
+                            </p>
+                            {person.title && <p className="text-[#555] text-xs truncate">{person.title}</p>}
+                            <p className="text-[#444] text-xs">
+                              {person.account_type === 'instructor'
+                                ? <span className="text-[#FF6B2B] font-semibold">Instructor</span>
+                                : `${(person.followers_count ?? 0).toLocaleString()} followers`}
+                            </p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {searchVideos.length > 0 && (
+                  <div>
+                    <p className="text-[#555] text-[11px] font-bold uppercase tracking-widest py-3">Videos</p>
+                    <div className="space-y-2">
+                      {searchVideos.map(v => (
+                        <Link key={v.id} href={`/feed/${v.id}`}
+                          className="flex gap-3 items-center active:opacity-70 transition">
+                          <div className="w-16 h-12 rounded-xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex-shrink-0 flex items-center justify-center overflow-hidden">
+                            {v.thumbnail_url
+                              ? <img src={v.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                              : <Play className="w-4 h-4 text-white fill-white" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-semibold line-clamp-1">{v.title}</p>
+                            <p className="text-[#555] text-xs mt-0.5">{(v.views ?? 0).toLocaleString()} views</p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="px-4 flex gap-2 pb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {allTabs.map(t => (

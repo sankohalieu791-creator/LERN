@@ -3,12 +3,13 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Home, BookOpen, Compass, User, Plus, Video, Users } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
 import CreatePost from '@/components/CreatePost'
 import CreateCourse from '@/components/CreateCourse'
 import CreateWorkshop from '@/components/CreateWorkshop'
+import { supabase } from '@/lib/supabase'
 
 export default function BottomNav() {
   const pathname = usePathname()
@@ -19,6 +20,25 @@ export default function BottomNav() {
   const [showPost,   setShowPost]   = useState(false)
   const [showCourse, setShowCourse] = useState(false)
   const [showWS,     setShowWS]     = useState(false)
+  const [unreadNotifs, setUnreadNotifs] = useState(0)
+
+  useEffect(() => {
+    if (!user) return
+    const fetchUnread = async () => {
+      const { count } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('read', false)
+      setUnreadNotifs(count ?? 0)
+    }
+    fetchUnread()
+    const channel = supabase
+      .channel(`nav-notifs-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, fetchUnread)
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user])
 
   if (pathname === '/' || pathname.startsWith('/auth') || /^\/feed\/.+/.test(pathname) || /^\/messages\/.+/.test(pathname)) return null
 
@@ -74,7 +94,14 @@ export default function BottomNav() {
       >
         <div className="flex items-center h-[60px]">
           <Link href="/feed" className={linkCls('/feed')}>
-            <Home className="w-6 h-6" />
+            <div className="relative">
+              <Home className="w-6 h-6" />
+              {unreadNotifs > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FF6B2B] rounded-full text-white text-[9px] font-bold flex items-center justify-center">
+                  {unreadNotifs > 9 ? '9+' : unreadNotifs}
+                </span>
+              )}
+            </div>
             <span className="text-[10px] font-medium">{t('feed')}</span>
           </Link>
           <Link href="/courses" className={linkCls('/courses')}>

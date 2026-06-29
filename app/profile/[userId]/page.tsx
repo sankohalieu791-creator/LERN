@@ -10,9 +10,10 @@ import {
   getInstructorRequests, updateRequestStatus,
   getProjectsByUser, getCertificatesByUser,
   getJobsByInstructor, getInstructorWorkshops,
+  getCoursesByInstructor,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
-import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin, Eye, Globe, Calendar } from 'lucide-react'
+import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin, Eye, Globe, Calendar, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import { useLanguage } from '@/context/LanguageContext'
 
@@ -63,7 +64,7 @@ export default function UserProfilePage() {
   const [following,     setFollowing]     = useState(false)
   const [loading,       setLoading]       = useState(true)
   const [followLoading, setFollowLoading] = useState(false)
-  const [activeTab,     setActiveTab]     = useState<'posts' | 'projects' | 'certs' | 'feedback' | 'requests' | 'jobs' | 'workshops'>('posts')
+  const [activeTab,     setActiveTab]     = useState<'posts' | 'courses' | 'projects' | 'certs' | 'feedback' | 'requests' | 'jobs' | 'workshops'>('posts')
 
   const [fbRating,     setFbRating]     = useState(0)
   const [fbText,       setFbText]       = useState('')
@@ -72,6 +73,7 @@ export default function UserProfilePage() {
 
   const [jobs, setJobs] = useState<any[]>([])
   const [workshops, setWorkshops] = useState<any[]>([])
+  const [instructorCourses, setInstructorCourses] = useState<any[]>([])
   const [certModal, setCertModal] = useState<any | null>(null)
 
   const profileId    = userId as string
@@ -83,7 +85,7 @@ export default function UserProfilePage() {
     const load = async () => {
       setLoading(true)
 
-      const [profileRes, videosRes, feedbackRes, projectsRes, certsRes, jobsRes, wsRes] = await Promise.all([
+      const [profileRes, videosRes, feedbackRes, projectsRes, certsRes, jobsRes, wsRes, coursesRes] = await Promise.all([
         getUserProfile(profileId),
         getUserVideos(profileId),
         getFeedback(profileId),
@@ -91,12 +93,14 @@ export default function UserProfilePage() {
         getCertificatesByUser(profileId),
         getJobsByInstructor(profileId),
         getInstructorWorkshops(profileId),
+        getCoursesByInstructor(profileId),
       ])
       setProfile(profileRes.data)
       setVideos(videosRes.data ?? [])
       setFeedback(feedbackRes.data ?? [])
       setJobs(jobsRes.data ?? [])
       setWorkshops(wsRes.data ?? [])
+      setInstructorCourses(coursesRes.data ?? [])
       // Respect public/private: when viewing someone else's profile, only show public items
       const viewerIsOwner = user?.id === profileId
       const rawProjects = (projectsRes.data ?? []) as any[]
@@ -182,23 +186,21 @@ export default function UserProfilePage() {
   const initial = profile.username?.[0]?.toUpperCase() ?? 'U'
   const pendingCount = requests.filter(r => r.status === 'pending').length
 
-  const tabs = [
-    { id: 'posts',    icon: Grid3X3,       label: t('posts')    },
-    { id: 'projects', icon: FolderOpen,    label: t('projects') },
-    { id: 'certs',    icon: Award,         label: t('certs')    },
-    { id: 'feedback', icon: MessageSquare, label: t('feedback') },
-    ...(isInstructor
-      ? [
-          { id: 'workshops', icon: Globe,     label: 'Workshops' },
-          { id: 'jobs',      icon: Briefcase, label: t('jobs')   },
-        ]
-      : []
-    ),
-    ...(isOwnProfile && isInstructor
-      ? [{ id: 'requests', icon: Inbox, label: t('requests') }]
-      : []
-    ),
-  ]
+  const tabs = isInstructor
+    ? [
+        { id: 'posts',     icon: Grid3X3,       label: t('posts')    },
+        { id: 'courses',   icon: BookOpen,       label: 'Courses'     },
+        { id: 'workshops', icon: Globe,          label: 'Workshops'   },
+        { id: 'feedback',  icon: MessageSquare,  label: t('feedback') },
+        { id: 'jobs',      icon: Briefcase,      label: t('jobs')     },
+        ...(isOwnProfile ? [{ id: 'requests', icon: Inbox, label: t('requests') }] : []),
+      ]
+    : [
+        { id: 'posts',    icon: Grid3X3,       label: t('posts')    },
+        { id: 'projects', icon: FolderOpen,    label: t('projects') },
+        { id: 'certs',    icon: Award,         label: t('certs')    },
+        { id: 'feedback', icon: MessageSquare, label: t('feedback') },
+      ]
 
   return (
     <div className="min-h-screen bg-[#0f0f0f] pb-24">
@@ -401,6 +403,42 @@ export default function UserProfilePage() {
                   </div>
                 )
               })}
+            </div>
+          )
+        )}
+
+        {/* COURSES — instructor only */}
+        {activeTab === 'courses' && (
+          instructorCourses.length === 0 ? (
+            <div className="text-center py-16">
+              <BookOpen className="w-10 h-10 text-[#2a2a2a] mx-auto mb-3" />
+              <p className="text-[#444] text-sm">No courses yet</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {instructorCourses.map((c: any) => (
+                <Link key={c.id} href={`/courses/${c.id}`}
+                  className="flex gap-3 items-center bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 active:opacity-75 transition">
+                  <div className="w-16 h-14 rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#FF6B2B] flex-shrink-0 overflow-hidden">
+                    {c.thumbnail_url && <img src={c.thumbnail_url} alt="" className="w-full h-full object-cover" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-sm line-clamp-1">{c.title}</p>
+                    {c.subject && (
+                      <p className="text-[#FF6B2B] text-[10px] font-bold uppercase tracking-wide mt-0.5">{c.subject}</p>
+                    )}
+                    <div className="flex items-center gap-2 mt-1 text-[#555] text-xs">
+                      {(c.enrolled_count ?? 0) > 0 && <span>{c.enrolled_count} enrolled</span>}
+                      {c.rating > 0 && (
+                        <span className="flex items-center gap-0.5">
+                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                          {c.rating.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              ))}
             </div>
           )
         )}

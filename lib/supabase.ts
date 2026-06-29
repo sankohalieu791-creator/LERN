@@ -864,6 +864,15 @@ export const getEnrolledCourses = async (userId: string) => {
   }
 }
 
+export const getCoursesByInstructor = async (instructorId: string) => {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('id, title, description, thumbnail_url, rating, enrolled_count, subject, level')
+    .eq('instructor_id', instructorId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
 export const deleteCourse = async (courseId: string, instructorId: string) => {
   const { error } = await supabase
     .from('courses').delete().eq('id', courseId).eq('instructor_id', instructorId)
