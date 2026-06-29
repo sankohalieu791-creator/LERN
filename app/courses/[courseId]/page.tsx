@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { getCourseById, enrollCourse, isEnrolled, getCourseProject, createCourseProject, getMyProjectSubmission, submitCourseProject, supabase } from '@/lib/supabase'
+import { getCourseById, enrollCourse, isEnrolled, getCourseProject, createCourseProject, getMyProjectSubmission, submitCourseProject, supabase, setSessionLive } from '@/lib/supabase'
+import { sendPush } from '@/lib/push'
 import { useAuth } from '@/context/AuthContext'
-import { Clock, Users, Star, ShieldCheck, Calendar, ChevronLeft, Loader2, AlertTriangle, FileText, Upload, CheckCircle, XCircle, RefreshCw, Plus, X, ImageIcon, Film, File } from 'lucide-react'
+import { Calendar, ChevronLeft, Loader2, AlertTriangle, FileText, Upload, CheckCircle, XCircle, RefreshCw, Plus, X, ImageIcon, Film, File } from 'lucide-react'
 import Link from 'next/link'
 
 function VerifiedBadge({ size = 14 }: { size?: number }) {
@@ -92,12 +93,35 @@ export default function CourseDetailPage() {
     load()
   }, [courseId, user])
 
+  // Realtime: watch for any session on this course going live/ending
+  useEffect(() => {
+    if (!courseId) return
+    const channel = supabase
+      .channel(`course-sessions-live-${courseId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'course_sessions',
+        filter: `course_id=eq.${courseId}`,
+      }, (payload: any) => {
+        setSessions(prev => prev.map(s => s.id === payload.new.id ? { ...s, ...payload.new } : s))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [courseId])
+
   const handleEnroll = async () => {
     if (!user) { router.push('/auth/login'); return }
     setEnrolling(true)
     await enrollCourse(courseId as string, user.id)
     setEnrolled(true)
     setEnrolling(false)
+    if (course?.instructor_id) {
+      sendPush(
+        course.instructor_id,
+        '🎓 New enrollment',
+        `${(user as any).username || 'Someone'} enrolled in ${course.title}`,
+        '/dashboard'
+      )
+    }
   }
 
   const handleCreateProject = async () => {
@@ -125,7 +149,7 @@ export default function CourseDetailPage() {
       let fileType: string | undefined
       if (submitFile) {
         const ext = submitFile.name.split('.').pop()
-        const path = `submissions/${user.id}/${Date.now()}.${ext}`
+        const path = `${user.id}/${Date.now()}.${ext}`
         const { error: upErr } = await supabase.storage.from('project-files').upload(path, submitFile)
         if (upErr) throw new Error('File upload failed: ' + upErr.message)
         fileUrl = supabase.storage.from('project-files').getPublicUrl(path).data.publicUrl
@@ -164,66 +188,40 @@ export default function CourseDetailPage() {
   const completedCount = sessions.filter((s: any) => s.is_completed).length
   const almostDone = sessions.length > 0 && completedCount / sessions.length >= 0.7 && isInstructor && !project
 
+  // Session routing helpers
+  const nextSession   = sessions.find((s: any) => !s.is_completed)      // instructor: go live with this one
+  const liveSession   = sessions.find((s: any) => s.is_live)            // student: join this one
+  const instructorUrl = nextSession
+    ? `/courses/${courseId}/classroom?sessionId=${nextSession.id}`
+    : `/courses/${courseId}/classroom`
+  const studentUrl = liveSession
+    ? `/courses/${courseId}/classroom?sessionId=${liveSession.id}`
+    : null
+
   return (
     <div className="fixed inset-0 bg-[#0f0f0f] overflow-y-auto">
 
-      {/* HERO THUMBNAIL */}
-      <div className="relative w-full flex-shrink-0 bg-[#1a1a1a]" style={{ height: '240px' }}>
-        {course.thumbnail_url
-          ? <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
-          : <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460]" />
-        }
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0f] via-transparent to-black/30" />
-
-        <button
-          onClick={() => router.back()}
-          className="absolute top-4 left-4 w-9 h-9 bg-black/60 rounded-full flex items-center justify-center z-10"
-          style={{ marginTop: 'env(safe-area-inset-top)' }}
-        >
+      {/* HEADER */}
+      <div className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-[rgba(255,255,255,0.06)]"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 16px)' }}>
+        <button onClick={() => router.back()}
+          className="w-9 h-9 bg-[#1a1a1a] rounded-full flex items-center justify-center flex-shrink-0">
           <ChevronLeft className="w-5 h-5 text-white" />
         </button>
-
-        <div className="absolute top-4 right-4 flex gap-1.5" style={{ marginTop: 'env(safe-area-inset-top)' }}>
-          <span className="text-[10px] font-bold bg-[#1d9bf0] text-white px-2 py-1 rounded-full">CERT</span>
-          <span className="text-[10px] font-bold bg-green-500 text-white px-2 py-1 rounded-full">FREE</span>
-        </div>
-
-        {(course.subject || course.level) && (
-          <span className="absolute bottom-4 left-4 text-[10px] font-bold bg-black/80 text-white px-2.5 py-1 rounded-full uppercase tracking-wide">
-            {[course.subject, course.level].filter(Boolean).join(' · ')}
+        <h1 className="text-white font-bold text-base leading-snug flex-1 line-clamp-1">{course.title}</h1>
+        {liveSession && (
+          <span className="flex items-center gap-1.5 bg-red-500/20 text-red-400 text-[10px] font-bold px-2.5 py-1 rounded-full border border-red-500/30">
+            <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" /> LIVE
           </span>
         )}
       </div>
 
       {/* CONTENT */}
-      <div className="px-4 pt-5 pb-32">
-
-        {/* Instructor: almost-at-end alert */}
-        {almostDone && (
-          <div className="mb-5 bg-gradient-to-r from-[#FF6B2B]/10 to-[#C026D3]/10 border border-[#FF6B2B]/30 rounded-2xl px-4 py-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-[#FF6B2B] flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-white font-bold text-sm mb-1">Almost at the end of your course!</p>
-                <p className="text-[#888] text-xs leading-relaxed mb-3">
-                  {completedCount} of {sessions.length} sessions done. Create a compulsory project so your students can showcase what they&apos;ve learned.
-                </p>
-                <button
-                  onClick={() => setShowCreateProject(true)}
-                  className="flex items-center gap-2 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white text-xs font-bold px-4 py-2.5 rounded-xl"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Create Project
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <h1 className="text-white font-bold text-xl leading-snug mb-4">{course.title}</h1>
+      <div className="px-4 pt-5 pb-4">
 
         {/* Instructor */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
             {course.users?.avatar_url
               ? <img src={course.users.avatar_url} className="w-full h-full object-cover" />
               : course.users?.username?.[0]?.toUpperCase()
@@ -238,79 +236,21 @@ export default function CourseDetailPage() {
           </div>
         </div>
 
-        {/* Description */}
-        <p className="text-[#888] text-sm leading-relaxed mb-5">{course.description}</p>
+        {course.description && (
+          <p className="text-[#888] text-sm leading-relaxed mb-5 border-b border-[rgba(255,255,255,0.06)] pb-5">
+            {course.description}
+          </p>
+        )}
 
-        {/* Stats */}
-        <div className="flex items-center gap-5 mb-5 pb-5 border-b border-[rgba(255,255,255,0.07)]">
-          <div className="flex items-center gap-1.5 text-[#888] text-sm">
-            <Clock className="w-4 h-4" />
-            <span>{course.duration_weeks}w</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-[#888] text-sm">
-            <Users className="w-4 h-4" />
-            <span>{(course.enrolled_count || 0).toLocaleString()}</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-sm">
-            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-            <span className="text-white font-bold">{course.rating?.toFixed(1)}</span>
-          </div>
-          <span className="ml-auto text-xs font-bold border border-[rgba(255,255,255,0.15)] text-[#888] px-3 py-1 rounded-full capitalize">
-            {course.level}
-          </span>
-        </div>
-
-        {/* Certificate banner */}
-        <div className="flex items-center gap-3 bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl px-4 py-3.5 mb-6">
-          <ShieldCheck className="w-5 h-5 text-[#FF6B2B] flex-shrink-0" />
-          <p className="text-white text-sm font-medium">Includes verified certificate on completion</p>
-        </div>
-
-        {/* Timetable */}
-        {sessions.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-[#FF6B2B]" />
-                <p className="text-white text-sm font-bold uppercase tracking-wide">Your Timetable</p>
-              </div>
-              <span className="text-[#555] text-xs">{sessions.length} sessions</span>
-            </div>
-            <div className="space-y-2">
-              {sessions.map((s: any) => {
-                const d = s.session_date ? new Date(s.session_date) : null
-                const mon = d?.toLocaleString('default', { month: 'short' }).toUpperCase()
-                const day = d?.getDate()
-                return (
-                  <div key={s.id} className="flex items-center gap-3 bg-[#1a1a1a] rounded-2xl px-4 py-3">
-                    <div className="flex-shrink-0 w-12 text-center">
-                      {d ? (
-                        <>
-                          <p className="text-[#555] text-[9px] font-bold">{mon}</p>
-                          <p className="text-white font-bold text-xl leading-none">{day}</p>
-                        </>
-                      ) : (
-                        <p className="text-white font-bold text-xl leading-none">{s.session_number}</p>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-semibold truncate">{s.title}</p>
-                      <p className="text-[#555] text-xs mt-0.5">
-                        {d?.toLocaleString('default', { weekday: 'short' })}
-                        {s.session_time && ` · ${s.session_time.slice(0, 5)}`}
-                        {` · ${s.duration_minutes ?? 60} min`}
-                      </p>
-                    </div>
-                    {s.is_project_day && (
-                      <span className="text-[9px] font-bold bg-red-500 text-white px-2 py-1 rounded-full flex-shrink-0">PROJECTS DAY</span>
-                    )}
-                    {s.is_live && (
-                      <span className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 animate-pulse" />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+        {/* Instructor: almost-at-end alert */}
+        {almostDone && (
+          <div className="mb-5 bg-gradient-to-r from-[#FF6B2B]/10 to-[#C026D3]/10 border border-[#FF6B2B]/30 rounded-2xl px-4 py-4">
+            <p className="text-white font-bold text-sm mb-1">Create your course project</p>
+            <p className="text-[#888] text-xs mb-3">Let students showcase what they&apos;ve learned.</p>
+            <button onClick={() => setShowCreateProject(true)}
+              className="flex items-center gap-2 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white text-xs font-bold px-4 py-2.5 rounded-xl">
+              <Plus className="w-3.5 h-3.5" /> Create Project
+            </button>
           </div>
         )}
 
@@ -402,6 +342,9 @@ export default function CourseDetailPage() {
             </button>
           </div>
         )}
+
+        {/* Spacer so content isn't hidden behind the fixed bottom button */}
+        <div className="h-28" />
       </div>
 
       {/* STICKY ENROLL/JOIN BUTTON */}
@@ -411,18 +354,24 @@ export default function CourseDetailPage() {
       >
         {isInstructor ? (
           <Link
-            href={`/courses/${courseId}/classroom`}
+            href={instructorUrl}
             className="block w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl text-center"
           >
-            Start Live Class
+            {liveSession ? 'Resume Live Class' : 'Start Live Class'}
           </Link>
         ) : enrolled ? (
-          <Link
-            href={`/courses/${courseId}/classroom`}
-            className="block w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl text-center"
-          >
-            Enter Live Classroom
-          </Link>
+          studentUrl ? (
+            <Link
+              href={studentUrl}
+              className="block w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl text-center"
+            >
+              Enter Live Classroom
+            </Link>
+          ) : (
+            <div className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] text-[#555] font-bold py-4 rounded-2xl text-center text-sm">
+              No Live Class Right Now
+            </div>
+          )
         ) : (
           <button
             onClick={handleEnroll}

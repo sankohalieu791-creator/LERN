@@ -18,9 +18,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   }
 
-  await service
+  const { error } = await service
     .from('push_subscriptions')
     .upsert({ user_id: userId, endpoint, p256dh, auth_key: auth }, { onConflict: 'endpoint' })
+
+  if (error) {
+    console.error('[push/subscribe] DB error:', error.message)
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  }
 
   return NextResponse.json({ ok: true })
 }

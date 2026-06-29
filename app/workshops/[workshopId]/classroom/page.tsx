@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { supabase } from '@/lib/supabase'
+import { supabase, setWorkshopLive } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
 import { Loader2 } from 'lucide-react'
 import type { ComponentProps } from 'react'
@@ -54,6 +54,13 @@ function WorkshopClassroomInner() {
   const instructorId = workshop.instructor_id || workshop.user_id
   const isInstructor = !!(user && user.id === instructorId)
 
+  const handleClose = async () => {
+    if (isInstructor) {
+      await setWorkshopLive(workshopId as string, false)
+    }
+    router.back()
+  }
+
   return (
     <VirtualClassroom
       courseTitle={workshop.title}
@@ -61,8 +68,8 @@ function WorkshopClassroomInner() {
       channelName={`workshop_${workshopId}`}
       isInstructor={isInstructor}
       isOpen={true}
-      onClose={() => router.back()}
-      courseId={workshopId}
+      onClose={handleClose}
+      courseId={workshopId as string}
     />
   )
 }

@@ -969,20 +969,14 @@ function CoursesPageInner() {
         )}
         <button
           onClick={() => setShowCreateMenu(!showCreateMenu)}
-          className="fixed z-50 w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-xl active:scale-95 transition-transform"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 72px)', right: '20px', ...(showCreateMenu && { display: 'none' }) }}
+          className="fixed z-50 w-12 h-12 bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] rounded-full flex items-center justify-center shadow-xl active:scale-95 transition-transform"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 72px)', right: '20px' }}
         >
-          <Plus className="w-5 h-5 text-black" strokeWidth={2.5} />
+          {showCreateMenu
+            ? <X className="w-5 h-5 text-white" />
+            : <Plus className="w-5 h-5 text-white" strokeWidth={2.5} />
+          }
         </button>
-        {showCreateMenu && (
-          <button
-            onClick={() => setShowCreateMenu(false)}
-            className="fixed z-50 w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-xl active:scale-95 transition-transform"
-            style={{ bottom: 'calc(env(safe-area-inset-bottom) + 72px)', right: '20px' }}
-          >
-            <X className="w-5 h-5 text-black" />
-          </button>
-        )}
       </>
     )}
 
@@ -1181,7 +1175,7 @@ function WorkshopCard({ workshop, isJoined, joining, isOwner, onJoin, onTap }: {
                 ? 'bg-[#252525] text-white border border-[rgba(255,255,255,0.08)]'
                 : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
             }`}>
-            {joining ? '…' : isJoined ? 'Joined ✓' : 'View & Join'}
+            {joining ? '…' : isJoined ? 'Joined ✓' : 'Join'}
           </button>
         )}
       </div>

@@ -519,7 +519,7 @@ export default function FeedPage() {
                     {/* Content — tap to go to the post/video */}
                     <div
                       className="flex-1 min-w-0 cursor-pointer active:opacity-80"
-                      onClick={() => { setShowNotifs(false); if (n.link) window.location.href = n.link }}
+                      onClick={() => { setShowNotifs(false); if (n.link) router.push(n.link) }}
                     >
                       <p className="text-white text-sm font-semibold">{n.title}</p>
                       <p className="text-[#888] text-xs mt-0.5 line-clamp-2">{n.body}</p>

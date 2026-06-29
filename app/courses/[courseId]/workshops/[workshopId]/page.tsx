@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase, setWorkshopLive } from '@/lib/supabase'
+import { sendPushToMany } from '@/lib/push'
 import { useAuth } from '@/context/AuthContext'
 import { Calendar, Clock, MapPin, Users, ChevronLeft, Loader2, Radio } from 'lucide-react'
 
@@ -80,6 +81,20 @@ export default function WorkshopDetailPage() {
     const { error } = await setWorkshopLive(workshopId as string, true)
     if (!error) {
       setWorkshop((prev: any) => ({ ...prev, is_live: true }))
+      // Notify enrolled students
+      const { data: rows } = await supabase
+        .from('enrollments')
+        .select('user_id')
+        .eq('workshop_id', workshopId)
+      const ids = (rows || []).map((r: any) => r.user_id).filter((id: string) => id !== user?.id)
+      if (ids.length) {
+        sendPushToMany(
+          ids,
+          '🔴 Workshop is starting!',
+          `${workshop?.title} is now live — join now`,
+          `/courses/${workshop?.course_id}/workshops/${workshopId}`
+        )
+      }
       router.push(`/workshops/${workshopId}/classroom`)
     }
     setGoingLive(false)

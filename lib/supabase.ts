@@ -220,7 +220,7 @@ async function syncFollowCounts(followerId: string, followingId: string) {
 export const followUser = async (followerId: string, followingId: string) => {
   const { data, error } = await supabase
     .from('followers')
-    .insert([{ follower_id: followerId, following_id: followingId }])
+    .upsert([{ follower_id: followerId, following_id: followingId }], { onConflict: 'follower_id,following_id', ignoreDuplicates: true })
   if (!error) syncFollowCounts(followerId, followingId).catch(() => {})
   return { data, error }
 }

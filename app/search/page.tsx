@@ -2,10 +2,10 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { getVideos, getCourses } from '@/lib/supabase'
+import { getVideos, getCourses, supabase } from '@/lib/supabase'
 import { Video, Course } from '@/lib/types'
 import Link from 'next/link'
-import { Star, Play } from 'lucide-react'
+import { Star, Play, User } from 'lucide-react'
 
 function SkeletonCard() {
   return (
@@ -22,29 +22,37 @@ function SkeletonCard() {
 function SearchResults() {
   const searchParams = useSearchParams()
   const query = searchParams.get('q') || ''
-  const [videos, setVideos] = useState<Video[]>([])
+  const [videos, setVideos]   = useState<Video[]>([])
   const [courses, setCourses] = useState<Course[]>([])
+  const [people, setPeople]   = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const search = async () => {
       if (!query) { setLoading(false); return }
+      const q = query.toLowerCase()
       try {
-        const { data: videosData } = await getVideos()
-        const { data: coursesData } = await getCourses()
+        const [{ data: videosData }, { data: coursesData }, { data: usersData }] = await Promise.all([
+          getVideos(),
+          getCourses(),
+          supabase.from('users').select('id, username, avatar_url, title, verified, account_type')
+            .ilike('username', `%${query}%`)
+            .limit(20),
+        ])
 
         setVideos(
           (videosData || []).filter(v =>
-            v.title.toLowerCase().includes(query.toLowerCase()) ||
-            v.description?.toLowerCase().includes(query.toLowerCase())
+            v.title.toLowerCase().includes(q) ||
+            v.description?.toLowerCase().includes(q)
           )
         )
         setCourses(
           (coursesData || []).filter(c =>
-            c.title.toLowerCase().includes(query.toLowerCase()) ||
-            c.description?.toLowerCase().includes(query.toLowerCase())
+            c.title.toLowerCase().includes(q) ||
+            c.description?.toLowerCase().includes(q)
           )
         )
+        setPeople(usersData || [])
       } catch (error) {
         console.error('Error searching:', error)
       } finally {
@@ -62,7 +70,7 @@ function SearchResults() {
     )
   }
 
-  const total = videos.length + courses.length
+  const total = videos.length + courses.length + people.length
 
   return (
     <div className="px-4 pt-4 pb-24 space-y-6">
@@ -72,6 +80,39 @@ function SearchResults() {
 
       {total === 0 && query && (
         <p className="text-center text-[#444] text-sm py-12">No results found</p>
+      )}
+
+      {people.length > 0 && (
+        <div>
+          <p className="text-[#888] text-xs font-bold uppercase tracking-widest mb-3">People</p>
+          <div className="space-y-2">
+            {people.map(person => (
+              <Link
+                key={person.id}
+                href={`/profile/${person.id}`}
+                className="flex items-center gap-3 p-3 bg-[#111] rounded-2xl active:scale-[0.98] transition"
+              >
+                {person.avatar_url ? (
+                  <img src={person.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
+                    <User className="w-5 h-5 text-[#555]" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-semibold leading-snug flex items-center gap-1">
+                    {person.username}
+                    {person.verified && <span className="text-[#1d9bf0] text-xs">✓</span>}
+                  </p>
+                  {person.title && <p className="text-[#555] text-xs mt-0.5 truncate">{person.title}</p>}
+                  {person.account_type === 'instructor' && (
+                    <p className="text-[#FF6B2B] text-[10px] font-bold uppercase tracking-wide">Instructor</p>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
       )}
 
       {videos.length > 0 && (

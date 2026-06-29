@@ -22,13 +22,13 @@ export default function CreateCourse({ isOpen, onClose, onSuccess }: CreateCours
   const [description, setDescription] = useState('')
   const [subject,     setSubject]     = useState('')
   const [level,       setLevel]       = useState('')
-  const [duration,    setDuration]    = useState('')
+  const [duration,    setDuration]    = useState('')   // display only, stored as 0 in duration_weeks
   const [thumbnail,    setThumbnail]    = useState<File | null>(null)
   const [sessionCount, setSessionCount] = useState(8)
   const [projectName,  setProjectName]  = useState('')
   const [startDate,    setStartDate]    = useState('')
   const [endDate,      setEndDate]      = useState('')
-  const [sessionTime,     setSessionTime]     = useState('19:00')
+  const [sessionTime,     setSessionTime]     = useState('')
   const [sessionDuration, setSessionDuration] = useState(60)
   const [loading,         setLoading]         = useState(false)
   const galleryRef = useRef<HTMLInputElement>(null)
@@ -64,7 +64,7 @@ export default function CreateCourse({ isOpen, onClose, onSuccess }: CreateCours
       }
       const { data: courseData } = await createCourse(user.id, {
         title, description, subject, level,
-        duration_weeks: parseInt(duration) || 0,
+        duration_weeks: 0,
         thumbnail_url: thumbnailUrl,
         start_date: startDate || null,
         end_date: endDate || null,
@@ -202,8 +202,8 @@ export default function CreateCourse({ isOpen, onClose, onSuccess }: CreateCours
           </div>
 
           <div>
-            <label className={labelCls}>Duration (weeks)</label>
-            <input type="number" value={duration} onChange={e => setDuration(e.target.value)} placeholder="4" className={inputCls} />
+            <label className={labelCls}>Duration</label>
+            <input value={duration} onChange={e => setDuration(e.target.value)} placeholder="e.g. 8 weeks · 30 days · 3 months" className={inputCls} />
           </div>
 
           <div>
@@ -231,16 +231,14 @@ export default function CreateCourse({ isOpen, onClose, onSuccess }: CreateCours
             />
           </div>
 
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className={labelCls}>Session Time</label>
-              <input
-                type="time"
-                value={sessionTime}
-                onChange={e => setSessionTime(e.target.value)}
-                className={inputCls}
-              />
-            </div>
+          <div>
+            <label className={labelCls}>Session Time <span className="text-[#444] normal-case font-normal">(optional)</span></label>
+            <input
+              type="time"
+              value={sessionTime}
+              onChange={e => setSessionTime(e.target.value)}
+              className={inputCls}
+            />
           </div>
 
           <div>

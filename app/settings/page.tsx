@@ -6,7 +6,7 @@ import { updateUserProfile, submitInstructorApplication } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Moon, Lock, Bell, Shield,
-  LogOut, X, CheckCircle2, MapPin, Clock, Mail, Phone, Languages, Check,
+  LogOut, X, CheckCircle2, MapPin, Clock, Mail, Phone, Languages, Check, Send,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useLanguage } from '@/context/LanguageContext'
@@ -53,9 +53,11 @@ export default function SettingsPage() {
   const [showLangPicker, setShowLangPicker] = useState(false)
   const [darkMode,   setDarkMode]   = useState(true)
   const [showApply,  setShowApply]  = useState(false)
-  const [applying,   setApplying]   = useState(false)
-  const [applied,    setApplied]    = useState(false)
-  const [applyError, setApplyError] = useState('')
+  const [applying,      setApplying]      = useState(false)
+  const [applied,       setApplied]       = useState(false)
+  const [applyError,    setApplyError]    = useState('')
+  const [testingPush,   setTestingPush]   = useState(false)
+  const [testPushMsg,   setTestPushMsg]   = useState('')
 
   const [applyForm, setApplyForm] = useState({
     role_type:       '',
@@ -139,6 +141,34 @@ export default function SettingsPage() {
   const handleSignOut = async () => {
     await signOut()
     router.push('/')
+  }
+
+  const handleTestPush = async () => {
+    if (!user) return
+    setTestingPush(true)
+    setTestPushMsg('')
+    try {
+      // Re-register subscription in case it wasn't stored yet
+      const { registerPushSubscription } = await import('@/lib/push')
+      await registerPushSubscription(user.id)
+      // Small delay to let subscription save
+      await new Promise(r => setTimeout(r, 1000))
+      const res = await fetch('/api/push/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setTestPushMsg('Sent! Close the app and check your notifications.')
+      } else {
+        setTestPushMsg(data.error ?? 'Failed. Make sure you allowed notifications.')
+      }
+    } catch {
+      setTestPushMsg('Error sending test push.')
+    } finally {
+      setTestingPush(false)
+    }
   }
 
   const initial = user?.username?.[0]?.toUpperCase() ?? 'U'
@@ -268,6 +298,29 @@ export default function SettingsPage() {
           </div>
           <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
         </Link>
+        <div className="px-4 py-4 border-b border-[rgba(255,255,255,0.05)]">
+          <div className="flex items-center gap-3.5">
+            <div className="w-9 h-9 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
+              <Send className="w-4 h-4 text-[#888]" />
+            </div>
+            <div className="flex-1">
+              <p className="text-white theme-text-1 text-sm font-semibold">Test Push Notification</p>
+              <p className="text-[#555] theme-text-2 text-xs mt-0.5">Send a test to verify lock-screen notifications work</p>
+            </div>
+            <button
+              onClick={handleTestPush}
+              disabled={testingPush}
+              className="bg-[#FF6B2B] text-white text-xs font-bold px-3 py-1.5 rounded-full disabled:opacity-40"
+            >
+              {testingPush ? '...' : 'Test'}
+            </button>
+          </div>
+          {testPushMsg && (
+            <p className={`mt-2 ml-[52px] text-xs ${testPushMsg.startsWith('Sent') ? 'text-green-400' : 'text-red-400'}`}>
+              {testPushMsg}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* LEGAL */}

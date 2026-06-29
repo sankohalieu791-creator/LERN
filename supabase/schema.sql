@@ -217,6 +217,21 @@ CREATE TABLE IF NOT EXISTS public.certificates (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ── PUSH SUBSCRIPTIONS ───────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  endpoint   TEXT NOT NULL UNIQUE,
+  p256dh     TEXT NOT NULL,
+  auth_key   TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "push_subscriptions: user owns their own"
+  ON public.push_subscriptions FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
 -- ── NOTIFICATIONS ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.notifications (
   id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -745,3 +760,15 @@ CREATE POLICY "classroom-files: authenticated upload" ON storage.objects FOR INS
   WITH CHECK (bucket_id = 'classroom-files' AND auth.role() = 'authenticated');
 CREATE POLICY "classroom-files: owner delete" ON storage.objects FOR DELETE
   USING (bucket_id = 'classroom-files' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- project-files (course project submissions — private read via owner or instructor, authenticated upload)
+INSERT INTO storage.buckets (id, name, public) VALUES ('project-files', 'project-files', TRUE) ON CONFLICT (id) DO NOTHING;
+DROP POLICY IF EXISTS "project-files: owner read"   ON storage.objects;
+DROP POLICY IF EXISTS "project-files: owner upload" ON storage.objects;
+DROP POLICY IF EXISTS "project-files: owner delete" ON storage.objects;
+CREATE POLICY "project-files: owner read" ON storage.objects FOR SELECT
+  USING (bucket_id = 'project-files' AND auth.uid()::text = (storage.foldername(name))[1]);
+CREATE POLICY "project-files: owner upload" ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'project-files' AND auth.role() = 'authenticated');
+CREATE POLICY "project-files: owner delete" ON storage.objects FOR DELETE
+  USING (bucket_id = 'project-files' AND auth.uid()::text = (storage.foldername(name))[1]);
