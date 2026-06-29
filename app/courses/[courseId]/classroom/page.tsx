@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getCourseById, setSessionLive, supabase, rateCourse, getUserCourseRating } from '@/lib/supabase'
+import { getCourseById, setSessionLive, completeSession, supabase, rateCourse, getUserCourseRating } from '@/lib/supabase'
 import { sendPushToMany } from '@/lib/push'
 import dynamic from 'next/dynamic'
 import { Loader2, Calendar, Clock, Star } from 'lucide-react'
@@ -28,6 +28,9 @@ function ClassroomInner() {
   const [ratingStars,   setRatingStars]   = useState(0)
   const [ratingDone,    setRatingDone]    = useState(false)
 
+  // Track when session actually went live to decide completion on close
+  const liveStartRef = useRef<number | null>(null)
+
   useEffect(() => {
     getCourseById(courseId).then(({ data }) => {
       setCourse(data)
@@ -39,29 +42,44 @@ function ClassroomInner() {
     })
   }, [courseId, sessionId])
 
-  // Instructor: mark session live and notify enrolled students
+  // Instructor: mark session live, notify enrolled students (push + in-app bell)
   useEffect(() => {
     if (!course || !user || !sessionId) return
     if (user.id !== course.instructor_id) return
-    setSessionLive(sessionId, true).then(({ error }) => {
-      if (!error) {
-        // Notify all enrolled students
-        supabase
-          .from('enrollments')
-          .select('user_id')
-          .eq('course_id', courseId)
-          .then(({ data: rows }) => {
-            const ids = (rows || []).map((r: any) => r.user_id).filter((id: string) => id !== user.id)
-            if (ids.length) {
-              sendPushToMany(
-                ids,
-                '🔴 Class is starting!',
-                `${course.title} is now live — join now`,
-                `/courses/${courseId}/classroom?sessionId=${sessionId}`
-              )
-            }
-          })
-      }
+
+    setSessionLive(sessionId, true).then(async ({ error }) => {
+      if (error) return
+      liveStartRef.current = Date.now()
+
+      const { data: rows } = await supabase
+        .from('enrollments')
+        .select('user_id')
+        .eq('course_id', courseId)
+
+      const ids = (rows || []).map((r: any) => r.user_id).filter((id: string) => id !== user.id)
+      if (!ids.length) return
+
+      // Push notification (lock screen / background)
+      sendPushToMany(
+        ids,
+        '🔴 Class is starting!',
+        `${course.title} is now live — join now`,
+        `/courses/${courseId}/classroom?sessionId=${sessionId}`
+      )
+
+      // In-app bell notification (single batch insert)
+      await supabase.from('notifications').insert(
+        ids.map((studentId: string) => ({
+          user_id:           studentId,
+          type:              'live_class',
+          title:             '🔴 Class is live!',
+          body:              `${course.title} has started — join now`,
+          link:              `/courses/${courseId}/classroom?sessionId=${sessionId}`,
+          sender_id:         user.id,
+          sender_username:   user.username ?? '',
+          sender_avatar_url: user.avatar_url ?? null,
+        }))
+      )
     })
   }, [course, user, sessionId, courseId])
 
@@ -203,9 +221,14 @@ function ClassroomInner() {
 
   const handleClose = async () => {
     if (isInstructor && sessionId) {
-      // Just mark the session not-live. Sessions are never auto-completed from a classroom close
-      // so instructors can reopen the same session without it showing as permanently done.
-      await setSessionLive(sessionId, false)
+      const liveDuration = liveStartRef.current ? Date.now() - liveStartRef.current : 0
+      if (liveDuration > 2 * 60 * 1000) {
+        // Real class (2+ minutes) — mark session completed so students see it as done
+        await completeSession(sessionId)
+      } else {
+        // Quick open/test — just stop live, don't permanently complete the session
+        await setSessionLive(sessionId, false)
+      }
     }
     router.back()
   }

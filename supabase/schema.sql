@@ -236,12 +236,17 @@ CREATE POLICY "push_subscriptions: user owns their own"
 CREATE TABLE IF NOT EXISTS public.notifications (
   id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id         UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
-  type            TEXT NOT NULL CHECK (type IN ('like','comment','follow')),
+  type            TEXT NOT NULL CHECK (type IN ('like','comment','follow','live_class','enrollment','new_course')),
   related_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
   video_id        UUID REFERENCES public.videos(id) ON DELETE SET NULL,
   read            BOOLEAN NOT NULL DEFAULT FALSE,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Run this once in Supabase SQL editor to update existing constraint:
+-- ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
+-- ALTER TABLE public.notifications ADD CONSTRAINT notifications_type_check
+--   CHECK (type IN ('like','comment','follow','live_class','enrollment','new_course'));
 
 -- ── FEEDBACK ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.feedback (
