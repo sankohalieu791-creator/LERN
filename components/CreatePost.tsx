@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { X, Upload, Image as ImageIcon, Loader2, Globe, Lock, Video, Camera } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import { createVideo } from '@/lib/supabase'
+import { createVideo, notifyFollowers } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 
 interface CreatePostProps {
@@ -164,7 +164,7 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
 
       if (cancelledRef.current) return
 
-      const { error: createErr } = await createVideo(userId, {
+      const { error: createErr, data: videoData } = await createVideo(userId, {
         title,
         description,
         subject: subject || 'general',
@@ -175,6 +175,22 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
         is_public: isPublic,
       })
       if (createErr) throw createErr
+
+      // Notify followers about the new post
+      const newVideoId = (videoData as any)?.[0]?.id
+      const poster = user ?? authUser
+      if (newVideoId && poster) {
+        const postTitle = postType === 'photo' ? '📸 New photo' : '🎬 New video'
+        notifyFollowers(
+          userId,
+          'new_course',
+          postTitle,
+          `${(poster as any).username ?? 'Someone'} just posted: ${title}`,
+          `/feed/${newVideoId}`,
+          { id: userId, username: (poster as any).username ?? '', avatar_url: (poster as any).avatar_url ?? null }
+        )
+      }
+
       reset()
       onClose()
     } catch (err: any) {
