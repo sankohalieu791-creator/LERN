@@ -675,7 +675,7 @@ export const getUserCourseRating = async (courseId: string, userId: string) => {
     .select('rating')
     .eq('course_id', courseId)
     .eq('user_id', userId)
-    .single()
+    .maybeSingle()
   return { data, error }
 }
 
