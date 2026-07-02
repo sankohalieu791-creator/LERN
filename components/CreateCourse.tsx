@@ -26,6 +26,8 @@ export default function CreateCourse({ isOpen, onClose, onSuccess }: CreateCours
   const [thumbnail,    setThumbnail]    = useState<File | null>(null)
   const [sessionCount, setSessionCount] = useState(8)
   const [projectName,  setProjectName]  = useState('')
+  const [projectDesc,  setProjectDesc]  = useState('')
+  const [projectDue,   setProjectDue]   = useState('')
   const [startDate,    setStartDate]    = useState('')
   const [endDate,      setEndDate]      = useState('')
   const [sessionTime,     setSessionTime]     = useState('')
@@ -135,7 +137,22 @@ export default function CreateCourse({ isOpen, onClose, onSuccess }: CreateCours
           })
         }
 
-        if (sessionRows.length > 0) await createCourseSessions(newCourseId, sessionRows)
+        if (sessionRows.length > 0) {
+          const { data: createdSessions } = await createCourseSessions(newCourseId, sessionRows)
+          // Auto-create the Project Day brief tied to the final (project day) session
+          const projectSession = (createdSessions as any[] | null)?.find(s => s.is_project_day)
+          if (projectSession && projectName.trim()) {
+            await supabase.from('course_projects').insert([{
+              instructor_id:   user.id,
+              course_id:       newCourseId,
+              session_id:      projectSession.id,
+              title:           projectName.trim(),
+              description:     projectDesc.trim() || null,
+              due_date:        projectDue || null,
+              submission_mode: 'upload',
+            }])
+          }
+        }
         // Notify followers
         notifyFollowers(
           user.id,
@@ -147,7 +164,7 @@ export default function CreateCourse({ isOpen, onClose, onSuccess }: CreateCours
         )
       }
       setTitle(''); setDescription(''); setSubject(''); setLevel('')
-      setDuration(''); setThumbnail(null); setSessionCount(8); setProjectName(''); setStartDate(''); setEndDate(''); setSessionTime('19:00'); setSessionDuration(60)
+      setDuration(''); setThumbnail(null); setSessionCount(8); setProjectName(''); setProjectDesc(''); setProjectDue(''); setStartDate(''); setEndDate(''); setSessionTime('19:00'); setSessionDuration(60)
       onClose()
       onSuccess?.()
     } catch (err) {
@@ -306,10 +323,23 @@ export default function CreateCourse({ isOpen, onClose, onSuccess }: CreateCours
             <p className="text-[#444] text-xs mt-2">Session {sessionCount} is always <span className="text-[#FF6B2B]">Projects Day</span></p>
           </div>
 
-          <div>
-            <label className={labelCls}>Project Name <span className="text-[#444] normal-case font-normal">(optional)</span></label>
-            <input value={projectName} onChange={e => setProjectName(e.target.value)}
-              placeholder="e.g. Build a full TypeScript app" className={inputCls} />
+          <div className="bg-[#161616] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 space-y-4">
+            <p className="text-[#FF6B2B] text-[11px] font-bold uppercase tracking-wider">Project Day Brief</p>
+            <div>
+              <label className={labelCls}>Project Title <span className="text-[#444] normal-case font-normal">(optional)</span></label>
+              <input value={projectName} onChange={e => setProjectName(e.target.value)}
+                placeholder="e.g. Build a full TypeScript app" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>What learners must do</label>
+              <textarea value={projectDesc} onChange={e => setProjectDesc(e.target.value)}
+                placeholder="Describe the task and how it will be graded" rows={3} className={`${inputCls} resize-none`} />
+            </div>
+            <div>
+              <label className={labelCls}>Submission Deadline</label>
+              <input type="date" value={projectDue} onChange={e => setProjectDue(e.target.value)} className={inputCls} />
+            </div>
+            <p className="text-[#444] text-xs">Opens automatically for learners once they finish the final session.</p>
           </div>
 
           <button type="button" onClick={() => galleryRef.current?.click()}

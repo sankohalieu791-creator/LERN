@@ -6,13 +6,14 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getCourseById, getCourseProjectBySession, getCourseProject,
   getProjectSubmissions, setSessionLive, gradeSubmission, supabase,
+  getMyProjectShowcase, publishProjectShowcase, createVideo, notifyFollowers,
 } from '@/lib/supabase'
 import { sendPushToMany } from '@/lib/push'
 import Link from 'next/link'
 import {
   ChevronLeft, Loader2, Upload, Film, ImageIcon, File, CheckCircle,
   XCircle, Clock, Calendar, Users, MessageSquare, X, Plus, RefreshCw,
-  ClipboardList, Video, Pencil,
+  ClipboardList, Video, Pencil, Globe, Lock, Trophy,
 } from 'lucide-react'
 
 function StatusBadge({ status }: { status: string }) {
@@ -71,6 +72,11 @@ function ProjectDayInner() {
   // Closing project day
   const [closing,      setClosing]      = useState(false)
 
+  // Student: publishing an accepted project
+  const [showcase,     setShowcase]     = useState<any>(null)
+  const [publishing,   setPublishing]   = useState<'public' | 'private' | null>(null)
+  const [publishError, setPublishError] = useState('')
+
   const openedRef = useRef(false)
 
   // ── Load ─────────────────────────────────────────────────────
@@ -116,6 +122,7 @@ function ProjectDayInner() {
             .eq('user_id', user.id)
             .maybeSingle()
           setMySubmission(sub)
+          setShowcase(await getMyProjectShowcase(user.id, courseId))
         }
       }
 
@@ -257,6 +264,51 @@ function ProjectDayInner() {
     }
   }
 
+  const handlePublish = async (visibility: 'public' | 'private') => {
+    if (!user || !project || !mySubmission) return
+    setPublishing(visibility)
+    setPublishError('')
+    try {
+      const { data, error } = await publishProjectShowcase(user.id, {
+        course_id:       courseId,
+        title:           project.title,
+        description:     mySubmission.description || project.description || undefined,
+        visibility,
+        attachment_url:  mySubmission.file_url || undefined,
+        attachment_type: mySubmission.file_type || undefined,
+      })
+      if (error) throw new Error(error.message)
+
+      // Public projects also appear in the main feed as a post
+      if (visibility === 'public') {
+        const { data: videoData } = await createVideo(user.id, {
+          title:         project.title,
+          description:   mySubmission.description || project.description || '',
+          subject:       course.subject || 'project',
+          duration:      '',
+          thumbnail_url: mySubmission.file_type === 'image' ? mySubmission.file_url : null,
+          video_url:     mySubmission.file_type === 'video' ? mySubmission.file_url : null,
+          views:         0,
+          is_public:     true,
+        })
+        const newVideoId = (videoData as any)?.[0]?.id
+        notifyFollowers(
+          user.id,
+          'new_course',
+          '🏆 New project',
+          `${(user as any).username ?? 'Someone'} published: ${project.title}`,
+          newVideoId ? `/feed/${newVideoId}` : `/courses/${courseId}`,
+          { id: user.id, username: (user as any).username ?? '', avatar_url: (user as any).avatar_url ?? null }
+        )
+      }
+      setShowcase(data ?? { visibility })
+    } catch (e: any) {
+      setPublishError(e.message || 'Could not publish. Try again.')
+    } finally {
+      setPublishing(null)
+    }
+  }
+
   const handleGrade = async (submissionId: string, status: 'accepted' | 'declined') => {
     setGrading(true)
     const { data } = await gradeSubmission(submissionId, status, feedbackText.trim() || undefined)
@@ -296,8 +348,16 @@ function ProjectDayInner() {
   const reviewed  = submissions.filter(s => s.status !== 'pending').length
   const classroomUrl = `/courses/${courseId}/classroom?sessionId=${sessionId}`
 
+  // Project Day opens for students once the taught sessions are done.
+  const allSessions     = (course.course_sessions ?? []) as any[]
+  const teachingSessions = allSessions.filter(s => !s.is_project_day)
+  const teachingDone    = teachingSessions.length > 0
+    ? teachingSessions.every(s => s.is_completed)
+    : allSessions.every(s => s.is_completed)
+  const projectOpen     = !!(session?.is_live || session?.is_completed || teachingDone)
+
   // Student gate: project day not open yet
-  if (!isInstructor && session && !session.is_live && !session.is_completed) {
+  if (!isInstructor && session && !projectOpen) {
     return (
       <div className="fixed inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center px-8 gap-5"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -570,6 +630,51 @@ function ProjectDayInner() {
                   <div className="bg-[#111] rounded-xl p-3 border border-[rgba(255,255,255,0.06)]">
                     <p className="text-[#555] text-[10px] font-bold uppercase tracking-wider mb-1">Instructor Feedback</p>
                     <p className="text-[#888] text-sm">{mySubmission.feedback}</p>
+                  </div>
+                )}
+
+                {/* Accepted → publish to feed or keep private */}
+                {mySubmission.status === 'accepted' && (
+                  <div className="border-t border-[rgba(255,255,255,0.07)] pt-4 mt-1">
+                    {showcase ? (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Trophy className="w-4 h-4 text-[#FF6B2B]" />
+                        <span className="text-white font-semibold">
+                          {showcase.visibility === 'public' ? 'Published to your feed' : 'Saved to your private showcase'}
+                        </span>
+                        {showcase.visibility === 'public'
+                          ? <Globe className="w-3.5 h-3.5 text-[#555] ml-auto" />
+                          : <Lock className="w-3.5 h-3.5 text-[#555] ml-auto" />}
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-white font-bold text-sm mb-1 flex items-center gap-1.5">
+                          <Trophy className="w-4 h-4 text-[#FF6B2B]" /> Showcase your project
+                        </p>
+                        <p className="text-[#555] text-xs mb-3">Your instructor accepted it — publish it publicly or keep it visible to instructors &amp; employers only.</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => handlePublish('public')}
+                            disabled={!!publishing}
+                            className="flex items-center justify-center gap-2 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white text-sm font-bold py-3 rounded-xl disabled:opacity-40"
+                          >
+                            {publishing === 'public' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                            Post to Feed
+                          </button>
+                          <button
+                            onClick={() => handlePublish('private')}
+                            disabled={!!publishing}
+                            className="flex items-center justify-center gap-2 bg-[#1e1e1e] border border-[rgba(255,255,255,0.1)] text-white text-sm font-bold py-3 rounded-xl disabled:opacity-40"
+                          >
+                            {publishing === 'private' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                            Keep Private
+                          </button>
+                        </div>
+                        {publishError && (
+                          <p className="text-red-400 text-xs bg-red-400/10 rounded-xl px-3 py-2 text-center mt-2">{publishError}</p>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </div>

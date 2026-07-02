@@ -116,7 +116,7 @@ export const getCourses = async (userId?: string) => {
     }
   }
 
-  const base = supabase.from('courses').select('*').order('created_at', { ascending: false })
+  const base = supabase.from('courses').select('*, course_sessions(*)').order('created_at', { ascending: false })
 
   let filtered = orgId
     ? base.or(`visibility.eq.public,and(visibility.eq.private,organisation_id.eq.${orgId})`)
@@ -126,7 +126,7 @@ export const getCourses = async (userId?: string) => {
 
   // If visibility column doesn't exist yet (SQL not run), fall back to unfiltered
   if (error || !data) {
-    const fallback = await supabase.from('courses').select('*').order('created_at', { ascending: false })
+    const fallback = await supabase.from('courses').select('*, course_sessions(*)').order('created_at', { ascending: false })
     data = fallback.data
     error = fallback.error
   }
@@ -651,6 +651,7 @@ export const createCourseSessions = async (courseId: string, sessions: any[]) =>
   const { data, error } = await supabase
     .from('course_sessions')
     .insert(sessions)
+    .select()
   return { data, error }
 }
 
@@ -1116,6 +1117,42 @@ export const updateSubmissionStatus = async (
     .eq('id', submissionId)
     .select()
     .single()
+  return { data, error }
+}
+
+// ── Project showcase (published, accepted projects) ───────────
+
+// Existing published showcase for this user on a course (null if not yet published)
+export const getMyProjectShowcase = async (userId: string, courseId: string) => {
+  const { data } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('course_id', courseId)
+    .maybeSingle()
+  return data
+}
+
+// Publish an accepted project to the showcase (public = feed + showcase, private = employer/instructor-only showcase)
+export const publishProjectShowcase = async (
+  userId: string,
+  payload: {
+    course_id: string
+    title: string
+    description?: string
+    visibility: 'public' | 'private'
+    attachment_url?: string
+    attachment_type?: string
+  }
+) => {
+  const row: any = { user_id: userId, ...payload }
+  let { data, error } = await supabase.from('projects').insert([row]).select().single()
+  // Fall back if the attachment columns haven't been added yet (migration not run)
+  if (error) {
+    const { attachment_url, attachment_type, ...minimal } = row
+    const retry = await supabase.from('projects').insert([minimal]).select().single()
+    data = retry.data; error = retry.error
+  }
   return { data, error }
 }
 

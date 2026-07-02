@@ -496,6 +496,8 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
     ? new Date(sessions[0].session_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     : null
 
+  const allSessionsCompleted = sessions.length > 0 && sessions.every((s: any) => s.is_completed)
+
   return (
     <div className="fixed inset-0 z-[60] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
@@ -615,13 +617,19 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
             <div className="flex-shrink-0 px-5 py-4 border-t border-[rgba(255,255,255,0.07)] bg-[#141414]"
               style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
               {isOwner ? (
-                <button
-                  onClick={handleStartClass}
-                  disabled={starting}
-                  className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
-                >
-                  {starting ? <><Loader2 className="w-4 h-4 animate-spin" />Starting…</> : t('start_class')}
-                </button>
+                allSessionsCompleted ? (
+                  <div className="w-full flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] text-[#555] font-bold py-4 rounded-2xl text-sm">
+                    <Check className="w-4 h-4 text-green-500" /> Course Complete
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleStartClass}
+                    disabled={starting}
+                    className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
+                  >
+                    {starting ? <><Loader2 className="w-4 h-4 animate-spin" />Starting…</> : t('start_class')}
+                  </button>
+                )
               ) : enrolled ? (
                 <div className="space-y-2">
                   <div className="bg-green-500/10 border border-green-500/25 rounded-2xl px-4 py-3 text-center">
@@ -1009,6 +1017,8 @@ function CourseCard({ course, isEnrolled, isOwner, onTap }: {
   onTap: () => void
 }) {
   const { t } = useLanguage()
+  const cardSessions = (course.course_sessions || []) as any[]
+  const allCompleted = cardSessions.length > 0 && cardSessions.every(s => s.is_completed)
   return (
     <div onClick={onTap}
       className="bg-[#1a1a1a] rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.06)] active:opacity-90 transition cursor-pointer">
@@ -1050,9 +1060,15 @@ function CourseCard({ course, isEnrolled, isOwner, onTap }: {
           <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />{course.rating?.toFixed(1)}</span>
         </div>
         {isOwner ? (
-          <div className="w-full py-3 rounded-2xl text-center text-sm font-bold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white">
-            Start Class →
-          </div>
+          allCompleted ? (
+            <div className="w-full py-3 rounded-2xl text-center text-sm font-bold bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] text-[#555] flex items-center justify-center gap-1.5">
+              <Check className="w-3.5 h-3.5 text-green-500" /> Course Complete
+            </div>
+          ) : (
+            <div className="w-full py-3 rounded-2xl text-center text-sm font-bold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white">
+              Start Class →
+            </div>
+          )
         ) : (
           <div className={`w-full py-3 rounded-2xl text-center text-sm font-bold ${
             isEnrolled ? 'bg-[#252525] text-white' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
