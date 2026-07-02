@@ -83,7 +83,29 @@ export interface CourseSession {
   session_time: string
   is_live: boolean
   is_project_day: boolean
+  is_completed: boolean
   created_at: string
+}
+
+export interface CourseProject {
+  id: string
+  instructor_id: string
+  course_id: string
+  session_id?: string
+  title: string
+  description?: string
+  due_date?: string
+  submission_mode: 'upload' | 'live' | 'both'
+  created_at: string
+}
+
+export interface ProjectSubmissionWithUser extends ProjectSubmission {
+  user?: { id: string; username: string; avatar_url?: string }
+  file_url?: string
+  file_type?: string
+  description?: string
+  feedback?: string
+  session_id?: string
 }
 
 export interface Workshop {

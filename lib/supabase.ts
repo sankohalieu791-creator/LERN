@@ -979,6 +979,42 @@ export const getCourseProject = async (courseId: string) => {
   return { data, error }
 }
 
+export const getCourseProjectBySession = async (sessionId: string) => {
+  const { data, error } = await supabase
+    .from('course_projects')
+    .select('*')
+    .eq('session_id', sessionId)
+    .maybeSingle()
+  return { data, error }
+}
+
+export const updateCourseProject = async (
+  projectId: string,
+  payload: { title?: string; description?: string; due_date?: string; submission_mode?: string }
+) => {
+  const { data, error } = await supabase
+    .from('course_projects')
+    .update(payload)
+    .eq('id', projectId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const gradeSubmission = async (
+  submissionId: string,
+  status: 'accepted' | 'declined',
+  feedback?: string
+) => {
+  const { data, error } = await supabase
+    .from('project_submissions')
+    .update({ status, feedback: feedback ?? null })
+    .eq('id', submissionId)
+    .select()
+    .single()
+  return { data, error }
+}
+
 export const createCourseProject = async (
   instructorId: string,
   courseId: string,

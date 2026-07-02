@@ -189,14 +189,28 @@ export default function CourseDetailPage() {
   const almostDone = sessions.length > 0 && completedCount / sessions.length >= 0.7 && isInstructor && !project
 
   // Session routing helpers
-  const nextSession   = sessions.find((s: any) => !s.is_completed)      // instructor: go live with this one
-  const liveSession   = sessions.find((s: any) => s.is_live)            // student: join this one
+  const nextSession      = sessions.find((s: any) => !s.is_completed)
+  const liveSession      = sessions.find((s: any) => s.is_live)
+  const isProjectDay     = nextSession?.is_project_day ?? false
+  const isLiveProjectDay = liveSession?.is_project_day ?? false
+
   const instructorUrl = nextSession
-    ? `/courses/${courseId}/classroom?sessionId=${nextSession.id}`
+    ? isProjectDay
+      ? `/courses/${courseId}/project-day?sessionId=${nextSession.id}`
+      : `/courses/${courseId}/classroom?sessionId=${nextSession.id}`
     : `/courses/${courseId}/classroom`
+
   const studentUrl = liveSession
-    ? `/courses/${courseId}/classroom?sessionId=${liveSession.id}`
+    ? isLiveProjectDay
+      ? `/courses/${courseId}/project-day?sessionId=${liveSession.id}`
+      : `/courses/${courseId}/classroom?sessionId=${liveSession.id}`
     : null
+
+  const instructorLabel = liveSession
+    ? (isProjectDay ? 'View Submissions' : 'Resume Live Class')
+    : (isProjectDay ? 'Open Project Day' : 'Start Live Class')
+
+  const studentLabel = isLiveProjectDay ? 'Submit Your Project' : 'Enter Live Classroom'
 
   return (
     <div className="fixed inset-0 bg-[#0f0f0f] overflow-y-auto">
@@ -357,7 +371,7 @@ export default function CourseDetailPage() {
             href={instructorUrl}
             className="block w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl text-center"
           >
-            {liveSession ? 'Resume Live Class' : 'Start Live Class'}
+            {instructorLabel}
           </Link>
         ) : enrolled ? (
           studentUrl ? (
@@ -365,7 +379,7 @@ export default function CourseDetailPage() {
               href={studentUrl}
               className="block w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl text-center"
             >
-              Enter Live Classroom
+              {studentLabel}
             </Link>
           ) : (
             <div className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] text-[#555] font-bold py-4 rounded-2xl text-center text-sm">
