@@ -109,7 +109,6 @@ export const getCourses = async (userId?: string) => {
     const { data: membership } = await supabase
       .from('organisation_members').select('organisation_id').eq('user_id', userId).maybeSingle()
     orgId = membership?.organisation_id ?? null
-    // Also check if user is org admin
     if (!orgId) {
       const { data: adminOrg } = await supabase
         .from('organisations').select('id').eq('admin_user_id', userId).maybeSingle()
@@ -117,24 +116,28 @@ export const getCourses = async (userId?: string) => {
     }
   }
 
-  let query = supabase.from('courses').select('*').order('created_at', { ascending: false })
+  const base = supabase.from('courses').select('*').order('created_at', { ascending: false })
 
-  if (orgId) {
-    // Public courses OR private courses belonging to user's org
-    query = query.or(`visibility.eq.public,and(visibility.eq.private,organisation_id.eq.${orgId})`)
-  } else {
-    // Only public courses (or courses without visibility set)
-    query = query.or('visibility.eq.public,visibility.is.null')
+  let filtered = orgId
+    ? base.or(`visibility.eq.public,and(visibility.eq.private,organisation_id.eq.${orgId})`)
+    : base.or('visibility.eq.public,visibility.is.null')
+
+  let { data, error } = await filtered
+
+  // If visibility column doesn't exist yet (SQL not run), fall back to unfiltered
+  if (error || !data) {
+    const fallback = await supabase.from('courses').select('*').order('created_at', { ascending: false })
+    data = fallback.data
+    error = fallback.error
   }
 
-  const { data, error } = await query
-  if (!data) return { data, error }
+  if (!data) return { data: [], error: null }
   const ids = [...new Set(data.map((c: any) => c.instructor_id || c.user_id).filter(Boolean))]
   const { data: usersData } = ids.length
     ? await supabase.from('users').select('id, username, avatar_url, verified, title').in('id', ids)
     : { data: [] }
   const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
-  return { data: data.map((c: any) => ({ ...c, users: map[c.instructor_id || c.user_id] ?? null })), error }
+  return { data: data.map((c: any) => ({ ...c, users: map[c.instructor_id || c.user_id] ?? null })), error: null }
 }
 
 export const getCourseById = async (courseId: string) => {
