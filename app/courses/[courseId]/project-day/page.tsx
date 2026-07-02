@@ -542,15 +542,13 @@ function ProjectDayInner() {
         {/* ══ STUDENT: SUBMISSION ════════════════════════════════ */}
         {!isInstructor && enrolled && project && (mode === 'upload' || mode === 'both') && (
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Upload className="w-4 h-4 text-[#FF6B2B]" />
-              <p className="text-white text-sm font-bold uppercase tracking-wide">Your Submission</p>
-            </div>
+            <p className="text-white text-base font-bold mb-3">Submit Your Project</p>
 
-            {mySubmission ? (
+            {mySubmission && mySubmission.status !== 'declined' ? (
+              // Already submitted — show status card
               <div className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-white font-bold text-sm">Submitted</p>
+                  <p className="text-white font-bold text-sm">Your submission</p>
                   <StatusBadge status={mySubmission.status} />
                 </div>
                 {mySubmission.description && (
@@ -563,8 +561,8 @@ function ProjectDayInner() {
                     <img src={mySubmission.file_url} alt="submission" className="w-full rounded-xl max-h-48 object-cover" />
                   ) : (
                     <a href={mySubmission.file_url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-[#1d9bf0] text-xs font-semibold">
-                      <File className="w-3.5 h-3.5" /> View your submitted file
+                      className="flex items-center gap-2 bg-[#111] rounded-xl px-4 py-3 text-[#1d9bf0] text-sm font-semibold">
+                      <File className="w-4 h-4" /> View submitted file
                     </a>
                   )
                 )}
@@ -574,58 +572,94 @@ function ProjectDayInner() {
                     <p className="text-[#888] text-sm">{mySubmission.feedback}</p>
                   </div>
                 )}
-                {mySubmission.status === 'declined' && (
-                  <button
-                    onClick={() => { setSubmitDesc(mySubmission.description ?? ''); setSubmitFile(null) }}
-                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-3 rounded-xl text-sm"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" /> Revise & Resubmit
-                  </button>
-                )}
               </div>
             ) : (
               // Submission form
-              <div className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4 space-y-4">
+              <div className="space-y-3">
+                {/* Declined banner */}
+                {mySubmission?.status === 'declined' && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3">
+                    <p className="text-red-400 text-sm font-bold mb-0.5">Needs revision</p>
+                    {mySubmission.feedback && <p className="text-[#888] text-xs">{mySubmission.feedback}</p>}
+                  </div>
+                )}
+
+                {/* Selected file preview */}
+                {submitFile && (
+                  <div className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-2xl p-3 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#111] flex items-center justify-center flex-shrink-0">
+                      {submitFile.type.startsWith('image/') ? <ImageIcon className="w-5 h-5 text-[#FF6B2B]" />
+                        : submitFile.type.startsWith('video/') ? <Film className="w-5 h-5 text-[#FF6B2B]" />
+                        : <File className="w-5 h-5 text-[#FF6B2B]" />}
+                    </div>
+                    <p className="text-white text-sm font-semibold flex-1 truncate">{submitFile.name}</p>
+                    <button onClick={() => setSubmitFile(null)}>
+                      <X className="w-4 h-4 text-[#555]" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Upload options */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Upload PDF */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const inp = document.createElement('input')
+                      inp.type = 'file'; inp.accept = '.pdf,.doc,.docx'
+                      inp.onchange = e => setSubmitFile((e.target as HTMLInputElement).files?.[0] || null)
+                      inp.click()
+                    }}
+                    className="flex flex-col items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-2xl py-5 active:opacity-70 transition"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#FF6B2B]/15 flex items-center justify-center">
+                      <File className="w-6 h-6 text-[#FF6B2B]" />
+                    </div>
+                    <p className="text-white text-sm font-bold">Upload PDF</p>
+                    <p className="text-[#555] text-[11px]">PDF, Word doc</p>
+                  </button>
+
+                  {/* Take / upload a photo */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const inp = document.createElement('input')
+                      inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment'
+                      inp.onchange = e => setSubmitFile((e.target as HTMLInputElement).files?.[0] || null)
+                      inp.click()
+                    }}
+                    className="flex flex-col items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-2xl py-5 active:opacity-70 transition"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#C026D3]/15 flex items-center justify-center">
+                      <ImageIcon className="w-6 h-6 text-[#C026D3]" />
+                    </div>
+                    <p className="text-white text-sm font-bold">Take a Photo</p>
+                    <p className="text-[#555] text-[11px]">Camera or gallery</p>
+                  </button>
+                </div>
+
+                {/* Notes */}
                 <textarea
                   value={submitDesc}
                   onChange={e => setSubmitDesc(e.target.value)}
-                  placeholder="Describe your work — what you built, what you learned, any notes for your instructor…"
-                  rows={4}
-                  className="w-full bg-[#111] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.2)] transition resize-none"
+                  placeholder="Add a note for your instructor — what you did, what you found challenging…"
+                  rows={3}
+                  className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-2xl px-4 py-3 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.2)] transition resize-none"
                 />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex items-center justify-center gap-2 bg-[#111] border border-dashed border-[rgba(255,255,255,0.12)] text-[#888] text-sm py-3.5 rounded-xl hover:text-white hover:border-[rgba(255,255,255,0.25)] transition"
-                >
-                  {submitFile ? (
-                    <>
-                      {submitFile.type.startsWith('image/') ? <ImageIcon className="w-4 h-4" />
-                        : submitFile.type.startsWith('video/') ? <Film className="w-4 h-4" />
-                        : <File className="w-4 h-4" />}
-                      <span className="truncate max-w-[220px] text-white text-xs">{submitFile.name}</span>
-                      <X className="w-3.5 h-3.5 ml-auto" onClick={e => { e.stopPropagation(); setSubmitFile(null) }} />
-                    </>
-                  ) : (
-                    <><Upload className="w-4 h-4" /> Upload Video, Photo or File</>
-                  )}
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,video/*,.pdf,.doc,.docx,.zip"
-                  onChange={e => setSubmitFile(e.target.files?.[0] || null)}
-                  className="hidden"
-                />
+
                 {submitError && (
                   <p className="text-red-400 text-xs bg-red-400/10 rounded-xl px-3 py-2 text-center">{submitError}</p>
                 )}
+
                 <button
                   onClick={handleSubmit}
                   disabled={submitting || (!submitDesc.trim() && !submitFile)}
-                  className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-xl disabled:opacity-40 flex items-center justify-center gap-2"
+                  className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
                 >
-                  {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</> : <><Upload className="w-4 h-4" /> Submit Project</>}
+                  {submitting
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</>
+                    : <><Upload className="w-4 h-4" /> Submit Project</>
+                  }
                 </button>
               </div>
             )}

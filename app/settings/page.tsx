@@ -237,6 +237,17 @@ export default function SettingsPage() {
           </div>
           <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
         </Link>
+        <Link href="/organisation/register"
+          className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition">
+          <div className="w-9 h-9 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
+            <Building2 className="w-4 h-4 text-[#888]" />
+          </div>
+          <div className="flex-1">
+            <p className="text-white theme-text-1 text-sm font-semibold">Register Your Institution</p>
+            <p className="text-[#555] theme-text-2 text-xs mt-0.5">Set up a space for your college or organisation</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
+        </Link>
       </div>
 
       {/* APPEARANCE */}
