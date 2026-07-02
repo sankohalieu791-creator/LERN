@@ -116,8 +116,8 @@ export default function RegisterOrganisationPage() {
         <h1 className="text-white font-bold text-base">Register Your Institution</h1>
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-5 pt-6 pb-6 space-y-6">
+      {/* Scrollable content — button lives inside here so keyboard never hides it */}
+      <div className="flex-1 overflow-y-auto px-5 pt-6 space-y-6">
         <div className="flex items-center gap-3">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
             <Building2 className="w-7 h-7 text-white" />
@@ -180,21 +180,20 @@ export default function RegisterOrganisationPage() {
         {error && (
           <p className="text-red-400 text-sm bg-red-400/10 rounded-xl px-4 py-3">{error}</p>
         )}
-      </div>
 
-      {/* Bottom button — always visible */}
-      <div className="flex-shrink-0 px-5 py-4 border-t border-[rgba(255,255,255,0.06)] bg-[#0a0a0a]"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
-        <button
-          onClick={handleSubmit}
-          disabled={loading || !name.trim() || !slug.trim() || !code.trim()}
-          className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
-        >
-          {loading
-            ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</>
-            : 'Create Institution Space'
-          }
-        </button>
+        {/* Button inside scroll area — never hidden by keyboard */}
+        <div className="pt-2 pb-10" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !name.trim() || !slug.trim() || !code.trim()}
+            className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            {loading
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</>
+              : 'Create Institution Space'
+            }
+          </button>
+        </div>
       </div>
 
     </div>
