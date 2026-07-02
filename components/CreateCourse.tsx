@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { X, ImageIcon } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import { createCourse, createCourseSessions, notifyFollowers, supabase } from '@/lib/supabase'
+import { createCourse, createCourseSessions, notifyFollowers, getMyOrganisation, supabase } from '@/lib/supabase'
 
 interface CreateCourseProps {
   isOpen: boolean
@@ -31,7 +31,16 @@ export default function CreateCourse({ isOpen, onClose, onSuccess }: CreateCours
   const [sessionTime,     setSessionTime]     = useState('')
   const [sessionDuration, setSessionDuration] = useState(60)
   const [loading,         setLoading]         = useState(false)
+  const [visibility,      setVisibility]      = useState<'public' | 'private'>('public')
+  const [myOrg,           setMyOrg]           = useState<any>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
+
+  // Load org admin status
+  useState(() => {
+    if (user?.id) {
+      getMyOrganisation(user.id).then(({ data }) => setMyOrg(data ?? null))
+    }
+  })
 
   if (!isOpen) return null
 
@@ -69,6 +78,8 @@ export default function CreateCourse({ isOpen, onClose, onSuccess }: CreateCours
         start_date: startDate || null,
         end_date: endDate || null,
         rating: 0,
+        visibility,
+        organisation_id: visibility === 'private' && myOrg ? myOrg.id : null,
       })
       const newCourseId = (courseData as any)?.[0]?.id
       if (newCourseId) {
@@ -187,6 +198,34 @@ export default function CreateCourse({ isOpen, onClose, onSuccess }: CreateCours
               className={inputCls}
             />
           </div>
+
+          {/* Visibility — only shown to org admins */}
+          {myOrg && (
+            <div>
+              <label className={labelCls}>Visibility</label>
+              <div className="flex gap-2">
+                {(['public', 'private'] as const).map(v => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setVisibility(v)}
+                    className={`flex-1 py-3 rounded-xl text-sm font-bold capitalize transition ${
+                      visibility === v
+                        ? v === 'private'
+                          ? 'bg-[#FF6B2B] text-white'
+                          : 'bg-white text-black'
+                        : 'bg-[#252525] text-[#888] border border-[rgba(255,255,255,0.07)]'
+                    }`}
+                  >
+                    {v === 'public' ? '🌍 Public' : `🔒 ${myOrg.name} only`}
+                  </button>
+                ))}
+              </div>
+              {visibility === 'private' && (
+                <p className="text-[#555] text-xs mt-2">Only students in {myOrg.name} will see this course</p>
+              )}
+            </div>
+          )}
 
           {/* Level pills */}
           <div>

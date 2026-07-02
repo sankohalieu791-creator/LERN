@@ -10,10 +10,11 @@ import {
   getInstructorRequests, updateRequestStatus,
   getProjectsByUser, getCertificatesByUser,
   getJobsByInstructor, getInstructorWorkshops,
-  getCoursesByInstructor,
+  getCoursesByInstructor, getOrCreateConversation, getRequestBetween,
+  getMyOrgMembership,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
-import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin, Eye, Globe, Calendar, BookOpen } from 'lucide-react'
+import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin, Eye, Globe, Calendar, BookOpen, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { useLanguage } from '@/context/LanguageContext'
 
@@ -75,6 +76,10 @@ export default function UserProfilePage() {
   const [workshops, setWorkshops] = useState<any[]>([])
   const [instructorCourses, setInstructorCourses] = useState<any[]>([])
   const [certModal, setCertModal] = useState<any | null>(null)
+  const [orgMembership, setOrgMembership] = useState<any>(null)
+  // Safeguarding: request status between viewer and instructor
+  const [requestStatus, setRequestStatus] = useState<'none' | 'pending' | 'accepted' | 'declined'>('none')
+  const [messagingLoading, setMessagingLoading] = useState(false)
 
   const profileId    = userId as string
   const isOwnProfile = user?.id === profileId
@@ -124,6 +129,20 @@ export default function UserProfilePage() {
           const { data: reqs } = await getInstructorRequests(profileId)
           setRequests(reqs ?? [])
         }
+
+        // Safeguarding: check request status when viewing an instructor's profile
+        if (user.id !== profileId && profileRes.data?.account_type === 'instructor') {
+          const { data: req } = await getRequestBetween(user.id, profileId)
+          setRequestStatus(req ? (req.status as any) : 'none')
+        }
+
+        // Org badge: load membership for the profile being viewed
+        const { data: membership } = await getMyOrgMembership(profileId)
+        setOrgMembership(membership)
+      } else {
+        // Not logged in — still load org for public display
+        const { data: membership } = await getMyOrgMembership(profileId)
+        setOrgMembership(membership)
       }
 
       setLoading(false)
@@ -149,6 +168,14 @@ export default function UserProfilePage() {
   const handleRequestAction = async (requestId: string, status: 'accepted' | 'declined') => {
     await updateRequestStatus(requestId, status)
     setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status } : r))
+  }
+
+  const handleMessage = async () => {
+    if (!user) { router.push('/auth/login'); return }
+    setMessagingLoading(true)
+    const { data: conv } = await getOrCreateConversation(user.id, profileId)
+    setMessagingLoading(false)
+    if (conv) router.push(`/messages/${conv.id}`)
   }
 
   // Only instructors can leave feedback, and not on other instructors
@@ -243,6 +270,16 @@ export default function UserProfilePage() {
             {profile.account_type ?? 'student'}
           </span>
         </div>
+        {/* Org badge */}
+        {orgMembership?.organisations && (
+          <div className="flex items-center gap-1.5 mt-1.5">
+            {orgMembership.organisations.logo_url
+              ? <img src={orgMembership.organisations.logo_url} alt="" className="w-4 h-4 rounded-sm object-cover" />
+              : <span className="text-xs">🏫</span>
+            }
+            <span className="text-[#888] text-xs">{orgMembership.organisations.name}</span>
+          </div>
+        )}
       </div>
       {profile.bio && (
         <p className="px-4 text-[#aaa] text-sm mb-3 leading-snug">{profile.bio}</p>
@@ -262,13 +299,43 @@ export default function UserProfilePage() {
           >
             {followLoading ? '…' : following ? t('unfollow') : t('follow')}
           </button>
+
+          {/* Message button — gated by accepted request for instructors */}
+          {isInstructor ? (
+            requestStatus === 'accepted' ? (
+              <button
+                onClick={handleMessage}
+                disabled={messagingLoading}
+                className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white px-4 py-2.5 rounded-xl text-sm font-bold"
+              >
+                {messagingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
+                Message
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] text-[#555] px-4 py-2.5 rounded-xl text-sm font-bold cursor-not-allowed"
+                title={requestStatus === 'pending' ? 'Waiting for instructor to accept your request' : 'Send a training request first'}>
+                <Lock className="w-4 h-4" />
+                {requestStatus === 'pending' ? 'Pending…' : 'Request First'}
+              </div>
+            )
+          ) : (
+            // Non-instructor: anyone can message
+            <button
+              onClick={handleMessage}
+              disabled={messagingLoading}
+              className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white px-4 py-2.5 rounded-xl text-sm font-bold"
+            >
+              {messagingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
+              Message
+            </button>
+          )}
+
           {canLeaveFeedback && (
             <button
               onClick={() => setActiveTab('feedback')}
-              className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white px-4 py-2.5 rounded-xl text-sm font-bold"
+              className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white px-3 py-2.5 rounded-xl text-sm font-bold"
             >
-              <MessageSquare className="w-4 h-4" />
-              {t('feedback')}
+              <Star className="w-4 h-4" />
             </button>
           )}
         </div>

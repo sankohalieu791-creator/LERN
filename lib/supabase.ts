@@ -102,12 +102,32 @@ export const createVideo = async (userId: string, videoData: any) => {
   return { data, error }
 }
 
-// Courses
-export const getCourses = async () => {
-  const { data, error } = await supabase
-    .from('courses')
-    .select('*')
-    .order('created_at', { ascending: false })
+// Courses — returns public courses + the user's org private courses (if userId provided)
+export const getCourses = async (userId?: string) => {
+  let orgId: string | null = null
+  if (userId) {
+    const { data: membership } = await supabase
+      .from('organisation_members').select('organisation_id').eq('user_id', userId).maybeSingle()
+    orgId = membership?.organisation_id ?? null
+    // Also check if user is org admin
+    if (!orgId) {
+      const { data: adminOrg } = await supabase
+        .from('organisations').select('id').eq('admin_user_id', userId).maybeSingle()
+      orgId = adminOrg?.id ?? null
+    }
+  }
+
+  let query = supabase.from('courses').select('*').order('created_at', { ascending: false })
+
+  if (orgId) {
+    // Public courses OR private courses belonging to user's org
+    query = query.or(`visibility.eq.public,and(visibility.eq.private,organisation_id.eq.${orgId})`)
+  } else {
+    // Only public courses (or courses without visibility set)
+    query = query.or('visibility.eq.public,visibility.is.null')
+  }
+
+  const { data, error } = await query
   if (!data) return { data, error }
   const ids = [...new Set(data.map((c: any) => c.instructor_id || c.user_id).filter(Boolean))]
   const { data: usersData } = ids.length
@@ -483,6 +503,19 @@ export const getMyTrainingRequests = async (userId: string) => {
   return { data, error }
 }
 
+// Returns the training request between two users (either direction for instructors)
+export const getRequestBetween = async (fromUserId: string, toInstructorId: string) => {
+  const { data, error } = await supabase
+    .from('training_requests')
+    .select('id, status')
+    .eq('from_user_id', fromUserId)
+    .eq('to_instructor_id', toInstructorId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return { data, error }
+}
+
 export const getInstructorCourses = async (instructorId: string) => {
   const { data, error } = await supabase
     .from('courses')
@@ -512,6 +545,7 @@ export const submitInstructorApplication = async (
     role_type: string
     location?: string
     experience_years?: number
+    employer?: string
     contact_email?: string
     contact_phone?: string
   }
@@ -1077,6 +1111,84 @@ export const updateSubmissionStatus = async (
     .from('project_submissions')
     .update({ status, feedback: feedback ?? null })
     .eq('id', submissionId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+// ── Organisations ─────────────────────────────────────────────
+
+export const getMyOrganisation = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('organisations')
+    .select('*')
+    .eq('admin_user_id', userId)
+    .maybeSingle()
+  return { data, error }
+}
+
+export const getOrgBySlug = async (slug: string) => {
+  const { data, error } = await supabase
+    .from('organisations')
+    .select('*')
+    .eq('slug', slug)
+    .maybeSingle()
+  return { data, error }
+}
+
+export const getOrgByCode = async (code: string) => {
+  const { data, error } = await supabase
+    .from('organisations')
+    .select('*')
+    .eq('join_code', code.toUpperCase().trim())
+    .maybeSingle()
+  return { data, error }
+}
+
+export const getMyOrgMembership = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('organisation_members')
+    .select('*, organisations(*)')
+    .eq('user_id', userId)
+    .maybeSingle()
+  return { data, error }
+}
+
+export const joinOrganisation = async (userId: string, orgId: string) => {
+  const { data, error } = await supabase
+    .from('organisation_members')
+    .insert([{ organisation_id: orgId, user_id: userId, role: 'student' }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const getOrgMembers = async (orgId: string) => {
+  const { data, error } = await supabase
+    .from('organisation_members')
+    .select('*, users(id, username, avatar_url, verified)')
+    .eq('organisation_id', orgId)
+    .order('joined_at', { ascending: false })
+  return { data, error }
+}
+
+export const getOrgCourses = async (orgId: string) => {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*, users(id, username, avatar_url, verified)')
+    .eq('organisation_id', orgId)
+    .eq('visibility', 'private')
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const createOrganisation = async (
+  adminId: string,
+  payload: { name: string; slug: string; join_code: string; logo_url?: string }
+) => {
+  const { data, error } = await supabase
+    .from('organisations')
+    .insert([{ admin_user_id: adminId, ...payload }])
     .select()
     .single()
   return { data, error }

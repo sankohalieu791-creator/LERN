@@ -690,7 +690,7 @@ function CoursesPageInner() {
   const isInstructor = user?.account_type === 'instructor'
 
   const reload = useCallback(async () => {
-    const [{ data: c }, { data: w }] = await Promise.all([getCourses(), getWorkshops()])
+    const [{ data: c }, { data: w }] = await Promise.all([getCourses(user?.id), getWorkshops()])
     setCourses(c || [])
     setWorkshops(w || [])
     const subjects = [...new Set(((c || []) as any[]).map(course => course.subject).filter(Boolean))] as string[]

@@ -6,7 +6,7 @@ import { updateUserProfile, submitInstructorApplication } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Moon, Lock, Bell, Shield,
-  LogOut, X, CheckCircle2, MapPin, Clock, Mail, Phone, Languages, Check,
+  LogOut, X, CheckCircle2, MapPin, Clock, Mail, Phone, Languages, Check, Building2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useLanguage } from '@/context/LanguageContext'
@@ -64,6 +64,7 @@ export default function SettingsPage() {
     bio:             '',
     location:        '',
     experience:      '',
+    employer:        '',
     contact_email:   '',
     contact_phone:   '',
   })
@@ -113,6 +114,7 @@ export default function SettingsPage() {
       role_type:       applyForm.role_type,
       location:        applyForm.location || undefined,
       experience_years: applyForm.experience ? parseInt(applyForm.experience) : undefined,
+      employer:        applyForm.employer || undefined,
       contact_email:   applyForm.contact_email || undefined,
       contact_phone:   applyForm.contact_phone || undefined,
     })
@@ -208,6 +210,33 @@ export default function SettingsPage() {
             <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
           </button>
         )}
+      </div>
+
+      {/* ORGANISATION — visible to org admins */}
+      <SectionLabel>Institution</SectionLabel>
+      <div className="border-t border-[rgba(255,255,255,0.05)] theme-border">
+        <Link href="/organisation"
+          className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
+            <Building2 className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1">
+            <p className="text-white theme-text-1 text-sm font-semibold">Organisation Dashboard</p>
+            <p className="text-[#555] theme-text-2 text-xs mt-0.5">Manage your institution&apos;s students and private courses</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
+        </Link>
+        <Link href="/join"
+          className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition">
+          <div className="w-9 h-9 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
+            <Building2 className="w-4 h-4 text-[#888]" />
+          </div>
+          <div className="flex-1">
+            <p className="text-white theme-text-1 text-sm font-semibold">Join Institution</p>
+            <p className="text-[#555] theme-text-2 text-xs mt-0.5">Enter your institution&apos;s join code</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
+        </Link>
       </div>
 
       {/* APPEARANCE */}
@@ -414,6 +443,10 @@ export default function SettingsPage() {
 
                     <ApplyField label="Short bio">
                       <textarea value={applyForm.bio} onChange={e => setApplyForm(f => ({ ...f, bio: e.target.value }))} placeholder="Why should learners trust you?" rows={3} className={`${applyInputCls} resize-none`} />
+                    </ApplyField>
+
+                    <ApplyField label="Employer / Institution (optional)">
+                      <input value={applyForm.employer} onChange={e => setApplyForm(f => ({ ...f, employer: e.target.value }))} placeholder="e.g. University of London, NHS, Self-employed" className={applyInputCls} />
                     </ApplyField>
 
                     <div className="flex gap-3">

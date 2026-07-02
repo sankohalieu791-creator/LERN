@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getMessages, sendMessage, markMessagesRead, deleteMessage, supabase } from '@/lib/supabase'
+import { getMessages, sendMessage, markMessagesRead, deleteMessage, getRequestBetween, supabase } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
-import { ArrowLeft, Send, Loader2, Copy, Trash2, Check } from 'lucide-react'
+import { ArrowLeft, Send, Loader2, Copy, Trash2, Check, Lock } from 'lucide-react'
 
 interface CtxMenu {
   msg: any
@@ -26,6 +26,7 @@ export default function ConversationPage() {
   const [loading,    setLoading]    = useState(true)
   const [ctxMenu,    setCtxMenu]    = useState<CtxMenu | null>(null)
   const [copied,     setCopied]     = useState(false)
+  const [chatBlocked, setChatBlocked] = useState(false)
 
   const bottomRef      = useRef<HTMLDivElement>(null)
   const inputRef       = useRef<HTMLInputElement>(null)
@@ -40,8 +41,18 @@ export default function ConversationPage() {
       const { data: conv } = await supabase.from('conversations').select('*').eq('id', convId).single()
       if (conv) {
         const otherId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id
-        const { data: u } = await supabase.from('users').select('id, username, avatar_url, verified').eq('id', otherId).single()
+        const { data: u } = await supabase.from('users').select('id, username, avatar_url, verified, account_type').eq('id', otherId).single()
         setOtherUser(u)
+
+        // Safeguarding: block chat if one party is an instructor and no accepted request exists
+        if (u?.account_type === 'instructor') {
+          const { data: req } = await getRequestBetween(user.id, otherId)
+          if (!req || req.status !== 'accepted') setChatBlocked(true)
+        } else if (user.account_type === 'instructor') {
+          // Instructor viewing student — check if student has an accepted request to this instructor
+          const { data: req } = await getRequestBetween(otherId, user.id)
+          if (!req || req.status !== 'accepted') setChatBlocked(true)
+        }
       }
       await markMessagesRead(convId, user.id)
       setLoading(false)
@@ -226,29 +237,41 @@ export default function ConversationPage() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div
-        className="flex-shrink-0 px-4 py-3 border-t border-[rgba(255,255,255,0.07)] bg-[#0f0f0f] flex items-center gap-3"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
-      >
-        <input
-          ref={inputRef}
-          value={text}
-          onChange={e => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Message…"
-          className="flex-1 bg-[#1e1e1e] border border-[rgba(255,255,255,0.08)] rounded-full px-4 py-3 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.2)] transition"
-        />
-        <button
-          onClick={handleSend}
-          disabled={!text.trim() || sending}
-          className="w-10 h-10 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-40 active:scale-95 transition"
+      {/* Input — blocked if no accepted request between student & instructor */}
+      {chatBlocked ? (
+        <div
+          className="flex-shrink-0 px-4 py-4 border-t border-[rgba(255,255,255,0.07)] bg-[#0f0f0f] flex items-center gap-3"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
         >
-          {sending
-            ? <Loader2 className="w-4 h-4 text-white animate-spin" />
-            : <Send className="w-4 h-4 text-white" />}
-        </button>
-      </div>
+          <div className="flex-1 flex items-center gap-3 bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl px-4 py-3">
+            <Lock className="w-4 h-4 text-[#555] flex-shrink-0" />
+            <p className="text-[#555] text-sm">Chat is locked — instructor must accept your request first</p>
+          </div>
+        </div>
+      ) : (
+        <div
+          className="flex-shrink-0 px-4 py-3 border-t border-[rgba(255,255,255,0.07)] bg-[#0f0f0f] flex items-center gap-3"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
+        >
+          <input
+            ref={inputRef}
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Message…"
+            className="flex-1 bg-[#1e1e1e] border border-[rgba(255,255,255,0.08)] rounded-full px-4 py-3 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.2)] transition"
+          />
+          <button
+            onClick={handleSend}
+            disabled={!text.trim() || sending}
+            className="w-10 h-10 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-40 active:scale-95 transition"
+          >
+            {sending
+              ? <Loader2 className="w-4 h-4 text-white animate-spin" />
+              : <Send className="w-4 h-4 text-white" />}
+          </button>
+        </div>
+      )}
 
       {/* Long-press / right-click context menu */}
       {ctxMenu && (
