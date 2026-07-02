@@ -193,6 +193,7 @@ export default function CourseDetailPage() {
   const liveSession      = sessions.find((s: any) => s.is_live)
   const isProjectDay     = nextSession?.is_project_day ?? false
   const isLiveProjectDay = liveSession?.is_project_day ?? false
+  const courseComplete   = sessions.length > 0 && !nextSession && !liveSession
 
   const instructorUrl = nextSession
     ? isProjectDay
@@ -366,7 +367,12 @@ export default function CourseDetailPage() {
         className="fixed bottom-0 left-0 right-0 px-4 py-4 bg-[#0f0f0f] border-t border-[rgba(255,255,255,0.07)]"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
       >
-        {isInstructor ? (
+        {courseComplete ? (
+          <div className="w-full flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] text-[#555] font-bold py-4 rounded-2xl text-sm">
+            <CheckCircle className="w-4 h-4 text-green-500" />
+            Course Complete
+          </div>
+        ) : isInstructor ? (
           <Link
             href={instructorUrl}
             className="block w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl text-center"
