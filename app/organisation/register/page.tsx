@@ -21,13 +21,13 @@ export default function RegisterOrganisationPage() {
   const { user } = useAuth()
   const router = useRouter()
 
-  const [name,     setName]     = useState('')
-  const [slug,     setSlug]     = useState('')
-  const [code,     setCode]     = useState(randomCode())
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState('')
-  const [done,     setDone]     = useState(false)
-  const [org,      setOrg]      = useState<any>(null)
+  const [name,    setName]    = useState('')
+  const [slug,    setSlug]    = useState('')
+  const [code,    setCode]    = useState(randomCode())
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState('')
+  const [done,    setDone]    = useState(false)
+  const [org,     setOrg]     = useState<any>(null)
 
   const handleNameChange = (v: string) => {
     setName(v)
@@ -43,24 +43,24 @@ export default function RegisterOrganisationPage() {
     setLoading(true)
     setError('')
 
-    // Check if already an admin
     const { data: existing } = await getMyOrganisation(user.id)
     if (existing) {
-      setError("You're already managing an organisation. Contact support to create another.")
+      setError("You're already managing an organisation.")
       setLoading(false)
       return
     }
 
     const { data, error: err } = await createOrganisation(user.id, {
-      name: name.trim(),
-      slug: slug.trim(),
+      name:      name.trim(),
+      slug:      slug.trim(),
       join_code: code.trim().toUpperCase(),
     })
 
     if (err) {
-      if (err.message?.includes('slug')) setError('That URL slug is already taken — try a different name.')
-      else if (err.message?.includes('join_code')) setError('That join code is already taken — generate a new one.')
-      else setError('Something went wrong. Try again.')
+      const msg = err.message ?? ''
+      if (msg.includes('slug'))      setError('That URL slug is already taken — try a different name.')
+      else if (msg.includes('join_code') || msg.includes('unique')) setError('That join code is taken — tap Generate for a new one.')
+      else setError(`Error: ${msg || 'Something went wrong. Try again.'}`)
       setLoading(false)
       return
     }
@@ -87,10 +87,14 @@ export default function RegisterOrganisationPage() {
         </div>
         <div>
           <p className="text-[#555] text-[10px] font-bold uppercase tracking-wider mb-1">Invite Link</p>
-          <p className="text-[#888] text-xs break-all">{typeof window !== 'undefined' ? window.location.origin : ''}/join/{org.slug}</p>
+          <p className="text-[#888] text-xs break-all">
+            {typeof window !== 'undefined' ? window.location.origin : ''}/join/{org.slug}
+          </p>
         </div>
       </div>
-      <p className="text-[#555] text-xs text-center">Share the join code or invite link with your students so they can access your private courses.</p>
+      <p className="text-[#555] text-xs text-center">
+        Share the join code or invite link with your students to give them access to your private courses.
+      </p>
       <button
         onClick={() => router.push('/organisation')}
         className="w-full max-w-xs bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl"
@@ -101,9 +105,10 @@ export default function RegisterOrganisationPage() {
   )
 
   return (
-    <div className="fixed inset-0 bg-[#0a0a0a] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div className="fixed inset-0 bg-[#0a0a0a] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-[rgba(255,255,255,0.06)]">
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-[rgba(255,255,255,0.06)]">
         <button onClick={() => router.back()}
           className="w-9 h-9 bg-[#1a1a1a] rounded-full flex items-center justify-center flex-shrink-0">
           <ChevronLeft className="w-5 h-5 text-white" />
@@ -111,14 +116,17 @@ export default function RegisterOrganisationPage() {
         <h1 className="text-white font-bold text-base">Register Your Institution</h1>
       </div>
 
-      <div className="px-5 pt-6 pb-32 space-y-6">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-5 pt-6 pb-6 space-y-6">
         <div className="flex items-center gap-3">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
             <Building2 className="w-7 h-7 text-white" />
           </div>
           <div>
             <p className="text-white font-bold text-base leading-tight">Set up your institution</p>
-            <p className="text-[#555] text-xs mt-0.5 leading-relaxed">Students join with a code or invite link and get access to your private courses.</p>
+            <p className="text-[#555] text-xs mt-0.5 leading-relaxed">
+              Students join with a code or invite link and get access to your private courses.
+            </p>
           </div>
         </div>
 
@@ -136,15 +144,15 @@ export default function RegisterOrganisationPage() {
           <div>
             <label className={labelCls}>URL Slug</label>
             <div className="flex items-center bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-2xl px-4 py-3.5 gap-1">
-              <span className="text-[#555] text-sm">lern.app/join/</span>
+              <span className="text-[#555] text-sm whitespace-nowrap">lern.app/join/</span>
               <input
                 value={slug}
                 onChange={e => setSlug(slugify(e.target.value))}
                 placeholder="city-college-london"
-                className="flex-1 bg-transparent text-white text-sm placeholder-[#444] outline-none"
+                className="flex-1 bg-transparent text-white text-sm placeholder-[#444] outline-none min-w-0"
               />
             </div>
-            <p className="text-[#444] text-xs mt-1.5 px-1">This is the invite link students tap to join.</p>
+            <p className="text-[#444] text-xs mt-1.5 px-1">Invite link students tap to join instantly.</p>
           </div>
 
           <div>
@@ -160,12 +168,12 @@ export default function RegisterOrganisationPage() {
               <button
                 type="button"
                 onClick={() => setCode(randomCode())}
-                className="px-4 py-3 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-2xl text-[#888] text-xs font-semibold whitespace-nowrap hover:text-white transition"
+                className="px-4 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-2xl text-[#888] text-xs font-semibold whitespace-nowrap hover:text-white transition"
               >
                 Generate
               </button>
             </div>
-            <p className="text-[#444] text-xs mt-1.5 px-1">Students can also type this code manually at lern.app/join.</p>
+            <p className="text-[#444] text-xs mt-1.5 px-1">Students can type this at lern.app/join.</p>
           </div>
         </div>
 
@@ -174,17 +182,21 @@ export default function RegisterOrganisationPage() {
         )}
       </div>
 
-      {/* Sticky submit */}
-      <div className="fixed bottom-0 left-0 right-0 px-5 py-4 bg-[#0a0a0a]/95 backdrop-blur-sm border-t border-[rgba(255,255,255,0.06)]"
+      {/* Bottom button — always visible */}
+      <div className="flex-shrink-0 px-5 py-4 border-t border-[rgba(255,255,255,0.06)] bg-[#0a0a0a]"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
         <button
           onClick={handleSubmit}
           disabled={loading || !name.trim() || !slug.trim() || !code.trim()}
           className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
         >
-          {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</> : 'Create Institution Space'}
+          {loading
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</>
+            : 'Create Institution Space'
+          }
         </button>
       </div>
+
     </div>
   )
 }
