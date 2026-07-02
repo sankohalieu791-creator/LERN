@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { updateUserProfile, submitInstructorApplication } from '@/lib/supabase'
+import { updateUserProfile, submitInstructorApplication, getMyOrganisation } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Moon, Lock, Bell, Shield,
@@ -56,6 +56,7 @@ export default function SettingsPage() {
   const [applying,      setApplying]      = useState(false)
   const [applied,       setApplied]       = useState(false)
   const [applyError,    setApplyError]    = useState('')
+  const [myOrg,         setMyOrg]         = useState<any>(null)
 
   const [applyForm, setApplyForm] = useState({
     role_type:       '',
@@ -73,6 +74,7 @@ export default function SettingsPage() {
     if (user) {
       setDarkMode(user.dark_mode ?? true)
       setApplyForm(f => ({ ...f, name: user.username || '' }))
+      getMyOrganisation(user.id).then(({ data }) => setMyOrg(data ?? null))
     }
   }, [user])
 
@@ -212,20 +214,26 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* ORGANISATION — visible to org admins */}
+      {/* INSTITUTION */}
       <SectionLabel>Institution</SectionLabel>
       <div className="border-t border-[rgba(255,255,255,0.05)] theme-border">
-        <Link href="/organisation"
-          className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
-            <Building2 className="w-4 h-4 text-white" />
-          </div>
-          <div className="flex-1">
-            <p className="text-white theme-text-1 text-sm font-semibold">Organisation Dashboard</p>
-            <p className="text-[#555] theme-text-2 text-xs mt-0.5">Manage your institution&apos;s students and private courses</p>
-          </div>
-          <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
-        </Link>
+
+        {/* Dashboard — instructors only */}
+        {user?.account_type === 'instructor' && (
+          <Link href="/organisation"
+            className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
+              <Building2 className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-white theme-text-1 text-sm font-semibold">Organisation Dashboard</p>
+              <p className="text-[#555] theme-text-2 text-xs mt-0.5">Manage your institution&apos;s students and private courses</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
+          </Link>
+        )}
+
+        {/* Join — everyone sees this */}
         <Link href="/join"
           className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition">
           <div className="w-9 h-9 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
@@ -237,17 +245,21 @@ export default function SettingsPage() {
           </div>
           <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
         </Link>
-        <Link href="/organisation/register"
-          className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition">
-          <div className="w-9 h-9 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
-            <Building2 className="w-4 h-4 text-[#888]" />
-          </div>
-          <div className="flex-1">
-            <p className="text-white theme-text-1 text-sm font-semibold">Register Your Institution</p>
-            <p className="text-[#555] theme-text-2 text-xs mt-0.5">Set up a space for your college or organisation</p>
-          </div>
-          <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
-        </Link>
+
+        {/* Register — instructors only, hidden once they already have an org */}
+        {user?.account_type === 'instructor' && !myOrg && (
+          <Link href="/organisation/register"
+            className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition">
+            <div className="w-9 h-9 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
+              <Building2 className="w-4 h-4 text-[#888]" />
+            </div>
+            <div className="flex-1">
+              <p className="text-white theme-text-1 text-sm font-semibold">Register Your Institution</p>
+              <p className="text-[#555] theme-text-2 text-xs mt-0.5">Set up a space for your college or organisation</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[#444] flex-shrink-0" />
+          </Link>
+        )}
       </div>
 
       {/* APPEARANCE */}
