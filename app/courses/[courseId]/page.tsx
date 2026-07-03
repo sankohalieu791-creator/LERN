@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { getCourseById, enrollCourse, isEnrolled, getCourseProject, getMyProjectSubmission, supabase } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import { useAuth } from '@/context/AuthContext'
-import { Clock, Users, Calendar, ChevronLeft, Loader2, FileText, CheckCircle, XCircle, File, ArrowRight } from 'lucide-react'
+import { Users, Calendar, ChevronLeft, Loader2, FileText, CheckCircle, XCircle, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
 function VerifiedBadge({ size = 14 }: { size?: number }) {
@@ -16,24 +16,6 @@ function VerifiedBadge({ size = 14 }: { size?: number }) {
         style={{ width: size * 0.58, height: size * 0.58 }}>
         <polyline points="20 6 9 17 4 12" />
       </svg>
-    </span>
-  )
-}
-
-function StatusBadge({ status }: { status: string }) {
-  if (status === 'accepted') return (
-    <span className="flex items-center gap-1.5 bg-green-500/15 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1.5 rounded-full">
-      <CheckCircle className="w-3.5 h-3.5" /> Accepted
-    </span>
-  )
-  if (status === 'declined') return (
-    <span className="flex items-center gap-1.5 bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-bold px-3 py-1.5 rounded-full">
-      <XCircle className="w-3.5 h-3.5" /> Declined — Try Again
-    </span>
-  )
-  return (
-    <span className="flex items-center gap-1.5 bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-xs font-bold px-3 py-1.5 rounded-full">
-      <Clock className="w-3.5 h-3.5" /> Pending Review
     </span>
   )
 }
@@ -51,6 +33,7 @@ export default function CourseDetailPage() {
   // Project brief + this student's submission (read-only here; full flow lives on the Project Day page)
   const [project, setProject] = useState<any>(null)
   const [submission, setSubmission] = useState<any>(null)
+  const [liveToast, setLiveToast] = useState<{ title: string; body: string } | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -78,6 +61,12 @@ export default function CourseDetailPage() {
     load()
   }, [courseId, user])
 
+  useEffect(() => {
+    if (!liveToast) return
+    const t = window.setTimeout(() => setLiveToast(null), 5000)
+    return () => window.clearTimeout(t)
+  }, [liveToast])
+
   // Realtime: watch for any session on this course going live/ending
   useEffect(() => {
     if (!courseId) return
@@ -88,10 +77,22 @@ export default function CourseDetailPage() {
         filter: `course_id=eq.${courseId}`,
       }, (payload: any) => {
         setSessions(prev => prev.map(s => s.id === payload.new.id ? { ...s, ...payload.new } : s))
+        if (payload.new.is_live && user && course && user.id !== course.instructor_id) {
+          setLiveToast({
+            title: '🔴 Class is live',
+            body: `${course.title} is now live — open the classroom to join.`,
+          })
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            new Notification('🔴 Class is live', {
+              body: `${course.title} is now live — join now`,
+              tag: `live-${payload.new.id}`,
+            })
+          }
+        }
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [courseId])
+  }, [courseId, user, course])
 
   const handleEnroll = async () => {
     if (!user) { router.push('/auth/login'); return }
@@ -137,8 +138,7 @@ export default function CourseDetailPage() {
   const teachingDone      = teachingSessions.length > 0
     ? teachingSessions.every((s: any) => s.is_completed)
     : sessions.every((s: any) => s.is_completed)
-  const projectDayOpen    = !!(projectDaySession && !projectDaySession.is_completed
-    && (projectDaySession.is_live || teachingDone))
+  const projectDayOpen    = !!(projectDaySession && !projectDaySession.is_completed && teachingDone)
 
   const instructorUrl = nextSession
     ? isProjectDay
@@ -180,6 +180,13 @@ export default function CourseDetailPage() {
         )}
       </div>
 
+      {liveToast && (
+        <div className="fixed top-4 left-4 right-4 z-[80] mx-auto max-w-sm rounded-2xl border border-red-500/30 bg-[#161616]/95 px-4 py-3 shadow-2xl shadow-black/50 backdrop-blur">
+          <p className="text-white text-sm font-bold">{liveToast.title}</p>
+          <p className="text-[#888] text-xs mt-1">{liveToast.body}</p>
+        </div>
+      )}
+
       {/* CONTENT */}
       <div className="px-4 pt-5 pb-4">
 
@@ -206,10 +213,8 @@ export default function CourseDetailPage() {
           </p>
         )}
 
-        {/* ── PROJECT SECTION (read-only summary — full flow lives on Project Day) ──
-            Hidden from students until the course is finished (Project Day open) or
-            they already submitted. Instructors always see it to set up / review. */}
-        {project && (isInstructor || projectDayOpen || submission) && (
+        {/* Instructor-only project controls stay on the course page; students go straight to the live classroom / project-day flow. */}
+        {project && isInstructor && (
           <div className="border-t border-[rgba(255,255,255,0.07)] pt-6">
             <div className="flex items-center gap-2 mb-4">
               <FileText className="w-4 h-4 text-[#FF6B2B]" />
@@ -229,47 +234,12 @@ export default function CourseDetailPage() {
               )}
             </div>
 
-            {/* Student: submission status (read-only) */}
-            {!isInstructor && enrolled && submission && (
-              <div className="bg-[#1a1a1a] rounded-2xl p-4 border border-[rgba(255,255,255,0.07)] mb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-white font-bold text-sm">Your Submission</p>
-                  <StatusBadge status={submission.status} />
-                </div>
-                {submission.description && (
-                  <p className="text-[#888] text-sm mb-2">{submission.description}</p>
-                )}
-                {submission.file_url && (
-                  <a href={submission.file_url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-[#1d9bf0] text-xs font-semibold">
-                    <File className="w-3.5 h-3.5" /> View submitted file
-                  </a>
-                )}
-                {submission.feedback && (
-                  <div className="mt-3 bg-[#111] rounded-xl p-3 border border-[rgba(255,255,255,0.06)]">
-                    <p className="text-[#555] text-[10px] font-bold uppercase tracking-wider mb-1">Instructor Feedback</p>
-                    <p className="text-[#888] text-sm">{submission.feedback}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Everyone: manage on the Project Day page */}
-            {isInstructor ? (
-              <Link
-                href={`/courses/${courseId}/project-day${projectDaySession ? `?sessionId=${projectDaySession.id}` : ''}`}
-                className="flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white font-bold py-3.5 rounded-2xl text-sm"
-              >
-                <Users className="w-4 h-4 text-[#888]" /> Review Submissions <ArrowRight className="w-3.5 h-3.5 text-[#888]" />
-              </Link>
-            ) : enrolled && projectDayOpen ? (
-              <Link
-                href={`/courses/${courseId}/project-day${projectDaySession ? `?sessionId=${projectDaySession.id}` : ''}`}
-                className="flex items-center justify-center gap-2 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-3.5 rounded-2xl text-sm"
-              >
-                {submission ? 'Open Project Day' : 'Submit Your Project'} <ArrowRight className="w-4 h-4" />
-              </Link>
-            ) : null}
+            <Link
+              href={`/courses/${courseId}/project-day${projectDaySession ? `?sessionId=${projectDaySession.id}` : ''}`}
+              className="flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white font-bold py-3.5 rounded-2xl text-sm"
+            >
+              <Users className="w-4 h-4 text-[#888]" /> Review Submissions <ArrowRight className="w-3.5 h-3.5 text-[#888]" />
+            </Link>
           </div>
         )}
 

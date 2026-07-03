@@ -194,16 +194,35 @@ CREATE TABLE IF NOT EXISTS public.projects (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ── COURSE PROJECTS (brief + due date) ───────────────────────
+CREATE TABLE IF NOT EXISTS public.course_projects (
+  id               UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  instructor_id    UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+  course_id        UUID REFERENCES public.courses(id) ON DELETE CASCADE NOT NULL,
+  session_id       UUID REFERENCES public.course_sessions(id) ON DELETE SET NULL,
+  title            TEXT NOT NULL,
+  description      TEXT,
+  due_date         DATE,
+  submission_mode  TEXT NOT NULL DEFAULT 'upload'
+                    CHECK (submission_mode IN ('upload','live','both')),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ── PROJECT SUBMISSIONS ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.project_submissions (
   id                  UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  project_id          UUID REFERENCES public.projects(id) ON DELETE CASCADE NOT NULL,
-  submission_text     TEXT,
-  attachment_url      TEXT,
+  project_id          UUID REFERENCES public.course_projects(id) ON DELETE CASCADE NOT NULL,
+  user_id             UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+  course_id           UUID REFERENCES public.courses(id) ON DELETE CASCADE,
+  session_id          UUID REFERENCES public.course_sessions(id) ON DELETE SET NULL,
   status              TEXT NOT NULL DEFAULT 'pending'
-                        CHECK (status IN ('pending','approved','needs_work')),
-  instructor_feedback TEXT,
-  submitted_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        CHECK (status IN ('pending','accepted','declined','needs_work')),
+  description         TEXT,
+  file_url            TEXT,
+  file_type           TEXT,
+  feedback            TEXT,
+  submitted_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (project_id, user_id)
 );
 
 -- ── CERTIFICATES ─────────────────────────────────────────────
@@ -631,21 +650,53 @@ CREATE POLICY "projects: authenticated insert" ON public.projects FOR INSERT WIT
 CREATE POLICY "projects: owner update"         ON public.projects FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "projects: owner delete"         ON public.projects FOR DELETE USING (auth.uid() = user_id);
 
+-- COURSE PROJECTS
+DROP POLICY IF EXISTS "course_projects: public read"       ON public.course_projects;
+DROP POLICY IF EXISTS "course_projects: instructor insert" ON public.course_projects;
+DROP POLICY IF EXISTS "course_projects: owner update"      ON public.course_projects;
+DROP POLICY IF EXISTS "course_projects: owner delete"      ON public.course_projects;
+CREATE POLICY "course_projects: public read"       ON public.course_projects FOR SELECT USING (true);
+CREATE POLICY "course_projects: instructor insert" ON public.course_projects FOR INSERT WITH CHECK (auth.uid() = instructor_id);
+CREATE POLICY "course_projects: owner update"      ON public.course_projects FOR UPDATE USING (auth.uid() = instructor_id);
+CREATE POLICY "course_projects: owner delete"      ON public.course_projects FOR DELETE USING (auth.uid() = instructor_id);
 
 -- PROJECT SUBMISSIONS
 DROP POLICY IF EXISTS "submissions: owner or instructor read"   ON public.project_submissions;
 DROP POLICY IF EXISTS "submissions: project owner insert"       ON public.project_submissions;
 DROP POLICY IF EXISTS "submissions: owner or instructor update" ON public.project_submissions;
 CREATE POLICY "submissions: owner or instructor read" ON public.project_submissions FOR SELECT
-  USING (EXISTS (SELECT 1 FROM public.projects p WHERE p.id = project_id AND (
-    p.user_id = auth.uid() OR p.visibility = 'public'
-    OR EXISTS (SELECT 1 FROM public.courses c WHERE c.id = p.course_id AND c.instructor_id = auth.uid()))));
+  USING (
+    auth.uid() = user_id
+    OR EXISTS (
+      SELECT 1
+      FROM public.course_projects cp
+      JOIN public.courses c ON c.id = cp.course_id
+      WHERE cp.id = project_id
+        AND c.instructor_id = auth.uid()
+    )
+  );
 CREATE POLICY "submissions: project owner insert" ON public.project_submissions FOR INSERT
-  WITH CHECK (EXISTS (SELECT 1 FROM public.projects WHERE id = project_id AND user_id = auth.uid()));
+  WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (
+      SELECT 1
+      FROM public.course_projects cp
+      JOIN public.enrollments e ON e.course_id = cp.course_id
+      WHERE cp.id = project_id
+        AND e.user_id = auth.uid()
+    )
+  );
 CREATE POLICY "submissions: owner or instructor update" ON public.project_submissions FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM public.projects p WHERE p.id = project_id AND (
-    p.user_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM public.courses c WHERE c.id = p.course_id AND c.instructor_id = auth.uid()))));
+  USING (
+    auth.uid() = user_id
+    OR EXISTS (
+      SELECT 1
+      FROM public.course_projects cp
+      JOIN public.courses c ON c.id = cp.course_id
+      WHERE cp.id = project_id
+        AND c.instructor_id = auth.uid()
+    )
+  );
 
 
 -- CERTIFICATES
@@ -774,6 +825,10 @@ DROP POLICY IF EXISTS "project-files: owner delete" ON storage.objects;
 CREATE POLICY "project-files: owner read" ON storage.objects FOR SELECT
   USING (bucket_id = 'project-files' AND auth.uid()::text = (storage.foldername(name))[1]);
 CREATE POLICY "project-files: owner upload" ON storage.objects FOR INSERT
-  WITH CHECK (bucket_id = 'project-files' AND auth.role() = 'authenticated');
+  WITH CHECK (
+    bucket_id = 'project-files'
+    AND auth.role() = 'authenticated'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
 CREATE POLICY "project-files: owner delete" ON storage.objects FOR DELETE
   USING (bucket_id = 'project-files' AND auth.uid()::text = (storage.foldername(name))[1]);
