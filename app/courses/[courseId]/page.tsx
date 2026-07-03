@@ -206,8 +206,10 @@ export default function CourseDetailPage() {
           </p>
         )}
 
-        {/* ── PROJECT SECTION (read-only summary — full flow lives on Project Day) ── */}
-        {project && (
+        {/* ── PROJECT SECTION (read-only summary — full flow lives on Project Day) ──
+            Hidden from students until the course is finished (Project Day open) or
+            they already submitted. Instructors always see it to set up / review. */}
+        {project && (isInstructor || projectDayOpen || submission) && (
           <div className="border-t border-[rgba(255,255,255,0.07)] pt-6">
             <div className="flex items-center gap-2 mb-4">
               <FileText className="w-4 h-4 text-[#FF6B2B]" />
@@ -267,8 +269,6 @@ export default function CourseDetailPage() {
               >
                 {submission ? 'Open Project Day' : 'Submit Your Project'} <ArrowRight className="w-4 h-4" />
               </Link>
-            ) : enrolled && !submission ? (
-              <p className="text-center text-[#555] text-xs">Unlocks on Project Day, once you finish the final session.</p>
             ) : null}
           </div>
         )}
@@ -285,8 +285,8 @@ export default function CourseDetailPage() {
           </div>
         )}
 
-        {/* Spacer so content isn't hidden behind the fixed bottom button */}
-        <div className="h-28" />
+        {/* Spacer so content isn't hidden behind the fixed bottom button (incl. device safe area) */}
+        <div style={{ height: 'calc(env(safe-area-inset-bottom) + 140px)' }} />
       </div>
 
       {/* STICKY ENROLL/JOIN BUTTON */}
