@@ -127,7 +127,7 @@ export default function CourseDetailPage() {
 
   // Session routing helpers
   const nextSession      = sessions.find((s: any) => !s.is_completed)
-  const liveSession      = sessions.find((s: any) => s.is_live)
+  const liveSession      = sessions.find((s: any) => s.is_live && !s.is_completed)
   const isProjectDay     = nextSession?.is_project_day ?? false
   const isLiveProjectDay = liveSession?.is_project_day ?? false
   const courseComplete   = sessions.length > 0 && !nextSession && !liveSession
@@ -256,7 +256,7 @@ export default function CourseDetailPage() {
         )}
 
         {/* Spacer so content isn't hidden behind the fixed bottom button (incl. device safe area) */}
-        <div style={{ height: 'calc(env(safe-area-inset-bottom) + 140px)' }} />
+        <div style={{ height: 'calc(env(safe-area-inset-bottom) + 220px)' }} />
       </div>
 
       {/* STICKY ENROLL/JOIN BUTTON */}

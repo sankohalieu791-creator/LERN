@@ -111,6 +111,22 @@ function EnrolledCourseCard({ course, onJoin, projectStatus }: { course: any; on
   const hasStarted     = sessions.some(s => s.is_completed)
   const isStartingSoon = !isLive && !hasStarted && firstDate && firstDate > now
 
+  const liveSession = sessions.find(s => s.is_live)
+  const projectDaySession = sessions.find(s => s.is_project_day)
+  const teachingSessions = sessions.filter(s => !s.is_project_day)
+  const teachingDone = teachingSessions.length > 0
+    ? teachingSessions.every(s => s.is_completed)
+    : sessions.every(s => s.is_completed)
+  const projectDayOpen = !!(projectDaySession && !projectDaySession.is_completed && teachingDone)
+
+  const enrolledCourseRoute = liveSession
+    ? projectDaySession && liveSession.id === projectDaySession.id
+      ? `/courses/${course.id}/project-day?sessionId=${liveSession.id}`
+      : `/courses/${course.id}/classroom?sessionId=${liveSession.id}`
+    : projectDayOpen
+      ? `/courses/${course.id}/project-day?sessionId=${projectDaySession.id}`
+      : `/courses/${course.id}`
+
   const nextSession = sessions.find(s => !s.is_completed && !s.is_live)
   const nextDate = nextSession?.session_date
     ? new Date(nextSession.session_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
@@ -130,7 +146,7 @@ function EnrolledCourseCard({ course, onJoin, projectStatus }: { course: any; on
   return (
     <div
       className="bg-[#1a1a1a] rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.06)] active:opacity-90 transition cursor-pointer"
-      onClick={() => router.push(`/courses/${course.id}`)}
+      onClick={() => router.push(enrolledCourseRoute)}
     >
       <div className="aspect-video relative bg-[#252525]">
         {course.thumbnail_url

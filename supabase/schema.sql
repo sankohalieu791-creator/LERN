@@ -121,8 +121,11 @@ CREATE TABLE IF NOT EXISTS public.course_sessions (
   session_time   TIME,
   is_live        BOOLEAN NOT NULL DEFAULT FALSE,
   is_project_day BOOLEAN NOT NULL DEFAULT FALSE,
+  is_completed   BOOLEAN NOT NULL DEFAULT FALSE,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.course_sessions ADD COLUMN IF NOT EXISTS is_completed BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- ── WORKSHOPS ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.workshops (

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getCourseById, setSessionLive, completeSession, supabase, rateCourse, getUserCourseRating } from '@/lib/supabase'
+import { getCourseById, setSessionLive, completeSession, deleteCourse, supabase, rateCourse, getUserCourseRating } from '@/lib/supabase'
 import { sendPushToMany } from '@/lib/push'
 import dynamic from 'next/dynamic'
 import { Loader2, Calendar, Clock, Star } from 'lucide-react'
@@ -224,7 +224,18 @@ function ClassroomInner() {
       const liveDuration = liveStartRef.current ? Date.now() - liveStartRef.current : 0
       if (liveDuration > 2 * 60 * 1000) {
         // Real class (2+ minutes) — mark session completed so students see it as done
-        await completeSession(sessionId)
+        const { error } = await completeSession(sessionId)
+        if (!error) {
+          const remainingSessions = (course?.course_sessions || [])
+            .filter((s: any) => s.id !== sessionId && !s.is_completed)
+          if (remainingSessions.length === 0) {
+            const { error: deleteError } = await deleteCourse(courseId, user.id)
+            if (!deleteError) {
+              router.push('/courses')
+              return
+            }
+          }
+        }
       } else {
         // Quick open/test — just stop live, don't permanently complete the session
         await setSessionLive(sessionId, false)
