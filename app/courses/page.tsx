@@ -19,6 +19,7 @@ import {
 import CreateCourse from '@/components/CreateCourse'
 import CreateWorkshop from '@/components/CreateWorkshop'
 import { useLanguage } from '@/context/LanguageContext'
+import { getNextUpcomingSession } from '@/lib/course-session-utils'
 
 function VerifiedBadge({ size = 12 }: { size?: number }) {
   return (
@@ -127,7 +128,7 @@ function EnrolledCourseCard({ course, onJoin, projectStatus }: { course: any; on
       ? `/courses/${course.id}/project-day?sessionId=${projectDaySession.id}`
       : `/courses/${course.id}`
 
-  const nextSession = sessions.find(s => !s.is_completed && !s.is_live)
+  const nextSession = getNextUpcomingSession(sessions)
   const nextDate = nextSession?.session_date
     ? new Date(nextSession.session_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     : null
@@ -487,7 +488,7 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
   const handleStartClass = async () => {
     setStarting(true)
     const sessions = course?.course_sessions?.slice().sort((a: any, b: any) => (a.session_number ?? 999) - (b.session_number ?? 999)) ?? []
-    const nextSession = sessions.find((s: any) => !s.is_live && !s.is_completed)
+    const nextSession = getNextUpcomingSession(sessions)
     if (nextSession) {
       await setSessionLive(nextSession.id, true)
     }

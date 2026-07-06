@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { getNextUpcomingSession } from '@/lib/course-session-utils'
 import { Lock, Clock, Users, Star, BookOpen } from 'lucide-react'
 
 function VerifiedBadge({ size = 10 }: { size?: number }) {
@@ -26,7 +27,7 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
   const isLive = sessions.some((s: any) => s.is_live)
   const allCompleted = sessions.length > 0 && sessions.every((s: any) => s.is_completed)
   const hasStarted = sessions.some((s: any) => s.is_completed)
-  const nextSession = sessions.find((s: any) => !s.is_completed && !s.is_live)
+  const nextSession = getNextUpcomingSession(sessions)
   const nextDateStr = nextSession?.session_date
     ? new Date(nextSession.session_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     : null

@@ -1,0 +1,32 @@
+export function getSessionScheduleTime(session: any) {
+  const dateValue = session?.session_date
+  if (!dateValue) return Number.MAX_SAFE_INTEGER
+
+  const timeValue = session?.session_time || '00:00:00'
+  const parsed = new Date(`${dateValue}T${timeValue}`)
+  if (Number.isNaN(parsed.getTime())) return Number.MAX_SAFE_INTEGER
+  return parsed.getTime()
+}
+
+export function getNextUpcomingSession(sessions: any[] = [], now = new Date()) {
+  const sorted = [...sessions]
+    .filter(Boolean)
+    .sort((a, b) => {
+      const aTime = getSessionScheduleTime(a)
+      const bTime = getSessionScheduleTime(b)
+      if (aTime !== bTime) return aTime - bTime
+      return (a?.session_number ?? 999) - (b?.session_number ?? 999)
+    })
+
+  const liveSession = sorted.find((session: any) => session.is_live && !session.is_completed)
+  if (liveSession) return liveSession
+
+  const upcoming = sorted.find((session: any) => {
+    if (session.is_completed) return false
+    const scheduledAt = getSessionScheduleTime(session)
+    if (scheduledAt !== Number.MAX_SAFE_INTEGER && scheduledAt < now.getTime()) return false
+    return true
+  })
+
+  return upcoming ?? sorted.find((session: any) => !session.is_completed) ?? null
+}

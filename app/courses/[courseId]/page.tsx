@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { getCourseById, enrollCourse, isEnrolled, getCourseProject, getMyProjectSubmission, supabase } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import { useAuth } from '@/context/AuthContext'
+import { getNextUpcomingSession } from '@/lib/course-session-utils'
 import { Users, Calendar, ChevronLeft, Loader2, FileText, CheckCircle, XCircle, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
@@ -126,7 +127,7 @@ export default function CourseDetailPage() {
   const isInstructor = !!(user && user.id === (course.instructor_id || course.user_id))
 
   // Session routing helpers
-  const nextSession      = sessions.find((s: any) => !s.is_completed)
+  const nextSession      = getNextUpcomingSession(sessions)
   const liveSession      = sessions.find((s: any) => s.is_live && !s.is_completed)
   const isProjectDay     = nextSession?.is_project_day ?? false
   const isLiveProjectDay = liveSession?.is_project_day ?? false
