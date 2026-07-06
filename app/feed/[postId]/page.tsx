@@ -141,7 +141,7 @@ export default function PostDetailPage() {
         style={{ marginTop: 'env(safe-area-inset-top)' }}
       >
         {video.video_url
-          ? <video src={video.video_url} controls autoPlay playsInline className="w-full h-full" />
+          ? <video src={video.video_url} controls autoPlay playsInline preload="metadata" crossOrigin="anonymous" className="w-full h-full" />
           : video.thumbnail_url
             ? <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover" />
             : <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] flex items-center justify-center">

@@ -97,7 +97,7 @@ function FeedCard({ video, userLikes, following, user, onOpen, onLike, onFollow,
 
         {/* Video preview */}
         {video.video_url && (
-          <video ref={videoRef} src={video.video_url} muted loop playsInline
+          <video ref={videoRef} src={video.video_url} muted loop playsInline preload="metadata" crossOrigin="anonymous"
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${playing ? 'opacity-100' : 'opacity-0'}`}
           />
         )}

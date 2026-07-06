@@ -383,7 +383,7 @@ function WorkshopDetailSheet({ workshop, isJoined, isOwner, onJoin, onDelete, on
                   onClick={() => router.push(`/workshops/${workshop.id}/classroom`)}
                   className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2"
                 >
-                  <Monitor className="w-4 h-4" /> Start Workshop
+                  <Monitor className="w-4 h-4" /> Start Workshop Live
                 </button>
               )}
               {confirmDel ? (
@@ -1187,7 +1187,7 @@ function WorkshopCard({ workshop, isJoined, joining, isOwner, onJoin, onTap }: {
           isOwner ? (
             <button onClick={goToClassroom}
               className="w-full py-3 rounded-2xl text-sm font-bold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white flex items-center justify-center gap-2 active:scale-[0.98] transition">
-              <Monitor className="w-4 h-4" /> Start Workshop
+              <Monitor className="w-4 h-4" /> Start Workshop Live
             </button>
           ) : isJoined ? (
             <button onClick={goToClassroom}

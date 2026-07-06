@@ -126,7 +126,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}>
+      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 120px)' }}>
 
         {/* ── OVERVIEW TAB ─────────────────────────────── */}
         {activeTab === 'overview' && (
@@ -278,7 +278,7 @@ export default function DashboardPage() {
                 <p className="text-[#333] text-xs mt-1">Students will appear here once they submit</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 pb-24">
                 {filteredSubs.map((s: any) => (
                   <div key={s.id} className="bg-[#1a1a1a] rounded-2xl p-4 border border-[rgba(255,255,255,0.06)]">
                     {/* Student */}

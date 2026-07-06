@@ -25,6 +25,7 @@ type TabId = 'instructors' | 'jobs' | 'request'
 const ROLE_COLOUR: Record<string, string> = {
   coach: 'bg-orange-500', professor: 'bg-blue-600',
   teacher: 'bg-green-600', mentor: 'bg-purple-600',
+  employer: 'bg-slate-600',
   dr: 'bg-teal-600',
 }
 

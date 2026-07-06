@@ -29,7 +29,7 @@ export interface InstructorApplication {
   full_name: string
   topic: string
   bio: string
-  role_type: 'mentor' | 'professor' | 'teacher' | 'coach'
+  role_type: 'mentor' | 'professor' | 'teacher' | 'coach' | 'employer'
   location?: string
   experience_years?: number
   contact_email?: string

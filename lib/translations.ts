@@ -42,7 +42,7 @@ const en = {
   // Courses
   enroll: 'Enroll',
   enrolled_label: 'Enrolled ✓',
-  start_class: '🔴 Start Class',
+  start_class: '🔴 Start Live Class',
   not_started: 'Not Started',
   finish: 'Finish',
   request: 'Request',
