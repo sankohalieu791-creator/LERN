@@ -201,7 +201,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
 CREATE TABLE IF NOT EXISTS public.course_projects (
   id               UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   instructor_id    UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
-  course_id        UUID REFERENCES public.courses(id) ON DELETE CASCADE NOT NULL,
+  course_id        UUID REFERENCES public.courses(id) ON DELETE SET NULL,
   session_id       UUID REFERENCES public.course_sessions(id) ON DELETE SET NULL,
   title            TEXT NOT NULL,
   description      TEXT,
@@ -216,7 +216,7 @@ CREATE TABLE IF NOT EXISTS public.project_submissions (
   id                  UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   project_id          UUID REFERENCES public.course_projects(id) ON DELETE CASCADE NOT NULL,
   user_id             UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
-  course_id           UUID REFERENCES public.courses(id) ON DELETE CASCADE,
+  course_id           UUID REFERENCES public.courses(id) ON DELETE SET NULL,
   session_id          UUID REFERENCES public.course_sessions(id) ON DELETE SET NULL,
   status              TEXT NOT NULL DEFAULT 'pending'
                         CHECK (status IN ('pending','accepted','declined','needs_work')),
