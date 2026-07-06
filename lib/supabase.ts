@@ -912,9 +912,13 @@ export const getCoursesByInstructor = async (instructorId: string) => {
 }
 
 export const deleteCourse = async (courseId: string, instructorId: string) => {
-  const { error } = await supabase
-    .from('courses').delete().eq('id', courseId).eq('instructor_id', instructorId)
-  return { error }
+  const { data, error } = await supabase
+    .from('courses')
+    .update({ is_deleted: true })
+    .eq('id', courseId)
+    .eq('instructor_id', instructorId)
+    .select()
+  return { data, error }
 }
 
 export const deleteWorkshop = async (workshopId: string, instructorId: string) => {
