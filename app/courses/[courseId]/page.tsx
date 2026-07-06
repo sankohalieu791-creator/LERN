@@ -257,7 +257,7 @@ export default function CourseDetailPage() {
         )}
 
         {/* Spacer so content isn't hidden behind the fixed bottom button (incl. device safe area) */}
-        <div style={{ height: 'calc(env(safe-area-inset-bottom) + 220px)' }} />
+        <div style={{ height: 'calc(env(safe-area-inset-bottom) + 120px)' }} />
       </div>
 
       {/* STICKY ENROLL/JOIN BUTTON */}
