@@ -116,7 +116,7 @@ export const getCourses = async (userId?: string) => {
     }
   }
 
-  const base = supabase.from('courses').select('*, course_sessions(*)').order('created_at', { ascending: false })
+  const base = supabase.from('courses').select('*, course_sessions(*)').eq('is_deleted', false).order('created_at', { ascending: false })
 
   let filtered = orgId
     ? base.or(`visibility.eq.public,and(visibility.eq.private,organisation_id.eq.${orgId})`)
@@ -145,6 +145,7 @@ export const getCourseById = async (courseId: string) => {
     .from('courses')
     .select('*, course_sessions(*)')
     .eq('id', courseId)
+    .eq('is_deleted', false)
     .single()
   if (!data) return { data, error }
   const { data: userData } = await supabase
@@ -889,7 +890,7 @@ export const getEnrolledCourses = async (userId: string) => {
   const courseIds = (enrollmentData || []).map((e: any) => e.course_id).filter(Boolean)
   if (!courseIds.length) return { data: [], error: null }
   const { data: coursesData, error } = await supabase
-    .from('courses').select('*, course_sessions(*)').in('id', courseIds)
+    .from('courses').select('*, course_sessions(*)').in('id', courseIds).eq('is_deleted', false)
   if (!coursesData) return { data: [], error }
   const instIds = [...new Set(coursesData.map((c: any) => c.instructor_id || c.user_id).filter(Boolean))]
   const { data: usersData } = instIds.length
@@ -907,6 +908,7 @@ export const getCoursesByInstructor = async (instructorId: string) => {
     .from('courses')
     .select('id, title, description, thumbnail_url, rating, enrolled_count, subject, level')
     .eq('instructor_id', instructorId)
+    .eq('is_deleted', false)
     .order('created_at', { ascending: false })
   return { data, error }
 }
@@ -1062,9 +1064,15 @@ export const createCourseProject = async (
   courseId: string,
   payload: { title: string; description?: string; due_date?: string }
 ) => {
+  const { data: courseRow } = await supabase
+    .from('courses')
+    .select('id')
+    .eq('id', courseId)
+    .maybeSingle()
+
   const { data, error } = await supabase
     .from('course_projects')
-    .insert([{ instructor_id: instructorId, course_id: courseId, ...payload }])
+    .insert([{ instructor_id: instructorId, ...(courseRow?.id ? { course_id: courseRow.id } : {}), ...payload }])
     .select()
     .single()
   return { data, error }
@@ -1101,9 +1109,15 @@ export const submitCourseProject = async (
   courseId: string,
   payload: { file_url?: string; file_type?: string; description?: string }
 ) => {
+  const { data: courseRow } = await supabase
+    .from('courses')
+    .select('id')
+    .eq('id', courseId)
+    .maybeSingle()
+
   const { data, error } = await supabase
     .from('project_submissions')
-    .upsert([{ user_id: userId, project_id: projectId, course_id: courseId, status: 'pending', ...payload }],
+    .upsert([{ user_id: userId, project_id: projectId, ...(courseRow?.id ? { course_id: courseRow.id } : {}), status: 'pending', ...payload }],
       { onConflict: 'project_id,user_id' })
     .select()
     .single()
