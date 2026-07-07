@@ -142,9 +142,15 @@ export default function CreateCourse({ isOpen, onClose, onSuccess }: CreateCours
           // Auto-create the Project Day brief tied to the final (project day) session
           const projectSession = (createdSessions as any[] | null)?.find(s => s.is_project_day)
           if (projectSession && projectName.trim()) {
+            const { data: courseRow } = await supabase
+              .from('courses')
+              .select('id')
+              .eq('id', newCourseId)
+              .maybeSingle()
+
             await supabase.from('course_projects').insert([{
               instructor_id:   user.id,
-              course_id:       newCourseId,
+              ...(courseRow?.id ? { course_id: courseRow.id } : {}),
               session_id:      projectSession.id,
               title:           projectName.trim(),
               description:     projectDesc.trim() || null,

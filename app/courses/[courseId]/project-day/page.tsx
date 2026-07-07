@@ -205,11 +205,17 @@ function ProjectDayInner() {
   const handleCreateProject = async () => {
     if (!user || !projTitle.trim()) return
     setCreating(true)
+    const { data: courseRow } = await supabase
+      .from('courses')
+      .select('id')
+      .eq('id', courseId)
+      .maybeSingle()
+
     const { data, error } = await supabase
       .from('course_projects')
       .insert([{
         instructor_id:   user.id,
-        course_id:       courseId,
+        ...(courseRow?.id ? { course_id: courseRow.id } : {}),
         session_id:      sessionId,
         title:           projTitle.trim(),
         description:     projDesc.trim() || null,
@@ -241,12 +247,18 @@ function ProjectDayInner() {
         const mime = submitFile.type
         fileType = mime.startsWith('image/') ? 'image' : mime.startsWith('video/') ? 'video' : 'document'
       }
+      const { data: courseRow } = await supabase
+        .from('courses')
+        .select('id')
+        .eq('id', courseId)
+        .maybeSingle()
+
       const { data, error } = await supabase
         .from('project_submissions')
         .upsert([{
           user_id:     user.id,
           project_id:  project.id,
-          course_id:   courseId,
+          ...(courseRow?.id ? { course_id: courseRow.id } : {}),
           session_id:  sessionId,
           status:      'pending',
           file_url:    fileUrl,
@@ -348,13 +360,15 @@ function ProjectDayInner() {
   const reviewed  = submissions.filter(s => s.status !== 'pending').length
   const classroomUrl = `/courses/${courseId}/classroom?sessionId=${sessionId}`
 
-  // Project Day opens for students once the taught sessions are done.
+  // Project Day stays locked for students until EVERY taught session is complete
+  // (i.e. the final class of the course has finished) — going live early no longer
+  // unlocks it.
   const allSessions     = (course.course_sessions ?? []) as any[]
   const teachingSessions = allSessions.filter(s => !s.is_project_day)
   const teachingDone    = teachingSessions.length > 0
     ? teachingSessions.every(s => s.is_completed)
     : allSessions.every(s => s.is_completed)
-  const projectOpen     = !!(session?.is_live || session?.is_completed || teachingDone)
+  const projectOpen     = !!(session?.is_completed || teachingDone)
 
   // Student gate: project day not open yet
   if (!isInstructor && session && !projectOpen) {

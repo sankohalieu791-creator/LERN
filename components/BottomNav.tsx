@@ -40,7 +40,16 @@ export default function BottomNav() {
     return () => { supabase.removeChannel(channel) }
   }, [user])
 
-  if (pathname === '/' || pathname.startsWith('/auth') || /^\/feed\/.+/.test(pathname) || /^\/messages\/.+/.test(pathname)) return null
+  if (
+    pathname === '/' ||
+    pathname.startsWith('/auth') ||
+    /^\/feed\/.+/.test(pathname) ||
+    /^\/messages\/.+/.test(pathname) ||
+    // Drill-in course/workshop detail pages have their own fixed bottom bar
+    // (enrol / start class / close project day) — the global nav would cover it.
+    /^\/courses\/.+/.test(pathname) ||
+    /^\/workshops\/.+/.test(pathname)
+  ) return null
 
   const active = (p: string) => pathname === p || pathname.startsWith(p + '/')
   const isInstructor = user?.account_type === 'instructor'

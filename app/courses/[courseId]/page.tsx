@@ -125,6 +125,8 @@ export default function CourseDetailPage() {
   )
 
   const isInstructor = !!(user && user.id === (course.instructor_id || course.user_id))
+  // Any instructor-role account (not just the owner) should never see an enrol CTA.
+  const isInstructorAccount = user?.account_type === 'instructor'
 
   // Session routing helpers
   const nextSession      = getNextUpcomingSession(sessions)
@@ -290,6 +292,10 @@ export default function CourseDetailPage() {
               No Live Class Right Now
             </div>
           )
+        ) : isInstructorAccount ? (
+          <div className="w-full flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] text-[#555] font-bold py-4 rounded-2xl text-sm">
+            Viewing as instructor
+          </div>
         ) : (
           <button
             onClick={handleEnroll}

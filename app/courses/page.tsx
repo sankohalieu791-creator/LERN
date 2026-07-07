@@ -243,12 +243,9 @@ function WorkshopDetailSheet({ workshop, isJoined, isOwner, onJoin, onDelete, on
   const [deleting,  setDeleting]  = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
 
-  const isLiveNow = !!(
-    workshop.is_online &&
-    workshop.workshop_date &&
-    workshop.workshop_time &&
-    new Date(`${workshop.workshop_date}T${workshop.workshop_time}`) <= new Date()
-  )
+  // Live only when the instructor has actually started the session (is_live flag),
+  // not merely because the scheduled start time has passed.
+  const isLiveNow = !!(workshop.is_online && workshop.is_live)
 
   const handleJoin = async () => {
     setJoining(true)
@@ -379,12 +376,12 @@ function WorkshopDetailSheet({ workshop, isJoined, isOwner, onJoin, onDelete, on
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
           {isOwner ? (
             <>
-              {isLiveNow && (
+              {workshop.is_online && (
                 <button
                   onClick={() => router.push(`/workshops/${workshop.id}/classroom`)}
                   className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2"
                 >
-                  <Monitor className="w-4 h-4" /> Start Workshop Live
+                  <Monitor className="w-4 h-4" /> {isLiveNow ? 'Enter Live Classroom' : 'Start Workshop Live'}
                 </button>
               )}
               {confirmDel ? (
@@ -456,6 +453,7 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
   const [ratingDone, setRatingDone] = useState(false)
 
   const isOwner = !!(user && course && user.id === course.instructor_id)
+  const isInstructorAccount = user?.account_type === 'instructor'
 
   useEffect(() => {
     const load = async () => {
@@ -577,19 +575,19 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
                       const mon = d?.toLocaleString('default', { month: 'short' }).toUpperCase()
                       const day = d?.getDate()
                       return (
-                        <div key={s.id} className="flex items-center gap-3 bg-[#1e1e1e] rounded-2xl px-4 py-3">
+                        <div key={s.id} className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${s.is_completed ? 'bg-[#161616] opacity-60' : 'bg-[#1e1e1e]'}`}>
                           <div className="flex-shrink-0 w-12 text-center">
                             {d ? (
                               <>
                                 <p className="text-[#555] text-[9px] font-bold">{mon}</p>
-                                <p className="text-white font-bold text-xl leading-none">{day}</p>
+                                <p className={`font-bold text-xl leading-none ${s.is_completed ? 'text-[#666] line-through' : 'text-white'}`}>{day}</p>
                               </>
                             ) : (
-                              <p className="text-white font-bold text-xl leading-none">{s.session_number}</p>
+                              <p className={`font-bold text-xl leading-none ${s.is_completed ? 'text-[#666] line-through' : 'text-white'}`}>{s.session_number}</p>
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-white text-sm font-semibold truncate">{s.title}</p>
+                            <p className={`text-sm font-semibold truncate ${s.is_completed ? 'text-[#666] line-through' : 'text-white'}`}>{s.title}</p>
                             <p className="text-[#555] text-xs mt-0.5">
                               {d?.toLocaleString('default', { weekday: 'short' })}
                               {s.session_time && ` · ${s.session_time.slice(0, 5)}`}
@@ -659,6 +657,10 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
                   >
                     View Timetable →
                   </button>
+                </div>
+              ) : isInstructorAccount ? (
+                <div className="w-full flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] text-[#555] font-bold py-4 rounded-2xl text-sm">
+                  Viewing as instructor
                 </div>
               ) : (
                 <button
@@ -1113,12 +1115,9 @@ function WorkshopCard({ workshop, isJoined, joining, isOwner, onJoin, onTap }: {
     ? date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : null
 
-  const isLiveNow = !!(
-    workshop.is_online &&
-    workshop.workshop_date &&
-    workshop.workshop_time &&
-    new Date(`${workshop.workshop_date}T${workshop.workshop_time}`) <= new Date()
-  )
+  // Live only when the instructor has actually started the session (is_live flag),
+  // not merely because the scheduled start time has passed.
+  const isLiveNow = !!(workshop.is_online && workshop.is_live)
 
   const goToClassroom = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -1184,13 +1183,13 @@ function WorkshopCard({ workshop, isJoined, joining, isOwner, onJoin, onTap }: {
           <span className="flex items-center gap-1"><UserCheck className="w-3 h-3" />{workshop.enrolled_count || 0} joined</span>
         </div>
 
-        {isLiveNow ? (
-          isOwner ? (
-            <button onClick={goToClassroom}
-              className="w-full py-3 rounded-2xl text-sm font-bold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white flex items-center justify-center gap-2 active:scale-[0.98] transition">
-              <Monitor className="w-4 h-4" /> Start Workshop Live
-            </button>
-          ) : isJoined ? (
+        {isOwner && workshop.is_online ? (
+          <button onClick={goToClassroom}
+            className="w-full py-3 rounded-2xl text-sm font-bold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white flex items-center justify-center gap-2 active:scale-[0.98] transition">
+            <Monitor className="w-4 h-4" /> {isLiveNow ? 'Enter Live Classroom' : 'Start Workshop Live'}
+          </button>
+        ) : isLiveNow ? (
+          isJoined ? (
             <button onClick={goToClassroom}
               className="w-full py-3 rounded-2xl text-sm font-bold bg-red-500 text-white flex items-center justify-center gap-2 active:scale-[0.98] transition">
               <span className="w-2 h-2 bg-white rounded-full animate-pulse" /> Join Now

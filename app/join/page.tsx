@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getOrgByCode, joinOrganisation, supabase } from '@/lib/supabase'
+import { getOrgByCode, getOrgBySlug, joinOrganisation, supabase } from '@/lib/supabase'
 import { Loader2, CheckCircle, Building2, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 
@@ -18,14 +18,33 @@ export default function JoinByCodePage() {
   const [joined,  setJoined]  = useState(false)
   const [error,   setError]   = useState('')
 
+  // Accept a plain code (LEYTON24), a bare slug (leyton-academy), or a full
+  // invite link pasted in (https://lern.app/join/leyton-academy).
+  const parseInput = (raw: string) => {
+    let value = raw.trim()
+    // If they pasted a URL, pull out the last path segment after /join/.
+    const match = value.match(/\/join\/([^/?#\s]+)/i)
+    if (match) value = match[1]
+    // Strip any leftover URL bits / trailing slashes.
+    value = value.replace(/[?#].*$/, '').replace(/\/+$/, '')
+    return value
+  }
+
   const handleFind = async () => {
     if (!code.trim()) return
     setFinding(true)
     setError('')
     setOrg(null)
-    const { data } = await getOrgByCode(code.trim())
+    const value = parseInput(code)
+    // Try join code first (uppercase), then fall back to a slug match so a
+    // pasted invite link works just like typing the code.
+    let { data } = await getOrgByCode(value)
     if (!data) {
-      setError('No institution found with that code. Check and try again.')
+      const bySlug = await getOrgBySlug(value.toLowerCase())
+      data = bySlug.data
+    }
+    if (!data) {
+      setError('No institution found. Paste your invite link or enter your join code.')
     } else {
       // Check if already a member
       if (user) {
@@ -87,18 +106,18 @@ export default function JoinByCodePage() {
         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center mb-6">
           <Building2 className="w-8 h-8 text-white" />
         </div>
-        <h2 className="text-white font-bold text-2xl mb-2">Enter your institution code</h2>
+        <h2 className="text-white font-bold text-2xl mb-2">Join your institution</h2>
         <p className="text-[#555] text-sm mb-8 leading-relaxed">
-          Your institution admin will give you this code. It looks like <span className="text-white font-semibold">LEYTON24</span>.
+          Paste the <span className="text-white font-semibold">invite link</span> your admin shared, or enter the join code like <span className="text-white font-semibold">LEYTON24</span>.
         </p>
 
         <div className="space-y-4">
           <input
             value={code}
-            onChange={e => { setCode(e.target.value.toUpperCase()); setOrg(null); setError('') }}
+            onChange={e => { setCode(e.target.value); setOrg(null); setError('') }}
             onKeyDown={e => e.key === 'Enter' && handleFind()}
-            placeholder="Enter code e.g. LEYTON24"
-            className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] rounded-2xl px-5 py-4 text-white text-lg font-bold tracking-widest placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.25)] transition uppercase"
+            placeholder="Code or invite link"
+            className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] rounded-2xl px-5 py-4 text-white text-base font-semibold placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.25)] transition"
           />
 
           {error && (
