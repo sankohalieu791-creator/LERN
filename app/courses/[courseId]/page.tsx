@@ -6,7 +6,7 @@ import { getCourseById, enrollCourse, isEnrolled, getCourseProject, getMyProject
 import { sendPush } from '@/lib/push'
 import { useAuth } from '@/context/AuthContext'
 import { getNextUpcomingSession } from '@/lib/course-session-utils'
-import { Users, Calendar, ChevronLeft, Loader2, FileText, CheckCircle, XCircle, ArrowRight, LayoutDashboard } from 'lucide-react'
+import { Users, Calendar, ChevronLeft, Loader2, FileText, CheckCircle, XCircle, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
 function VerifiedBadge({ size = 14 }: { size?: number }) {
@@ -299,12 +299,9 @@ export default function CourseDetailPage() {
             </div>
           )
         ) : isInstructorAccount ? (
-          <Link
-            href="/dashboard"
-            className="flex w-full items-center justify-center gap-2 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl text-center"
-          >
-            <LayoutDashboard className="w-4 h-4" /> Instructor Dashboard
-          </Link>
+          <div className="w-full flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] text-[#555] font-bold py-4 rounded-2xl text-sm">
+            Viewing as instructor
+          </div>
         ) : (
           <button
             onClick={handleEnroll}

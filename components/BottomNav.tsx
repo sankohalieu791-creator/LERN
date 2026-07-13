@@ -45,10 +45,12 @@ export default function BottomNav() {
     pathname.startsWith('/auth') ||
     /^\/feed\/.+/.test(pathname) ||
     /^\/messages\/.+/.test(pathname) ||
-    // Drill-in course/workshop detail pages have their own fixed bottom bar
-    // (enrol / start class / close project day) — the global nav would cover it.
+    // Drill-in pages with their own fixed bottom bar / bottom-sheet actions
+    // (enrol, start class, close project day, submission decisions) — the global
+    // nav sits on top of those controls and hides them.
     /^\/courses\/.+/.test(pathname) ||
-    /^\/workshops\/.+/.test(pathname)
+    /^\/workshops\/.+/.test(pathname) ||
+    pathname === '/dashboard'
   ) return null
 
   const active = (p: string) => pathname === p || pathname.startsWith(p + '/')

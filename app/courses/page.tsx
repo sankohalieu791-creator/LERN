@@ -671,12 +671,9 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
                   </button>
                 </div>
               ) : isInstructorAccount ? (
-                <button
-                  onClick={() => router.push('/dashboard')}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl"
-                >
-                  <LayoutDashboard className="w-4 h-4" /> Instructor Dashboard
-                </button>
+                <div className="w-full flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] text-[#555] font-bold py-4 rounded-2xl text-sm">
+                  Viewing as instructor
+                </div>
               ) : isLocked ? (
                 <div className="space-y-2">
                   <div className="w-full flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] text-[#888] font-bold py-3.5 rounded-2xl text-sm">
@@ -838,15 +835,23 @@ function CoursesPageInner() {
     <>
     <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
-      {/* TABS */}
+      {/* TABS — instructors don't enrol, so the far-right Enrolled tab becomes
+          their Instructor Dashboard entry point. */}
       <div className="flex-shrink-0 flex border-b border-[rgba(255,255,255,0.07)] bg-[#0f0f0f]">
         {(['courses','workshops','enrolled'] as Tab[]).map(tab => (
-          <button key={tab} data-tab={tab} onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-3.5 text-sm font-semibold capitalize border-b-2 transition ${
-              activeTab === tab ? 'text-white border-white' : 'text-[#555] border-transparent'
-            }`}>
-            {tab === 'enrolled' ? t('enroll_tab') : tab === 'workshops' ? t('workshops') : t('courses')}
-          </button>
+          tab === 'enrolled' && isInstructor ? (
+            <button key="dashboard" onClick={() => router.push('/dashboard')}
+              className="flex-1 py-3.5 text-sm font-semibold border-b-2 border-transparent text-[#555] flex items-center justify-center gap-1.5 transition">
+              <LayoutDashboard className="w-4 h-4" /> Dashboard
+            </button>
+          ) : (
+            <button key={tab} data-tab={tab} onClick={() => setActiveTab(tab)}
+              className={`flex-1 py-3.5 text-sm font-semibold capitalize border-b-2 transition ${
+                activeTab === tab ? 'text-white border-white' : 'text-[#555] border-transparent'
+              }`}>
+              {tab === 'enrolled' ? t('enroll_tab') : tab === 'workshops' ? t('workshops') : t('courses')}
+            </button>
+          )
         ))}
       </div>
 
