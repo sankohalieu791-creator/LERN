@@ -358,31 +358,45 @@ export default function DashboardPage() {
       </div>
 
       {/* ── REVIEW MODAL ─────────────────────────────── */}
+      {/* h-[100dvh] (not inset-0): the DYNAMIC viewport excludes the mobile browser's
+          bottom toolbar, so the sheet's footer is never parked underneath it. Body
+          scrolls; the decision buttons live in a pinned footer and are always visible. */}
       {reviewModal && (
-        <div className="fixed inset-0 z-[70] flex flex-col justify-end">
+        <div className="fixed inset-x-0 top-0 h-[100dvh] z-[70] flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => { setReviewModal(null); setFeedback('') }} />
-          <div className="relative bg-[#141414] rounded-t-3xl max-h-[85dvh] overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
-            <div className="flex justify-center pt-3">
+          <div className="relative bg-[#141414] rounded-t-3xl flex flex-col max-h-[88dvh] min-h-0">
+            <div className="flex justify-center pt-3 flex-shrink-0">
               <div className="w-10 h-1 bg-[#333] rounded-full" />
             </div>
-            <div className="flex items-center justify-between px-5 pt-3 pb-4 border-b border-[rgba(255,255,255,0.07)]">
-              <h2 className="text-white text-lg font-bold">
-                {reviewModal._decline ? 'Decline Submission' : 'Accept Submission'}
-              </h2>
-              <button onClick={() => { setReviewModal(null); setFeedback('') }} className="w-8 h-8 bg-[#222] rounded-full flex items-center justify-center">
+            <div className="flex-shrink-0 flex items-center justify-between px-5 pt-3 pb-4 border-b border-[rgba(255,255,255,0.07)]">
+              <div>
+                <h2 className="text-white text-lg font-bold">
+                  {reviewModal.status !== 'pending' ? 'Change Decision' : 'Review Submission'}
+                </h2>
+                {reviewModal.status !== 'pending' && (
+                  <p className="text-[#555] text-xs mt-0.5">
+                    Currently <span className={reviewModal.status === 'accepted' ? 'text-green-400' : 'text-red-400'}>
+                      {reviewModal.status}
+                    </span>
+                  </p>
+                )}
+              </div>
+              <button onClick={() => { setReviewModal(null); setFeedback('') }} className="w-8 h-8 bg-[#222] rounded-full flex items-center justify-center flex-shrink-0">
                 <X className="w-4 h-4 text-white" />
               </button>
             </div>
-            <div className="px-5 pt-4 pb-4 space-y-4">
+
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 px-5 pt-4 pb-4 space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
                   {reviewModal.user?.avatar_url
                     ? <img src={reviewModal.user.avatar_url} className="w-full h-full object-cover" />
                     : reviewModal.user?.username?.[0]?.toUpperCase() ?? '?'}
                 </div>
-                <div>
-                  <p className="text-white font-bold text-sm">{reviewModal.user?.username}</p>
-                  <p className="text-[#555] text-xs">{reviewModal.project?.title}</p>
+                <div className="min-w-0">
+                  <p className="text-white font-bold text-sm truncate">{reviewModal.user?.username}</p>
+                  <p className="text-[#555] text-xs truncate">{reviewModal.project?.title}</p>
                 </div>
               </div>
               <div>
@@ -390,32 +404,37 @@ export default function DashboardPage() {
                 <textarea
                   value={feedback}
                   onChange={e => setFeedback(e.target.value)}
-                  placeholder={reviewModal._decline
-                    ? "Tell the student what to improve and resubmit…"
-                    : "Great work! Any comments for the student?"}
+                  placeholder="Tell the student what was good, or what to improve and resubmit…"
                   rows={3}
                   className="w-full bg-[#1e1e1e] border border-[rgba(255,255,255,0.08)] rounded-2xl px-4 py-3 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.2)] transition resize-none"
                 />
               </div>
-              <div className="flex gap-3">
+            </div>
+
+            {/* Pinned footer — BOTH decisions are always offered, so a decision can
+                actually be changed either way (previously only Accept was shown). */}
+            <div className="flex-shrink-0 px-5 pt-3 border-t border-[rgba(255,255,255,0.07)] bg-[#141414] rounded-b-none"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
+              <div className="flex gap-2">
                 <button
                   onClick={() => { setReviewModal(null); setFeedback('') }}
-                  className="flex-1 bg-[#252525] text-white font-bold py-3.5 rounded-2xl text-sm"
+                  className="px-5 bg-[#252525] text-white font-bold py-3.5 rounded-2xl text-sm flex-shrink-0"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={() => handleReview(reviewModal._decline ? 'declined' : 'accepted')}
-                  disabled={reviewing}
-                  className={`flex-1 font-bold py-3.5 rounded-2xl text-sm disabled:opacity-40 flex items-center justify-center gap-2 ${
-                    reviewModal._decline
-                      ? 'bg-red-500 text-white'
-                      : 'bg-green-500 text-white'
-                  }`}
+                  onClick={() => handleReview('declined')}
+                  disabled={reviewing || reviewModal.status === 'declined'}
+                  className="flex-1 bg-red-500 text-white font-bold py-3.5 rounded-2xl text-sm disabled:opacity-30 flex items-center justify-center gap-2"
                 >
-                  {reviewing
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : reviewModal._decline ? <><X className="w-4 h-4" />Decline</> : <><Check className="w-4 h-4" />Accept</>}
+                  {reviewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <><X className="w-4 h-4" />Decline</>}
+                </button>
+                <button
+                  onClick={() => handleReview('accepted')}
+                  disabled={reviewing || reviewModal.status === 'accepted'}
+                  className="flex-1 bg-green-500 text-white font-bold py-3.5 rounded-2xl text-sm disabled:opacity-30 flex items-center justify-center gap-2"
+                >
+                  {reviewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4" />Accept</>}
                 </button>
               </div>
             </div>
