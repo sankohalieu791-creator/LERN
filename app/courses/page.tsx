@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import {
   SlidersHorizontal, Star, Clock, Users, X, Check,
   Calendar, Loader2, Lock,
-  UserCheck, Plus, BookOpen, Trash2, MapPin, Globe, Monitor,
+  UserCheck, Plus, BookOpen, Trash2, MapPin, Globe, Monitor, LayoutDashboard,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -14,7 +14,7 @@ import {
   isEnrolled, rateCourse, getUserCourseRating,
   joinWorkshop, leaveWorkshop, getMyWorkshopJoins,
   setSessionLive, getEnrolledCourses, deleteWorkshop,
-  supabase,
+  supabase, getMyOrgId,
 } from '@/lib/supabase'
 import CreateCourse from '@/components/CreateCourse'
 import CreateWorkshop from '@/components/CreateWorkshop'
@@ -454,17 +454,25 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
 
   const isOwner = !!(user && course && user.id === course.instructor_id)
   const isInstructorAccount = user?.account_type === 'instructor'
+  const [myOrgId, setMyOrgId] = useState<string | null>(null)
+  const [enrollError, setEnrollError] = useState('')
+
+  // Private org course + viewer is not in that org → visible, but locked.
+  const isLocked = !!(course && course.visibility === 'private'
+    && (!myOrgId || course.organisation_id !== myOrgId) && !isOwner)
 
   useEffect(() => {
     const load = async () => {
       const { data } = await getCourseById(courseId)
       setCourse(data)
       if (user) {
-        const [{ data: enrolledData }, { data: ratingData }] = await Promise.all([
+        const [{ data: enrolledData }, { data: ratingData }, orgId] = await Promise.all([
           isEnrolled(courseId, user.id),
           getUserCourseRating(courseId, user.id),
+          getMyOrgId(user.id),
         ])
         setEnrolled(!!enrolledData)
+        setMyOrgId(orgId)
         if (ratingData?.rating) { setUserRating(ratingData.rating); setRatingDone(true) }
       }
       setLoading(false)
@@ -475,10 +483,11 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
   const handleEnroll = async () => {
     if (!user) { router.push('/auth/login'); return }
     setEnrolling(true)
-    await enrollCourse(courseId, user.id)
+    const { error } = await enrollCourse(courseId, user.id)
+    setEnrolling(false)
+    if (error) { setEnrollError(error.message || 'Could not enrol. Please try again.'); return }
     setEnrolled(true)
     setSuccess(true)
-    setEnrolling(false)
     if (course) onEnrolled?.(course)
     setTimeout(() => setSuccess(false), 2000)
   }
@@ -631,6 +640,9 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
 
             <div className="flex-shrink-0 px-5 py-4 border-t border-[rgba(255,255,255,0.07)] bg-[#141414]"
               style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
+              {enrollError && (
+                <p className="text-red-400 text-xs bg-red-400/10 rounded-xl px-3 py-2 mb-2 text-center">{enrollError}</p>
+              )}
               {isOwner ? (
                 allSessionsCompleted ? (
                   <div className="w-full flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] text-[#555] font-bold py-4 rounded-2xl text-sm">
@@ -659,8 +671,27 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
                   </button>
                 </div>
               ) : isInstructorAccount ? (
-                <div className="w-full flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] text-[#555] font-bold py-4 rounded-2xl text-sm">
-                  Viewing as instructor
+                <button
+                  onClick={() => router.push('/dashboard')}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl"
+                >
+                  <LayoutDashboard className="w-4 h-4" /> Instructor Dashboard
+                </button>
+              ) : isLocked ? (
+                <div className="space-y-2">
+                  <div className="w-full flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] text-[#888] font-bold py-3.5 rounded-2xl text-sm">
+                    <Lock className="w-4 h-4 text-[#c9a2ff]" /> Private course
+                  </div>
+                  <p className="text-[#555] text-xs text-center leading-relaxed px-2">
+                    Only members of this institution can enrol. Open the invite link your
+                    institution shared, or enter their join code.
+                  </p>
+                  <button
+                    onClick={() => router.push('/join')}
+                    className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-3.5 rounded-2xl"
+                  >
+                    Join Institution
+                  </button>
                 </div>
               ) : (
                 <button
@@ -1051,9 +1082,15 @@ function CourseCard({ course, isEnrolled, isOwner, onTap }: {
             {[course.subject, course.level].filter(Boolean).join(' · ')}
           </span>
         )}
-        {isOwner && (
+        {isOwner ? (
           <div className="absolute top-2.5 right-2.5">
             <span className="text-[10px] font-bold bg-[#FF6B2B] text-white px-2.5 py-1 rounded-full">YOUR COURSE</span>
+          </div>
+        ) : course.visibility === 'private' && (
+          <div className="absolute top-2.5 right-2.5">
+            <span className="flex items-center gap-1 text-[10px] font-bold bg-black/80 text-[#c9a2ff] border border-[#c9a2ff]/30 px-2.5 py-1 rounded-full uppercase tracking-wide">
+              <Lock className="w-2.5 h-2.5" /> Private
+            </span>
           </div>
         )}
       </div>

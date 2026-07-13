@@ -6,7 +6,7 @@ import { getCourseById, enrollCourse, isEnrolled, getCourseProject, getMyProject
 import { sendPush } from '@/lib/push'
 import { useAuth } from '@/context/AuthContext'
 import { getNextUpcomingSession } from '@/lib/course-session-utils'
-import { Users, Calendar, ChevronLeft, Loader2, FileText, CheckCircle, XCircle, ArrowRight } from 'lucide-react'
+import { Users, Calendar, ChevronLeft, Loader2, FileText, CheckCircle, XCircle, ArrowRight, LayoutDashboard } from 'lucide-react'
 import Link from 'next/link'
 
 function VerifiedBadge({ size = 14 }: { size?: number }) {
@@ -30,6 +30,7 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true)
   const [enrolled, setEnrolled] = useState(false)
   const [enrolling, setEnrolling] = useState(false)
+  const [enrollError, setEnrollError] = useState('')
 
   // Project brief + this student's submission (read-only here; full flow lives on the Project Day page)
   const [project, setProject] = useState<any>(null)
@@ -98,9 +99,11 @@ export default function CourseDetailPage() {
   const handleEnroll = async () => {
     if (!user) { router.push('/auth/login'); return }
     setEnrolling(true)
-    await enrollCourse(courseId as string, user.id)
-    setEnrolled(true)
+    setEnrollError('')
+    const { error } = await enrollCourse(courseId as string, user.id)
     setEnrolling(false)
+    if (error) { setEnrollError(error.message || 'Could not enrol. Please try again.'); return }
+    setEnrolled(true)
     if (course?.instructor_id) {
       sendPush(
         course.instructor_id,
@@ -267,6 +270,9 @@ export default function CourseDetailPage() {
         className="fixed bottom-0 left-0 right-0 px-4 py-4 bg-[#0f0f0f] border-t border-[rgba(255,255,255,0.07)]"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
       >
+        {enrollError && (
+          <p className="text-red-400 text-xs bg-red-400/10 rounded-xl px-3 py-2 mb-2 text-center">{enrollError}</p>
+        )}
         {courseComplete ? (
           <div className="w-full flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] text-[#555] font-bold py-4 rounded-2xl text-sm">
             <CheckCircle className="w-4 h-4 text-green-500" />
@@ -293,9 +299,12 @@ export default function CourseDetailPage() {
             </div>
           )
         ) : isInstructorAccount ? (
-          <div className="w-full flex items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] text-[#555] font-bold py-4 rounded-2xl text-sm">
-            Viewing as instructor
-          </div>
+          <Link
+            href="/dashboard"
+            className="flex w-full items-center justify-center gap-2 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl text-center"
+          >
+            <LayoutDashboard className="w-4 h-4" /> Instructor Dashboard
+          </Link>
         ) : (
           <button
             onClick={handleEnroll}

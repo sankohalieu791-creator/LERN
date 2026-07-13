@@ -262,11 +262,10 @@ export default function FeedPage() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  const goToProfile = async (userId: string, e?: React.MouseEvent) => {
+  const goToProfile = (userId: string, e?: React.MouseEvent) => {
     e?.stopPropagation()
-    if (user && user.id !== userId) {
-      try { await incrementProfileViews(userId) } catch {}
-    }
+    // Don't increment here — /profile/[userId] already counts the view on mount.
+    // Doing it in both places double-counted every visit from the feed.
     router.push(`/profile/${userId}`)
   }
 

@@ -18,8 +18,9 @@ import {
   deleteCourse, deleteWorkshop, getInstructorWorkshops,
   getFollowersList, getFollowingList,
   getJobsByInstructor, deleteJob, getSavedJobs, saveJob, unsaveJob,
-  supabase,
+  supabase, createNotification,
 } from '@/lib/supabase'
+import { sendPush } from '@/lib/push'
 import CreateJob from '@/components/CreateJob'
 import type { Project, Certificate, Video } from '@/lib/types'
 
@@ -87,6 +88,7 @@ export default function ProfileMePage() {
   const [certificates, setCertificates] = useState<Certificate[]>([])
   const [feedback,     setFeedback]     = useState<any[]>([])
   const [dataLoading,  setDataLoading]  = useState(false)
+  const [viewsCount,   setViewsCount]   = useState<number | null>(null)
 
   // Certificate form
   const [certTitle,  setCertTitle]  = useState('')
@@ -123,6 +125,14 @@ export default function ProfileMePage() {
   const TABS = isInstructor ? INSTRUCTOR_TABS : STUDENT_TABS
 
   const initial = user?.username?.[0]?.toUpperCase() ?? 'U'
+
+  // The auth profile is cached in localStorage, so user.views_count goes stale and
+  // the counter looks frozen. Read the live value straight from the DB.
+  useEffect(() => {
+    if (!user) return
+    supabase.from('users').select('views_count').eq('id', user.id).maybeSingle()
+      .then(({ data }) => { if (data) setViewsCount(data.views_count ?? 0) })
+  }, [user])
 
   useEffect(() => {
     if (!user) return
@@ -216,9 +226,24 @@ export default function ProfileMePage() {
 
   const handleRequestAction = async (requestId: string, status: 'accepted' | 'declined') => {
     setUpdatingRequest(requestId)
-    await updateRequestStatus(requestId, status)
-    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status } : r))
+    const { error } = await updateRequestStatus(requestId, status)
     setUpdatingRequest(null)
+    // Don't flip the UI if the write failed — it used to show "Accepted" on an error.
+    if (error) return
+
+    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status } : r))
+
+    // Tell the requester what happened — previously they were never told.
+    const req = requests.find(r => r.id === requestId)
+    if (req?.from_user_id) {
+      const accepted = status === 'accepted'
+      const title = accepted ? '✅ Request accepted' : '❌ Request declined'
+      const body  = accepted
+        ? `${user?.username || 'The instructor'} accepted your ${req.type} request`
+        : `${user?.username || 'The instructor'} declined your ${req.type} request`
+      sendPush(req.from_user_id, title, body, `/profile/${user?.id}`)
+      createNotification(req.from_user_id, 'request', title, body, `/profile/${user?.id}`)
+    }
   }
 
   const confirmDelete = async () => {
@@ -356,7 +381,9 @@ export default function ProfileMePage() {
       <div className="mx-4 mb-4 flex items-center gap-2 text-xs bg-[#1a1a1a] theme-card border border-[rgba(255,255,255,0.06)] theme-border rounded-xl px-3 py-2">
         <Eye className="w-3 h-3 text-[#555]" />
         <span className="text-[#555] font-bold">VIEWED BY</span>
-        <span className="text-white font-semibold">{user?.views_count ?? 0} Profiles</span>
+        <span className="text-white font-semibold">
+          {viewsCount ?? user?.views_count ?? 0} {(viewsCount ?? user?.views_count ?? 0) === 1 ? 'Profile' : 'Profiles'}
+        </span>
       </div>
 
       {/* ── ACTION BUTTONS ───────────────────────────────────── */}
@@ -375,24 +402,7 @@ export default function ProfileMePage() {
         </Link>
       </div>
 
-      {/* ── INSTRUCTOR DASHBOARD SHORTCUT ─────────────────────── */}
-      {isInstructor && (
-        <div className="px-4 mb-5">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-3 w-full bg-gradient-to-r from-[#FF6B2B]/10 to-[#C026D3]/10 border border-[#FF6B2B]/25 rounded-xl px-4 py-3 hover:from-[#FF6B2B]/15 hover:to-[#C026D3]/15 transition"
-          >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
-              <MessageSquare className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="text-white text-sm font-bold">Instructor Dashboard</p>
-              <p className="text-[#555] text-xs">Analytics, submissions &amp; more</p>
-            </div>
-            <BookOpen className="w-4 h-4 text-[#555]" />
-          </Link>
-        </div>
-      )}
+      {/* Instructor Dashboard now lives on the course detail screen (where Enroll sits for students). */}
 
       {/* ── TABS ─────────────────────────────────────────────── */}
       <div className="flex border-b border-[rgba(255,255,255,0.07)] theme-border">

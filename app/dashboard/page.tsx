@@ -361,7 +361,7 @@ export default function DashboardPage() {
       {reviewModal && (
         <div className="fixed inset-0 z-[70] flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => { setReviewModal(null); setFeedback('') }} />
-          <div className="relative bg-[#141414] rounded-t-3xl max-h-[85vh] overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
+          <div className="relative bg-[#141414] rounded-t-3xl max-h-[85dvh] overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
             <div className="flex justify-center pt-3">
               <div className="w-10 h-1 bg-[#333] rounded-full" />
             </div>

@@ -102,42 +102,46 @@ export const createVideo = async (userId: string, videoData: any) => {
   return { data, error }
 }
 
-// Courses — returns public courses + the user's org private courses (if userId provided)
+// The org a user belongs to (as member, or as the org's admin). Null if none.
+export const getMyOrgId = async (userId?: string): Promise<string | null> => {
+  if (!userId) return null
+  const { data: membership } = await supabase
+    .from('organisation_members').select('organisation_id').eq('user_id', userId).maybeSingle()
+  if (membership?.organisation_id) return membership.organisation_id
+  const { data: adminOrg } = await supabase
+    .from('organisations').select('id').eq('admin_user_id', userId).maybeSingle()
+  return adminOrg?.id ?? null
+}
+
+// Courses — EVERY non-deleted course is listed, including an organisation's private
+// ones. Private courses are surfaced with a "Private" badge and are locked: you can
+// see they exist, but you can only enrol once you've joined the org via its invite
+// link. `is_locked` tells the UI which ones to gate.
 export const getCourses = async (userId?: string) => {
-  let orgId: string | null = null
-  if (userId) {
-    const { data: membership } = await supabase
-      .from('organisation_members').select('organisation_id').eq('user_id', userId).maybeSingle()
-    orgId = membership?.organisation_id ?? null
-    if (!orgId) {
-      const { data: adminOrg } = await supabase
-        .from('organisations').select('id').eq('admin_user_id', userId).maybeSingle()
-      orgId = adminOrg?.id ?? null
-    }
-  }
+  const orgId = await getMyOrgId(userId)
 
-  const base = supabase.from('courses').select('*, course_sessions(*)').eq('is_deleted', false).order('created_at', { ascending: false })
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*, course_sessions(*)')
+    .eq('is_deleted', false)
+    .order('created_at', { ascending: false })
 
-  let filtered = orgId
-    ? base.or(`visibility.eq.public,and(visibility.eq.private,organisation_id.eq.${orgId})`)
-    : base.or('visibility.eq.public,visibility.is.null')
+  if (error || !data) return { data: [], error }
 
-  let { data, error } = await filtered
-
-  // If visibility column doesn't exist yet (SQL not run), fall back to unfiltered
-  if (error || !data) {
-    const fallback = await supabase.from('courses').select('*, course_sessions(*)').order('created_at', { ascending: false })
-    data = fallback.data
-    error = fallback.error
-  }
-
-  if (!data) return { data: [], error: null }
   const ids = [...new Set(data.map((c: any) => c.instructor_id || c.user_id).filter(Boolean))]
   const { data: usersData } = ids.length
     ? await supabase.from('users').select('id, username, avatar_url, verified, title').in('id', ids)
     : { data: [] }
   const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
-  return { data: data.map((c: any) => ({ ...c, users: map[c.instructor_id || c.user_id] ?? null })), error: null }
+
+  return {
+    data: data.map((c: any) => ({
+      ...c,
+      users: map[c.instructor_id || c.user_id] ?? null,
+      is_locked: c.visibility === 'private' && (!orgId || c.organisation_id !== orgId),
+    })),
+    error: null,
+  }
 }
 
 export const getCourseById = async (courseId: string) => {
@@ -163,6 +167,22 @@ export const createCourse = async (instructorId: string, courseData: any) => {
 }
 
 export const enrollCourse = async (courseId: string, userId: string) => {
+  // A private (organisation) course can only be joined by members of that org —
+  // i.e. someone who used the institution's invite link. Anyone can SEE the course
+  // in the list, but enrolling requires membership.
+  const { data: course } = await supabase
+    .from('courses').select('visibility, organisation_id').eq('id', courseId).maybeSingle()
+
+  if (course?.visibility === 'private') {
+    const orgId = await getMyOrgId(userId)
+    if (!orgId || orgId !== course.organisation_id) {
+      return {
+        data: null,
+        error: { message: 'This is a private course. Join the institution with its invite link to enrol.' } as any,
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from('enrollments')
     .insert([{ course_id: courseId, user_id: userId }])

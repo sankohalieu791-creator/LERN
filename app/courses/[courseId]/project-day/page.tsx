@@ -13,7 +13,7 @@ import Link from 'next/link'
 import {
   ChevronLeft, Loader2, Upload, Film, ImageIcon, File, CheckCircle,
   XCircle, Clock, Calendar, Users, MessageSquare, X, Plus, RefreshCw,
-  ClipboardList, Video, Pencil, Globe, Lock, Trophy,
+  ClipboardList, Video, Pencil, Globe, Lock, Trophy, Maximize2,
 } from 'lucide-react'
 
 function StatusBadge({ status }: { status: string }) {
@@ -74,6 +74,7 @@ function ProjectDayInner() {
 
   // Student: publishing an accepted project
   const [showcase,     setShowcase]     = useState<any>(null)
+  const [lightbox,     setLightbox]     = useState<string | null>(null)
   const [publishing,   setPublishing]   = useState<'public' | 'private' | null>(null)
   const [publishError, setPublishError] = useState('')
 
@@ -516,7 +517,13 @@ function ProjectDayInner() {
                             className="w-full rounded-xl max-h-48 bg-black"
                           />
                         ) : sub.file_type === 'image' ? (
-                          <img src={sub.file_url} alt="submission" className="w-full rounded-xl max-h-48 object-cover" />
+                          <button type="button" onClick={() => setLightbox(sub.file_url)} className="block w-full">
+                            <img src={sub.file_url} alt="submission"
+                              className="w-full rounded-xl max-h-[50vh] object-contain bg-black" />
+                            <span className="mt-1.5 flex items-center justify-center gap-1.5 text-[#555] text-[11px] font-semibold">
+                              <Maximize2 className="w-3 h-3" /> Tap to view full size
+                            </span>
+                          </button>
                         ) : (
                           <a href={sub.file_url} target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-2 text-[#1d9bf0] text-xs font-semibold">
@@ -630,9 +637,15 @@ function ProjectDayInner() {
                 )}
                 {mySubmission.file_url && (
                   mySubmission.file_type === 'video' ? (
-                    <video src={mySubmission.file_url} controls className="w-full rounded-xl max-h-48 bg-black" />
+                    <video src={mySubmission.file_url} controls className="w-full rounded-xl max-h-[60vh] bg-black" />
                   ) : mySubmission.file_type === 'image' ? (
-                    <img src={mySubmission.file_url} alt="submission" className="w-full rounded-xl max-h-48 object-cover" />
+                    <button type="button" onClick={() => setLightbox(mySubmission.file_url)} className="block w-full">
+                      <img src={mySubmission.file_url} alt="submission"
+                        className="w-full rounded-xl max-h-[60vh] object-contain bg-black" />
+                      <span className="mt-1.5 flex items-center justify-center gap-1.5 text-[#555] text-xs font-semibold">
+                        <Maximize2 className="w-3 h-3" /> Tap to view full size
+                      </span>
+                    </button>
                   ) : (
                     <a href={mySubmission.file_url} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-2 bg-[#111] rounded-xl px-4 py-3 text-[#1d9bf0] text-sm font-semibold">
@@ -805,6 +818,21 @@ function ProjectDayInner() {
             {closing ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
             Close Project Day & Mark Complete
           </button>
+        </div>
+      )}
+
+      {/* ── FULL-SCREEN SUBMISSION VIEWER ────────────────────── */}
+      {lightbox && (
+        <div className="fixed inset-0 z-[80] bg-black/95 flex items-center justify-center"
+          onClick={() => setLightbox(null)}>
+          <button
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 w-10 h-10 bg-[#1e1e1e] rounded-full flex items-center justify-center z-10"
+            style={{ top: 'calc(env(safe-area-inset-top) + 16px)' }}
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+          <img src={lightbox} alt="submission" className="max-w-full max-h-full object-contain" />
         </div>
       )}
 

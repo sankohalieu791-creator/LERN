@@ -126,8 +126,14 @@ export default function SettingsPage() {
       setApplyError(error.message || 'Submission failed. Please try again.')
       return
     }
-    // Grant instructor access immediately + verified badge
-    const { error: profileErr } = await updateUserProfile(user.id, { account_type: 'instructor', verified: true })
+    // Grant access immediately + verified badge. Employers get the employer
+    // account type; every other role type teaches, so they become instructors.
+    const isEmployer = applyForm.role_type === 'employer'
+    const { error: profileErr } = await updateUserProfile(user.id, {
+      account_type: isEmployer ? 'employer' : 'instructor',
+      is_employer:  isEmployer,
+      verified:     true,
+    })
     if (profileErr) {
       setApplyError('Application saved but could not activate instructor access. Please sign out and back in.')
       return

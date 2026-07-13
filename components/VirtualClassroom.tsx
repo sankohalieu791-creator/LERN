@@ -113,6 +113,8 @@ export default function VirtualClassroom({
   const [joined,       setJoined]       = useState(false)
   const [connecting,   setConnecting]   = useState(false)
   const [muted,        setMuted]        = useState(true)
+  // Set when the instructor force-mutes this client; blocks self-unmute until cleared.
+  const [forceMuted,   setForceMuted]   = useState(false)
   const [cameraOn,     setCameraOn]     = useState(false)
   const [screenSharing, setScreenSharing] = useState(false)
   const [handUp,       setHandUp]       = useState(false)
@@ -345,17 +347,28 @@ export default function VirtualClassroom({
       if (payload.targetUserId === myUserId) leaveAndClose()
     })
 
-    channel.on('broadcast', { event: 'mute' }, ({ payload }) => {
-      if (payload.targetUserId === myUserId) {
-        localAudioRef.current?.close()
-        localAudioRef.current = null
-        setMuted(true)
-      }
+    channel.on('broadcast', { event: 'mute' }, async ({ payload }) => {
+      if (payload.targetUserId !== myUserId) return
+      // Actually stop the audio reaching the room: unpublish from Agora first,
+      // otherwise the client keeps a stale publish record and the mic keeps streaming.
+      try {
+        if (localAudioRef.current && clientRef.current) {
+          await clientRef.current.unpublish([localAudioRef.current])
+        }
+      } catch { /* already unpublished */ }
+      localAudioRef.current?.close()
+      localAudioRef.current = null
+      setMuted(true)
+      // Held muted until the instructor lets them speak again — otherwise the
+      // student could simply tap their mic button and undo the mute instantly.
+      setForceMuted(true)
     })
 
     channel.on('broadcast', { event: 'accept_hand' }, ({ payload }) => {
       if (payload.targetUserId === myUserId) {
         setHandUp(false)
+        // Being accepted to speak lifts an instructor force-mute.
+        setForceMuted(false)
         setMessages(prev => [...prev, {
           id: String(Date.now()), userId: 'system', username: 'Instructor',
           text: '✅ You have been accepted to speak.', instructor: true,
@@ -570,6 +583,14 @@ export default function VirtualClassroom({
   }
   const kickParticipant = (targetUserId: string) => {
     realtimeRef.current?.send({ type: 'broadcast', event: 'kick', payload: { targetUserId } })
+    // Drop them from the accepted set — otherwise pendingRequests filters them out
+    // forever and a kicked student who comes back is stuck on "waiting for admission"
+    // with no way for the instructor to re-admit them.
+    setAcceptedIds(prev => {
+      const next = new Set(prev)
+      next.delete(targetUserId)
+      return next
+    })
   }
   const muteParticipant = (targetUserId: string) => {
     realtimeRef.current?.send({ type: 'broadcast', event: 'mute', payload: { targetUserId } })
@@ -651,6 +672,11 @@ export default function VirtualClassroom({
 
   const toggleMic = async () => {
     if (!joined || !clientRef.current) return
+    // Instructor has force-muted this student — they cannot unmute themselves.
+    if (muted && forceMuted) {
+      setRtcError('You have been muted by the instructor.')
+      return
+    }
     try {
       const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
       if (muted) {
@@ -907,9 +933,7 @@ export default function VirtualClassroom({
 
       {/* HEADER */}
       <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
-        <button onClick={leaveAndClose} className="w-9 h-9 bg-[#1e1e1e] rounded-full flex items-center justify-center">
-          <X className="w-4 h-4 text-white" />
-        </button>
+        <div className="w-9 h-9 flex-shrink-0" />
         <div className="text-center flex-1 px-3">
           {recording && (
             <div className="flex items-center justify-center gap-1.5 mb-0.5">
