@@ -451,7 +451,7 @@ export default function ProfileMePage() {
                   </Link>
                   <button
                     onClick={e => { e.preventDefault(); e.stopPropagation(); setDeleteTarget({ type: 'post', id: v.id }) }}
-                    className="absolute top-1.5 right-1.5 w-7 h-7 bg-black/70 rounded-full flex items-center justify-center z-10"
+                    className="absolute top-1.5 right-1.5 w-7 h-7 bg-[#2a2a2a] rounded-full flex items-center justify-center z-10"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-white" />
                   </button>

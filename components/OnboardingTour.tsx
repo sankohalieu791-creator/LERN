@@ -1,268 +1,387 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { X, ArrowRight } from 'lucide-react'
+import { X, ArrowRight, ArrowLeft, Sparkles, Rocket } from 'lucide-react'
 
-const S_KEY = 'lern_tour_s3'   // student tour done
-const I_KEY = 'lern_tour_i3'   // instructor tour done
-
-// Bottom nav has 5 items. Centers at 10%, 30%, 50%, 70%, 90% of screen width.
-const NAV_CENTERS = ['10%', '30%', '50%', '70%', '90%']
+const DONE_KEY_STUDENT    = 'lern_tour_v4_student'
+const DONE_KEY_INSTRUCTOR = 'lern_tour_v4_instructor'
 
 interface Step {
+  target: string | null   // data-tour selector on the real element, or null for a centered card
+  shape: 'circle' | 'rect'
   route: string
   emoji: string
   title: string
   body: string
-  cta: string
-  navPulse?: number   // index 0-4 — which nav item to pulse
 }
 
 // ── Student / User tour ───────────────────────────────────────
 const STUDENT_STEPS: Step[] = [
   {
-    route: '/feed',
+    target: '[data-tour="nav-feed"]', shape: 'circle', route: '/feed',
     emoji: '📱',
-    title: 'Your Feed',
-    body: 'This is your feed. Scroll through videos posted by instructors. Tap a video to watch it full screen. Tap ❤️ to like and 💬 to leave a comment.',
-    cta: 'Next',
-    navPulse: 0,
+    title: 'This is your Feed',
+    body: 'Scroll through videos posted by instructors. Tap a video to watch it full screen. Tap the heart to like and the speech bubble to comment.',
   },
   {
-    route: '/courses',
+    target: '[data-tour="nav-courses"]', shape: 'circle', route: '/courses',
     emoji: '📚',
     title: 'Courses & Workshops',
-    body: 'Tap the Courses tab to browse everything available. Tap any course to see the full timetable — every session with its date, start time, and how long it runs — before you commit to enrolling.',
-    cta: 'Next',
-    navPulse: 1,
+    body: 'Tap here to browse everything available. Open any course to see its full timetable — every session, date, start time, and duration — before you commit.',
   },
   {
-    route: '/discovery',
+    target: '[data-tour="nav-discover"]', shape: 'circle', route: '/discovery',
     emoji: '🔍',
     title: 'Discover Instructors',
-    body: 'Browse mentors, coaches, teachers, and professors on the Discover tab. Tap any card to view their full profile. Follow them to see their posts, or send them a training or mentorship request.',
-    cta: 'Next',
-    navPulse: 3,
+    body: 'Browse mentors, coaches, teachers, and professors. Tap a card to see a full profile, follow them, or send a training or mentorship request.',
   },
   {
-    route: '/profile/me',
+    target: '[data-tour="nav-profile"]', shape: 'circle', route: '/profile/me',
     emoji: '👤',
     title: 'Your Profile',
-    body: 'This is your public profile. Add your projects, certificates, and a bio. The more complete your profile, the more credible you look to instructors and the community.',
-    cta: 'Next',
-    navPulse: 4,
+    body: 'This is your public profile. Add your projects, certificates, and a bio — the more complete it is, the more credible you look to instructors.',
   },
   {
-    route: '/settings',
+    target: '[data-tour="apply-teach-btn"]', shape: 'rect', route: '/settings',
     emoji: '🎓',
-    title: 'Want to Teach on LERN?',
-    body: 'From your profile, go to Settings and scroll down to "Apply to Teach". Fill in your details and submit — once approved you\'ll unlock instructor tools and get your own onboarding walkthrough.',
-    cta: 'Done — let\'s go!',
-    navPulse: 4,
+    title: 'Want to teach on LERN?',
+    body: 'Tap "Apply to teach" right here, fill in your details, and submit. Once approved you\'ll unlock instructor tools and your own instructor walkthrough.',
   },
 ]
 
 // ── Instructor tour ───────────────────────────────────────────
 const INSTRUCTOR_STEPS: Step[] = [
   {
-    route: '/courses',
+    target: '[data-tour="nav-create"]', shape: 'circle', route: '/courses',
     emoji: '🚀',
-    title: 'You\'re an Instructor',
-    body: 'Welcome to the instructor side of LERN. Your first move: tap the + button in the centre of the bottom nav to create a course or workshop.',
-    cta: 'Next',
-    navPulse: 2,
+    title: "You're an instructor",
+    body: 'This is your Create button. Tap it any time to create a Course or a Workshop — that\'s where everything starts.',
   },
   {
-    route: '/courses',
+    target: '[data-tour="nav-create"]', shape: 'circle', route: '/courses',
     emoji: '📅',
     title: 'Create a Course',
-    body: 'Set a title, subject, level, start date and end date. Sessions are generated automatically — one per day. You pick the daily session time and duration so students know exactly what they\'re committing to.',
-    cta: 'Next',
-    navPulse: 2,
+    body: 'Set a title, subject, level, start date and end date. Sessions are generated automatically, one per day — you pick the daily time and duration.',
   },
   {
-    route: '/courses',
+    target: '[data-tour="nav-create"]', shape: 'circle', route: '/courses',
     emoji: '🗓️',
-    title: 'Or Run a Workshop',
-    body: 'Workshops are one-off live events. Choose Online to get a virtual classroom, or In-Person to display your venue. Followers get a push notification when you create one.',
-    cta: 'Next',
-    navPulse: 2,
+    title: 'Or run a Workshop',
+    body: 'Workshops are one-off live events. Choose Online for a virtual classroom, or In-Person to display your venue. Followers get notified when you create one.',
   },
   {
-    route: '/courses',
+    target: '[data-tour="nav-courses"]', shape: 'circle', route: '/courses',
     emoji: '🔴',
-    title: 'Go Live',
-    body: 'When it\'s session time, open your course from the Courses tab and tap Start Session. Every enrolled student gets a push notification and their card turns to "Join Live" instantly.',
-    cta: 'Next',
-    navPulse: 1,
+    title: 'Go live',
+    body: 'When it\'s session time, open your course from here and tap Start Session. Every enrolled student is notified and can join instantly.',
   },
   {
-    route: '/feed',
+    target: '[data-tour="nav-create"]', shape: 'circle', route: '/feed',
     emoji: '🎬',
-    title: 'Post to Your Feed',
-    body: 'Tap + → Post Video to share content with the community. Your followers see every video in their feed. Post before your course launches to build an audience and get enrollments.',
-    cta: 'Next',
-    navPulse: 2,
+    title: 'Post to your Feed',
+    body: 'Tap Create → Post Video to share content with the community. Post before your course launches to build an audience and drive enrollments.',
   },
   {
-    route: '/discovery',
+    target: '[data-tour="nav-discover"]', shape: 'circle', route: '/discovery',
     emoji: '🌍',
-    title: 'You\'re on Discovery',
-    body: 'Students browse the Discover tab to find instructors. Make sure your profile has a clear bio, your role, and your experience so students find and choose you over others.',
-    cta: 'Next',
-    navPulse: 3,
+    title: "You're on Discovery",
+    body: 'Students browse this tab to find instructors. Keep your bio, role, and experience sharp so students choose you over others.',
   },
   {
-    route: '/profile/me',
+    target: '[data-tour="nav-profile"]', shape: 'circle', route: '/profile/me',
     emoji: '📥',
-    title: 'Manage Requests',
-    body: 'Students can send you training and mentorship requests. Go to your Profile → Requests tab to accept or decline. Your courses and workshops are all listed on your profile too.',
-    cta: 'Let\'s go! 🎉',
-    navPulse: 4,
+    title: 'Manage requests',
+    body: 'Students can send you training and mentorship requests. Go to Profile → Requests to accept or decline. Your courses and workshops live here too.',
   },
 ]
+
+function useTargetRect(selector: string | null, gate: boolean) {
+  const [rect, setRect] = useState<DOMRect | null>(null)
+
+  useEffect(() => {
+    if (!selector || !gate) { setRect(null); return }
+
+    let raf = 0
+    const deadline = Date.now() + 15000 // slow route compiles/navigations can take a while
+    const measure = () => {
+      const el = document.querySelector(selector) as HTMLElement | null
+      if (el) {
+        el.scrollIntoView({ block: 'center', behavior: 'auto' })
+        setRect(el.getBoundingClientRect())
+      } else if (Date.now() < deadline) {
+        raf = requestAnimationFrame(measure)
+      }
+    }
+    measure()
+
+    const onLayout = () => {
+      const el = document.querySelector(selector) as HTMLElement | null
+      if (el) setRect(el.getBoundingClientRect())
+    }
+    window.addEventListener('resize', onLayout)
+    window.addEventListener('scroll', onLayout, true)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', onLayout)
+      window.removeEventListener('scroll', onLayout, true)
+    }
+  }, [selector, gate])
+
+  return rect
+}
 
 export default function OnboardingTour() {
   const { user } = useAuth() as any
   const router = useRouter()
 
+  const [phase, setPhase] = useState<'idle' | 'prompt' | 'touring' | 'toast'>('idle')
   const [steps, setSteps] = useState<Step[]>([])
-  const [index, setIndex]   = useState(0)
-  const [visible, setVisible] = useState(false)
-  const [active, setActive] = useState(false)
+  const [index, setIndex] = useState(0)
+  const [cardVisible, setCardVisible] = useState(false)
+  const isInstructor = user?.account_type === 'instructor'
+  const doneKeyRef = useRef(isInstructor ? DONE_KEY_INSTRUCTOR : DONE_KEY_STUDENT)
 
   useEffect(() => {
     if (!user) return
+    doneKeyRef.current = isInstructor ? DONE_KEY_INSTRUCTOR : DONE_KEY_STUDENT
+    if (localStorage.getItem(doneKeyRef.current)) return
 
-    const isInstructor = user.account_type === 'instructor'
-
-    if (isInstructor && !localStorage.getItem(I_KEY)) {
-      setSteps(INSTRUCTOR_STEPS)
-      setIndex(0)
-      setActive(true)
-      setTimeout(() => setVisible(true), 600)
-      return
-    }
-    if (!isInstructor && !localStorage.getItem(S_KEY)) {
-      setSteps(STUDENT_STEPS)
-      setIndex(0)
-      setActive(true)
-      setTimeout(() => setVisible(true), 600)
-    }
+    setSteps(isInstructor ? INSTRUCTOR_STEPS : STUDENT_STEPS)
+    const t = setTimeout(() => setPhase('prompt'), 700)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.account_type])
 
-  if (!active || steps.length === 0) return null
-
   const step = steps[index]
-  const total = steps.length
-  const isLast = index === total - 1
-  const isInstructor = user?.account_type === 'instructor'
+  const rect = useTargetRect(phase === 'touring' ? (step?.target ?? null) : null, phase === 'touring')
 
-  const dismiss = () => {
-    setVisible(false)
+  useEffect(() => {
+    if (phase !== 'touring') return
+    setCardVisible(false)
+    const t = setTimeout(() => setCardVisible(true), rect ? 260 : 400)
+    return () => clearTimeout(t)
+  }, [index, phase, rect])
+
+  const finish = useCallback(() => {
+    localStorage.setItem(doneKeyRef.current, '1')
+    setCardVisible(false)
+    setPhase('toast')
+    setTimeout(() => setPhase('idle'), 1900)
+  }, [])
+
+  const skip = useCallback(() => {
+    localStorage.setItem(doneKeyRef.current, '1')
+    setCardVisible(false)
+    setTimeout(() => setPhase('idle'), 200)
+  }, [])
+
+  const startTour = () => {
+    setPhase('touring')
+    setIndex(0)
+    const first = steps[0]
+    if (first && first.route) router.push(first.route)
+  }
+
+  const goTo = (nextIndex: number) => {
+    if (nextIndex < 0 || nextIndex >= steps.length) return
+    const target = steps[nextIndex]
+    setCardVisible(false)
     setTimeout(() => {
-      localStorage.setItem(isInstructor ? I_KEY : S_KEY, '1')
-      setActive(false)
-    }, 300)
+      setIndex(nextIndex)
+      if (target.route) router.push(target.route)
+    }, 180)
   }
 
   const next = () => {
-    if (isLast) { dismiss(); return }
-    const nextStep = steps[index + 1]
-    setVisible(false)
-    setTimeout(() => {
-      setIndex(i => i + 1)
-      if (nextStep.route !== step.route) router.push(nextStep.route)
-      setTimeout(() => setVisible(true), 120)
-    }, 200)
+    if (index === steps.length - 1) { finish(); return }
+    goTo(index + 1)
+  }
+  const back = () => goTo(index - 1)
+
+  if (phase === 'idle' || steps.length === 0) return null
+
+  // ── Toast on completion ──────────────────────────────────────
+  if (phase === 'toast') {
+    return (
+      <div className="fixed top-0 left-0 right-0 z-[300] flex justify-center pt-[calc(env(safe-area-inset-top,0px)+14px)] pointer-events-none">
+        <div className="flex items-center gap-2.5 bg-[#141414] border border-[rgba(255,255,255,0.1)] text-white text-sm font-semibold px-4 py-3 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.6)]">
+          <Sparkles className="w-4 h-4 text-[#FF6B2B]" />
+          You're all set — enjoy LERN!
+        </div>
+      </div>
+    )
   }
 
-  const navX = step.navPulse !== undefined ? NAV_CENTERS[step.navPulse] : null
+  // ── Welcome prompt ────────────────────────────────────────────
+  if (phase === 'prompt') {
+    return (
+      <div className="fixed inset-0 z-[300] flex items-center justify-center px-5" style={{ background: 'rgba(5,5,8,0.86)', backdropFilter: 'blur(6px)' }}>
+        <div className="w-full max-w-sm rounded-[28px] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.8)] border border-[rgba(255,255,255,0.1)] bg-[#141414]">
+          <div className="h-1 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3]" />
+          <div className="px-7 pt-8 pb-7 text-center">
+            <div className="mx-auto mb-5 w-16 h-16 rounded-2xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center shadow-[0_8px_30px_rgba(192,38,211,0.35)]">
+              <Rocket className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-white text-xl font-extrabold mb-2">
+              Welcome to LERN{user?.username ? `, ${user.username}` : ''}!
+            </h2>
+            <p className="text-[#999] text-sm leading-[1.6] mb-7">
+              {isInstructor
+                ? 'Want a quick tour of how to create courses, go live, and grow your following?'
+                : 'Want a 60-second tour so you know exactly how to find courses, instructors, and get the most out of the app?'}
+            </p>
+            <button
+              onClick={startTour}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold text-[15px] py-3.5 rounded-2xl active:scale-[0.98] transition mb-3"
+            >
+              Take the tour <ArrowRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={skip}
+              className="w-full text-[#666] text-sm font-semibold py-2"
+            >
+              Skip for now
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Spotlight walkthrough ─────────────────────────────────────
+  const total = steps.length
+  const isLast = index === total - 1
+  const PAD = step.shape === 'circle' ? 14 : 6
+  const radius = step.shape === 'circle' ? 999 : 18
+
+  let cardStyle: React.CSSProperties = {}
+  let arrowStyle: React.CSSProperties | null = null
+
+  if (rect) {
+    const vh = window.innerHeight
+    const vw = window.innerWidth
+    const spaceBelow = vh - rect.bottom
+    const spaceAbove = rect.top
+    const placeBelow = spaceBelow > 240 && spaceBelow >= spaceAbove
+
+    if (placeBelow) {
+      cardStyle = { top: rect.bottom + PAD + 22 }
+    } else {
+      cardStyle = { bottom: vh - rect.top + PAD + 22 }
+    }
+
+    const cx = Math.min(Math.max(rect.left + rect.width / 2, 40), vw - 40)
+    arrowStyle = {
+      left: cx,
+      transform: 'translateX(-50%) rotate(45deg)',
+      ...(placeBelow ? { top: rect.bottom + PAD + 8 } : { bottom: vh - rect.top + PAD + 8 }),
+    }
+  } else {
+    cardStyle = { top: '50%', transform: 'translateY(-50%)' }
+  }
 
   return (
     <>
-      {/* Nav pulse ring */}
-      {navX && visible && (
+      {/* Dimmed backdrop with cutout */}
+      <div
+        className="fixed inset-0 z-[290] transition-opacity duration-300"
+        style={{ opacity: cardVisible ? 1 : 0, background: rect ? undefined : 'rgba(5,5,8,0.88)' }}
+      >
+        {rect && (
+          <div
+            className="absolute transition-all duration-300 ease-out"
+            style={{
+              left: rect.left - PAD,
+              top: rect.top - PAD,
+              width: rect.width + PAD * 2,
+              height: rect.height + PAD * 2,
+              borderRadius: radius,
+              boxShadow: '0 0 0 9999px rgba(5,5,8,0.88)',
+            }}
+          />
+        )}
+      </div>
+
+      {/* Glow ring around the spotlighted element */}
+      {rect && (
         <div
-          className="fixed z-[190] pointer-events-none"
+          className="fixed z-[291] pointer-events-none transition-all duration-300 ease-out animate-pulse"
           style={{
-            left: navX,
-            transform: 'translateX(-50%)',
-            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)',
+            left: rect.left - PAD,
+            top: rect.top - PAD,
+            width: rect.width + PAD * 2,
+            height: rect.height + PAD * 2,
+            borderRadius: radius,
+            boxShadow: '0 0 0 3px #FF6B2B, 0 0 28px 6px rgba(192,38,211,0.55)',
+            opacity: cardVisible ? 1 : 0,
           }}
-        >
-          <span className="relative flex h-8 w-8">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] opacity-60" />
-            <span className="relative inline-flex rounded-full h-8 w-8 bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] opacity-40" />
-          </span>
-        </div>
+        />
+      )}
+
+      {/* Pointer triangle */}
+      {arrowStyle && (
+        <div
+          className="fixed z-[292] w-3.5 h-3.5 bg-[#141414] border-t border-l border-[rgba(255,255,255,0.1)] transition-opacity duration-300"
+          style={{ ...arrowStyle, opacity: cardVisible ? 1 : 0 }}
+        />
       )}
 
       {/* Tour card */}
       <div
-        className="fixed left-3 right-3 z-[199]"
+        className="fixed left-4 right-4 z-[293] transition-all duration-300 ease-out"
         style={{
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 78px)',
-          opacity: visible ? 1 : 0,
-          transform: visible ? 'translateY(0)' : 'translateY(20px)',
-          transition: 'opacity 0.3s ease, transform 0.3s cubic-bezier(0.16,1,0.3,1)',
-          pointerEvents: visible ? 'auto' : 'none',
+          ...cardStyle,
+          opacity: cardVisible ? 1 : 0,
+          pointerEvents: cardVisible ? 'auto' : 'none',
         }}
       >
-        <div className="rounded-3xl overflow-hidden shadow-[0_12px_60px_rgba(0,0,0,0.75)] border border-[rgba(255,255,255,0.09)] bg-[#141414]">
+        <div className="mx-auto max-w-sm rounded-[26px] overflow-hidden shadow-[0_20px_70px_rgba(0,0,0,0.75)] border border-[rgba(255,255,255,0.1)] bg-[#141414]">
+          <div className="h-1 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3]" />
+          <div className="px-6 pt-5 pb-6">
 
-          {/* Gradient accent bar */}
-          <div className="h-[3px] bg-gradient-to-r from-[#FF6B2B] to-[#C026D3]" />
-
-          <div className="px-5 pt-4 pb-5">
-
-            {/* Header row */}
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl leading-none">{step.emoji}</span>
+            <div className="flex items-start justify-between mb-3.5">
+              <div className="flex items-center gap-3">
+                <span className="text-[28px] leading-none">{step.emoji}</span>
                 <div>
-                  <p className="text-white font-bold text-base leading-tight">{step.title}</p>
-                  <p className="text-[#555] text-[11px] mt-0.5 font-medium">{index + 1} of {total}</p>
+                  <p className="text-white font-extrabold text-[17px] leading-tight">{step.title}</p>
+                  <p className="text-[#666] text-[11px] mt-1 font-bold tracking-wide uppercase">Step {index + 1} of {total}</p>
                 </div>
               </div>
               <button
-                onClick={dismiss}
-                className="w-7 h-7 rounded-full bg-[#252525] border border-[rgba(255,255,255,0.07)] flex items-center justify-center flex-shrink-0 mt-0.5"
+                onClick={skip}
+                aria-label="Skip tour"
+                className="w-8 h-8 rounded-full bg-[#252525] border border-[rgba(255,255,255,0.08)] flex items-center justify-center flex-shrink-0"
               >
-                <X className="w-3.5 h-3.5 text-[#666]" />
+                <X className="w-4 h-4 text-[#777]" />
               </button>
             </div>
 
-            {/* Body */}
-            <p className="text-[#999] text-[13px] leading-[1.6] mb-4">{step.body}</p>
+            <p className="text-[#aaa] text-[14px] leading-[1.65] mb-5">{step.body}</p>
 
-            {/* Progress dots */}
-            <div className="flex items-center justify-between">
-              <div className="flex gap-1.5">
-                {steps.map((_, i) => (
-                  <div
-                    key={i}
-                    className="rounded-full transition-all duration-200"
-                    style={{
-                      width:  i === index ? 20 : 6,
-                      height: 6,
-                      background: i === index
-                        ? 'linear-gradient(90deg, #FF6B2B, #C026D3)'
-                        : i < index
-                          ? 'rgba(255,255,255,0.25)'
-                          : 'rgba(255,255,255,0.08)',
-                    }}
-                  />
-                ))}
-              </div>
+            {/* Progress bar */}
+            <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] mb-5 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] transition-all duration-300"
+                style={{ width: `${((index + 1) / total) * 100}%` }}
+              />
+            </div>
 
+            <div className="flex items-center gap-2.5">
+              {index > 0 && (
+                <button
+                  onClick={back}
+                  className="flex items-center justify-center gap-1 bg-[#1f1f1f] border border-[rgba(255,255,255,0.08)] text-[#ccc] font-bold text-sm px-4 py-3 rounded-2xl active:scale-95 transition"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={next}
-                className="flex items-center gap-1.5 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold text-sm px-5 py-2.5 rounded-2xl active:scale-95 transition"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold text-sm px-5 py-3 rounded-2xl active:scale-[0.98] transition"
               >
-                {step.cta}
+                {isLast ? "Let's go! 🎉" : 'Next'}
                 {!isLast && <ArrowRight className="w-4 h-4" />}
               </button>
             </div>

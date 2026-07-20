@@ -100,6 +100,12 @@ html.light .bg-\[\#252525\]  { background-color: #e8e8e8 !important; }
 html.light .bg-\[\#222\]     { background-color: #e8e8e8 !important; }
 html.light .bg-\[\#333\]     { background-color: #d5d5d5 !important; }
 html.light .bg-\[\#2a2a2a\]  { background-color: #e0e0e0 !important; }
+html.light .bg-\[\#181818\]  { background-color: #f0f0f0 !important; }
+html.light .bg-\[\#161616\]  { background-color: #ececec !important; }
+html.light .bg-\[\#1f1f1f\]  { background-color: #eeeeee !important; }
+html.light .bg-\[\#2e2e2e\]  { background-color: #d8d8d8 !important; }
+html.light .bg-\[\#2a2000\]  { background-color: #fff3d6 !important; }
+html.light .bg-\[\#261a00\]  { background-color: #fdf0d5 !important; }
 
 /* Text */
 html.light .text-white        { color: #0a0a0a !important; }
@@ -111,6 +117,32 @@ html.light .text-\[\#555\]    { color: #666    !important; }
 html.light .text-\[\#444\]    { color: #777    !important; }
 html.light .text-\[\#333\]    { color: #888    !important; }
 html.light .text-\[\#2a2a2a\] { color: #999    !important; }
+html.light .text-\[\#222\]    { color: #999    !important; }
+html.light .text-\[\#999\]    { color: #555    !important; }
+html.light .text-\[\#ccc\]    { color: #444    !important; }
+
+/* Colorful CTA buttons/badges (gradients, brand-accent solids, red) are
+   designed with white text against a saturated background in BOTH themes —
+   the blanket ".text-white -> near-black" rule above is meant for plain
+   dark cards/backgrounds and must not touch these, or every gradient
+   button (signup, tour, "post", etc.) loses its label in light mode. */
+html.light .gradient-btn,
+html.light .gradient-btn .text-white,
+html.light [class*="bg-gradient-to"].text-white,
+html.light [class*="bg-gradient-to"] .text-white,
+html.light [class*="bg-red-"].text-white,
+html.light [class*="bg-red-"] .text-white,
+html.light [class*="bg-orange-"].text-white,
+html.light [class*="bg-purple-"].text-white,
+html.light [class*="bg-blue-"].text-white,
+html.light [class*="bg-green-"].text-white,
+html.light [class*="bg-[#FF6B2B]"].text-white,
+html.light [class*="bg-[#7C3AED]"].text-white,
+html.light [class*="bg-[#C026D3]"].text-white,
+html.light [class*="bg-[#E91E8C]"].text-white,
+html.light [class*="bg-[#1d9bf0]"].text-white {
+  color: #fff !important;
+}
 
 /* Borders */
 html.light .border-\[rgba\(255\,255\,255\,0\.05\)\] { border-color: rgba(0,0,0,.06)  !important; }

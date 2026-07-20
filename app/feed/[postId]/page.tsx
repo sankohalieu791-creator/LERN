@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, ThumbsUp, MessageCircle, Share2, Send, Play } from 'lucide-react'
+import { ArrowLeft, ThumbsUp, MessageCircle, Share2, Send, Play, Music } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getVideoById, likeVideo, unlikeVideo, hasUserLiked,
@@ -40,6 +40,7 @@ export default function PostDetailPage() {
   const [comments,   setComments]   = useState<any[]>([])
   const [newComment, setNewComment] = useState('')
   const [loading,    setLoading]    = useState(true)
+  const [isAudioOnly, setIsAudioOnly] = useState(false)
 
   // Lock both html and body — must happen BEFORE layout so body padding-top
   // doesn't shift content. fixed inset-0 handles safe area internally.
@@ -141,7 +142,26 @@ export default function PostDetailPage() {
         style={{ marginTop: 'env(safe-area-inset-top)' }}
       >
         {video.video_url
-          ? <video src={video.video_url} controls autoPlay playsInline preload="metadata" crossOrigin="anonymous" className="w-full h-full" />
+          ? <>
+              <video
+                src={video.video_url}
+                controls
+                playsInline
+                preload="metadata"
+                crossOrigin="anonymous"
+                onLoadedMetadata={(e) => setIsAudioOnly(e.currentTarget.videoWidth === 0)}
+                className={`w-full h-full ${isAudioOnly ? 'hidden' : ''}`}
+              />
+              {isAudioOnly && (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#1a1a2e] to-[#0f3460]">
+                  <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center">
+                    <Music className="w-8 h-8 text-white/60" />
+                  </div>
+                  <p className="text-white/50 text-xs">Audio recording — no camera was on</p>
+                  <audio src={video.video_url} controls className="w-4/5 max-w-xs" />
+                </div>
+              )}
+            </>
           : video.thumbnail_url
             ? <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover" />
             : <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] flex items-center justify-center">

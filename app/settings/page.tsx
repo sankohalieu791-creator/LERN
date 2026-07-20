@@ -206,6 +206,7 @@ export default function SettingsPage() {
           </div>
         ) : (
           <button
+            data-tour="apply-teach-btn"
             onClick={() => setShowApply(true)}
             className="w-full flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)] hover:bg-[#181818] transition text-left"
           >

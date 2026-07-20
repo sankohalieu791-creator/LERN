@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Bell, ThumbsUp, MessageCircle, Share2, X, Send, Play, Trash2, Eye, Clock, User } from 'lucide-react'
+import { Search, Bell, ThumbsUp, MessageCircle, Share2, X, Send, Play, Trash2, Eye, Clock, User, Music } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -56,6 +56,7 @@ function FeedCard({ video, userLikes, following, user, onOpen, onLike, onFollow,
   onProfile: () => void
 }) {
   const [playing, setPlaying] = useState(false)
+  const [previewAudioOnly, setPreviewAudioOnly] = useState(false)
   const cardRef  = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -91,14 +92,17 @@ function FeedCard({ video, userLikes, following, user, onOpen, onLike, onFollow,
         {/* Thumbnail */}
         {video.thumbnail_url
           ? <img src={video.thumbnail_url} alt={video.title}
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${playing ? 'opacity-0' : 'opacity-100'}`} />
-          : <div className={`absolute inset-0 bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] transition-opacity ${playing ? 'opacity-0' : 'opacity-100'}`} />
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${playing && !previewAudioOnly ? 'opacity-0' : 'opacity-100'}`} />
+          : <div className={`absolute inset-0 bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] flex items-center justify-center transition-opacity ${playing && !previewAudioOnly ? 'opacity-0' : 'opacity-100'}`}>
+              {previewAudioOnly && <Music className="w-8 h-8 text-white/30" />}
+            </div>
         }
 
         {/* Video preview */}
         {video.video_url && (
           <video ref={videoRef} src={video.video_url} muted loop playsInline preload="metadata" crossOrigin="anonymous"
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${playing ? 'opacity-100' : 'opacity-0'}`}
+            onLoadedMetadata={(e) => setPreviewAudioOnly(e.currentTarget.videoWidth === 0)}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${playing && !previewAudioOnly ? 'opacity-100' : 'opacity-0'}`}
           />
         )}
 
@@ -195,6 +199,7 @@ export default function FeedPage() {
   const [userLikes,      setUserLikes]      = useState<Set<string>>(new Set())
   const [following,      setFollowing]      = useState<Set<string>>(new Set())
   const [selectedVideo,  setSelectedVideo]  = useState<any>(null)
+  const [isAudioOnly,    setIsAudioOnly]    = useState(false)
   const [searchOpen,     setSearchOpen]     = useState(false)
   const [searchQuery,    setSearchQuery]    = useState('')
   const [searchPeople,   setSearchPeople]   = useState<any[]>([])
@@ -271,6 +276,7 @@ export default function FeedPage() {
 
   const openVideo = async (video: any) => {
     setSelectedVideo(video)
+    setIsAudioOnly(false)
     setComments([])
     setNewComment('')
     try {
@@ -624,13 +630,24 @@ export default function FeedPage() {
         {/* VIDEO */}
         <div className="relative w-full flex-shrink-0 bg-black" style={{ height: '40vh' }}>
           {selectedVideo.video_url
-            ? <video
-                src={selectedVideo.video_url}
-                controls
-                autoPlay
-                playsInline
-                className="w-full h-full object-contain bg-black"
-              />
+            ? <>
+                <video
+                  src={selectedVideo.video_url}
+                  controls
+                  playsInline
+                  onLoadedMetadata={(e) => setIsAudioOnly(e.currentTarget.videoWidth === 0)}
+                  className={`w-full h-full object-contain bg-black ${isAudioOnly ? 'hidden' : ''}`}
+                />
+                {isAudioOnly && (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#1a1a2e] to-[#0f3460]">
+                    <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center">
+                      <Music className="w-8 h-8 text-white/60" />
+                    </div>
+                    <p className="text-white/50 text-xs">Audio recording — no camera was on</p>
+                    <audio src={selectedVideo.video_url} controls className="w-4/5 max-w-xs" />
+                  </div>
+                )}
+              </>
             : selectedVideo.thumbnail_url
               ? <img src={selectedVideo.thumbnail_url} alt={selectedVideo.title} className="w-full h-full object-cover" />
               : <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] flex items-center justify-center">

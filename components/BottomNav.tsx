@@ -104,7 +104,7 @@ export default function BottomNav() {
         }}
       >
         <div className="flex items-center h-[60px]">
-          <Link href="/feed" className={linkCls('/feed')}>
+          <Link href="/feed" data-tour="nav-feed" className={linkCls('/feed')}>
             <div className="relative">
               <Home className="w-6 h-6" />
               {unreadNotifs > 0 && (
@@ -115,13 +115,14 @@ export default function BottomNav() {
             </div>
             <span className="text-[10px] font-medium">{t('feed')}</span>
           </Link>
-          <Link href="/courses" className={linkCls('/courses')}>
+          <Link href="/courses" data-tour="nav-courses" className={linkCls('/courses')}>
             <BookOpen className="w-6 h-6" />
             <span className="text-[10px] font-medium">{t('courses')}</span>
           </Link>
 
           <div className="flex-shrink-0 flex items-center justify-center w-[72px]">
             <button
+              data-tour="nav-create"
               onClick={() => setShowMenu(!showMenu)}
               className="flex items-center justify-center active:scale-95 transition-transform w-[46px] h-[46px] -mt-4"
             >
@@ -129,11 +130,11 @@ export default function BottomNav() {
             </button>
           </div>
 
-          <Link href="/discovery" className={linkCls('/discovery')}>
+          <Link href="/discovery" data-tour="nav-discover" className={linkCls('/discovery')}>
             <Compass className="w-6 h-6" />
             <span className="text-[10px] font-medium">{t('discover')}</span>
           </Link>
-          <Link href="/profile/me" className={linkCls('/profile/me')}>
+          <Link href="/profile/me" data-tour="nav-profile" className={linkCls('/profile/me')}>
             <User className="w-6 h-6" />
             <span className="text-[10px] font-medium">{t('profile')}</span>
           </Link>
