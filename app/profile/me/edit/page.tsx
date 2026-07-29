@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { updateUserProfile } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
-import { Camera, ChevronLeft, Loader2 } from 'lucide-react'
+import { Camera, ChevronLeft, Loader2, X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -24,6 +24,8 @@ export default function EditProfilePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
+  const [skills,     setSkills]     = useState<string[]>([])
+  const [skillInput, setSkillInput] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -35,7 +37,16 @@ export default function EditProfilePage() {
       phone:    user.phone_number     || '',
     })
     setAvatarPreview(user.avatar_url || null)
+    setSkills(user.skills || [])
   }, [user])
+
+  const addSkill = () => {
+    const s = skillInput.trim()
+    if (!s || skills.includes(s)) { setSkillInput(''); return }
+    setSkills(prev => [...prev, s])
+    setSkillInput('')
+  }
+  const removeSkill = (s: string) => setSkills(prev => prev.filter(x => x !== s))
 
   const handleAvatarChange = async (file: File) => {
     if (!user) return
@@ -80,6 +91,7 @@ export default function EditProfilePage() {
         bio:              form.bio,
         work_description: form.location,
         phone_number:     form.phone,
+        skills,
       })
       if (err) throw err
       await refreshUser()
@@ -164,11 +176,33 @@ export default function EditProfilePage() {
         <Field label="Username">
           <input value={form.username} onChange={set('username')} placeholder="your_username" className={inputCls} />
         </Field>
-        <Field label="Title">
-          <input value={form.title} onChange={set('title')} placeholder="e.g. Frontend Developer" className={inputCls} />
-        </Field>
+        {user?.account_type !== 'student' && (
+          <Field label="Title">
+            <input value={form.title} onChange={set('title')} placeholder="e.g. Frontend Developer" className={inputCls} />
+          </Field>
+        )}
         <Field label="Bio">
           <textarea value={form.bio} onChange={set('bio')} placeholder="Tell people about yourself…" rows={3} className={`${inputCls} resize-none`} />
+        </Field>
+        <Field label="Skills">
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {skills.map(s => (
+              <span key={s} className="flex items-center gap-1 text-xs font-semibold bg-[#1e1e1e] theme-card text-[#aaa] theme-text-2 border border-[rgba(255,255,255,0.08)] theme-border pl-2.5 pr-1.5 py-1 rounded-full">
+                {s}
+                <button type="button" onClick={() => removeSkill(s)} className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-[rgba(255,255,255,0.1)]">
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <input
+            value={skillInput}
+            onChange={e => setSkillInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addSkill() } }}
+            onBlur={addSkill}
+            placeholder="Type a skill and press Enter"
+            className={inputCls}
+          />
         </Field>
         <Field label="Location">
           <input value={form.location} onChange={set('location')} placeholder="London, UK" className={inputCls} />

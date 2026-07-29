@@ -18,10 +18,12 @@ import {
   deleteCourse, deleteWorkshop, getInstructorWorkshops,
   getFollowersList, getFollowingList,
   getJobsByInstructor, deleteJob, getSavedJobs, saveJob, unsaveJob,
+  getMyOrgMembership, getEnrolledCourses,
   supabase, createNotification,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import CreateJob from '@/components/CreateJob'
+import { getAgeBand, getStudentDisplayTitle } from '@/lib/profile-utils'
 import type { Project, Certificate, Video } from '@/lib/types'
 
 // ── Verified badge ────────────────────────────────────────────
@@ -89,6 +91,8 @@ export default function ProfileMePage() {
   const [feedback,     setFeedback]     = useState<any[]>([])
   const [dataLoading,  setDataLoading]  = useState(false)
   const [viewsCount,   setViewsCount]   = useState<number | null>(null)
+  const [orgName,        setOrgName]        = useState<string | null>(null)
+  const [enrolledCount,  setEnrolledCount]  = useState(0)
 
   // Certificate form
   const [certTitle,  setCertTitle]  = useState('')
@@ -122,9 +126,12 @@ export default function ProfileMePage() {
   const [openingMsg,       setOpeningMsg]       = useState<string | null>(null)
 
   const isInstructor = user?.account_type === 'instructor'
+  const isStudent = user?.account_type === 'student'
   const TABS = isInstructor ? INSTRUCTOR_TABS : STUDENT_TABS
 
   const initial = user?.username?.[0]?.toUpperCase() ?? 'U'
+  const ageBand = getAgeBand(user?.date_of_birth)
+  const displayTitle = isStudent ? getStudentDisplayTitle(user?.date_of_birth, orgName) : user?.title
 
   // The auth profile is cached in localStorage, so user.views_count goes stale and
   // the counter looks frozen. Read the live value straight from the DB.
@@ -154,13 +161,15 @@ export default function ProfileMePage() {
         setRequests(r.data ?? [])
         setMyJobs(jbs.data ?? [])
       } else {
-        const [v, p, c, f, mr, sj] = await Promise.all([
+        const [v, p, c, f, mr, sj, org, enrolled] = await Promise.all([
           getUserVideos(user.id),
           getProjectsByUser(user.id),
           getCertificatesByUser(user.id),
           getFeedback(user.id),
           getMyTrainingRequestsFull(user.id),
           getSavedJobs(user.id),
+          getMyOrgMembership(user.id),
+          getEnrolledCourses(user.id),
         ])
         setVideos(v.data ?? [])
         setProjects(p.data ?? [])
@@ -168,6 +177,8 @@ export default function ProfileMePage() {
         setFeedback(f.data ?? [])
         setMyRequests(mr.data ?? [])
         setSavedJobs(sj.data ?? [])
+        setOrgName(org.data?.organisations?.name ?? null)
+        setEnrolledCount(enrolled.data?.length ?? 0)
       }
       setDataLoading(false)
     }
@@ -344,15 +355,51 @@ export default function ProfileMePage() {
           <span className="text-[10px] font-bold bg-[#1e1e1e] text-[#888] border border-[rgba(255,255,255,0.08)] px-2 py-0.5 rounded-full uppercase">
             {user?.account_type ?? 'student'}
           </span>
+          {ageBand && (
+            <span className="text-[10px] font-bold bg-[#1e1e1e] text-[#666] border border-[rgba(255,255,255,0.08)] px-2 py-0.5 rounded-full">
+              {ageBand}
+            </span>
+          )}
         </div>
       </div>
 
-      {user?.title && (
-        <p className="px-4 text-[#777] theme-text-2 text-sm mb-1">{user.title}</p>
+      {displayTitle && (
+        <p className="px-4 text-[#777] theme-text-2 text-sm mb-1">{displayTitle}</p>
       )}
 
       {user?.bio && (
         <p className="px-4 text-[#aaa] theme-text-1 text-sm mb-2 leading-snug">{user.bio}</p>
+      )}
+
+      {/* ── VERIFIED SKILL STRIP (students) ──────────────────── */}
+      {isStudent && (
+        <div className="px-4 mb-3 flex items-center gap-2">
+          <div className="flex-1 bg-[#1a1a1a] theme-card border border-[rgba(255,255,255,0.06)] theme-border rounded-xl py-2.5 text-center">
+            <p className="text-white theme-text-1 font-bold text-base leading-none">{enrolledCount}</p>
+            <p className="text-[#555] theme-text-2 text-[11px] mt-1">Courses</p>
+          </div>
+          <div className="flex-1 bg-[#1a1a1a] theme-card border border-[rgba(255,255,255,0.06)] theme-border rounded-xl py-2.5 text-center">
+            <p className={`font-bold text-base leading-none ${user?.verified ? 'text-green-400' : 'text-[#555]'}`}>
+              {user?.verified ? '✓' : '—'}
+            </p>
+            <p className="text-[#555] theme-text-2 text-[11px] mt-1">Verified</p>
+          </div>
+          <div className="flex-1 bg-[#1a1a1a] theme-card border border-[rgba(255,255,255,0.06)] theme-border rounded-xl py-2.5 text-center">
+            <p className="text-white theme-text-1 font-bold text-base leading-none">{projects.length}</p>
+            <p className="text-[#555] theme-text-2 text-[11px] mt-1">Projects</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── SKILLS ────────────────────────────────────────────── */}
+      {!!user?.skills?.length && (
+        <div className="px-4 mb-3 flex flex-wrap gap-1.5">
+          {user.skills.map(skill => (
+            <span key={skill} className="text-xs font-semibold bg-[#1e1e1e] theme-card text-[#aaa] theme-text-2 border border-[rgba(255,255,255,0.08)] theme-border px-2.5 py-1 rounded-full">
+              {skill}
+            </span>
+          ))}
+        </div>
       )}
 
       {/* ── LOCATION + CONTACT ───────────────────────────────── */}

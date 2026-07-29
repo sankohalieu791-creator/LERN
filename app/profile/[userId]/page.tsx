@@ -11,12 +11,13 @@ import {
   getProjectsByUser, getCertificatesByUser,
   getJobsByInstructor, getInstructorWorkshops,
   getCoursesByInstructor, getOrCreateConversation, getRequestBetween,
-  getMyOrgMembership,
+  getMyOrgMembership, getEnrolledCourses,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin, Eye, Globe, Calendar, BookOpen, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { useLanguage } from '@/context/LanguageContext'
+import { getAgeBand, getStudentDisplayTitle } from '@/lib/profile-utils'
 
 function VerifiedBadge({ size = 16 }: { size?: number }) {
   return (
@@ -77,6 +78,7 @@ export default function UserProfilePage() {
   const [instructorCourses, setInstructorCourses] = useState<any[]>([])
   const [certModal, setCertModal] = useState<any | null>(null)
   const [orgMembership, setOrgMembership] = useState<any>(null)
+  const [enrolledCount, setEnrolledCount] = useState(0)
   // Safeguarding: request status between viewer and instructor
   const [requestStatus, setRequestStatus] = useState<'none' | 'pending' | 'accepted' | 'declined'>('none')
   const [messagingLoading, setMessagingLoading] = useState(false)
@@ -143,6 +145,11 @@ export default function UserProfilePage() {
         // Not logged in — still load org for public display
         const { data: membership } = await getMyOrgMembership(profileId)
         setOrgMembership(membership)
+      }
+
+      if (profileRes.data?.account_type === 'student') {
+        const { data: enrolled } = await getEnrolledCourses(profileId)
+        setEnrolledCount(enrolled?.length ?? 0)
       }
 
       setLoading(false)
@@ -212,6 +219,10 @@ export default function UserProfilePage() {
 
   const initial = profile.username?.[0]?.toUpperCase() ?? 'U'
   const pendingCount = requests.filter(r => r.status === 'pending').length
+  const isStudent = profile.account_type === 'student'
+  const orgName = orgMembership?.organisations?.name ?? null
+  const ageBand = getAgeBand(profile.date_of_birth)
+  const displayTitle = isStudent ? getStudentDisplayTitle(profile.date_of_birth, orgName) : profile.title
 
   const tabs = isInstructor
     ? [
@@ -269,20 +280,55 @@ export default function UserProfilePage() {
           <span className="text-[10px] font-bold bg-[#1e1e1e] text-[#888] border border-[rgba(255,255,255,0.08)] px-2 py-0.5 rounded-full uppercase">
             {profile.account_type ?? 'student'}
           </span>
+          {ageBand && (
+            <span className="text-[10px] font-bold bg-[#1e1e1e] text-[#666] border border-[rgba(255,255,255,0.08)] px-2 py-0.5 rounded-full">
+              {ageBand}
+            </span>
+          )}
         </div>
-        {/* Org badge */}
-        {orgMembership?.organisations && (
+        {displayTitle && (
           <div className="flex items-center gap-1.5 mt-1.5">
-            {orgMembership.organisations.logo_url
+            {orgName && (orgMembership.organisations.logo_url
               ? <img src={orgMembership.organisations.logo_url} alt="" className="w-4 h-4 rounded-sm object-cover" />
               : <span className="text-xs">🏫</span>
-            }
-            <span className="text-[#888] text-xs">{orgMembership.organisations.name}</span>
+            )}
+            <span className="text-[#888] text-xs">{displayTitle}</span>
           </div>
         )}
       </div>
       {profile.bio && (
         <p className="px-4 text-[#aaa] text-sm mb-3 leading-snug">{profile.bio}</p>
+      )}
+
+      {/* VERIFIED SKILL STRIP (students) */}
+      {isStudent && (
+        <div className="px-4 mb-3 flex items-center gap-2">
+          <div className="flex-1 bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-xl py-2.5 text-center">
+            <p className="text-white font-bold text-base leading-none">{enrolledCount}</p>
+            <p className="text-[#555] text-[11px] mt-1">Courses</p>
+          </div>
+          <div className="flex-1 bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-xl py-2.5 text-center">
+            <p className={`font-bold text-base leading-none ${profile.verified ? 'text-green-400' : 'text-[#555]'}`}>
+              {profile.verified ? '✓' : '—'}
+            </p>
+            <p className="text-[#555] text-[11px] mt-1">Verified</p>
+          </div>
+          <div className="flex-1 bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-xl py-2.5 text-center">
+            <p className="text-white font-bold text-base leading-none">{projects.length}</p>
+            <p className="text-[#555] text-[11px] mt-1">Projects</p>
+          </div>
+        </div>
+      )}
+
+      {/* SKILLS */}
+      {!!profile.skills?.length && (
+        <div className="px-4 mb-3 flex flex-wrap gap-1.5">
+          {profile.skills.map((skill: string) => (
+            <span key={skill} className="text-xs font-semibold bg-[#1e1e1e] text-[#aaa] border border-[rgba(255,255,255,0.08)] px-2.5 py-1 rounded-full">
+              {skill}
+            </span>
+          ))}
+        </div>
       )}
 
       {/* ACTION BUTTONS */}
