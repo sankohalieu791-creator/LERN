@@ -8,6 +8,8 @@ import ThemeProvider from '@/components/ThemeProvider'
 import ClientShell from '@/components/ClientShell'
 import PushNotificationSetup from '@/components/PushNotificationSetup'
 import OnboardingTour from '@/components/OnboardingTour'
+import SafetyGate from '@/components/SafetyGate'
+import DobPrompt from '@/components/DobPrompt'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 
@@ -52,6 +54,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </ClientShell>
           <BottomNav />
+          <SafetyGate />
+          <DobPrompt />
           <OnboardingTour />
         </AuthProvider>
         </LanguageProvider>

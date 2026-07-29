@@ -20,6 +20,9 @@ export interface User {
   notif_course_reminders: boolean
   instructor_role?: 'mentor' | 'professor' | 'teacher' | 'coach'
   experience_years?: number
+  date_of_birth?: string
+  skills: string[]
+  terms_accepted_at?: string
   created_at: string
 }
 

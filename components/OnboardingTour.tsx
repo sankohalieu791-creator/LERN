@@ -145,6 +145,9 @@ export default function OnboardingTour() {
 
   useEffect(() => {
     if (!user) return
+    // Wait until the safety gate + DOB backfill (if needed) are cleared —
+    // otherwise the tour can start behind/underneath those full-screen gates.
+    if (!user.terms_accepted_at || !user.date_of_birth) return
     doneKeyRef.current = isInstructor ? DONE_KEY_INSTRUCTOR : DONE_KEY_STUDENT
     if (localStorage.getItem(doneKeyRef.current)) return
 
@@ -152,7 +155,7 @@ export default function OnboardingTour() {
     const t = setTimeout(() => setPhase('prompt'), 700)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, user?.account_type])
+  }, [user?.id, user?.account_type, user?.terms_accepted_at, user?.date_of_birth])
 
   const step = steps[index]
   const rect = useTargetRect(phase === 'touring' ? (step?.target ?? null) : null, phase === 'touring')

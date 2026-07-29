@@ -7,14 +7,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Auth
 export const signUp = async (email: string, password: string, username: string) => {
+  // The on_auth_user_created DB trigger creates the public.users row (username/
+  // email/account_type) the instant this succeeds — a client-side write here would
+  // race the session hydration and get silently blocked by RLS, so we don't attempt one.
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: { data: { username } }
   })
-  if (!error && data.user) {
-    await createUserProfile(data.user.id, username, email)
-  }
   return { data, error }
 }
 
@@ -37,8 +37,24 @@ export const getUser = async () => {
 export const createUserProfile = async (userId: string, username: string, email: string) => {
   const { data, error } = await supabase
     .from('users')
-    .insert([{ id: userId, username, email, account_type: 'student' }])
+    .upsert([{ id: userId, username, email, account_type: 'student' }], { onConflict: 'id' })
   return { data, error }
+}
+
+export const acceptTerms = async (userId: string) => {
+  const { error } = await supabase
+    .from('users')
+    .update({ terms_accepted_at: new Date().toISOString() })
+    .eq('id', userId)
+  return { error }
+}
+
+export const recordProfileView = async (profileId: string, viewerId: string) => {
+  if (profileId === viewerId) return
+  const { error } = await supabase
+    .from('profile_views')
+    .insert([{ profile_id: profileId, viewer_id: viewerId }])
+  return { error }
 }
 
 export const getUserProfile = async (userId: string) => {
