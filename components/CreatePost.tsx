@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Loader2, Globe, Lock, Camera, RotateCcw, Circle, Square, SwitchCamera, Upload } from 'lucide-react'
+import { X, Loader2, Globe, Lock, Camera, RotateCcw, Circle, Square, SwitchCamera, Upload, Timer, Sun, Scissors } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { createVideo, notifyFollowers } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
@@ -76,13 +76,30 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
   const [recording, setRecording] = useState(false)
   const [recordSecs, setRecordSecs] = useState(0)
 
+  // Self-timer (TikTok-style hands-free countdown before capture)
+  const [timerSeconds, setTimerSeconds] = useState<0 | 3 | 10>(0)
+  const [countdown, setCountdown] = useState<number | null>(null)
+
+  // Live-preview brightness adjustment
+  const [brightness, setBrightness] = useState(100)
+  const [showBrightness, setShowBrightness] = useState(false)
+
+  // Video trim (in/out points selected on the preview step, before posting)
+  const [trimStart, setTrimStart] = useState(0)
+  const [trimEnd, setTrimEnd] = useState(0)
+  const [videoDurationSecs, setVideoDurationSecs] = useState(0)
+  const [trimming, setTrimming] = useState(false)
+  const [draggingHandle, setDraggingHandle] = useState<'start' | 'end' | null>(null)
+
   const liveVideoRef  = useRef<HTMLVideoElement>(null)
   const canvasRef     = useRef<HTMLCanvasElement>(null)
   const streamRef     = useRef<MediaStream | null>(null)
   const recorderRef   = useRef<MediaRecorder | null>(null)
   const chunksRef     = useRef<Blob[]>([])
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fileInputRef  = useRef<HTMLInputElement>(null)
+  const trimTrackRef  = useRef<HTMLDivElement>(null)
   const cancelledRef  = useRef(false)
 
   const stopStream = useCallback(() => {
@@ -120,12 +137,15 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
     setThumbnail(null); setVideo(null); setThumbPreview(null); setVideoPreview(null)
     setError(''); setIsPublic(true); setUploadPct(0)
     setRecording(false); setRecordSecs(0); setCameraError('')
+    setTimerSeconds(0); setCountdown(null); setBrightness(100); setShowBrightness(false)
+    setTrimStart(0); setTrimEnd(0); setVideoDurationSecs(0); setTrimming(false)
   }
 
   const handleClose = () => {
     cancelledRef.current = true
     stopStream()
     if (recordTimerRef.current) clearInterval(recordTimerRef.current)
+    if (countdownTimeoutRef.current) clearTimeout(countdownTimeoutRef.current)
     reset()
     onClose()
   }
@@ -135,7 +155,18 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
     if (!v || !c || !v.videoWidth) { resolve(null); return }
     c.width = v.videoWidth
     c.height = v.videoHeight
-    c.getContext('2d')?.drawImage(v, 0, 0)
+    const ctx = c.getContext('2d')
+    if (ctx) {
+      // Front camera preview is mirrored for a natural "looking in a mirror"
+      // feel — bake the same mirror into captured photos so what you saw
+      // while framing the shot is what gets saved, not a backwards flip.
+      if (facingMode === 'user') {
+        ctx.translate(c.width, 0)
+        ctx.scale(-1, 1)
+      }
+      ctx.filter = `brightness(${brightness}%)`
+      ctx.drawImage(v, 0, 0)
+    }
     c.toBlob(blob => resolve(blob ? new File([blob], 'capture.jpg', { type: 'image/jpeg' }) : null), 'image/jpeg', 0.92)
   })
 
@@ -161,7 +192,9 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
       const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'video/webm' })
       const file = new File([blob], 'capture.webm', { type: blob.type })
       setVideo(file)
-      setVideoPreview(URL.createObjectURL(file))
+      const url = URL.createObjectURL(file)
+      setVideoPreview(url)
+      loadVideoDuration(url)
       const thumb = await captureFrame()
       if (thumb) { setThumbnail(thumb); setThumbPreview(URL.createObjectURL(thumb)) }
       stopStream()
@@ -187,16 +220,107 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
     setDuration(fmtDuration(recordSecs))
   }
 
+  // Self-timer: counts down on screen, then fires the actual capture hands-free.
+  const runCountdown = (n: number) => {
+    setCountdown(n)
+    if (n <= 0) {
+      setCountdown(null)
+      if (postType === 'photo') handleSnapPhoto()
+      else handleStartRecording()
+      return
+    }
+    countdownTimeoutRef.current = setTimeout(() => runCountdown(n - 1), 1000)
+  }
+
   const handleShutter = () => {
+    if (countdown !== null) return
+    if (timerSeconds > 0 && !recording) { runCountdown(timerSeconds); return }
     if (postType === 'photo') { handleSnapPhoto(); return }
     if (recording) handleStopRecording()
     else handleStartRecording()
   }
 
+  const loadVideoDuration = (url: string) => {
+    const el = document.createElement('video')
+    el.preload = 'metadata'
+    el.onloadedmetadata = () => {
+      const secs = el.duration || 0
+      setVideoDurationSecs(secs)
+      setTrimStart(0)
+      setTrimEnd(secs)
+    }
+    el.src = url
+  }
+
   const handleRetake = () => {
     setThumbnail(null); setVideo(null); setThumbPreview(null); setVideoPreview(null)
-    setDuration('0:00')
+    setDuration('0:00'); setTrimStart(0); setTrimEnd(0); setVideoDurationSecs(0)
     setStep('camera')
+  }
+
+  // Re-plays the selected in/out range through a hidden video element and
+  // re-records its output — a lightweight, dependency-free way to trim a
+  // clip client-side without shipping an ffmpeg build to the browser.
+  const produceTrimmedVideo = (url: string, start: number, end: number): Promise<File | null> => new Promise(resolve => {
+    const canCapture = typeof (HTMLVideoElement.prototype as any).captureStream === 'function'
+    if (!canCapture || typeof MediaRecorder === 'undefined') { resolve(null); return }
+    const source = document.createElement('video')
+    source.src = url
+    source.muted = false
+    source.playsInline = true
+    source.onerror = () => resolve(null)
+    source.onloadedmetadata = () => { source.currentTime = start }
+    source.onseeked = () => {
+      const stream: MediaStream = (source as any).captureStream()
+      const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+        .find(t => MediaRecorder.isTypeSupported(t)) ?? ''
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+      const chunks: Blob[] = []
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' })
+        resolve(new File([blob], 'trimmed.webm', { type: blob.type }))
+      }
+      recorder.start()
+      source.play().catch(() => {})
+      const checkEnd = () => {
+        if (source.currentTime >= end || source.ended) { recorder.stop(); source.pause(); return }
+        requestAnimationFrame(checkEnd)
+      }
+      requestAnimationFrame(checkEnd)
+    }
+  })
+
+  const handlePreviewNext = async () => {
+    const isTrimmed = postType === 'video' && videoDurationSecs > 0 &&
+      (trimStart > 0.15 || trimEnd < videoDurationSecs - 0.15)
+    if (!isTrimmed || !videoPreview) { setStep('details'); return }
+
+    setTrimming(true)
+    const trimmedFile = await produceTrimmedVideo(videoPreview, trimStart, trimEnd)
+    setTrimming(false)
+    if (trimmedFile) {
+      setVideo(trimmedFile)
+      setVideoPreview(URL.createObjectURL(trimmedFile))
+      setDuration(fmtDuration(trimEnd - trimStart))
+    }
+    // If trimming isn't supported on this device, fall through with the
+    // untrimmed clip rather than blocking the post.
+    setStep('details')
+  }
+
+  const beginDragHandle = (handle: 'start' | 'end') => (e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDraggingHandle(handle)
+  }
+
+  const onDragHandleMove = (handle: 'start' | 'end') => (e: React.PointerEvent) => {
+    if (draggingHandle !== handle || !trimTrackRef.current || !videoDurationSecs) return
+    const rect = trimTrackRef.current.getBoundingClientRect()
+    const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
+    const t = frac * videoDurationSecs
+    if (handle === 'start') setTrimStart(Math.min(t, trimEnd - 0.3))
+    else setTrimEnd(Math.max(t, trimStart + 0.3))
   }
 
   const handleFallbackFile = (file: File) => {
@@ -208,7 +332,9 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
     } else if (file.type.startsWith('video/')) {
       setPostType('video')
       setVideo(file)
-      setVideoPreview(URL.createObjectURL(file))
+      const url = URL.createObjectURL(file)
+      setVideoPreview(url)
+      loadVideoDuration(url)
       const el = document.createElement('video')
       el.preload = 'metadata'
       el.onloadedmetadata = () => { setDuration(fmtDuration(el.duration)); URL.revokeObjectURL(el.src) }
@@ -297,7 +423,7 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
   // ── CAMERA STEP ────────────────────────────────────────────────
   if (step === 'camera') {
     return (
-      <div className="fixed inset-0 bg-black z-50 flex flex-col">
+      <div className="fixed inset-0 bg-black z-50 flex flex-col camera-ui">
         <div className="flex-shrink-0 flex items-center justify-between px-4 py-3" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}>
           <button onClick={handleClose} className="w-9 h-9 bg-black/50 rounded-full flex items-center justify-center">
             <X className="w-5 h-5 text-white" />
@@ -316,12 +442,7 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
               Video
             </button>
           </div>
-          <button
-            onClick={() => setFacingMode(m => m === 'user' ? 'environment' : 'user')}
-            className="w-9 h-9 bg-black/50 rounded-full flex items-center justify-center"
-          >
-            <SwitchCamera className="w-5 h-5 text-white" />
-          </button>
+          <div className="w-9 h-9" />
         </div>
 
         <div className="flex-1 relative overflow-hidden bg-[#111] flex items-center justify-center">
@@ -332,12 +453,62 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
               <button onClick={startCamera} className="text-[#FF6B2B] text-sm font-semibold">Try again</button>
             </div>
           ) : (
-            <video ref={liveVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            <video
+              ref={liveVideoRef} autoPlay playsInline muted
+              className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
+              style={{ filter: `brightness(${brightness}%)` }}
+            />
           )}
+
+          {/* Right-side toolbar: flip camera, self-timer, brightness */}
+          {!cameraError && (
+            <div className="absolute right-3 top-3 flex flex-col items-center gap-3.5">
+              <button
+                onClick={() => setFacingMode(m => m === 'user' ? 'environment' : 'user')}
+                className="w-9 h-9 bg-black/50 rounded-full flex items-center justify-center"
+              >
+                <SwitchCamera className="w-5 h-5 text-white" />
+              </button>
+              <button
+                onClick={() => setTimerSeconds(t => t === 0 ? 3 : t === 3 ? 10 : 0)}
+                className={`w-9 h-9 rounded-full flex flex-col items-center justify-center ${timerSeconds > 0 ? 'bg-[#FF6B2B]' : 'bg-black/50'}`}
+              >
+                <Timer className="w-4 h-4 text-white" />
+                {timerSeconds > 0 && <span className="text-white text-[8px] font-bold leading-none">{timerSeconds}s</span>}
+              </button>
+              <button
+                onClick={() => setShowBrightness(v => !v)}
+                className={`w-9 h-9 rounded-full flex items-center justify-center ${showBrightness ? 'bg-[#FF6B2B]' : 'bg-black/50'}`}
+              >
+                <Sun className="w-5 h-5 text-white" />
+              </button>
+            </div>
+          )}
+
+          {showBrightness && !cameraError && (
+            <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3 bg-black/60 rounded-full px-4 py-2.5">
+              <Sun className="w-4 h-4 text-white flex-shrink-0" />
+              <input
+                type="range" min={50} max={150} value={brightness}
+                onChange={e => setBrightness(Number(e.target.value))}
+                className="flex-1 accent-[#FF6B2B]"
+              />
+              <span className="text-white text-xs font-bold w-10 text-right flex-shrink-0">{brightness}%</span>
+            </div>
+          )}
+
           {recording && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-black/60 rounded-full px-3 py-1.5">
               <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
               <span className="text-white text-xs font-bold">{fmtDuration(recordSecs)} / {fmtDuration(MAX_RECORD_SECONDS)}</span>
+            </div>
+          )}
+
+          {countdown !== null && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <span key={countdown} className="text-white font-black animate-fadeIn" style={{ fontSize: 96 }}>
+                {countdown}
+              </span>
             </div>
           )}
         </div>
@@ -345,7 +516,7 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
         <div className="flex-shrink-0 flex flex-col items-center gap-4 py-6" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
           <button
             onClick={handleShutter}
-            disabled={!!cameraError}
+            disabled={!!cameraError || countdown !== null}
             className="w-[72px] h-[72px] rounded-full border-4 border-white flex items-center justify-center disabled:opacity-30"
           >
             {postType === 'photo'
@@ -372,7 +543,7 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
   // ── PREVIEW STEP ───────────────────────────────────────────────
   if (step === 'preview') {
     return (
-      <div className="fixed inset-0 bg-black z-50 flex flex-col">
+      <div className="fixed inset-0 bg-black z-50 flex flex-col camera-ui">
         <div className="flex-shrink-0 flex items-center justify-between px-4 py-3" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}>
           <button onClick={handleClose} className="w-9 h-9 bg-black/50 rounded-full flex items-center justify-center">
             <X className="w-5 h-5 text-white" />
@@ -385,19 +556,62 @@ export default function CreatePost({ isOpen, onClose }: CreatePostProps) {
           {postType === 'video' && videoPreview && (
             <video src={videoPreview} controls playsInline className="w-full h-full object-contain" />
           )}
+          {trimming && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70">
+              <Loader2 className="w-6 h-6 text-white animate-spin" />
+              <p className="text-white text-sm font-semibold">Trimming…</p>
+            </div>
+          )}
         </div>
+
+        {postType === 'video' && videoDurationSecs > 0.5 && (
+          <div className="flex-shrink-0 px-5 pt-1">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-white text-xs font-semibold flex items-center gap-1.5">
+                <Scissors className="w-3.5 h-3.5" /> Trim
+              </span>
+              <span className="text-[#888] text-xs">{fmtDuration(trimEnd - trimStart)}</span>
+            </div>
+            <div ref={trimTrackRef} className="relative h-9 bg-[#252525] rounded-lg touch-none">
+              <div
+                className="absolute top-0 bottom-0 bg-[#FF6B2B]/25 border-y-2 border-[#FF6B2B]"
+                style={{
+                  left: `${(trimStart / videoDurationSecs) * 100}%`,
+                  right: `${100 - (trimEnd / videoDurationSecs) * 100}%`,
+                }}
+              />
+              <div
+                onPointerDown={beginDragHandle('start')}
+                onPointerMove={onDragHandleMove('start')}
+                onPointerUp={() => setDraggingHandle(null)}
+                className="absolute top-0 bottom-0 w-4 -ml-2 bg-[#FF6B2B] rounded-md cursor-ew-resize touch-none"
+                style={{ left: `${(trimStart / videoDurationSecs) * 100}%` }}
+              />
+              <div
+                onPointerDown={beginDragHandle('end')}
+                onPointerMove={onDragHandleMove('end')}
+                onPointerUp={() => setDraggingHandle(null)}
+                className="absolute top-0 bottom-0 w-4 -ml-2 bg-[#FF6B2B] rounded-md cursor-ew-resize touch-none"
+                style={{ left: `${(trimEnd / videoDurationSecs) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         <div className="flex-shrink-0 flex items-center gap-3 px-5 py-5" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}>
           <button
             onClick={handleRetake}
-            className="flex-1 flex items-center justify-center gap-2 bg-[#252525] text-white font-bold py-3.5 rounded-2xl active:scale-[0.98] transition"
+            disabled={trimming}
+            className="flex-1 flex items-center justify-center gap-2 bg-[#252525] text-white font-bold py-3.5 rounded-2xl active:scale-[0.98] transition disabled:opacity-40"
           >
             <RotateCcw className="w-4 h-4" /> Retake
           </button>
           <button
-            onClick={() => setStep('details')}
-            className="flex-1 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-3.5 rounded-2xl active:scale-[0.98] transition"
+            onClick={handlePreviewNext}
+            disabled={trimming}
+            className="flex-1 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-3.5 rounded-2xl active:scale-[0.98] transition disabled:opacity-40"
           >
-            Next
+            {trimming ? 'Trimming…' : 'Next'}
           </button>
         </div>
       </div>

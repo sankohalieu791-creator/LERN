@@ -145,14 +145,19 @@ html.light [class*="bg-[#1d9bf0]"].text-white {
 }
 
 /* Borders */
+html.light .border-\[rgba\(255\,255\,255\,0\.04\)\] { border-color: rgba(0,0,0,.05)  !important; }
 html.light .border-\[rgba\(255\,255\,255\,0\.05\)\] { border-color: rgba(0,0,0,.06)  !important; }
 html.light .border-\[rgba\(255\,255\,255\,0\.06\)\] { border-color: rgba(0,0,0,.08)  !important; }
 html.light .border-\[rgba\(255\,255\,255\,0\.07\)\] { border-color: rgba(0,0,0,.10)  !important; }
 html.light .border-\[rgba\(255\,255\,255\,0\.08\)\] { border-color: rgba(0,0,0,.12)  !important; }
+html.light .border-\[rgba\(255\,255\,255\,0\.09\)\] { border-color: rgba(0,0,0,.13)  !important; }
 html.light .border-\[rgba\(255\,255\,255\,0\.1\)\]  { border-color: rgba(0,0,0,.14)  !important; }
 html.light .border-\[rgba\(255\,255\,255\,0\.12\)\] { border-color: rgba(0,0,0,.16)  !important; }
 html.light .border-\[rgba\(255\,255\,255\,0\.15\)\] { border-color: rgba(0,0,0,.20)  !important; }
 html.light .border-\[rgba\(255\,255\,255\,0\.2\)\]  { border-color: rgba(0,0,0,.25)  !important; }
+html.light .border-\[rgba\(255\,255\,255\,0\.22\)\] { border-color: rgba(0,0,0,.27)  !important; }
+html.light .border-\[rgba\(255\,255\,255\,0\.25\)\] { border-color: rgba(0,0,0,.30)  !important; }
+html.light .border-\[rgba\(255\,255\,255\,0\.3\)\]  { border-color: rgba(0,0,0,.35)  !important; }
 
 /* Inputs & placeholders */
 html.light input,
@@ -180,10 +185,22 @@ html.light .bg-black\/70  { background-color: rgba(0,0,0,0.70) !important; color
 html.light .bg-black\/60  { background-color: rgba(0,0,0,0.60) !important; color: #fff !important; }
 html.light .bg-black\/40  { background-color: rgba(0,0,0,0.40) !important; color: #fff !important; }
 
-/* Feed page main container and video modal stay dark */
+/* Pure-black video/media surfaces stay black in both themes */
 html.light .bg-black { background-color: #000 !important; }
-html.light .bg-\[\#111\]  { background-color: #111 !important; }
-html.light .bg-\[\#0f0f0f\]\.z-10 { background-color: #f2f2f2 !important; }
+
+/* Camera capture UI (record/preview screens) is intentionally always-dark,
+   like every native camera app — a light viewfinder would hurt contrast
+   while framing a shot. These compound selectors are more specific than
+   the blanket rules above, so they win regardless of source order and
+   opt anything inside .camera-ui back out of light-mode remapping. */
+html.light .camera-ui .text-white          { color: #fff !important; }
+html.light .camera-ui .bg-\[\#111\]        { background-color: #111 !important; }
+html.light .camera-ui .bg-\[\#252525\]     { background-color: #252525 !important; }
+html.light .camera-ui .text-\[\#888\]      { color: #888 !important; }
+html.light .camera-ui .text-\[\#444\]      { color: #444 !important; }
+html.light .camera-ui .text-\[\#333\]      { color: #333 !important; }
+html.light .camera-ui .border-\[rgba\(255\,255\,255\,0\.08\)\] { border-color: rgba(255,255,255,0.08) !important; }
+html.light .camera-ui .border-\[rgba\(255\,255\,255\,0\.2\)\]  { border-color: rgba(255,255,255,0.2)  !important; }
 
 ::-webkit-scrollbar {
   width: 8px;
