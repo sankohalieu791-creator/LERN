@@ -519,12 +519,22 @@ export const getInstructorRequests = async (instructorId: string) => {
     .eq('to_instructor_id', instructorId)
     .order('created_at', { ascending: false })
   if (!data) return { data, error }
-  const ids = [...new Set(data.map((r: any) => r.from_user_id).filter(Boolean))]
+  const ids = [...new Set([
+    ...data.map((r: any) => r.from_user_id),
+    ...data.map((r: any) => r.about_user_id),
+  ].filter(Boolean))]
   const { data: usersData } = ids.length
     ? await supabase.from('users').select('id, username, avatar_url, verified').in('id', ids)
     : { data: [] }
   const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
-  return { data: data.map((r: any) => ({ ...r, requester: map[r.from_user_id] ?? null })), error }
+  return {
+    data: data.map((r: any) => ({
+      ...r,
+      requester: map[r.from_user_id] ?? null,
+      about: r.about_user_id ? (map[r.about_user_id] ?? null) : null,
+    })),
+    error,
+  }
 }
 
 export const updateRequestStatus = async (requestId: string, status: 'accepted' | 'declined') => {
@@ -1286,6 +1296,62 @@ export const createOrganisation = async (
     .select()
     .single()
   return { data, error }
+}
+
+export const getAllOrganisations = async () => {
+  const { data, error } = await supabase
+    .from('organisations')
+    .select('*')
+    .order('name', { ascending: true })
+  return { data, error }
+}
+
+// Employer-safe discovery: independent adults only — anyone belonging to an
+// organisation is only reachable via the Organisations tab (routed through
+// their org admin), regardless of age. This is the safeguarding boundary.
+export const getEmployerDiscoverableUsers = async () => {
+  const cutoff = new Date()
+  cutoff.setFullYear(cutoff.getFullYear() - 18)
+  const cutoffStr = cutoff.toISOString().slice(0, 10)
+
+  const [{ data: users, error }, { data: members }] = await Promise.all([
+    supabase
+      .from('users')
+      .select('id, username, avatar_url, verified, title, bio, work_description, skills, date_of_birth, followers_count')
+      .eq('account_type', 'student')
+      .lte('date_of_birth', cutoffStr)
+      .order('followers_count', { ascending: false }),
+    supabase.from('organisation_members').select('user_id'),
+  ])
+  if (!users) return { data: [], error }
+  const orgUserIds = new Set((members ?? []).map((m: any) => m.user_id))
+  return { data: users.filter(u => !orgUserIds.has(u.id)), error: null }
+}
+
+// Sends employer interest either directly to an independent adult, or — if
+// the target belongs to an organisation — to that org's admin instead, with
+// about_user_id recording who the interest is actually about.
+export const expressEmployerInterest = async (employerId: string, targetUserId: string, message: string) => {
+  const { data: membership } = await supabase
+    .from('organisation_members')
+    .select('organisations(admin_user_id)')
+    .eq('user_id', targetUserId)
+    .maybeSingle()
+  const orgAdminId = (membership as any)?.organisations?.admin_user_id as string | undefined
+
+  const { data, error } = await supabase
+    .from('training_requests')
+    .insert([{
+      from_user_id: employerId,
+      to_instructor_id: orgAdminId ?? targetUserId,
+      about_user_id: orgAdminId ? targetUserId : null,
+      type: 'employer_interest',
+      message,
+      status: 'pending',
+    }])
+    .select()
+    .single()
+  return { data, error, routedToOrgAdmin: !!orgAdminId }
 }
 
 export const getInstructorDashboardStats = async (instructorId: string) => {

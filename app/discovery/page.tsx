@@ -19,6 +19,7 @@ import {
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import type { InstructorApplication } from '@/lib/types'
+import EmployerDiscovery from '@/components/EmployerDiscovery'
 
 type TabId = 'instructors' | 'jobs' | 'request'
 
@@ -502,6 +503,14 @@ function JobCard({
 }
 
 export default function DiscoveryPage() {
+  const { user } = useAuth()
+  // Employers get a completely different, safeguarding-routed discovery
+  // experience (Users/Organisations) instead of Instructors/Jobs/Request.
+  if (user?.account_type === 'employer') return <EmployerDiscovery />
+  return <StudentInstructorDiscovery />
+}
+
+function StudentInstructorDiscovery() {
   const { user } = useAuth()
   const [activeTab,     setActiveTab]     = useState<TabId>('instructors')
   const [search,        setSearch]        = useState('')

@@ -807,11 +807,20 @@ export default function ProfileMePage() {
                     </div>
                     {/* Type badge */}
                     <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
-                      r.type === 'training' ? 'bg-orange-500/15 text-orange-400' : 'bg-purple-500/15 text-purple-400'
+                      r.type === 'training' ? 'bg-orange-500/15 text-orange-400'
+                      : r.type === 'employer_interest' ? 'bg-blue-500/15 text-blue-400'
+                      : 'bg-purple-500/15 text-purple-400'
                     }`}>
-                      {r.type === 'training' ? '🎯 Training' : '🤝 Mentorship'}
+                      {r.type === 'training' ? '🎯 Training' : r.type === 'employer_interest' ? '💼 Employer interest' : '🤝 Mentorship'}
                     </span>
                   </div>
+
+                  {/* Who the interest is actually about, when routed via this org */}
+                  {r.about && (
+                    <p className="text-[#888] text-xs mb-2">
+                      Interested in: <span className="text-white font-semibold">{r.about.username}</span>
+                    </p>
+                  )}
 
                   {/* Message */}
                   <p className="text-[#888] text-sm bg-[#111] rounded-xl px-3 py-2.5 mb-3 leading-relaxed">{r.message}</p>
