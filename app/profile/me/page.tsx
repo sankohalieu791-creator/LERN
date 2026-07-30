@@ -23,7 +23,7 @@ import {
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import CreateJob from '@/components/CreateJob'
-import { getAgeBand, getStudentDisplayTitle, formatViewBreakdown } from '@/lib/profile-utils'
+import { getStudentDisplayTitle, formatViewBreakdown } from '@/lib/profile-utils'
 import type { Project, Certificate, Video } from '@/lib/types'
 
 // ── Verified badge ────────────────────────────────────────────
@@ -131,7 +131,6 @@ export default function ProfileMePage() {
   const TABS = isInstructor ? INSTRUCTOR_TABS : STUDENT_TABS
 
   const initial = user?.username?.[0]?.toUpperCase() ?? 'U'
-  const ageBand = getAgeBand(user?.date_of_birth)
   const displayTitle = isStudent ? getStudentDisplayTitle(user?.date_of_birth, orgName) : user?.title
 
   // The auth profile is cached in localStorage, so user.views_count goes stale and
@@ -361,11 +360,6 @@ export default function ProfileMePage() {
           <span className="text-[10px] font-bold bg-[#1e1e1e] text-[#888] border border-[rgba(255,255,255,0.08)] px-2 py-0.5 rounded-full uppercase">
             {user?.account_type ?? 'student'}
           </span>
-          {ageBand && (
-            <span className="text-[10px] font-bold bg-[#1e1e1e] text-[#666] border border-[rgba(255,255,255,0.08)] px-2 py-0.5 rounded-full">
-              {ageBand}
-            </span>
-          )}
         </div>
       </div>
 

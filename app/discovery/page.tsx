@@ -22,7 +22,7 @@ import { sendPush } from '@/lib/push'
 import type { InstructorApplication } from '@/lib/types'
 import EmployerDiscovery from '@/components/EmployerDiscovery'
 
-type TabId = 'jobs' | 'apprenticeships' | 'internships' | 'request' | 'received'
+type TabId = 'instructors' | 'jobs' | 'apprenticeships' | 'internships' | 'request' | 'received'
 
 const JOB_TYPES_FOR_TAB: Partial<Record<TabId, string[]>> = {
   jobs: ['job', 'part-time', 'contract', 'freelance'],
@@ -588,7 +588,7 @@ function StudentInstructorDiscovery() {
   }, [search])
 
   useEffect(() => {
-    if (activeTab !== 'request') return
+    if (activeTab !== 'instructors' && activeTab !== 'request') return
     const load = async () => {
       setLoading(true)
       const [{ data }, followIds, reqData] = await Promise.all([
@@ -705,6 +705,7 @@ function StudentInstructorDiscovery() {
   })
 
   const allTabs: { id: TabId; label: string }[] = [
+    { id: 'instructors',     label: 'Instructors'         },
     { id: 'jobs',            label: '💼 Jobs'             },
     { id: 'apprenticeships', label: '🎓 Apprenticeships'  },
     { id: 'internships',     label: '📋 Internships'      },

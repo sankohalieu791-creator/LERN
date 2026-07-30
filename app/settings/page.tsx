@@ -191,17 +191,21 @@ export default function SettingsPage() {
       {/* CREATOR */}
       <SectionLabel>{t('creator')}</SectionLabel>
       <div className="border-t border-[rgba(255,255,255,0.05)] theme-border">
-        {user?.account_type === 'instructor' ? (
+        {user?.account_type === 'instructor' || user?.account_type === 'employer' ? (
           <div className="flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.05)]">
             <div className="w-9 h-9 rounded-full bg-[#1d9bf0] flex items-center justify-center flex-shrink-0">
               <CheckCircle2 className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <p className="text-white theme-text-1 text-sm font-semibold">{t('verified_instructor')}</p>
+                <p className="text-white theme-text-1 text-sm font-semibold">
+                  {user?.account_type === 'employer' ? t('verified_employer') : t('verified_instructor')}
+                </p>
                 {user?.verified && <VerifiedBadge size={15} />}
               </div>
-              <p className="text-[#555] theme-text-2 text-xs mt-0.5">{t('verified_instructor_sub')}</p>
+              <p className="text-[#555] theme-text-2 text-xs mt-0.5">
+                {user?.account_type === 'employer' ? t('verified_employer_sub') : t('verified_instructor_sub')}
+              </p>
             </div>
           </div>
         ) : (

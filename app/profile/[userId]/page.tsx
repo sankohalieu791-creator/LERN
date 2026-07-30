@@ -10,14 +10,14 @@ import {
   getInstructorRequests, updateRequestStatus,
   getProjectsByUser, getCertificatesByUser,
   getJobsByInstructor, getInstructorWorkshops,
-  getCoursesByInstructor, getOrCreateConversation, getRequestBetween,
+  getCoursesByInstructor,
   getMyOrgMembership, getEnrolledCourses, recordProfileView,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
-import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin, Eye, Globe, Calendar, BookOpen, Lock } from 'lucide-react'
+import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin, Eye, Globe, Calendar, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import { useLanguage } from '@/context/LanguageContext'
-import { getAgeBand, getStudentDisplayTitle } from '@/lib/profile-utils'
+import { getStudentDisplayTitle } from '@/lib/profile-utils'
 
 function VerifiedBadge({ size = 16 }: { size?: number }) {
   return (
@@ -79,9 +79,6 @@ export default function UserProfilePage() {
   const [certModal, setCertModal] = useState<any | null>(null)
   const [orgMembership, setOrgMembership] = useState<any>(null)
   const [enrolledCount, setEnrolledCount] = useState(0)
-  // Safeguarding: request status between viewer and instructor
-  const [requestStatus, setRequestStatus] = useState<'none' | 'pending' | 'accepted' | 'declined'>('none')
-  const [messagingLoading, setMessagingLoading] = useState(false)
 
   const profileId    = userId as string
   const isOwnProfile = user?.id === profileId
@@ -133,12 +130,6 @@ export default function UserProfilePage() {
           setRequests(reqs ?? [])
         }
 
-        // Safeguarding: check request status when viewing an instructor's profile
-        if (user.id !== profileId && profileRes.data?.account_type === 'instructor') {
-          const { data: req } = await getRequestBetween(user.id, profileId)
-          setRequestStatus(req ? (req.status as any) : 'none')
-        }
-
         // Org badge: load membership for the profile being viewed
         const { data: membership } = await getMyOrgMembership(profileId)
         setOrgMembership(membership)
@@ -178,14 +169,6 @@ export default function UserProfilePage() {
     setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status } : r))
   }
 
-  const handleMessage = async () => {
-    if (!user) { router.push('/auth/login'); return }
-    setMessagingLoading(true)
-    const { data: conv } = await getOrCreateConversation(user.id, profileId)
-    setMessagingLoading(false)
-    if (conv) router.push(`/messages/${conv.id}`)
-  }
-
   // Only instructors can leave feedback, and not on other instructors
   const canLeaveFeedback = !!user && !isOwnProfile && myProfile?.account_type === 'instructor' && !isInstructor
 
@@ -222,7 +205,6 @@ export default function UserProfilePage() {
   const pendingCount = requests.filter(r => r.status === 'pending').length
   const isStudent = profile.account_type === 'student'
   const orgName = orgMembership?.organisations?.name ?? null
-  const ageBand = getAgeBand(profile.date_of_birth)
   const displayTitle = isStudent ? getStudentDisplayTitle(profile.date_of_birth, orgName) : profile.title
 
   const tabs = isInstructor
@@ -281,11 +263,6 @@ export default function UserProfilePage() {
           <span className="text-[10px] font-bold bg-[#1e1e1e] text-[#888] border border-[rgba(255,255,255,0.08)] px-2 py-0.5 rounded-full uppercase">
             {profile.account_type ?? 'student'}
           </span>
-          {ageBand && (
-            <span className="text-[10px] font-bold bg-[#1e1e1e] text-[#666] border border-[rgba(255,255,255,0.08)] px-2 py-0.5 rounded-full">
-              {ageBand}
-            </span>
-          )}
         </div>
         {displayTitle && (
           <div className="flex items-center gap-1.5 mt-1.5">
@@ -346,45 +323,6 @@ export default function UserProfilePage() {
           >
             {followLoading ? '…' : following ? t('unfollow') : t('follow')}
           </button>
-
-          {/* Message button — gated by accepted request for instructors */}
-          {isInstructor ? (
-            requestStatus === 'accepted' ? (
-              <button
-                onClick={handleMessage}
-                disabled={messagingLoading}
-                className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white px-4 py-2.5 rounded-xl text-sm font-bold"
-              >
-                {messagingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
-                Message
-              </button>
-            ) : (
-              <div className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] text-[#555] px-4 py-2.5 rounded-xl text-sm font-bold cursor-not-allowed"
-                title={requestStatus === 'pending' ? 'Waiting for instructor to accept your request' : 'Send a training request first'}>
-                <Lock className="w-4 h-4" />
-                {requestStatus === 'pending' ? 'Pending…' : 'Request First'}
-              </div>
-            )
-          ) : (
-            // Non-instructor: anyone can message
-            <button
-              onClick={handleMessage}
-              disabled={messagingLoading}
-              className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white px-4 py-2.5 rounded-xl text-sm font-bold"
-            >
-              {messagingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
-              Message
-            </button>
-          )}
-
-          {canLeaveFeedback && (
-            <button
-              onClick={() => setActiveTab('feedback')}
-              className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white px-3 py-2.5 rounded-xl text-sm font-bold"
-            >
-              <Star className="w-4 h-4" />
-            </button>
-          )}
         </div>
       )}
 

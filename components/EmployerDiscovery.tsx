@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Check, Loader2, Building2, ChevronLeft, Briefcase } from 'lucide-react'
+import { X, Check, Loader2, Building2, ChevronLeft, Briefcase, Clock } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import { getEmployerDiscoverableUsers, getAllOrganisations, getOrgMembers, expressEmployerInterest } from '@/lib/supabase'
+import { getEmployerDiscoverableUsers, getAllOrganisations, getOrgMembers, expressEmployerInterest, getMyExpressedInterest } from '@/lib/supabase'
 
-type Tab = 'users' | 'orgs'
+type Tab = 'users' | 'orgs' | 'received'
 
 function Avatar({ url, name, size = 52 }: { url?: string | null; name?: string; size?: number }) {
   return (
@@ -136,11 +136,13 @@ function InterestSheet({ target, onClose, onSent }: { target: any; onClose: () =
 }
 
 export default function EmployerDiscovery() {
+  const { user } = useAuth() as any
   const [tab, setTab] = useState<Tab>('users')
   const [users, setUsers] = useState<any[]>([])
   const [orgs, setOrgs] = useState<any[]>([])
   const [openOrg, setOpenOrg] = useState<any | null>(null)
   const [orgMembers, setOrgMembers] = useState<any[]>([])
+  const [received, setReceived] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [interestTarget, setInterestTarget] = useState<any | null>(null)
 
@@ -149,6 +151,12 @@ export default function EmployerDiscovery() {
     setLoading(true)
     getEmployerDiscoverableUsers().then(({ data }) => { setUsers(data ?? []); setLoading(false) })
   }, [tab])
+
+  useEffect(() => {
+    if (tab !== 'received' || !user) return
+    setLoading(true)
+    getMyExpressedInterest(user.id).then(({ data }) => { setReceived(data ?? []); setLoading(false) })
+  }, [tab, user])
 
   useEffect(() => {
     if (tab !== 'orgs') return
@@ -174,6 +182,7 @@ export default function EmployerDiscovery() {
           {([
             { id: 'users' as const, label: 'Users' },
             { id: 'orgs'  as const, label: 'Organisations' },
+            { id: 'received' as const, label: 'Interest Received' },
           ]).map(t => (
             <button
               key={t.id}
@@ -202,6 +211,34 @@ export default function EmployerDiscovery() {
             </div>
           ) : (
             users.map(u => <UserCard key={u.id} u={u} onExpressInterest={() => setInterestTarget(u)} />)
+          )
+        ) : tab === 'received' ? (
+          received.length === 0 ? (
+            <div className="text-center py-16">
+              <Clock className="w-10 h-10 text-[#2a2a2a] mx-auto mb-3" />
+              <p className="text-[#444] text-sm">No interest sent yet</p>
+              <p className="text-[#333] text-xs mt-1">Interest you express from Users or Organisations shows up here with its status</p>
+            </div>
+          ) : (
+            received.map((r: any) => (
+              <div key={r.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <Avatar url={r.target?.avatar_url} name={r.target?.username} size={40} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-sm truncate">{r.target?.username ?? 'Unknown'}</p>
+                    <p className="text-[#555] text-xs">{new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
+                    r.status === 'accepted' ? 'bg-green-500/15 text-green-400'
+                    : r.status === 'declined' ? 'bg-[#252525] text-[#555]'
+                    : 'bg-yellow-500/10 text-yellow-500'
+                  }`}>
+                    {r.status === 'accepted' ? '✓ Accepted' : r.status === 'declined' ? '✕ Declined' : '⏳ Pending'}
+                  </span>
+                </div>
+                <p className="text-[#888] text-sm bg-[#111] rounded-xl px-3 py-2.5 leading-relaxed">{r.message}</p>
+              </div>
+            ))
           )
         ) : openOrg ? (
           <>

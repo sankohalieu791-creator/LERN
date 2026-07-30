@@ -1375,6 +1375,28 @@ export const expressEmployerInterest = async (employerId: string, targetUserId: 
   return { data, error, routedToOrgAdmin: !!orgAdminId }
 }
 
+// Employers can't see anyone else's response until now — this is their own
+// "sent" outbox, tracking who each expression of interest was really about
+// (about_user_id when org-routed, else the direct recipient) and its status.
+export const getMyExpressedInterest = async (employerId: string) => {
+  const { data, error } = await supabase
+    .from('training_requests')
+    .select('*')
+    .eq('from_user_id', employerId)
+    .eq('type', 'employer_interest')
+    .order('created_at', { ascending: false })
+  if (!data) return { data: null, error }
+  const ids = [...new Set(data.map((r: any) => r.about_user_id ?? r.to_instructor_id).filter(Boolean))]
+  const { data: usersData } = ids.length
+    ? await supabase.from('users').select('id, username, avatar_url, verified').in('id', ids)
+    : { data: [] }
+  const map = Object.fromEntries(((usersData || []) as any[]).map(u => [u.id, u]))
+  return {
+    data: data.map((r: any) => ({ ...r, target: map[r.about_user_id ?? r.to_instructor_id] ?? null })),
+    error,
+  }
+}
+
 export const getInstructorDashboardStats = async (instructorId: string) => {
   const [{ data: courses }, { data: workshops }] = await Promise.all([
     supabase.from('courses').select('id, title, enrolled_count, thumbnail_url').eq('instructor_id', instructorId),
