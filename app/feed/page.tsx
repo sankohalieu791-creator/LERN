@@ -200,7 +200,6 @@ export default function FeedPage() {
   const [following,      setFollowing]      = useState<Set<string>>(new Set())
   const [selectedVideo,  setSelectedVideo]  = useState<any>(null)
   const [isAudioOnly,    setIsAudioOnly]    = useState(false)
-  const [searchOpen,     setSearchOpen]     = useState(false)
   const [searchQuery,    setSearchQuery]    = useState('')
   const [searchPeople,   setSearchPeople]   = useState<any[]>([])
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -376,14 +375,11 @@ export default function FeedPage() {
   if (loading) return (
     <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col z-10">
       <div
-        className="flex-shrink-0 bg-[#0f0f0f] border-b border-[rgba(255,255,255,0.06)] px-4 py-3 flex items-center justify-between"
+        className="flex-shrink-0 bg-[#0f0f0f] border-b border-[rgba(255,255,255,0.06)] px-4 py-3 flex items-center gap-3"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
-        <span className="text-white font-black text-xl tracking-tight">LERN</span>
-        <div className="flex items-center gap-5">
-          <div className="w-5 h-5 bg-[#1e1e1e] rounded-full animate-pulse" />
-          <div className="w-5 h-5 bg-[#1e1e1e] rounded-full animate-pulse" />
-        </div>
+        <div className="flex-1 h-10 bg-[#1a1a1a] rounded-full animate-pulse" />
+        <div className="w-5 h-5 bg-[#1e1e1e] rounded-full animate-pulse flex-shrink-0" />
       </div>
       <div className="flex-1 overflow-hidden">
         {[0, 1].map(i => (
@@ -417,51 +413,45 @@ export default function FeedPage() {
         className="flex-shrink-0 bg-[#0f0f0f] border-b border-[rgba(255,255,255,0.06)]"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
-        {searchOpen ? (
-          <div className="px-4 py-3 flex items-center gap-3">
+        <div className="px-4 py-3 flex items-center gap-3">
+          <div className="flex-1 flex items-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] rounded-full px-4 py-2.5">
+            <Search className="w-4 h-4 text-[#555] flex-shrink-0" />
             <input
               ref={searchRef}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search people, videos…"
-              autoFocus
-              className="flex-1 bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] rounded-full px-4 py-2.5 text-white text-sm placeholder-[#444] outline-none"
+              className="flex-1 min-w-0 bg-transparent text-white text-sm placeholder-[#444] outline-none"
             />
-            <button onClick={() => { setSearchOpen(false); setSearchQuery(''); setSearchPeople([]) }}
-              className="text-[#888] text-sm font-semibold">Cancel</button>
-          </div>
-        ) : (
-          <div className="px-4 py-3 flex items-center justify-between">
-            <span className="text-white font-black text-xl tracking-tight">LERN</span>
-            <div className="flex items-center gap-5">
-              <button onClick={() => { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 50) }}>
-                <Search className="w-6 h-6 text-[#888]" />
+            {searchQuery && (
+              <button onClick={() => { setSearchQuery(''); setSearchPeople([]) }} className="flex-shrink-0">
+                <X className="w-4 h-4 text-[#555]" />
               </button>
-              <button
-                className="relative"
-                onClick={async () => {
-                  setShowNotifs(true)
-                  if (notifCount > 0 && user) {
-                    await markNotificationsRead(user.id)
-                    setNotifCount(0)
-                    setNotifs(prev => prev.map(n => ({ ...n, read: true })))
-                  }
-                }}
-              >
-                <Bell className="w-6 h-6 text-[#888]" />
-                {notifCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] rounded-full w-3.5 h-3.5 flex items-center justify-center font-bold">
-                    {notifCount > 9 ? '9+' : notifCount}
-                  </span>
-                )}
-              </button>
-            </div>
+            )}
           </div>
-        )}
+          <button
+            className="relative flex-shrink-0"
+            onClick={async () => {
+              setShowNotifs(true)
+              if (notifCount > 0 && user) {
+                await markNotificationsRead(user.id)
+                setNotifCount(0)
+                setNotifs(prev => prev.map(n => ({ ...n, read: true })))
+              }
+            }}
+          >
+            <Bell className="w-6 h-6 text-[#888]" />
+            {notifCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] rounded-full w-3.5 h-3.5 flex items-center justify-center font-bold">
+                {notifCount > 9 ? '9+' : notifCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* SEARCH RESULTS — shown when search is active */}
-      {searchOpen && searchQuery.trim() ? (
+      {searchQuery.trim() ? (
         <div className="flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-24 space-y-5">
           {/* People */}
           {searchPeople.length > 0 && (
@@ -471,7 +461,7 @@ export default function FeedPage() {
                 {searchPeople.map(person => (
                   <Link key={person.id} href={`/profile/${person.id}`}
                     className="flex items-center gap-3 py-2.5 border-b border-[rgba(255,255,255,0.04)] last:border-0 active:opacity-70 transition"
-                    onClick={() => { setSearchOpen(false); setSearchQuery(''); setSearchPeople([]) }}
+                    onClick={() => { setSearchQuery(''); setSearchPeople([]) }}
                   >
                     {person.avatar_url
                       ? <img src={person.avatar_url} alt="" className="w-11 h-11 rounded-full object-cover flex-shrink-0" />
@@ -502,7 +492,7 @@ export default function FeedPage() {
               <p className="text-[#555] text-[11px] font-bold uppercase tracking-widest mb-3">Videos</p>
               <div className="space-y-2">
                 {filteredVideos.map(video => (
-                  <button key={video.id} onClick={() => { openVideo(video); setSearchOpen(false); setSearchQuery(''); setSearchPeople([]) }}
+                  <button key={video.id} onClick={() => { openVideo(video); setSearchQuery(''); setSearchPeople([]) }}
                     className="flex gap-3 items-center w-full text-left active:opacity-70 transition">
                     <div className="w-16 h-12 rounded-xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex-shrink-0 flex items-center justify-center overflow-hidden">
                       {video.thumbnail_url

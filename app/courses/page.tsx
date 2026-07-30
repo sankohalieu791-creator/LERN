@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import {
   SlidersHorizontal, Star, Clock, Users, X, Check,
   Calendar, Loader2, Lock,
-  UserCheck, Plus, BookOpen, Trash2, MapPin, Globe, Monitor, LayoutDashboard,
+  UserCheck, Plus, BookOpen, Trash2, MapPin, Globe, Monitor, LayoutDashboard, Building2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -836,8 +836,9 @@ function CoursesPageInner() {
     <div className="fixed inset-0 bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
       {/* TABS — instructors don't enrol, so the far-right Enrolled tab becomes
-          their Instructor Dashboard entry point. */}
-      <div className="flex-shrink-0 flex border-b border-[rgba(255,255,255,0.07)] bg-[#0f0f0f]">
+          their Instructor Dashboard entry point. Organisation Dashboard lives
+          here too now (moved off Settings) as a compact icon button. */}
+      <div className="flex-shrink-0 flex items-stretch border-b border-[rgba(255,255,255,0.07)] bg-[#0f0f0f]">
         {(['courses','workshops','enrolled'] as Tab[]).map(tab => (
           tab === 'enrolled' && isInstructor ? (
             <button key="dashboard" onClick={() => router.push('/dashboard')}
@@ -853,6 +854,12 @@ function CoursesPageInner() {
             </button>
           )
         ))}
+        {isInstructor && (
+          <button onClick={() => router.push('/organisation')} title="Organisation Dashboard"
+            className="flex-shrink-0 w-12 flex items-center justify-center border-b-2 border-transparent text-[#555] hover:text-white transition">
+            <Building2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* SCROLLABLE CONTENT */}
