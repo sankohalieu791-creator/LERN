@@ -15,13 +15,20 @@ import {
   sendTrainingRequest, getMyTrainingRequests,
   createNotification, getOrCreateConversation,
   getJobs, saveJob, unsaveJob, getSavedJobIds,
+  getInstructorRequests, updateRequestStatus,
   supabase,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import type { InstructorApplication } from '@/lib/types'
 import EmployerDiscovery from '@/components/EmployerDiscovery'
 
-type TabId = 'instructors' | 'jobs' | 'request'
+type TabId = 'jobs' | 'apprenticeships' | 'internships' | 'request' | 'received'
+
+const JOB_TYPES_FOR_TAB: Partial<Record<TabId, string[]>> = {
+  jobs: ['job', 'part-time', 'contract', 'freelance'],
+  apprenticeships: ['apprenticeship'],
+  internships: ['internship'],
+}
 
 const ROLE_COLOUR: Record<string, string> = {
   coach: 'bg-orange-500', professor: 'bg-blue-600',
@@ -512,7 +519,7 @@ export default function DiscoveryPage() {
 
 function StudentInstructorDiscovery() {
   const { user } = useAuth()
-  const [activeTab,     setActiveTab]     = useState<TabId>('instructors')
+  const [activeTab,     setActiveTab]     = useState<TabId>('jobs')
   const [search,        setSearch]        = useState('')
   const [instructors,   setInstructors]   = useState<InstructorApplication[]>([])
   const [loading,       setLoading]       = useState(false)
@@ -525,6 +532,10 @@ function StudentInstructorDiscovery() {
   const [jobs,         setJobs]         = useState<any[]>([])
   const [savedJobIds,  setSavedJobIds]  = useState<Set<string>>(new Set())
   const [jobsLoading,  setJobsLoading]  = useState(false)
+
+  const [received,        setReceived]        = useState<any[]>([])
+  const [receivedLoading, setReceivedLoading] = useState(false)
+  const [updatingReceived, setUpdatingReceived] = useState<string | null>(null)
 
   // Global search (people + videos) — triggered when search is non-empty
   const [searchPeople,   setSearchPeople]   = useState<any[]>([])
@@ -577,10 +588,9 @@ function StudentInstructorDiscovery() {
   }, [search])
 
   useEffect(() => {
-    if (activeTab === 'jobs') return
+    if (activeTab !== 'request') return
     const load = async () => {
       setLoading(true)
-      // 'instructors' and 'request' both show all instructors (no role filter)
       const [{ data }, followIds, reqData] = await Promise.all([
         getInstructors(undefined),
         user ? getFollowingIds(user.id) : Promise.resolve([] as string[]),
@@ -595,7 +605,18 @@ function StudentInstructorDiscovery() {
   }, [activeTab, user])
 
   useEffect(() => {
-    if (activeTab !== 'jobs') return
+    if (activeTab !== 'received' || !user) return
+    const load = async () => {
+      setReceivedLoading(true)
+      const { data } = await getInstructorRequests(user.id)
+      setReceived((data ?? []).filter((r: any) => r.type === 'employer_interest'))
+      setReceivedLoading(false)
+    }
+    load()
+  }, [activeTab, user])
+
+  useEffect(() => {
+    if (!(activeTab in JOB_TYPES_FOR_TAB)) return
     const load = async () => {
       setJobsLoading(true)
       const [{ data }, followIds, savedIds] = await Promise.all([
@@ -643,6 +664,22 @@ function StudentInstructorDiscovery() {
     }
   }, [user])
 
+  const handleReceivedAction = async (requestId: string, status: 'accepted' | 'declined') => {
+    setUpdatingReceived(requestId)
+    const { error } = await updateRequestStatus(requestId, status)
+    setUpdatingReceived(null)
+    if (error) return
+    setReceived(prev => prev.map(r => r.id === requestId ? { ...r, status } : r))
+    const req = received.find(r => r.id === requestId)
+    if (req?.from_user_id && user) {
+      const accepted = status === 'accepted'
+      const title = accepted ? '✅ Interest accepted' : '❌ Interest declined'
+      const body  = `${(user as any).username || 'They'} ${accepted ? 'accepted' : 'declined'} your interest`
+      sendPush(req.from_user_id, title, body, `/profile/${user.id}`)
+      createNotification(req.from_user_id, 'request', title, body, `/profile/${user.id}`)
+    }
+  }
+
   const filtered = instructors.filter(a => {
     if (!search.trim()) return true
     const q = search.toLowerCase()
@@ -655,6 +692,8 @@ function StudentInstructorDiscovery() {
   })
 
   const filteredJobs = jobs.filter(j => {
+    const allowedTypes = JOB_TYPES_FOR_TAB[activeTab]
+    if (allowedTypes && !allowedTypes.includes(j.type)) return false
     if (!search.trim()) return true
     const q = search.toLowerCase()
     return (
@@ -666,9 +705,11 @@ function StudentInstructorDiscovery() {
   })
 
   const allTabs: { id: TabId; label: string }[] = [
-    { id: 'instructors', label: 'Instructors' },
-    { id: 'jobs',        label: '💼 Jobs'     },
-    { id: 'request',     label: '✉ Request'  },
+    { id: 'jobs',            label: '💼 Jobs'             },
+    { id: 'apprenticeships', label: '🎓 Apprenticeships'  },
+    { id: 'internships',     label: '📋 Internships'      },
+    { id: 'request',         label: '✉ Request'           },
+    { id: 'received',        label: '📥 Interest Received' },
   ]
 
   return (
@@ -681,6 +722,9 @@ function StudentInstructorDiscovery() {
             <h1 className="text-white text-2xl font-bold">Discover</h1>
             {activeTab === 'request' && (
               <p className="text-[#555] text-sm mt-0.5">Send a 1-to-1 training or mentorship request</p>
+            )}
+            {activeTab === 'received' && (
+              <p className="text-[#555] text-sm mt-0.5">Employers who've expressed interest in you</p>
             )}
           </div>
           <Link href="/messages" className="relative mt-1">
@@ -796,7 +840,7 @@ function StudentInstructorDiscovery() {
 
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 space-y-4 pt-1"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
-        {activeTab === 'jobs' ? (
+        {activeTab in JOB_TYPES_FOR_TAB ? (
           jobsLoading ? (
             <div className="space-y-3 pt-1">
               {[0,1,2].map(i => (
@@ -838,6 +882,60 @@ function StudentInstructorDiscovery() {
                 onSave={() => handleSaveJob(job.id)}
                 onFollow={() => handleFollow(job.instructor_id)}
               />
+            ))
+          )
+        ) : activeTab === 'received' ? (
+          receivedLoading ? (
+            <div className="space-y-3 pt-1">
+              {[0,1].map(i => (
+                <div key={i} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4 h-32 animate-pulse" />
+              ))}
+            </div>
+          ) : received.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-[#444] text-sm">No interest received yet</p>
+              <p className="text-[#333] text-xs mt-1">When an employer expresses interest in you, it'll show up here</p>
+            </div>
+          ) : (
+            received.map((r: any) => (
+              <div key={r.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
+                    {r.requester?.avatar_url
+                      ? <img src={r.requester.avatar_url} className="w-full h-full object-cover" />
+                      : r.requester?.username?.[0]?.toUpperCase() ?? '?'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-bold">{r.requester?.username ?? 'An employer'}</p>
+                    <p className="text-[#555] text-xs">{new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                  </div>
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 bg-blue-500/15 text-blue-400">💼 Employer interest</span>
+                </div>
+                <p className="text-[#888] text-sm bg-[#111] rounded-xl px-3 py-2.5 mb-3 leading-relaxed">{r.message}</p>
+                {r.status === 'pending' ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleReceivedAction(r.id, 'accepted')}
+                      disabled={updatingReceived === r.id}
+                      className="flex-1 py-2.5 bg-green-500/15 border border-green-500/30 text-green-400 rounded-full text-sm font-semibold flex items-center justify-center gap-1.5 transition active:scale-95"
+                    >
+                      <Check className="w-4 h-4" />
+                      {updatingReceived === r.id ? '…' : 'Accept'}
+                    </button>
+                    <button
+                      onClick={() => handleReceivedAction(r.id, 'declined')}
+                      disabled={updatingReceived === r.id}
+                      className="flex-1 py-2.5 bg-[#252525] border border-[rgba(255,255,255,0.07)] text-[#888] rounded-full text-sm font-semibold transition active:scale-95"
+                    >
+                      Decline
+                    </button>
+                  </div>
+                ) : (
+                  <div className={`flex items-center gap-2 text-sm font-semibold ${r.status === 'accepted' ? 'text-green-400' : 'text-[#555]'}`}>
+                    {r.status === 'accepted' ? <><Check className="w-4 h-4" /> Accepted</> : 'Declined'}
+                  </div>
+                )}
+              </div>
             ))
           )
         ) : loading ? (
