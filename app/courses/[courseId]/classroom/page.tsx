@@ -156,67 +156,60 @@ function ClassroomInner() {
     )
   }
 
-  // ── Time-gate for students ────────────────────────────────
-  if (!isInstructor && session) {
-    const isLive = session.is_live
-
+  // ── Gate for students: only the instructor's is_live flag matters ──
+  // (the scheduled date/time is shown for context below, but it must
+  // never block a class that's actually live — an instructor going live
+  // early, or a stale/incorrect schedule, shouldn't lock students out).
+  if (!isInstructor && session && !session.is_live) {
     let scheduledAt: Date | null = null
     if (session.session_date && session.session_time) {
       scheduledAt = new Date(`${session.session_date}T${session.session_time}`)
     }
+    const dateLabel = scheduledAt
+      ? scheduledAt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+      : null
+    const timeLabel = scheduledAt
+      ? scheduledAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+      : null
 
-    const tooEarly = scheduledAt ? Date.now() < scheduledAt.getTime() : false
-    const notStarted = !isLive
-
-    if (notStarted || tooEarly) {
-      const dateLabel = scheduledAt
-        ? scheduledAt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
-        : null
-      const timeLabel = scheduledAt
-        ? scheduledAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-        : null
-
-      return (
-        <div className="fixed inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center px-8 gap-6"
-          style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-          <div className="w-20 h-20 rounded-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] flex items-center justify-center">
-            <span style={{ fontSize: 36 }}>⏳</span>
-          </div>
-          <div className="text-center">
-            <p className="text-[#FF6B2B] text-xs font-bold uppercase tracking-[0.2em] mb-2">
-              {tooEarly ? 'Class Not Started Yet' : 'Waiting for Instructor'}
-            </p>
-            <p className="text-white font-bold text-lg mb-1 line-clamp-2">{course.title}</p>
-            {session.title && <p className="text-[#555] text-sm mb-4">{session.title}</p>}
-            {(dateLabel || timeLabel) && (
-              <div className="flex items-center justify-center gap-4 mt-3">
-                {dateLabel && (
-                  <div className="flex items-center gap-1.5 text-[#888] text-sm">
-                    <Calendar className="w-4 h-4 text-[#FF6B2B]" />
-                    {dateLabel}
-                  </div>
-                )}
-                {timeLabel && (
-                  <div className="flex items-center gap-1.5 text-[#888] text-sm">
-                    <Clock className="w-4 h-4 text-[#1d9bf0]" />
-                    {timeLabel}
-                  </div>
-                )}
-              </div>
-            )}
-            {!tooEarly && (
-              <p className="text-[#444] text-xs mt-4">
-                This page will automatically update when the instructor starts the class.
-              </p>
-            )}
-          </div>
-          <button onClick={() => router.back()}
-            className="mt-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] text-white font-semibold px-8 py-3 rounded-full text-sm">
-            Go Back
-          </button>
+    return (
+      <div className="fixed inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center px-8 gap-6"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="w-20 h-20 rounded-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] flex items-center justify-center">
+          <span style={{ fontSize: 36 }}>⏳</span>
         </div>
-      )
-    }
+        <div className="text-center">
+          <p className="text-[#FF6B2B] text-xs font-bold uppercase tracking-[0.2em] mb-2">
+            Waiting for Instructor
+          </p>
+          <p className="text-white font-bold text-lg mb-1 line-clamp-2">{course.title}</p>
+          {session.title && <p className="text-[#555] text-sm mb-4">{session.title}</p>}
+          {(dateLabel || timeLabel) && (
+            <div className="flex items-center justify-center gap-4 mt-3">
+              {dateLabel && (
+                <div className="flex items-center gap-1.5 text-[#888] text-sm">
+                  <Calendar className="w-4 h-4 text-[#FF6B2B]" />
+                  {dateLabel}
+                </div>
+              )}
+              {timeLabel && (
+                <div className="flex items-center gap-1.5 text-[#888] text-sm">
+                  <Clock className="w-4 h-4 text-[#1d9bf0]" />
+                  {timeLabel}
+                </div>
+              )}
+            </div>
+          )}
+          <p className="text-[#444] text-xs mt-4">
+            This page will automatically update when the instructor starts the class.
+          </p>
+        </div>
+        <button onClick={() => router.back()}
+          className="mt-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] text-white font-semibold px-8 py-3 rounded-full text-sm">
+          Go Back
+        </button>
+      </div>
+    )
   }
 
   const handleClose = async () => {
