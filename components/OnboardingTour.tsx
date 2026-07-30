@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { X, ArrowRight, ArrowLeft, Sparkles, Rocket } from 'lucide-react'
 
-const DONE_KEY_STUDENT    = 'lern_tour_v4_student'
-const DONE_KEY_INSTRUCTOR = 'lern_tour_v4_instructor'
+const DONE_KEY_STUDENT    = 'lern_tour_v5_student'
+const DONE_KEY_INSTRUCTOR = 'lern_tour_v5_instructor'
+const DONE_KEY_EMPLOYER   = 'lern_tour_v5_employer'
 
 interface Step {
   target: string | null   // data-tour selector on the real element, or null for a centered card
@@ -34,14 +35,14 @@ const STUDENT_STEPS: Step[] = [
   {
     target: '[data-tour="nav-discover"]', shape: 'circle', route: '/discovery',
     emoji: '🔍',
-    title: 'Discover Instructors',
-    body: 'Browse mentors, coaches, teachers, and professors. Tap a card to see a full profile, follow them, or send a training or mentorship request.',
+    title: 'Jobs, apprenticeships & more',
+    body: 'Browse Jobs, Apprenticeships, and Internships here. Use Request to browse instructors and send a training or mentorship request. Interest Received is where employers who want to work with you show up.',
   },
   {
     target: '[data-tour="nav-profile"]', shape: 'circle', route: '/profile/me',
     emoji: '👤',
-    title: 'Your Profile',
-    body: 'This is your public profile. Add your projects, certificates, and a bio — the more complete it is, the more credible you look to instructors.',
+    title: 'Your Verified Skill Profile',
+    body: 'Add skills, projects, and certificates — your title updates itself too: your school\'s name if you\'ve joined one, or "Student" if you\'re under 18. The more complete it is, the more credible you look.',
   },
   {
     target: '[data-tour="apply-teach-btn"]', shape: 'rect', route: '/settings',
@@ -78,6 +79,12 @@ const INSTRUCTOR_STEPS: Step[] = [
     body: 'When it\'s session time, open your course from here and tap Start Session. Every enrolled student is notified and can join instantly.',
   },
   {
+    target: '[data-tour="org-dashboard-btn"]', shape: 'circle', route: '/courses',
+    emoji: '🏫',
+    title: 'Run an organisation',
+    body: 'If you admin a school or academy, manage its students and private courses here. Employer interest in your students is routed to you first, and shows up in your Requests tab below.',
+  },
+  {
     target: '[data-tour="nav-create"]', shape: 'circle', route: '/feed',
     emoji: '🎬',
     title: 'Post to your Feed',
@@ -87,13 +94,35 @@ const INSTRUCTOR_STEPS: Step[] = [
     target: '[data-tour="nav-discover"]', shape: 'circle', route: '/discovery',
     emoji: '🌍',
     title: "You're on Discovery",
-    body: 'Students browse this tab to find instructors. Keep your bio, role, and experience sharp so students choose you over others.',
+    body: 'Jobs, Apprenticeships, and Internships live here — post one from your profile to attract candidates. Use Request to reach other instructors, and Interest Received for employer interest sent to you.',
   },
   {
     target: '[data-tour="nav-profile"]', shape: 'circle', route: '/profile/me',
     emoji: '📥',
     title: 'Manage requests',
-    body: 'Students can send you training and mentorship requests. Go to Profile → Requests to accept or decline. Your courses and workshops live here too.',
+    body: 'Students send you training and mentorship requests here — and if you run an organisation, employer interest in your students ("💼 Employer interest") shows up in the same Requests tab, with who they\'re interested in clearly labelled.',
+  },
+]
+
+// ── Employer tour ─────────────────────────────────────────────
+const EMPLOYER_STEPS: Step[] = [
+  {
+    target: '[data-tour="nav-feed"]', shape: 'circle', route: '/feed',
+    emoji: '📱',
+    title: 'Welcome to LERN',
+    body: 'Browse videos from students and instructors here to get a feel for the talent on the platform.',
+  },
+  {
+    target: '[data-tour="nav-discover"]', shape: 'circle', route: '/discovery',
+    emoji: '🤝',
+    title: 'Find and contact talent — safely',
+    body: 'Users shows independent adults (18+) you can message directly. Organisations lets you browse students by school — interest in an org-affiliated student always goes to their admin first, never straight to the student, for safeguarding.',
+  },
+  {
+    target: '[data-tour="nav-profile"]', shape: 'circle', route: '/profile/me',
+    emoji: '👤',
+    title: 'Your profile',
+    body: 'This is what students and organisations see when you express interest in them. Keep it complete so they know who\'s reaching out.',
   },
 ]
 
@@ -141,17 +170,19 @@ export default function OnboardingTour() {
   const [index, setIndex] = useState(0)
   const [cardVisible, setCardVisible] = useState(false)
   const isInstructor = user?.account_type === 'instructor'
-  const doneKeyRef = useRef(isInstructor ? DONE_KEY_INSTRUCTOR : DONE_KEY_STUDENT)
+  const isEmployer = user?.account_type === 'employer'
+  const stepsForRole = isInstructor ? INSTRUCTOR_STEPS : isEmployer ? EMPLOYER_STEPS : STUDENT_STEPS
+  const doneKeyRef = useRef(isInstructor ? DONE_KEY_INSTRUCTOR : isEmployer ? DONE_KEY_EMPLOYER : DONE_KEY_STUDENT)
 
   useEffect(() => {
     if (!user) return
     // Wait until the safety gate + DOB backfill (if needed) are cleared —
     // otherwise the tour can start behind/underneath those full-screen gates.
     if (!user.terms_accepted_at || !user.date_of_birth) return
-    doneKeyRef.current = isInstructor ? DONE_KEY_INSTRUCTOR : DONE_KEY_STUDENT
+    doneKeyRef.current = isInstructor ? DONE_KEY_INSTRUCTOR : isEmployer ? DONE_KEY_EMPLOYER : DONE_KEY_STUDENT
     if (localStorage.getItem(doneKeyRef.current)) return
 
-    setSteps(isInstructor ? INSTRUCTOR_STEPS : STUDENT_STEPS)
+    setSteps(stepsForRole)
     const t = setTimeout(() => setPhase('prompt'), 700)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -233,6 +264,8 @@ export default function OnboardingTour() {
             <p className="text-[#999] text-sm leading-[1.6] mb-7">
               {isInstructor
                 ? 'Want a quick tour of how to create courses, go live, and grow your following?'
+                : isEmployer
+                ? 'Want a 60-second tour of how to find talent and contact them safely?'
                 : 'Want a 60-second tour so you know exactly how to find courses, instructors, and get the most out of the app?'}
             </p>
             <button

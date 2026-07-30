@@ -855,7 +855,7 @@ function CoursesPageInner() {
           )
         ))}
         {isInstructor && (
-          <button onClick={() => router.push('/organisation')} title="Organisation Dashboard"
+          <button data-tour="org-dashboard-btn" onClick={() => router.push('/organisation')} title="Organisation Dashboard"
             className="flex-shrink-0 w-12 flex items-center justify-center border-b-2 border-transparent text-[#555] hover:text-white transition">
             <Building2 className="w-4 h-4" />
           </button>
