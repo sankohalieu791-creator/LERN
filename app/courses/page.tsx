@@ -9,6 +9,7 @@ import {
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import Avatar from '@/components/Avatar'
 import {
   getCourses, getWorkshops, getCourseById, enrollCourse,
   isEnrolled, rateCourse, getUserCourseRating,
@@ -183,11 +184,7 @@ function EnrolledCourseCard({ course, onJoin, projectStatus }: { course: any; on
       <div className="p-4">
         <h3 className="text-white font-bold text-sm leading-snug mb-2 line-clamp-2">{course.title}</h3>
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] overflow-hidden flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
-            {course.users?.avatar_url
-              ? <img src={course.users.avatar_url} className="w-full h-full object-cover" />
-              : course.users?.username?.[0]}
-          </div>
+          <Avatar url={course.users?.avatar_url} size={20} />
           <span className="text-[#666] text-xs font-semibold flex items-center gap-1">
             {course.users?.username}
             {course.users?.verified && <VerifiedBadge size={10} />}
@@ -354,11 +351,7 @@ function WorkshopDetailSheet({ workshop, isJoined, isOwner, onJoin, onDelete, on
           {/* Instructor */}
           {workshop.users && (
             <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] overflow-hidden flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                {workshop.users.avatar_url
-                  ? <img src={workshop.users.avatar_url} className="w-full h-full object-cover" />
-                  : workshop.users.username?.[0]?.toUpperCase()}
-              </div>
+              <Avatar url={workshop.users.avatar_url} size={36} />
               <p className="text-white text-sm font-semibold flex items-center gap-1.5">
                 {workshop.users.username}
                 {workshop.users.verified && <VerifiedBadge size={13} />}
@@ -545,12 +538,7 @@ function CourseDetailSheet({ courseId, onClose, onEnrolled }: { courseId: string
               <h2 className="text-white text-xl font-bold leading-snug mb-3">{course?.title}</h2>
 
               <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-                  {course?.users?.avatar_url
-                    ? <img src={course.users.avatar_url} className="w-full h-full object-cover" />
-                    : course?.users?.username?.[0]?.toUpperCase()
-                  }
-                </div>
+                <Avatar url={course?.users?.avatar_url} size={36} />
                 <p className="text-white text-sm font-semibold flex items-center gap-1.5">
                   {course?.users?.username}
                   {course?.users?.verified && <VerifiedBadge size={13} />}
@@ -1112,11 +1100,7 @@ function CourseCard({ course, isEnrolled, isOwner, onTap }: {
           <p className="text-[#555] text-sm line-clamp-2 mb-3 leading-snug">{course.description}</p>
         )}
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] overflow-hidden flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
-            {course.users?.avatar_url
-              ? <img src={course.users.avatar_url} className="w-full h-full object-cover" />
-              : course.users?.username?.[0]?.toUpperCase()}
-          </div>
+          <Avatar url={course.users?.avatar_url} size={28} />
           <span className="text-white text-sm font-semibold flex items-center gap-1">
             {course.users?.username}
             {course.users?.verified && <VerifiedBadge size={13} />}
@@ -1213,11 +1197,7 @@ function WorkshopCard({ workshop, isJoined, joining, isOwner, onJoin, onTap }: {
 
         {workshop.users && (
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] overflow-hidden flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
-              {workshop.users?.avatar_url
-                ? <img src={workshop.users.avatar_url} className="w-full h-full object-cover" />
-                : workshop.users?.username?.[0]?.toUpperCase()}
-            </div>
+            <Avatar url={workshop.users?.avatar_url} size={28} />
             <span className="text-white text-sm font-semibold flex items-center gap-1">
               {workshop.users?.username}
               {workshop.users?.verified && <VerifiedBadge size={13} />}

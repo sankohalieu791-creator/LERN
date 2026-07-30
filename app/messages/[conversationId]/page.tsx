@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { getMessages, sendMessage, markMessagesRead, deleteMessage, getRequestBetween, supabase } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import { ArrowLeft, Send, Loader2, Copy, Trash2, Check, Lock } from 'lucide-react'
+import Avatar from '@/components/Avatar'
 
 interface CtxMenu {
   msg: any
@@ -156,8 +157,6 @@ export default function ConversationPage() {
     else grouped.push({ date: day, msgs: [m] })
   }
 
-  const initial = otherUser?.username?.[0]?.toUpperCase() ?? '?'
-
   // Position the context menu so it stays on screen
   const menuY = ctxMenu
     ? Math.min(ctxMenu.y, (typeof window !== 'undefined' ? window.innerHeight : 800) - 130)
@@ -173,11 +172,7 @@ export default function ConversationPage() {
         <button onClick={() => router.back()} className="text-white p-1 -ml-1 flex-shrink-0">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-          {otherUser?.avatar_url
-            ? <img src={otherUser.avatar_url} alt={otherUser.username} className="w-full h-full object-cover" />
-            : initial}
-        </div>
+        <Avatar url={otherUser?.avatar_url} size={36} />
         <p className="text-white font-bold text-base flex-1 truncate">{otherUser?.username ?? '…'}</p>
       </div>
 
@@ -212,11 +207,7 @@ export default function ConversationPage() {
                     onContextMenu={e => { e.preventDefault(); setCtxMenu({ msg: m, x: e.clientX, y: e.clientY }) }}
                   >
                     {!isMe && (
-                      <div className={`w-6 h-6 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-[10px] font-bold overflow-hidden flex-shrink-0 ${showAvatar ? 'visible' : 'invisible'}`}>
-                        {m.sender?.avatar_url
-                          ? <img src={m.sender.avatar_url} className="w-full h-full object-cover" />
-                          : m.sender?.username?.[0]?.toUpperCase() ?? '?'}
-                      </div>
+                      <Avatar url={m.sender?.avatar_url} size={24} className={showAvatar ? 'visible' : 'invisible'} />
                     )}
                     <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
                       <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed select-none ${

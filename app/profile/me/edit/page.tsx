@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { Camera, ChevronLeft, Loader2, X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Avatar from '@/components/Avatar'
 
 export default function EditProfilePage() {
   const { user, refreshUser } = useAuth()
@@ -130,11 +131,7 @@ export default function EditProfilePage() {
       {/* AVATAR */}
       <div className="flex flex-col items-center py-7 border-b border-[rgba(255,255,255,0.07)] theme-border">
         <div className="relative">
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-3xl font-bold overflow-hidden">
-            {avatarPreview
-              ? <img src={avatarPreview} alt="avatar" className="w-full h-full object-cover" />
-              : initial}
-          </div>
+          <Avatar url={avatarPreview} size={96} />
           {/* Spinning overlay while uploading */}
           {uploadingAvatar && (
             <div className="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center">

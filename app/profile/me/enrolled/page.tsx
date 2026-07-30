@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { getNextUpcomingSession } from '@/lib/course-session-utils'
 import { Lock, Clock, Users, Star, BookOpen } from 'lucide-react'
+import Avatar from '@/components/Avatar'
 
 function VerifiedBadge({ size = 10 }: { size?: number }) {
   return (
@@ -67,11 +68,7 @@ function EnrolledCourseCard({ course, onJoin }: { course: any; onJoin: () => voi
         <h3 className="text-white font-bold text-sm leading-snug mb-2 line-clamp-2">{course.title}</h3>
 
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] overflow-hidden flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
-            {course.users?.avatar_url
-              ? <img src={course.users.avatar_url} className="w-full h-full object-cover" />
-              : course.users?.username?.[0]}
-          </div>
+          <Avatar url={course.users?.avatar_url} size={20} />
           <span className="text-[#666] text-xs font-semibold flex items-center gap-1">
             {course.users?.username}
             {course.users?.verified && <VerifiedBadge size={10} />}

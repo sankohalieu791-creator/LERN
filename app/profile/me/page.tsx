@@ -25,6 +25,7 @@ import { sendPush } from '@/lib/push'
 import CreateJob from '@/components/CreateJob'
 import { getStudentDisplayTitle, formatViewBreakdown } from '@/lib/profile-utils'
 import type { Project, Certificate, Video } from '@/lib/types'
+import Avatar from '@/components/Avatar'
 
 // ── Verified badge ────────────────────────────────────────────
 function VerifiedBadge({ size = 16 }: { size?: number }) {
@@ -130,7 +131,6 @@ export default function ProfileMePage() {
   const isStudent = user?.account_type === 'student'
   const TABS = isInstructor ? INSTRUCTOR_TABS : STUDENT_TABS
 
-  const initial = user?.username?.[0]?.toUpperCase() ?? 'U'
   const displayTitle = isStudent ? getStudentDisplayTitle(user?.date_of_birth, orgName) : user?.title
 
   // The auth profile is cached in localStorage, so user.views_count goes stale and
@@ -319,11 +319,7 @@ export default function ProfileMePage() {
       {/* ── HEADER ROW: avatar left · stats right ───────────── */}
       <div className="px-4 pt-5 flex items-center gap-4 mb-4">
 
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-2xl font-bold overflow-hidden flex-shrink-0">
-          {user?.avatar_url
-            ? <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
-            : initial}
-        </div>
+        <Avatar url={user?.avatar_url} size={80} />
 
         <div className="flex flex-1 justify-around">
           {[
@@ -660,12 +656,7 @@ export default function ProfileMePage() {
               {myRequests.map((r: any) => (
                 <div key={r.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-                      {r.instructor?.avatar_url
-                        ? <img src={r.instructor.avatar_url} className="w-full h-full object-cover" />
-                        : r.instructor?.username?.[0]?.toUpperCase() ?? '?'
-                      }
-                    </div>
+                    <Avatar url={r.instructor?.avatar_url} size={40} />
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-sm font-bold">{r.instructor?.username ?? 'Instructor'}</p>
                       <p className="text-[#555] text-xs">{new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
@@ -797,12 +788,7 @@ export default function ProfileMePage() {
                 <div key={r.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
                   {/* Requester */}
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-                      {r.requester?.avatar_url
-                        ? <img src={r.requester.avatar_url} className="w-full h-full object-cover" />
-                        : r.requester?.username?.[0]?.toUpperCase() ?? '?'
-                      }
-                    </div>
+                    <Avatar url={r.requester?.avatar_url} size={40} />
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-sm font-bold">{r.requester?.username ?? 'Someone'}</p>
                       <p className="text-[#555] text-xs">{new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
@@ -833,7 +819,7 @@ export default function ProfileMePage() {
                       <button
                         onClick={() => handleRequestAction(r.id, 'accepted')}
                         disabled={updatingRequest === r.id}
-                        className="flex-1 py-2.5 bg-green-500/15 border border-green-500/30 text-green-400 rounded-full text-sm font-semibold flex items-center justify-center gap-1.5 transition active:scale-95"
+                        className="flex-1 py-2.5 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white rounded-full text-sm font-semibold flex items-center justify-center gap-1.5 transition active:scale-95"
                       >
                         <Check className="w-4 h-4" />
                         {updatingRequest === r.id ? '…' : 'Accept'}
@@ -847,13 +833,25 @@ export default function ProfileMePage() {
                       </button>
                     </div>
                   ) : (
-                    <div className={`flex items-center gap-2 text-sm font-semibold ${
-                      r.status === 'accepted' ? 'text-green-400' : 'text-[#555]'
-                    }`}>
-                      {r.status === 'accepted'
-                        ? <><Check className="w-4 h-4" /> Accepted</>
-                        : <><Clock className="w-4 h-4" /> Declined</>
-                      }
+                    <div className="flex items-center justify-between gap-2">
+                      <div className={`flex items-center gap-2 text-sm font-semibold ${
+                        r.status === 'accepted' ? 'text-[#FF6B2B]' : 'text-[#555]'
+                      }`}>
+                        {r.status === 'accepted'
+                          ? <><Check className="w-4 h-4" /> Accepted</>
+                          : <><Clock className="w-4 h-4" /> Declined</>
+                        }
+                      </div>
+                      {r.status === 'accepted' && r.from_user_id && (
+                        <button
+                          onClick={() => handleOpenMessage(r.from_user_id)}
+                          disabled={openingMsg === r.from_user_id}
+                          className="flex items-center gap-1.5 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white text-xs font-bold px-4 py-1.5 rounded-full active:scale-95 transition disabled:opacity-50"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          {openingMsg === r.from_user_id ? '…' : 'Message'}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -885,12 +883,7 @@ export default function ProfileMePage() {
                   <div key={f.id} className="bg-[#1a1a1a] theme-card border border-[rgba(255,255,255,0.06)] theme-border rounded-2xl p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
-                          {displayUser?.avatar_url
-                            ? <img src={displayUser.avatar_url} className="w-full h-full object-cover" />
-                            : displayUser?.username?.[0]?.toUpperCase() ?? '?'
-                          }
-                        </div>
+                        <Avatar url={displayUser?.avatar_url} size={32} />
                         <div>
                           <p className="text-[#555] text-[10px]">{label}</p>
                           <p className="text-white theme-text-1 text-sm font-semibold">{displayUser?.username ?? 'User'}</p>
@@ -1070,11 +1063,7 @@ export default function ProfileMePage() {
                 {followList.map((u: any) => (
                   <button key={u.id} onClick={() => { setFollowSheet(null); router.push(`/profile/${u.id}`) }}
                     className="flex items-center gap-3 px-5 py-3 w-full text-left">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] overflow-hidden flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                      {u.avatar_url
-                        ? <img src={u.avatar_url} className="w-full h-full object-cover" />
-                        : u.username?.[0]?.toUpperCase()}
-                    </div>
+                    <Avatar url={u.avatar_url} size={40} />
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-sm font-bold flex items-center gap-1">
                         {u.username}

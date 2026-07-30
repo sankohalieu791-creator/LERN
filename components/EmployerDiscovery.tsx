@@ -2,20 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Check, Loader2, Building2, ChevronLeft, Briefcase, Clock } from 'lucide-react'
+import { X, Check, Loader2, Building2, ChevronLeft, Briefcase, Clock, MessageCircle } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import { getEmployerDiscoverableUsers, getAllOrganisations, getOrgMembers, expressEmployerInterest, getMyExpressedInterest } from '@/lib/supabase'
+import { getEmployerDiscoverableUsers, getAllOrganisations, getOrgMembers, expressEmployerInterest, getMyExpressedInterest, getOrCreateConversation } from '@/lib/supabase'
+import Avatar from '@/components/Avatar'
 
 type Tab = 'users' | 'orgs' | 'received'
-
-function Avatar({ url, name, size = 52 }: { url?: string | null; name?: string; size?: number }) {
-  return (
-    <div className="rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white font-bold overflow-hidden flex-shrink-0"
-      style={{ width: size, height: size, fontSize: size * 0.36 }}>
-      {url ? <img src={url} alt={name} className="w-full h-full object-cover" /> : (name?.[0]?.toUpperCase() ?? '?')}
-    </div>
-  )
-}
 
 function VerifiedTick() {
   return (
@@ -33,7 +25,7 @@ function UserCard({ u, onExpressInterest }: { u: any; onExpressInterest: () => v
     <div className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4">
       <div className="flex items-start gap-3 mb-3">
         <button onClick={() => router.push(`/profile/${u.id}`)} className="flex-shrink-0">
-          <Avatar url={u.avatar_url} name={u.username} />
+          <Avatar url={u.avatar_url} size={52} />
         </button>
         <div className="flex-1 min-w-0">
           <button onClick={() => router.push(`/profile/${u.id}`)} className="flex items-center gap-1">
@@ -76,7 +68,6 @@ function InterestSheet({ target, onClose, onSent }: { target: any; onClose: () =
       setRoutedToOrg(!!routedToOrgAdmin)
       setSent(true)
       onSent()
-      setTimeout(onClose, 2200)
     }
   }
 
@@ -92,7 +83,7 @@ function InterestSheet({ target, onClose, onSent }: { target: any; onClose: () =
           </button>
         </div>
         <div className="mx-5 mt-4 mb-4 flex items-center gap-3 bg-[#1e1e1e] border border-[rgba(255,255,255,0.07)] rounded-2xl p-3">
-          <Avatar url={target.avatar_url} name={target.username} size={44} />
+          <Avatar url={target.avatar_url} size={44} />
           <div>
             <p className="text-white font-bold text-sm">{target.username}</p>
             {target.title && <p className="text-[#888] text-xs">{target.title}</p>}
@@ -110,6 +101,12 @@ function InterestSheet({ target, onClose, onSent }: { target: any; onClose: () =
                 ? `${target.username} belongs to an organisation, so their admin was notified first — this keeps contact safe.`
                 : `${target.username} will be notified directly.`}
             </p>
+            <button
+              onClick={onClose}
+              className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl mt-6"
+            >
+              Done
+            </button>
           </div>
         ) : (
           <div className="px-5 pb-6">
@@ -137,6 +134,7 @@ function InterestSheet({ target, onClose, onSent }: { target: any; onClose: () =
 
 export default function EmployerDiscovery() {
   const { user } = useAuth() as any
+  const router = useRouter()
   const [tab, setTab] = useState<Tab>('users')
   const [users, setUsers] = useState<any[]>([])
   const [orgs, setOrgs] = useState<any[]>([])
@@ -145,6 +143,7 @@ export default function EmployerDiscovery() {
   const [received, setReceived] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [interestTarget, setInterestTarget] = useState<any | null>(null)
+  const [openingMsg, setOpeningMsg] = useState<string | null>(null)
 
   useEffect(() => {
     if (tab !== 'users') return
@@ -170,6 +169,14 @@ export default function EmployerDiscovery() {
     const { data } = await getOrgMembers(org.id)
     setOrgMembers(data ?? [])
     setLoading(false)
+  }
+
+  const handleOpenMessage = async (targetId: string) => {
+    if (!user) return
+    setOpeningMsg(targetId)
+    const { data } = await getOrCreateConversation(user.id, targetId)
+    setOpeningMsg(null)
+    if (data?.id) router.push(`/messages/${data.id}`)
   }
 
   return (
@@ -223,7 +230,7 @@ export default function EmployerDiscovery() {
             received.map((r: any) => (
               <div key={r.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4">
                 <div className="flex items-center gap-3 mb-3">
-                  <Avatar url={r.target?.avatar_url} name={r.target?.username} size={40} />
+                  <Avatar url={r.target?.avatar_url} size={40} />
                   <div className="flex-1 min-w-0">
                     <p className="text-white font-bold text-sm truncate">{r.target?.username ?? 'Unknown'}</p>
                     <p className="text-[#555] text-xs">{new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
@@ -236,7 +243,17 @@ export default function EmployerDiscovery() {
                     {r.status === 'accepted' ? '✓ Accepted' : r.status === 'declined' ? '✕ Declined' : '⏳ Pending'}
                   </span>
                 </div>
-                <p className="text-[#888] text-sm bg-[#111] rounded-xl px-3 py-2.5 leading-relaxed">{r.message}</p>
+                <p className="text-[#888] text-sm bg-[#111] rounded-xl px-3 py-2.5 leading-relaxed mb-3">{r.message}</p>
+                {r.status === 'accepted' && r.target?.id && (
+                  <button
+                    onClick={() => handleOpenMessage(r.target.id)}
+                    disabled={openingMsg === r.target.id}
+                    className="flex items-center gap-1.5 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white text-xs font-bold px-4 py-1.5 rounded-full active:scale-95 transition disabled:opacity-50"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    {openingMsg === r.target.id ? '…' : 'Message'}
+                  </button>
+                )}
               </div>
             ))
           )

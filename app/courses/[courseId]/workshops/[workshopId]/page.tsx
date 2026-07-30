@@ -6,6 +6,7 @@ import { supabase, setWorkshopLive } from '@/lib/supabase'
 import { sendPushToMany } from '@/lib/push'
 import { useAuth } from '@/context/AuthContext'
 import { Calendar, Clock, MapPin, Users, ChevronLeft, Loader2, Radio } from 'lucide-react'
+import Avatar from '@/components/Avatar'
 
 function VerifiedBadge({ size = 14 }: { size?: number }) {
   return (
@@ -166,12 +167,7 @@ export default function WorkshopDetailPage() {
 
         {/* Instructor */}
         <div className="flex items-center gap-3 mb-4 pb-4 border-b border-[rgba(255,255,255,0.07)]">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-            {workshop.users?.avatar_url
-              ? <img src={workshop.users.avatar_url} className="w-full h-full object-cover" />
-              : workshop.users?.username?.[0]?.toUpperCase()
-            }
-          </div>
+          <Avatar url={workshop.users?.avatar_url} size={40} />
           <div>
             <p className="text-white text-sm font-bold flex items-center gap-1.5">
               {workshop.users?.username}

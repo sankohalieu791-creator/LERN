@@ -15,6 +15,7 @@ import {
 } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
+import Avatar from '@/components/Avatar'
 
 function VerifiedBadge({ size = 14 }: { size?: number }) {
   return (
@@ -124,12 +125,7 @@ function FeedCard({ video, userLikes, following, user, onOpen, onLike, onFollow,
       <div className="px-4 pt-3 pb-1">
         <div className="flex items-center justify-between mb-2">
           <button onClick={e => { e.stopPropagation(); onProfile() }} className="flex items-center gap-2.5 flex-1 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-[11px] font-bold overflow-hidden flex-shrink-0">
-              {video.users?.avatar_url
-                ? <img src={video.users.avatar_url} className="w-full h-full object-cover" />
-                : video.users?.username?.[0]?.toUpperCase()
-              }
-            </div>
+            <Avatar url={video.users?.avatar_url} size={36} />
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-bold flex items-center gap-1 leading-none mb-0.5">
                 {video.users?.username}
@@ -463,12 +459,7 @@ export default function FeedPage() {
                     className="flex items-center gap-3 py-2.5 border-b border-[rgba(255,255,255,0.04)] last:border-0 active:opacity-70 transition"
                     onClick={() => { setSearchQuery(''); setSearchPeople([]) }}
                   >
-                    {person.avatar_url
-                      ? <img src={person.avatar_url} alt="" className="w-11 h-11 rounded-full object-cover flex-shrink-0" />
-                      : <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
-                          <span className="text-white font-bold">{person.username?.[0]?.toUpperCase() ?? '?'}</span>
-                        </div>
-                    }
+                    <Avatar url={person.avatar_url} size={44} />
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-sm font-bold flex items-center gap-1">
                         {person.username}
@@ -582,12 +573,13 @@ export default function FeedPage() {
                         setShowNotifs(false)
                         if (n.sender_id) router.push(`/profile/${n.sender_id}`)
                       }}
-                      className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white font-bold text-sm flex-shrink-0 overflow-hidden"
+                      className="flex-shrink-0"
                     >
-                      {n.sender_avatar_url
-                        ? <img src={n.sender_avatar_url} className="w-full h-full object-cover" />
-                        : n.sender_username?.[0]?.toUpperCase()
-                          ?? (n.type === 'like' ? '❤️' : n.type === 'comment' ? '💬' : n.type === 'follow' ? '👤' : '🔔')
+                      {n.sender_id
+                        ? <Avatar url={n.sender_avatar_url} size={40} />
+                        : <div className="w-10 h-10 rounded-full bg-[#252525] flex items-center justify-center text-sm">
+                            {n.type === 'like' ? '❤️' : n.type === 'comment' ? '💬' : n.type === 'follow' ? '👤' : '🔔'}
+                          </div>
                       }
                     </button>
                     {/* Content — tap to go to the post/video */}
@@ -692,12 +684,7 @@ export default function FeedPage() {
                 onClick={() => { setSelectedVideo(null); goToProfile(selectedVideo.user_id) }}
                 className="flex items-center gap-3 flex-1 min-w-0"
               >
-                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-                  {selectedVideo.users?.avatar_url
-                    ? <img src={selectedVideo.users.avatar_url} className="w-full h-full object-cover" />
-                    : selectedVideo.users?.username?.[0]?.toUpperCase()
-                  }
-                </div>
+                <Avatar url={selectedVideo.users?.avatar_url} size={44} />
                 <div className="text-left min-w-0">
                   <p className="text-white text-sm font-bold flex items-center gap-1.5">
                     {selectedVideo.users?.username}
@@ -749,12 +736,7 @@ export default function FeedPage() {
                 <div className="space-y-4 pb-2">
                   {comments.map((c: any) => (
                     <div key={c.id} className="flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
-                        {c.users?.avatar_url
-                          ? <img src={c.users.avatar_url} className="w-full h-full object-cover" />
-                          : c.users?.username?.[0]?.toUpperCase()
-                        }
-                      </div>
+                      <Avatar url={c.users?.avatar_url} size={32} />
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-xs font-bold mb-0.5 flex items-center gap-1">
                           {c.users?.username}
@@ -786,12 +768,7 @@ export default function FeedPage() {
             className="flex-shrink-0 px-4 py-3 border-t border-[rgba(255,255,255,0.08)] bg-[#111] flex gap-3 items-center"
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
           >
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold overflow-hidden flex-shrink-0">
-              {(user as any).avatar_url
-                ? <img src={(user as any).avatar_url} className="w-full h-full object-cover" />
-                : (user as any).username?.[0]?.toUpperCase()
-              }
-            </div>
+            <Avatar url={(user as any).avatar_url} size={36} />
             <input
               ref={commentRef}
               value={newComment}

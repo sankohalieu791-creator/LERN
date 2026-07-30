@@ -20,6 +20,7 @@ import {
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import type { InstructorApplication } from '@/lib/types'
+import SharedAvatar from '@/components/Avatar'
 import EmployerDiscovery from '@/components/EmployerDiscovery'
 
 type TabId = 'instructors' | 'jobs' | 'apprenticeships' | 'internships' | 'request' | 'received'
@@ -71,16 +72,7 @@ function VerifiedTick({ size = 16 }: { size?: number }) {
 }
 
 function Avatar({ app, size = 56 }: { app: InstructorApplication; size?: number }) {
-  const u = app.users
-  const letter = (app.full_name?.[0] || u?.username?.[0] || '?').toUpperCase()
-  return (
-    <div className="rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white font-bold overflow-hidden flex-shrink-0"
-      style={{ width: size, height: size, fontSize: size * 0.35 }}>
-      {u?.avatar_url
-        ? <img src={u.avatar_url} alt={app.full_name} className="w-full h-full object-cover" />
-        : letter}
-    </div>
-  )
+  return <SharedAvatar url={app.users?.avatar_url} size={size} />
 }
 
 function InstructorCard({
@@ -314,12 +306,7 @@ function ContactSheet({
 
         {/* Avatar row */}
         <div className="flex-shrink-0 px-5 pb-3 flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] border-2 border-[#2a2a2a] flex items-center justify-center text-white text-xl font-bold overflow-hidden flex-shrink-0">
-            {u?.avatar_url
-              ? <img src={u.avatar_url} alt={app.full_name} className="w-full h-full object-cover" />
-              : (app.full_name?.[0] || '?').toUpperCase()
-            }
-          </div>
+          <SharedAvatar url={u?.avatar_url} size={64} className="border-2 border-[#2a2a2a]" />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-white text-lg font-bold truncate">{app.full_name}</h2>
@@ -439,11 +426,10 @@ function JobCard({
     <div className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4">
       <div className="flex items-start gap-3 mb-3">
         <button onClick={() => u?.id && router.push(`/profile/${u.id}`)} className="flex-shrink-0">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white font-bold overflow-hidden"
-            style={{ fontSize: 18 }}>
+          <div className="w-12 h-12 rounded-2xl bg-[#252525] flex items-center justify-center overflow-hidden">
             {u?.avatar_url
               ? <img src={u.avatar_url} alt={u.username} className="w-full h-full object-cover" />
-              : u?.username?.[0]?.toUpperCase() ?? '?'}
+              : <User className="w-6 h-6 text-[#666]" />}
           </div>
         </button>
         <div className="flex-1 min-w-0">
@@ -519,6 +505,7 @@ export default function DiscoveryPage() {
 
 function StudentInstructorDiscovery() {
   const { user } = useAuth()
+  const router = useRouter()
   const [activeTab,     setActiveTab]     = useState<TabId>('jobs')
   const [search,        setSearch]        = useState('')
   const [instructors,   setInstructors]   = useState<InstructorApplication[]>([])
@@ -536,6 +523,7 @@ function StudentInstructorDiscovery() {
   const [received,        setReceived]        = useState<any[]>([])
   const [receivedLoading, setReceivedLoading] = useState(false)
   const [updatingReceived, setUpdatingReceived] = useState<string | null>(null)
+  const [openingMsg,      setOpeningMsg]      = useState<string | null>(null)
 
   // Global search (people + videos) — triggered when search is non-empty
   const [searchPeople,   setSearchPeople]   = useState<any[]>([])
@@ -680,6 +668,14 @@ function StudentInstructorDiscovery() {
     }
   }
 
+  const handleOpenMessage = async (targetId: string) => {
+    if (!user) return
+    setOpeningMsg(targetId)
+    const { data } = await getOrCreateConversation(user.id, targetId)
+    setOpeningMsg(null)
+    if (data?.id) router.push(`/messages/${data.id}`)
+  }
+
   const filtered = instructors.filter(a => {
     if (!search.trim()) return true
     const q = search.toLowerCase()
@@ -771,12 +767,7 @@ function StudentInstructorDiscovery() {
                       {searchPeople.map(person => (
                         <Link key={person.id} href={`/profile/${person.id}`}
                           className="flex items-center gap-3 py-2.5 border-b border-[rgba(255,255,255,0.04)] last:border-0 active:opacity-70 transition">
-                          {person.avatar_url
-                            ? <img src={person.avatar_url} alt="" className="w-11 h-11 rounded-full object-cover flex-shrink-0" />
-                            : <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
-                                <span className="text-white font-bold">{person.username?.[0]?.toUpperCase() ?? <User className="w-4 h-4" />}</span>
-                              </div>
-                          }
+                          <SharedAvatar url={person.avatar_url} size={44} />
                           <div className="flex-1 min-w-0">
                             <p className="text-white text-sm font-bold flex items-center gap-1">
                               {person.username}
@@ -901,11 +892,7 @@ function StudentInstructorDiscovery() {
             received.map((r: any) => (
               <div key={r.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl p-4">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-                    {r.requester?.avatar_url
-                      ? <img src={r.requester.avatar_url} className="w-full h-full object-cover" />
-                      : r.requester?.username?.[0]?.toUpperCase() ?? '?'}
-                  </div>
+                  <SharedAvatar url={r.requester?.avatar_url} size={40} />
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-bold">{r.requester?.username ?? 'An employer'}</p>
                     <p className="text-[#555] text-xs">{new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
@@ -918,7 +905,7 @@ function StudentInstructorDiscovery() {
                     <button
                       onClick={() => handleReceivedAction(r.id, 'accepted')}
                       disabled={updatingReceived === r.id}
-                      className="flex-1 py-2.5 bg-green-500/15 border border-green-500/30 text-green-400 rounded-full text-sm font-semibold flex items-center justify-center gap-1.5 transition active:scale-95"
+                      className="flex-1 py-2.5 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white rounded-full text-sm font-semibold flex items-center justify-center gap-1.5 transition active:scale-95"
                     >
                       <Check className="w-4 h-4" />
                       {updatingReceived === r.id ? '…' : 'Accept'}
@@ -932,8 +919,20 @@ function StudentInstructorDiscovery() {
                     </button>
                   </div>
                 ) : (
-                  <div className={`flex items-center gap-2 text-sm font-semibold ${r.status === 'accepted' ? 'text-green-400' : 'text-[#555]'}`}>
-                    {r.status === 'accepted' ? <><Check className="w-4 h-4" /> Accepted</> : 'Declined'}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className={`flex items-center gap-2 text-sm font-semibold ${r.status === 'accepted' ? 'text-[#FF6B2B]' : 'text-[#555]'}`}>
+                      {r.status === 'accepted' ? <><Check className="w-4 h-4" /> Accepted</> : 'Declined'}
+                    </div>
+                    {r.status === 'accepted' && r.from_user_id && (
+                      <button
+                        onClick={() => handleOpenMessage(r.from_user_id)}
+                        disabled={openingMsg === r.from_user_id}
+                        className="flex items-center gap-1.5 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white text-xs font-bold px-4 py-1.5 rounded-full active:scale-95 transition disabled:opacity-50"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        {openingMsg === r.from_user_id ? '…' : 'Message'}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

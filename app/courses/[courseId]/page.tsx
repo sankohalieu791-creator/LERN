@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext'
 import { getNextUpcomingSession } from '@/lib/course-session-utils'
 import { Users, Calendar, ChevronLeft, Loader2, FileText, CheckCircle, XCircle, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import Avatar from '@/components/Avatar'
 
 function VerifiedBadge({ size = 14 }: { size?: number }) {
   return (
@@ -198,12 +199,7 @@ export default function CourseDetailPage() {
 
         {/* Instructor */}
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-            {course.users?.avatar_url
-              ? <img src={course.users.avatar_url} className="w-full h-full object-cover" />
-              : course.users?.username?.[0]?.toUpperCase()
-            }
-          </div>
+          <Avatar url={course.users?.avatar_url} size={44} />
           <div>
             <p className="text-white text-sm font-bold flex items-center gap-1.5">
               {course.users?.username}

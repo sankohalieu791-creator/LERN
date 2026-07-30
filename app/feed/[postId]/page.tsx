@@ -10,6 +10,7 @@ import {
   getComments, addComment,
 } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
+import Avatar from '@/components/Avatar'
 
 function VerifiedBadge({ size = 13 }: { size?: number }) {
   return (
@@ -208,12 +209,7 @@ export default function PostDetailPage() {
           {/* INSTRUCTOR */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-                {video.users?.avatar_url
-                  ? <img src={video.users.avatar_url} className="w-full h-full object-cover" />
-                  : video.users?.username?.[0]?.toUpperCase()
-                }
-              </div>
+              <Avatar url={video.users?.avatar_url} size={40} />
               <p className="text-white text-sm font-bold flex items-center gap-1.5">
                 {video.users?.username}
                 {video.users?.verified && <VerifiedBadge />}
@@ -244,12 +240,7 @@ export default function PostDetailPage() {
               <div className="space-y-4">
                 {comments.map((c: any) => (
                   <div key={c.id} className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
-                      {c.users?.avatar_url
-                        ? <img src={c.users.avatar_url} className="w-full h-full object-cover" />
-                        : c.users?.username?.[0]?.toUpperCase()
-                      }
-                    </div>
+                    <Avatar url={c.users?.avatar_url} size={32} />
                     <div>
                       <p className="text-white text-xs font-bold mb-0.5">{c.users?.username}</p>
                       <p className="text-[#888] text-sm">{c.text}</p>
@@ -270,12 +261,7 @@ export default function PostDetailPage() {
           className="flex-shrink-0 px-4 py-3 border-t border-[rgba(255,255,255,0.07)] bg-[#111] flex gap-2 items-center"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
         >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold overflow-hidden flex-shrink-0">
-            {(user as any).avatar_url
-              ? <img src={(user as any).avatar_url} className="w-full h-full object-cover" />
-              : (user as any).username?.[0]?.toUpperCase()
-            }
-          </div>
+          <Avatar url={(user as any).avatar_url} size={32} />
           <input
             value={newComment}
             onChange={e => setNewComment(e.target.value)}

@@ -18,6 +18,7 @@ import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Ch
 import Link from 'next/link'
 import { useLanguage } from '@/context/LanguageContext'
 import { getStudentDisplayTitle } from '@/lib/profile-utils'
+import Avatar from '@/components/Avatar'
 
 function VerifiedBadge({ size = 16 }: { size?: number }) {
   return (
@@ -201,7 +202,6 @@ export default function UserProfilePage() {
     </div>
   )
 
-  const initial = profile.username?.[0]?.toUpperCase() ?? 'U'
   const pendingCount = requests.filter(r => r.status === 'pending').length
   const isStudent = profile.account_type === 'student'
   const orgName = orgMembership?.organisations?.name ?? null
@@ -236,11 +236,7 @@ export default function UserProfilePage() {
 
       {/* HEADER ROW */}
       <div className="px-4 pt-5 flex items-center gap-4 mb-4">
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-2xl font-bold overflow-hidden flex-shrink-0">
-          {profile.avatar_url
-            ? <img src={profile.avatar_url} alt={profile.username} className="w-full h-full object-cover" />
-            : initial}
-        </div>
+        <Avatar url={profile.avatar_url} size={80} />
         <div className="flex flex-1 justify-around">
           {[
             { label: t('posts'),     value: videos.length               },
@@ -548,12 +544,7 @@ export default function UserProfilePage() {
                   <div key={f.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
-                          {f.users?.avatar_url
-                            ? <img src={f.users.avatar_url} className="w-full h-full object-cover" />
-                            : f.users?.username?.[0]?.toUpperCase() ?? 'E'
-                          }
-                        </div>
+                        <Avatar url={f.users?.avatar_url} size={32} />
                         <p className="text-white text-sm font-semibold">{f.users?.username ?? 'Instructor'}</p>
                       </div>
                       <Stars rating={f.rating} />
@@ -583,12 +574,7 @@ export default function UserProfilePage() {
                 {requests.map((r: any) => (
                   <div key={r.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-                        {r.requester?.avatar_url
-                          ? <img src={r.requester.avatar_url} className="w-full h-full object-cover" />
-                          : r.requester?.username?.[0]?.toUpperCase() ?? '?'
-                        }
-                      </div>
+                      <Avatar url={r.requester?.avatar_url} size={40} />
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-sm font-bold">{r.requester?.username ?? 'Unknown'}</p>
                         <p className="text-[#555] text-xs">{timeAgo(r.created_at)}</p>
@@ -610,7 +596,7 @@ export default function UserProfilePage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleRequestAction(r.id, 'accepted')}
-                          className="flex-1 flex items-center justify-center gap-1.5 bg-green-500 text-white text-sm font-bold py-2.5 rounded-xl active:scale-[0.98] transition"
+                          className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white text-sm font-bold py-2.5 rounded-xl active:scale-[0.98] transition"
                         >
                           <Check className="w-4 h-4" /> Accept
                         </button>
@@ -624,7 +610,7 @@ export default function UserProfilePage() {
                     ) : (
                       <div className={`text-center py-2 rounded-xl text-sm font-bold ${
                         r.status === 'accepted'
-                          ? 'bg-green-500/15 text-green-400'
+                          ? 'bg-[#252525] text-[#FF6B2B]'
                           : 'bg-[#252525] text-[#555]'
                       }`}>
                         {r.status === 'accepted' ? '✓ Accepted' : '✕ Declined'}

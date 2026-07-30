@@ -9,6 +9,7 @@ import {
   Building2, Link2, Plus, Calendar,
 } from 'lucide-react'
 import Link from 'next/link'
+import Avatar from '@/components/Avatar'
 
 function timeAgo(dateStr: string) {
   const d = new Date(dateStr)
@@ -181,12 +182,7 @@ export default function OrganisationPage() {
                     href={`/profile/${m.user_id}`}
                     className="flex items-center gap-3 bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-2xl p-3.5 active:opacity-75 transition"
                   >
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-                      {m.users?.avatar_url
-                        ? <img src={m.users.avatar_url} alt="" className="w-full h-full object-cover" />
-                        : (m.users?.username?.[0] ?? '?').toUpperCase()
-                      }
-                    </div>
+                    <Avatar url={m.users?.avatar_url} size={40} />
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-bold text-sm truncate">{m.users?.username ?? 'Student'}</p>
                       <p className="text-[#555] text-xs flex items-center gap-1">

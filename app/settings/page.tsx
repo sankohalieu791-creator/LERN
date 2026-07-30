@@ -11,6 +11,7 @@ import {
 import Link from 'next/link'
 import { useLanguage } from '@/context/LanguageContext'
 import { LANGUAGES, type Language } from '@/lib/translations'
+import Avatar from '@/components/Avatar'
 
 // ── helpers ───────────────────────────────────────────────────
 function VerifiedBadge({ size = 16 }: { size?: number }) {
@@ -152,8 +153,6 @@ export default function SettingsPage() {
     router.push('/')
   }
 
-  const initial = user?.username?.[0]?.toUpperCase() ?? 'U'
-
   return (
     <>
     <div className="fixed inset-0 bg-[#0f0f0f] theme-bg flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -171,11 +170,7 @@ export default function SettingsPage() {
 
       {/* USER ROW */}
       <Link href="/profile/me" className="flex items-center gap-3.5 px-4 py-4 border-b border-[rgba(255,255,255,0.07)] theme-border hover:bg-[#181818] transition">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-lg font-bold overflow-hidden flex-shrink-0">
-          {user?.avatar_url
-            ? <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
-            : initial}
-        </div>
+        <Avatar url={user?.avatar_url} size={48} />
         <div className="flex-1">
           <div className="flex items-center gap-1.5">
             <p className="text-white theme-text-1 font-bold text-base leading-tight">{user?.username ?? 'Your Name'}</p>

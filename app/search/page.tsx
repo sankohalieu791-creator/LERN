@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { Star, Play, User } from 'lucide-react'
+import { Star, Play } from 'lucide-react'
+import Avatar from '@/components/Avatar'
 
 function SkeletonCard() {
   return (
@@ -112,15 +113,7 @@ function SearchResults() {
                 href={`/profile/${person.id}`}
                 className="flex items-center gap-3 py-3 active:opacity-70 transition border-b border-[rgba(255,255,255,0.04)] last:border-0"
               >
-                {person.avatar_url ? (
-                  <img src={person.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center flex-shrink-0">
-                    <span className="text-white font-bold text-lg">
-                      {person.username?.[0]?.toUpperCase() ?? <User className="w-5 h-5" />}
-                    </span>
-                  </div>
-                )}
+                <Avatar url={person.avatar_url} size={48} />
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-bold leading-snug flex items-center gap-1">
                     {person.username}

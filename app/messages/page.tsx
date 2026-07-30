@@ -10,6 +10,7 @@ import {
   supabase,
 } from '@/lib/supabase'
 import { ArrowLeft, MessageCircle, Loader2, MoreVertical, Star, Trash2 } from 'lucide-react'
+import Avatar from '@/components/Avatar'
 
 function timeAgo(dateStr: string) {
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
@@ -128,7 +129,6 @@ export default function MessagesPage() {
             {conversations.map((c: any) => {
               const other   = c.otherUser
               const last    = c.lastMessage
-              const initial = other?.username?.[0]?.toUpperCase() ?? '?'
               const isOpen  = menuFor === c.id
               const preview = last
                 ? (last.sender_id === user?.id ? 'You: ' : '') + last.content
@@ -142,12 +142,7 @@ export default function MessagesPage() {
                   >
                     {/* Avatar */}
                     <div className="relative flex-shrink-0 mt-0.5">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-base font-bold overflow-hidden">
-                        {other?.avatar_url
-                          ? <img src={other.avatar_url} alt={other.username} className="w-full h-full object-cover" />
-                          : initial
-                        }
-                      </div>
+                      <Avatar url={other?.avatar_url} size={48} />
                       {c.isFavorite && (
                         <span className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center">
                           <Star className="w-3 h-3 text-yellow-900 fill-yellow-900" />

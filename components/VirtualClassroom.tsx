@@ -8,6 +8,7 @@ import {
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
 import { supabase, notifyFollowers, createVideo } from '@/lib/supabase'
+import Avatar from '@/components/Avatar'
 import type {
   IAgoraRTCClient,
   IMicrophoneAudioTrack,
@@ -48,33 +49,6 @@ interface ChatMessage {
 }
 
 const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!
-
-const AVATAR_COLORS = [
-  'from-red-500 to-orange-500',
-  'from-blue-500 to-purple-500',
-  'from-green-500 to-teal-500',
-  'from-yellow-500 to-orange-500',
-  'from-pink-500 to-rose-500',
-]
-
-function Avatar({ name, avatarUrl, size = 48, colorIndex = 0 }: {
-  name: string
-  avatarUrl?: string | null
-  size?: number
-  colorIndex?: number
-}) {
-  if (avatarUrl) {
-    return <img src={avatarUrl} className="rounded-full object-cover" style={{ width: size, height: size }} />
-  }
-  return (
-    <div
-      className={`rounded-full bg-gradient-to-br ${AVATAR_COLORS[colorIndex % AVATAR_COLORS.length]} flex items-center justify-center text-white font-bold flex-shrink-0`}
-      style={{ width: size, height: size, fontSize: size * 0.35 }}
-    >
-      {name?.[0]?.toUpperCase() ?? '?'}
-    </div>
-  )
-}
 
 function formatDuration(secs: number): string {
   const h = Math.floor(secs / 3600)
@@ -984,7 +958,7 @@ export default function VirtualClassroom({
             <div className="divide-y divide-[rgba(255,255,255,0.05)]">
               {pendingRequests.map((p, i) => (
                 <div key={p.userId} className="px-4 py-3 flex items-center gap-3">
-                  <Avatar name={p.username} avatarUrl={p.avatar_url} size={36} colorIndex={i + 1} />
+                  <Avatar url={p.avatar_url} size={36} />
                   <p className="text-white text-sm font-semibold flex-1 truncate">{p.username}</p>
                   <button onClick={() => denyRequest(p.userId)}
                     className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center mr-1">
@@ -1031,14 +1005,14 @@ export default function VirtualClassroom({
 
         {!connecting && !joined && !rtcError && countdown === null && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#111] gap-3">
-            <Avatar name={instructorName} size={56} colorIndex={0} />
+            <Avatar url={null} size={56} />
             <p className="text-[#555] text-sm">Connecting…</p>
           </div>
         )}
 
         {!connecting && joined && !hasRemoteVideo && !cameraOn && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] gap-2">
-            <Avatar name={instructorName} size={72} colorIndex={0} />
+            <Avatar url={null} size={72} />
             <p className="text-white text-sm font-semibold mt-1">{instructorName}</p>
             <p className="text-[#555] text-xs">
               {isInstructor ? t('turn_on_camera') : t('waiting_instructor')}
@@ -1055,7 +1029,7 @@ export default function VirtualClassroom({
         {/* Live indicator */}
         {joined && (
           <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-black/70 rounded-full px-3 py-1.5">
-            <Avatar name={instructorName} size={20} colorIndex={0} />
+            <Avatar url={null} size={20} />
             <span className="text-white text-xs font-semibold">{instructorName}</span>
             <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
           </div>
@@ -1077,7 +1051,7 @@ export default function VirtualClassroom({
               </div>
               {raisedHands.map((p, i) => (
                 <div key={p.userId} className="px-4 py-2.5 flex items-center gap-3 border-b border-[rgba(255,255,255,0.04)] last:border-0">
-                  <Avatar name={p.username} avatarUrl={p.avatar_url} size={28} colorIndex={i + 2} />
+                  <Avatar url={p.avatar_url} size={28} />
                   <p className="text-white text-sm font-semibold flex-1 truncate">{p.username}</p>
                   <button
                     onClick={() => acceptHand(p.userId)}
@@ -1107,7 +1081,7 @@ export default function VirtualClassroom({
                 .map((p, i) => (
                   <div key={p.userId} className="flex flex-col items-center gap-1 flex-shrink-0">
                     <div className="relative">
-                      <Avatar name={p.username} avatarUrl={p.avatar_url} size={44} colorIndex={i} />
+                      <Avatar url={p.avatar_url} size={44} />
                       {p.handUp && <span className="absolute -top-1 -right-1 text-base">✋</span>}
                     </div>
                     <p className="text-[#888] text-[10px] max-w-[48px] truncate text-center">

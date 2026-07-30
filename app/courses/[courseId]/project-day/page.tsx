@@ -10,6 +10,7 @@ import {
 } from '@/lib/supabase'
 import { sendPushToMany } from '@/lib/push'
 import Link from 'next/link'
+import Avatar from '@/components/Avatar'
 import {
   ChevronLeft, Loader2, Upload, Film, ImageIcon, File, CheckCircle,
   XCircle, Clock, Calendar, Users, MessageSquare, X, Plus, RefreshCw,
@@ -492,12 +493,7 @@ function ProjectDayInner() {
                   <div key={sub.id} className="bg-[#1a1a1a] border border-[rgba(255,255,255,0.07)] rounded-2xl overflow-hidden">
                     {/* Student row */}
                     <div className="flex items-center gap-3 p-4">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-xs font-bold overflow-hidden flex-shrink-0">
-                        {sub.user?.avatar_url
-                          ? <img src={sub.user.avatar_url} className="w-full h-full object-cover" alt="" />
-                          : (sub.user?.username?.[0] ?? '?').toUpperCase()
-                        }
-                      </div>
+                      <Avatar url={sub.user?.avatar_url} size={36} />
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-sm font-bold truncate">{sub.user?.username ?? 'Student'}</p>
                         {sub.description && (

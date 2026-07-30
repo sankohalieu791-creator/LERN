@@ -9,6 +9,7 @@ import {
   CheckCircle, XCircle, Clock, FileText, MessageSquare,
   TrendingUp, Award, ChevronRight, X, Check,
 } from 'lucide-react'
+import Avatar from '@/components/Avatar'
 
 function StatCard({ icon: Icon, label, value, color }: { icon: any; label: string; value: number | string; color: string }) {
   return (
@@ -107,11 +108,7 @@ export default function DashboardPage() {
           <h1 className="text-white font-bold text-lg">Instructor Dashboard</h1>
           <p className="text-[#555] text-xs">@{(user as any).username}</p>
         </div>
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-          {(user as any).avatar_url
-            ? <img src={(user as any).avatar_url} className="w-full h-full object-cover" />
-            : (user as any).username?.[0]?.toUpperCase()}
-        </div>
+        <Avatar url={(user as any).avatar_url} size={36} />
       </div>
 
       {/* Tabs */}
@@ -284,11 +281,7 @@ export default function DashboardPage() {
                     {/* Student */}
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-                          {s.user?.avatar_url
-                            ? <img src={s.user.avatar_url} className="w-full h-full object-cover" />
-                            : s.user?.username?.[0]?.toUpperCase() ?? '?'}
-                        </div>
+                        <Avatar url={s.user?.avatar_url} size={36} />
                         <div>
                           <p className="text-white text-sm font-bold">{s.user?.username ?? 'Unknown'}</p>
                           <p className="text-[#555] text-[10px]">
@@ -389,11 +382,7 @@ export default function DashboardPage() {
             {/* Scrollable body */}
             <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 px-5 pt-4 pb-4 space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B2B] to-[#C026D3] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
-                  {reviewModal.user?.avatar_url
-                    ? <img src={reviewModal.user.avatar_url} className="w-full h-full object-cover" />
-                    : reviewModal.user?.username?.[0]?.toUpperCase() ?? '?'}
-                </div>
+                <Avatar url={reviewModal.user?.avatar_url} size={40} />
                 <div className="min-w-0">
                   <p className="text-white font-bold text-sm truncate">{reviewModal.user?.username}</p>
                   <p className="text-[#555] text-xs truncate">{reviewModal.project?.title}</p>
