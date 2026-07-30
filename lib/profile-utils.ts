@@ -42,3 +42,25 @@ export function getStudentDisplayTitle(
   if (age !== null && age < 18) return 'Student'
   return null
 }
+
+const VIEW_ROLE_LABELS: Record<string, [string, string]> = {
+  employer:   ['employer', 'employers'],
+  student:    ['student', 'students'],
+  instructor: ['instructor', 'instructors'],
+  mentor:     ['mentor', 'mentors'],
+  coach:      ['coach', 'coaches'],
+  teacher:    ['teacher', 'teachers'],
+  professor:  ['professor', 'professors'],
+}
+
+// "6 employers, 2 mentors" from a { role: count } map, largest group first.
+export function formatViewBreakdown(counts: Record<string, number>): string | null {
+  const parts = Object.entries(counts)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([role, n]) => {
+      const [singular, plural] = VIEW_ROLE_LABELS[role] ?? [role, `${role}s`]
+      return `${n} ${n === 1 ? singular : plural}`
+    })
+  return parts.length ? parts.join(', ') : null
+}

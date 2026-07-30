@@ -11,7 +11,7 @@ import {
   getProjectsByUser, getCertificatesByUser,
   getJobsByInstructor, getInstructorWorkshops,
   getCoursesByInstructor, getOrCreateConversation, getRequestBetween,
-  getMyOrgMembership, getEnrolledCourses,
+  getMyOrgMembership, getEnrolledCourses, recordProfileView,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import { Grid3X3, Play, MessageSquare, ArrowLeft, Star, Loader2, Send, Inbox, Check, X, FolderOpen, Award, ExternalLink, Briefcase, MapPin, Eye, Globe, Calendar, BookOpen, Lock } from 'lucide-react'
@@ -124,6 +124,7 @@ export default function UserProfilePage() {
           const { data: followed } = await isFollowing(user.id, profileId)
           setFollowing(!!followed)
           try { await incrementProfileViews(profileId) } catch {}
+          try { await recordProfileView(profileId, user.id) } catch {}
         }
 
         // Load requests if viewing own instructor profile

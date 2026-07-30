@@ -57,6 +57,27 @@ export const recordProfileView = async (profileId: string, viewerId: string) => 
   return { error }
 }
 
+// Role-segmented "Viewed by" — e.g. "6 employers, 2 mentors" — computed
+// client-side from the raw view log since it's a small per-profile dataset.
+export const getProfileViewBreakdown = async (profileId: string) => {
+  // profile_views has two FKs into users (profile_id, viewer_id) — PostgREST
+  // can't infer which one to embed, so the relationship must be named explicitly.
+  const { data, error } = await supabase
+    .from('profile_views')
+    .select('viewer_id, users!profile_views_viewer_id_fkey(account_type, instructor_role)')
+    .eq('profile_id', profileId)
+  if (!data) return { data: null, error }
+
+  const counts: Record<string, number> = {}
+  for (const row of data as any[]) {
+    const u = row.users
+    if (!u) continue
+    const key = u.account_type === 'instructor' && u.instructor_role ? u.instructor_role : u.account_type
+    counts[key] = (counts[key] ?? 0) + 1
+  }
+  return { data: { total: data.length, counts }, error: null }
+}
+
 export const getUserProfile = async (userId: string) => {
   const { data, error } = await supabase
     .from('users')

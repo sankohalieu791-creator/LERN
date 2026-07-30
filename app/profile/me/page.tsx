@@ -18,12 +18,12 @@ import {
   deleteCourse, deleteWorkshop, getInstructorWorkshops,
   getFollowersList, getFollowingList,
   getJobsByInstructor, deleteJob, getSavedJobs, saveJob, unsaveJob,
-  getMyOrgMembership, getEnrolledCourses,
+  getMyOrgMembership, getEnrolledCourses, getProfileViewBreakdown,
   supabase, createNotification,
 } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import CreateJob from '@/components/CreateJob'
-import { getAgeBand, getStudentDisplayTitle } from '@/lib/profile-utils'
+import { getAgeBand, getStudentDisplayTitle, formatViewBreakdown } from '@/lib/profile-utils'
 import type { Project, Certificate, Video } from '@/lib/types'
 
 // ── Verified badge ────────────────────────────────────────────
@@ -91,6 +91,7 @@ export default function ProfileMePage() {
   const [feedback,     setFeedback]     = useState<any[]>([])
   const [dataLoading,  setDataLoading]  = useState(false)
   const [viewsCount,   setViewsCount]   = useState<number | null>(null)
+  const [viewBreakdown, setViewBreakdown] = useState<Record<string, number> | null>(null)
   const [orgName,        setOrgName]        = useState<string | null>(null)
   const [enrolledCount,  setEnrolledCount]  = useState(0)
 
@@ -139,6 +140,11 @@ export default function ProfileMePage() {
     if (!user) return
     supabase.from('users').select('views_count').eq('id', user.id).maybeSingle()
       .then(({ data }) => { if (data) setViewsCount(data.views_count ?? 0) })
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
+    getProfileViewBreakdown(user.id).then(({ data }) => { if (data) setViewBreakdown(data.counts) })
   }, [user])
 
   useEffect(() => {
@@ -426,10 +432,12 @@ export default function ProfileMePage() {
 
       {/* ── VIEWED BY ────────────────────────────────────────── */}
       <div className="mx-4 mb-4 flex items-center gap-2 text-xs bg-[#1a1a1a] theme-card border border-[rgba(255,255,255,0.06)] theme-border rounded-xl px-3 py-2">
-        <Eye className="w-3 h-3 text-[#555]" />
-        <span className="text-[#555] font-bold">VIEWED BY</span>
-        <span className="text-white font-semibold">
-          {viewsCount ?? user?.views_count ?? 0} {(viewsCount ?? user?.views_count ?? 0) === 1 ? 'Profile' : 'Profiles'}
+        <Eye className="w-3 h-3 text-[#555] flex-shrink-0" />
+        <span className="text-[#555] font-bold flex-shrink-0">VIEWED BY</span>
+        <span className="text-white font-semibold truncate">
+          {viewBreakdown && formatViewBreakdown(viewBreakdown)
+            ? formatViewBreakdown(viewBreakdown)
+            : `${viewsCount ?? user?.views_count ?? 0} ${(viewsCount ?? user?.views_count ?? 0) === 1 ? 'Profile' : 'Profiles'}`}
         </span>
       </div>
 
