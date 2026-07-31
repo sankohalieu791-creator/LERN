@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getCourseById, setSessionLive, completeSession, deleteCourse, supabase, rateCourse, getUserCourseRating } from '@/lib/supabase'
+import { getCourseById, setSessionLive, completeSession, supabase, rateCourse, getUserCourseRating } from '@/lib/supabase'
 import { sendPushToMany } from '@/lib/push'
 import dynamic from 'next/dynamic'
 import { Loader2, Calendar, Clock, Star } from 'lucide-react'
@@ -83,6 +83,21 @@ function ClassroomInner() {
     })
   }, [course, user, sessionId, courseId])
 
+  // Once class ends, take the student straight to Project Day if it's now
+  // open (final teaching session just finished); otherwise just go back.
+  const goAfterClassEnds = (courseData: any) => {
+    const allSessions = courseData?.course_sessions || []
+    const projectDaySession = allSessions.find((s: any) => s.is_project_day)
+    const teachingSessions = allSessions.filter((s: any) => !s.is_project_day)
+    const teachingDone = teachingSessions.length > 0
+      ? teachingSessions.every((s: any) => s.is_completed)
+      : allSessions.every((s: any) => s.is_completed)
+    const projectDayOpen = !!(projectDaySession && !projectDaySession.is_completed && teachingDone)
+
+    if (projectDayOpen) router.push(`/courses/${courseId}/project-day?sessionId=${projectDaySession.id}`)
+    else router.back()
+  }
+
   // Realtime: watch is_live — gates students in; shows rating when class ends
   useEffect(() => {
     if (!sessionId) return
@@ -93,10 +108,17 @@ function ClassroomInner() {
         filter: `id=eq.${sessionId}`,
       }, async (payload: any) => {
         setSession((prev: any) => prev ? { ...prev, ...payload.new } : prev)
-        // Class just ended — prompt student to rate
+        // Class just ended — prompt student to rate. Re-fetch the full course
+        // too (not just this session) so completion state is fresh for the
+        // "take them straight to Project Day" redirect once they're done rating.
         if (!payload.new.is_live && user && user.id !== course?.instructor_id) {
-          const { data: existing } = await getUserCourseRating(courseId, user.id)
+          const [{ data: existing }, { data: freshCourse }] = await Promise.all([
+            getUserCourseRating(courseId, user.id),
+            getCourseById(courseId),
+          ])
+          if (freshCourse) setCourse(freshCourse)
           if (!existing) setShowRating(true)
+          else goAfterClassEnds(freshCourse ?? course)
         }
       })
       .subscribe()
@@ -142,14 +164,14 @@ function ClassroomInner() {
               if (!user || ratingStars === 0) return
               await rateCourse(courseId, user.id, ratingStars)
               setRatingDone(true)
-              setTimeout(() => router.back(), 1500)
+              setTimeout(() => goAfterClassEnds(course), 1500)
             }}
             className="bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold px-10 py-3.5 rounded-full disabled:opacity-30"
           >
             Submit Rating
           </button>
         )}
-        <button onClick={() => router.back()} className="text-[#555] text-sm">
+        <button onClick={() => goAfterClassEnds(course)} className="text-[#555] text-sm">
           Skip
         </button>
       </div>
@@ -216,19 +238,10 @@ function ClassroomInner() {
     if (isInstructor && sessionId) {
       const liveDuration = liveStartRef.current ? Date.now() - liveStartRef.current : 0
       if (liveDuration > 2 * 60 * 1000) {
-        // Real class (2+ minutes) — mark session completed so students see it as done
-        const { error } = await completeSession(sessionId)
-        if (!error) {
-          const remainingSessions = (course?.course_sessions || [])
-            .filter((s: any) => s.id !== sessionId && !s.is_completed)
-          if (remainingSessions.length === 0) {
-            const { error: deleteError } = await deleteCourse(courseId, user.id)
-            if (!deleteError) {
-              router.push('/courses')
-              return
-            }
-          }
-        }
+        // Real class (2+ minutes) — mark session completed so students see it
+        // as done. The course itself stays around (shows as "Completed") —
+        // it must never get deleted just because its sessions finished.
+        await completeSession(sessionId)
       } else {
         // Quick open/test — just stop live, don't permanently complete the session
         await setSessionLive(sessionId, false)
