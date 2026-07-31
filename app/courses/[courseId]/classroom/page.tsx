@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { getCourseById, setSessionLive, completeSession, supabase, rateCourse, getUserCourseRating } from '@/lib/supabase'
 import { sendPushToMany } from '@/lib/push'
+import { getProjectDayInfo } from '@/lib/course-session-utils'
 import dynamic from 'next/dynamic'
 import { Loader2, Calendar, Clock, Star } from 'lucide-react'
 import type { ComponentProps } from 'react'
@@ -86,14 +87,7 @@ function ClassroomInner() {
   // Once class ends, take the student straight to Project Day if it's now
   // open (final teaching session just finished); otherwise just go back.
   const goAfterClassEnds = (courseData: any) => {
-    const allSessions = courseData?.course_sessions || []
-    const projectDaySession = allSessions.find((s: any) => s.is_project_day)
-    const teachingSessions = allSessions.filter((s: any) => !s.is_project_day)
-    const teachingDone = teachingSessions.length > 0
-      ? teachingSessions.every((s: any) => s.is_completed)
-      : allSessions.every((s: any) => s.is_completed)
-    const projectDayOpen = !!(projectDaySession && !projectDaySession.is_completed && teachingDone)
-
+    const { projectDaySession, projectDayOpen } = getProjectDayInfo(courseData?.course_sessions || [])
     if (projectDayOpen) router.push(`/courses/${courseId}/project-day?sessionId=${projectDaySession.id}`)
     else router.back()
   }

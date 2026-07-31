@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { getCourseById, enrollCourse, isEnrolled, getCourseProject, getMyProjectSubmission, supabase } from '@/lib/supabase'
 import { sendPush } from '@/lib/push'
 import { useAuth } from '@/context/AuthContext'
-import { getNextUpcomingSession } from '@/lib/course-session-utils'
+import { getNextUpcomingSession, getProjectDayInfo } from '@/lib/course-session-utils'
 import { Users, Calendar, ChevronLeft, Loader2, FileText, CheckCircle, XCircle, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import Avatar from '@/components/Avatar'
@@ -140,12 +140,7 @@ export default function CourseDetailPage() {
   const courseComplete   = sessions.length > 0 && !nextSession && !liveSession
 
   // Project Day opens for students once the taught sessions are done — no need to wait for the instructor to go live.
-  const projectDaySession = sessions.find((s: any) => s.is_project_day)
-  const teachingSessions  = sessions.filter((s: any) => !s.is_project_day)
-  const teachingDone      = teachingSessions.length > 0
-    ? teachingSessions.every((s: any) => s.is_completed)
-    : sessions.every((s: any) => s.is_completed)
-  const projectDayOpen    = !!(projectDaySession && !projectDaySession.is_completed && teachingDone)
+  const { projectDaySession, teachingDone, projectDayOpen } = getProjectDayInfo(sessions)
 
   const instructorUrl = nextSession
     ? isProjectDay

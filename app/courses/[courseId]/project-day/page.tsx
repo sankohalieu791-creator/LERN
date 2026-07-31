@@ -11,10 +11,11 @@ import {
 import { sendPushToMany } from '@/lib/push'
 import Link from 'next/link'
 import Avatar from '@/components/Avatar'
+import { createZip } from '@/lib/zip'
 import {
-  ChevronLeft, Loader2, Upload, Film, ImageIcon, File, CheckCircle,
+  ChevronLeft, Loader2, Upload, Film, ImageIcon, File as FileIcon, CheckCircle,
   XCircle, Clock, Calendar, Users, MessageSquare, X, Plus, RefreshCw,
-  ClipboardList, Video, Pencil, Globe, Lock, Trophy, Maximize2,
+  ClipboardList, Video, Pencil, Globe, Lock, Trophy, Maximize2, Folder as FolderIcon,
 } from 'lucide-react'
 
 function StatusBadge({ status }: { status: string }) {
@@ -63,6 +64,7 @@ function ProjectDayInner() {
   const [submitFile,   setSubmitFile]   = useState<File | null>(null)
   const [submitting,   setSubmitting]   = useState(false)
   const [submitError,  setSubmitError]  = useState('')
+  const [zippingFolder, setZippingFolder] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Instructor grading
@@ -523,7 +525,7 @@ function ProjectDayInner() {
                         ) : (
                           <a href={sub.file_url} target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-2 text-[#1d9bf0] text-xs font-semibold">
-                            <File className="w-3.5 h-3.5" /> View submitted file
+                            <FileIcon className="w-3.5 h-3.5" /> View submitted file
                           </a>
                         )}
                       </div>
@@ -645,7 +647,7 @@ function ProjectDayInner() {
                   ) : (
                     <a href={mySubmission.file_url} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-2 bg-[#111] rounded-xl px-4 py-3 text-[#1d9bf0] text-sm font-semibold">
-                      <File className="w-4 h-4" /> View submitted file
+                      <FileIcon className="w-4 h-4" /> View submitted file
                     </a>
                   )
                 )}
@@ -718,7 +720,7 @@ function ProjectDayInner() {
                     <div className="w-10 h-10 rounded-xl bg-[#111] flex items-center justify-center flex-shrink-0">
                       {submitFile.type.startsWith('image/') ? <ImageIcon className="w-5 h-5 text-[#FF6B2B]" />
                         : submitFile.type.startsWith('video/') ? <Film className="w-5 h-5 text-[#FF6B2B]" />
-                        : <File className="w-5 h-5 text-[#FF6B2B]" />}
+                        : <FileIcon className="w-5 h-5 text-[#FF6B2B]" />}
                     </div>
                     <p className="text-white text-sm font-semibold flex-1 truncate">{submitFile.name}</p>
                     <button onClick={() => setSubmitFile(null)}>
@@ -729,22 +731,22 @@ function ProjectDayInner() {
 
                 {/* Upload options */}
                 <div className="grid grid-cols-2 gap-3">
-                  {/* Upload PDF */}
+                  {/* Upload a file (document) */}
                   <button
                     type="button"
                     onClick={() => {
                       const inp = document.createElement('input')
-                      inp.type = 'file'; inp.accept = '.pdf,.doc,.docx'
+                      inp.type = 'file'; inp.accept = '.pdf,.doc,.docx,.txt,.zip'
                       inp.onchange = e => setSubmitFile((e.target as HTMLInputElement).files?.[0] || null)
                       inp.click()
                     }}
                     className="flex flex-col items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-2xl py-5 active:opacity-70 transition"
                   >
                     <div className="w-12 h-12 rounded-full bg-[#FF6B2B]/15 flex items-center justify-center">
-                      <File className="w-6 h-6 text-[#FF6B2B]" />
+                      <FileIcon className="w-6 h-6 text-[#FF6B2B]" />
                     </div>
-                    <p className="text-white text-sm font-bold">Upload PDF</p>
-                    <p className="text-[#555] text-[11px]">PDF, Word doc</p>
+                    <p className="text-white text-sm font-bold">Upload File</p>
+                    <p className="text-[#555] text-[11px]">PDF, Word doc…</p>
                   </button>
 
                   {/* Take / upload a photo */}
@@ -763,6 +765,61 @@ function ProjectDayInner() {
                     </div>
                     <p className="text-white text-sm font-bold">Take a Photo</p>
                     <p className="text-[#555] text-[11px]">Camera or gallery</p>
+                  </button>
+
+                  {/* Upload a video */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const inp = document.createElement('input')
+                      inp.type = 'file'; inp.accept = 'video/*'
+                      inp.onchange = e => setSubmitFile((e.target as HTMLInputElement).files?.[0] || null)
+                      inp.click()
+                    }}
+                    className="flex flex-col items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-2xl py-5 active:opacity-70 transition"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#1d9bf0]/15 flex items-center justify-center">
+                      <Film className="w-6 h-6 text-[#1d9bf0]" />
+                    </div>
+                    <p className="text-white text-sm font-bold">Upload Video</p>
+                    <p className="text-[#555] text-[11px]">Camera roll or file</p>
+                  </button>
+
+                  {/* Upload a whole folder — zipped client-side into one file */}
+                  <button
+                    type="button"
+                    disabled={zippingFolder}
+                    onClick={() => {
+                      const inp = document.createElement('input')
+                      inp.type = 'file'
+                      ;(inp as any).webkitdirectory = true
+                      inp.onchange = async e => {
+                        const fileList = (e.target as HTMLInputElement).files
+                        if (!fileList || fileList.length === 0) return
+                        setZippingFolder(true)
+                        try {
+                          const entries = await Promise.all(
+                            Array.from(fileList).map(async f => ({
+                              name: (f as any).webkitRelativePath || f.name,
+                              data: new Uint8Array(await f.arrayBuffer()),
+                            }))
+                          )
+                          const zipBlob = await createZip(entries)
+                          const folderName = (fileList[0] as any).webkitRelativePath?.split('/')[0] || 'project'
+                          setSubmitFile(new File([zipBlob], `${folderName}.zip`, { type: 'application/zip' }))
+                        } finally {
+                          setZippingFolder(false)
+                        }
+                      }
+                      inp.click()
+                    }}
+                    className="flex flex-col items-center justify-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-2xl py-5 active:opacity-70 transition disabled:opacity-40"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#2ECC71]/15 flex items-center justify-center">
+                      {zippingFolder ? <Loader2 className="w-6 h-6 text-[#2ECC71] animate-spin" /> : <FolderIcon className="w-6 h-6 text-[#2ECC71]" />}
+                    </div>
+                    <p className="text-white text-sm font-bold">{zippingFolder ? 'Zipping…' : 'Upload Folder'}</p>
+                    <p className="text-[#555] text-[11px]">Zips it for you</p>
                   </button>
                 </div>
 

@@ -5,6 +5,7 @@ import {
   SlidersHorizontal, Star, Clock, Users, X, Check,
   Calendar, Loader2, Lock,
   UserCheck, Plus, BookOpen, Trash2, MapPin, Globe, Monitor, LayoutDashboard, Building2,
+  ClipboardCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -20,7 +21,7 @@ import {
 import CreateCourse from '@/components/CreateCourse'
 import CreateWorkshop from '@/components/CreateWorkshop'
 import { useLanguage } from '@/context/LanguageContext'
-import { getNextUpcomingSession } from '@/lib/course-session-utils'
+import { getNextUpcomingSession, getProjectDayInfo } from '@/lib/course-session-utils'
 
 function VerifiedBadge({ size = 12 }: { size?: number }) {
   return (
@@ -114,12 +115,7 @@ function EnrolledCourseCard({ course, onJoin, projectStatus }: { course: any; on
   const isStartingSoon = !isLive && !hasStarted && firstDate && firstDate > now
 
   const liveSession = sessions.find(s => s.is_live)
-  const projectDaySession = sessions.find(s => s.is_project_day)
-  const teachingSessions = sessions.filter(s => !s.is_project_day)
-  const teachingDone = teachingSessions.length > 0
-    ? teachingSessions.every(s => s.is_completed)
-    : sessions.every(s => s.is_completed)
-  const projectDayOpen = !!(projectDaySession && !projectDaySession.is_completed && teachingDone)
+  const { projectDaySession, projectDayOpen } = getProjectDayInfo(sessions)
 
   const enrolledCourseRoute = liveSession
     ? projectDaySession && liveSession.id === projectDaySession.id
@@ -206,6 +202,14 @@ function EnrolledCourseCard({ course, onJoin, projectStatus }: { course: any; on
             >
               <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
               Join Live
+            </button>
+          ) : projectDayOpen && projectStatus !== 'accepted' && projectStatus !== 'pending' ? (
+            <button
+              onClick={e => { e.stopPropagation(); router.push(`/courses/${course.id}/project-day?sessionId=${projectDaySession.id}`) }}
+              className="bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              Submit Your Project
             </button>
           ) : allCompleted ? (
             <span className="bg-green-500/10 text-green-400 text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5 border border-green-500/20">
@@ -762,9 +766,14 @@ function CoursesPageInner() {
             const cid = projToCourse[sub.project_id]
             if (cid) subMap[cid] = sub.status
           }
-          // Mark courses with a project but no submission as 'due'
+          // Only mark a project 'due' once its Project Day is actually open —
+          // i.e. the live teaching sessions have finished. A project brief
+          // existing from day one shouldn't nag a student before class starts.
+          const courseById: Record<string, any> = Object.fromEntries(enrolledData.map((c: any) => [c.id, c]))
           for (const p of projects) {
-            if (!subMap[p.course_id]) subMap[p.course_id] = 'due'
+            if (subMap[p.course_id]) continue
+            const { projectDayOpen } = getProjectDayInfo(courseById[p.course_id]?.course_sessions || [])
+            if (projectDayOpen) subMap[p.course_id] = 'due'
           }
           setProjectStatuses(subMap)
         }
@@ -790,9 +799,17 @@ function CoursesPageInner() {
     setJoiningId(null)
   }
 
+  const dueProjectCourses = Object.entries(projectStatuses).filter(([, status]) => status === 'due')
+
   const filtered = courses.filter(c => {
     if (filterLevel   && c.level   !== filterLevel)   return false
     if (filterSubject && c.subject !== filterSubject) return false
+    // A course whose sessions have all finished has nothing left to join —
+    // drop it from discovery once it's done, unless you're the instructor
+    // who taught it (they still need to find/manage it).
+    const sessions = c.course_sessions || []
+    const allSessionsDone = sessions.length > 0 && sessions.every((s: any) => s.is_completed)
+    if (allSessionsDone && user?.id !== (c.instructor_id || c.user_id)) return false
     return true
   })
 
@@ -912,11 +929,21 @@ function CoursesPageInner() {
                 </button>
               </div>
             ) : (
-              enrolled.map(c => (
-                <EnrolledCourseCard key={c.id} course={c}
-                  projectStatus={projectStatuses[c.id]}
-                  onJoin={() => router.push(`/courses/${c.id}/classroom`)} />
-              ))
+              <>
+                {dueProjectCourses.length > 0 && (
+                  <div className="flex items-center gap-3 bg-[#FF6B2B]/10 border border-[#FF6B2B]/25 rounded-2xl px-4 py-3.5 mb-1">
+                    <ClipboardCheck className="w-5 h-5 text-[#FF6B2B] flex-shrink-0" />
+                    <p className="text-white text-sm font-semibold flex-1">
+                      You have {dueProjectCourses.length} project{dueProjectCourses.length > 1 ? 's' : ''} to submit
+                    </p>
+                  </div>
+                )}
+                {enrolled.map(c => (
+                  <EnrolledCourseCard key={c.id} course={c}
+                    projectStatus={projectStatuses[c.id]}
+                    onJoin={() => router.push(`/courses/${c.id}/classroom`)} />
+                ))}
+              </>
             )}
           </div>
         )}

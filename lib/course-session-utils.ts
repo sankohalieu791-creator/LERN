@@ -30,3 +30,15 @@ export function getNextUpcomingSession(sessions: any[] = [], now = new Date()) {
 
   return upcoming ?? sorted.find((session: any) => !session.is_completed) ?? null
 }
+
+// Whether a course's Project Day is open for submission — all teaching
+// sessions finished, and the project day session itself isn't marked done.
+export function getProjectDayInfo(sessions: any[] = []) {
+  const projectDaySession = sessions.find((s: any) => s.is_project_day)
+  const teachingSessions = sessions.filter((s: any) => !s.is_project_day)
+  const teachingDone = teachingSessions.length > 0
+    ? teachingSessions.every((s: any) => s.is_completed)
+    : sessions.length > 0 && sessions.every((s: any) => s.is_completed)
+  const projectDayOpen = !!(projectDaySession && !projectDaySession.is_completed && teachingDone)
+  return { projectDaySession, teachingSessions, teachingDone, projectDayOpen }
+}
