@@ -13,6 +13,7 @@ export interface User {
   date_of_birth?: string
   organisation_id?: string
   sidebar_collapsed?: boolean
+  consented_at?: string
   created_at: string
 }
 

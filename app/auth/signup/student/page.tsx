@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
-import { signUp, redeemJoinCode, recordConsent, supabase } from '@/lib/supabase'
+import { signUp, redeemJoinCode, recordConsent, getUserProfile, supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { ShieldCheck } from 'lucide-react'
 
@@ -37,6 +37,28 @@ export default function StudentSignupPage() {
 
   // A2
   const [code, setCode] = useState('')
+
+  // Resume an unfinished signup instead of re-running it -- a returning
+  // visitor who already has a session (created an account but never
+  // entered a join code, or never accepted the safeguarding step) would
+  // otherwise hit "User already registered" retrying step 1, or get
+  // dumped on an empty dashboard by RoleGate. Land them back on whichever
+  // step they actually still need.
+  useEffect(() => {
+    (async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) return
+      const { data: profile } = await getUserProfile(authUser.id)
+      if (!profile || profile.role !== 'student') return
+      setFullName(profile.full_name || '')
+      setEmail(profile.email || '')
+      setDob(profile.date_of_birth || '')
+      if (!profile.organisation_id) setStep(2)
+      else if (!profile.consented_at) setStep(3)
+      else router.replace('/student')
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleA1Submit = async () => {
     setError('')

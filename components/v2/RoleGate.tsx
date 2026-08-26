@@ -15,13 +15,21 @@ export default function RoleGate({ allow, children }: { allow: Role; children: R
   const { user, loading } = useAuth()
   const router = useRouter()
 
+  // A student can end up with a valid session but an unfinished signup --
+  // e.g. they created an account but never entered a join code, or never
+  // accepted the safeguarding step. Without this check they'd land on a
+  // dashboard with no organisation to load anything against (My Work spins
+  // forever) instead of being sent back to finish the wizard.
+  const incomplete = allow === 'student' && !!user && (!user.organisation_id || !user.consented_at)
+
   useEffect(() => {
     if (loading) return
     if (!user) { router.replace('/auth/login'); return }
-    if (user.role !== allow) router.replace(routeForRole(user.role))
-  }, [user, loading, allow, router])
+    if (user.role !== allow) { router.replace(routeForRole(user.role)); return }
+    if (incomplete) router.replace('/auth/signup/student')
+  }, [user, loading, allow, incomplete, router])
 
-  if (loading || !user || user.role !== allow) {
+  if (loading || !user || user.role !== allow || incomplete) {
     return (
       <div className="min-h-screen bg-paper flex items-center justify-center">
         <span className="w-6 h-6 border-2 border-[#E2DDD1] border-t-brand rounded-full animate-spin" />
