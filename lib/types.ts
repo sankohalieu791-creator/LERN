@@ -1,188 +1,134 @@
+// v2 schema types — see supabase/migrations/2026-08-26-rebuild-schema-v2.sql
+// onward for the source of truth. Every user is exactly one role; the
+// role decides what they can see and do (enforced in RLS, not here).
+
+export type Role = 'student' | 'institution_staff' | 'provider_staff' | 'employer'
+export type OrgType = 'institution' | 'provider'
+
 export interface User {
   id: string
-  email: string
-  username: string
-  avatar_url?: string
-  bio?: string
-  title?: string
-  work_description?: string
-  phone_number?: string
-  account_type: 'student' | 'instructor' | 'employer'
-  is_instructor: boolean
-  is_employer: boolean
-  verified: boolean
-  followers_count: number
-  following_count: number
-  views_count: number
-  dark_mode: boolean
-  notif_push_enabled: boolean
-  notif_email_enabled: boolean
-  notif_course_reminders: boolean
-  instructor_role?: 'mentor' | 'professor' | 'teacher' | 'coach'
-  experience_years?: number
-  date_of_birth?: string
-  skills: string[]
-  terms_accepted_at?: string
-  created_at: string
-}
-
-export interface InstructorApplication {
-  id: string
-  user_id: string
+  role: Role
   full_name: string
-  topic: string
-  bio: string
-  role_type: 'mentor' | 'professor' | 'teacher' | 'coach' | 'employer'
-  location?: string
-  experience_years?: number
-  contact_email?: string
-  contact_phone?: string
-  status: 'pending' | 'approved' | 'rejected'
-  created_at: string
-  users?: User
-}
-
-export interface Video {
-  id: string
-  user_id: string
-  title: string
-  description: string
-  thumbnail_url?: string
-  video_url?: string
-  duration: string
-  subject: string
-  views: number
-  likes_count: number
-  comments_count: number
-  is_live: boolean
-  stream_url?: string
-  created_at: string
-  users?: User
-}
-
-export interface Course {
-  id: string
-  instructor_id: string
-  title: string
-  description: string
-  thumbnail_url?: string
-  subject: string
-  level: 'beginner' | 'intermediate' | 'advanced'
-  duration_weeks: number
-  rating: number
-  enrolled_count: number
-  created_at: string
-  users?: User
-  course_sessions?: CourseSession[]
-}
-
-export interface CourseSession {
-  id: string
-  course_id: string
-  session_number: number
-  title: string
-  description: string
-  session_date: string
-  session_time: string
-  is_live: boolean
-  is_project_day: boolean
-  is_completed: boolean
+  email: string
+  date_of_birth?: string
+  organisation_id?: string
   created_at: string
 }
 
-export interface CourseProject {
+export interface Organisation {
   id: string
-  instructor_id: string
-  course_id: string
-  session_id?: string
+  name: string
+  type: OrgType
+  safeguarding_lead_id?: string
+  created_at: string
+}
+
+// Student/employer-safe: name only, never `type` — matches the
+// organisations_public view (org type is never shown to students).
+export interface OrganisationPublic {
+  id: string
+  name: string
+}
+
+export interface JoinCode {
+  id: string
+  organisation_id: string
+  code: string
+  expires_at?: string
+  revoked: boolean
+  created_by?: string
+  created_at: string
+}
+
+export interface WorkItem {
+  id: string
+  organisation_id: string
+  type: 'brief' | 'course' | 'workshop'
   title: string
   description?: string
-  due_date?: string
-  submission_mode: 'upload' | 'live' | 'both'
+  criteria: string
+  visibility: 'public' | 'private'
+  created_by?: string
   created_at: string
 }
 
-export interface ProjectSubmissionWithUser extends ProjectSubmission {
-  user?: { id: string; username: string; avatar_url?: string }
-  file_url?: string
+export interface Enrolment {
+  id: string
+  student_id: string
+  work_item_id: string
+  joined_at: string
+}
+
+export type SubmissionStatus = 'submitted' | 'returned' | 'verified' | 'revoked'
+export type ModerationStatus = 'clear' | 'flagged' | 'hidden'
+
+export interface Submission {
+  id: string
+  student_id: string
+  work_item_id: string
+  content?: string
   file_type?: string
-  description?: string
-  feedback?: string
-  session_id?: string
+  file_size_bytes?: number
+  moderation_status: ModerationStatus
+  flagged_reason?: string
+  status: SubmissionStatus
+  submitted_at: string
+  users?: User
+  work_items?: WorkItem
 }
 
-export interface Workshop {
+export type ReviewDecision = 'verified' | 'returned' | 'revoked'
+
+export interface Review {
   id: string
-  instructor_id: string
-  title: string
-  description: string
-  thumbnail_url?: string
-  workshop_date: string
-  workshop_time: string
-  location: string
-  is_online: boolean
-  max_participants: number
-  enrolled_count: number
-  is_live: boolean
-  stream_url?: string
+  submission_id: string
+  reviewer_id: string
+  feedback?: string
+  decision: ReviewDecision
   created_at: string
   users?: User
 }
 
-export interface Project {
+export type ShareVisibility = 'organisation' | 'public'
+
+export interface Verification {
   id: string
-  user_id: string
-  course_id?: string
+  submission_id: string
+  verified_by: string
+  verified_at: string
+  visibility: ShareVisibility
+  revoked_at?: string
+  revoked_by?: string
+  revocation_reason?: string
+  users?: User
+}
+
+export interface Opportunity {
+  id: string
+  employer_id: string
   title: string
-  description: string
-  visibility: 'private' | 'public'
+  description?: string
   created_at: string
 }
 
-export interface ProjectSubmission {
-  id: string
-  project_id: string
-  submission_text: string
-  attachment_url?: string
-  status: 'pending' | 'approved' | 'needs_work'
-  instructor_feedback?: string
-  submitted_at: string
-}
+export type InterestStatus = 'pending' | 'accepted' | 'declined'
 
-export interface Certificate {
+export interface Interest {
   id: string
-  user_id: string
-  title: string
-  issuer: string
-  year: number
-  certificate_url: string
+  employer_id: string
+  student_id: string
+  status: InterestStatus
+  org_notified_at?: string
   created_at: string
 }
 
-export interface Notification {
+export type NotificationType = 'submission_received' | 'work_returned' | 'work_verified' | 'work_revoked'
+
+export interface AppNotification {
   id: string
   user_id: string
-  type: 'like' | 'comment' | 'follow'
-  related_user_id?: string
-  video_id?: string
+  type: NotificationType
+  submission_id?: string
   read: boolean
   created_at: string
-}
-
-export interface Feedback {
-  id: string
-  profile_user_id: string
-  reviewer_id: string
-  rating: number
-  feedback_text: string
-  created_at: string
-}
-
-export interface Comment {
-  id: string
-  video_id: string
-  user_id: string
-  text: string
-  created_at: string
-  users?: User
 }

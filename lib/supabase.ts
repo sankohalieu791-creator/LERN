@@ -5,15 +5,19 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Auth
-export const signUp = async (email: string, password: string, username: string) => {
-  // The on_auth_user_created DB trigger creates the public.users row (username/
-  // email/account_type) the instant this succeeds — a client-side write here would
-  // race the session hydration and get silently blocked by RLS, so we don't attempt one.
+// Auth (v2) — the on_auth_user_created DB trigger creates the public.users
+// row (role/full_name/email/date_of_birth) the instant signUp succeeds, from
+// the metadata passed here. A client-side insert would race session
+// hydration and get blocked by RLS, so we never attempt one directly.
+export const signUp = async (
+  email: string,
+  password: string,
+  meta: { role: 'student' | 'institution_staff' | 'provider_staff'; full_name: string; date_of_birth?: string }
+) => {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { username } }
+    options: { data: meta },
   })
   return { data, error }
 }
@@ -31,6 +35,66 @@ export const signOut = async () => {
 export const getUser = async () => {
   const { data: { user } } = await supabase.auth.getUser()
   return user
+}
+
+// Screen A2 — join an organisation by code. Requires an active session
+// (redeem_join_code() writes to the caller's own row via auth.uid()).
+// Throws via `error` on an invalid/expired/revoked code — never partially
+// succeeds.
+export const redeemJoinCode = async (code: string) => {
+  const { data, error } = await supabase.rpc('redeem_join_code', { p_code: code.trim() })
+  return { data: data as string | null, error }
+}
+
+// Screen O1/O3 — self-serve organisation sign-up: creates the org, makes
+// the calling user its staff member (institution_staff/provider_staff
+// depending on type), and names them safeguarding lead by default.
+export const createOrganisationAndJoin = async (name: string, type: 'institution' | 'provider', fullName: string) => {
+  const { data, error } = await supabase.rpc('create_organisation_and_join', {
+    p_name: name, p_type: type, p_full_name: fullName,
+  })
+  return { data: data as string | null, error }
+}
+
+// Screens A3/O2 — active, non-pre-ticked consent.
+export const recordConsent = async (userId: string) => {
+  const { error } = await supabase
+    .from('users')
+    .update({ consented_at: new Date().toISOString() })
+    .eq('id', userId)
+  return { error }
+}
+
+// Screen O3 — generate a join code for the caller's own organisation.
+// Retries on the rare code collision (unique constraint).
+export const generateJoinCode = async (organisationId: string, createdBy: string, expiresAt?: string | null) => {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = Array.from({ length: 8 }, () =>
+      '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random() * 32)]
+    ).join('')
+    const { data, error } = await supabase
+      .from('join_codes')
+      .insert([{ organisation_id: organisationId, code, created_by: createdBy, expires_at: expiresAt ?? null }])
+      .select()
+      .single()
+    if (!error) return { data, error: null }
+    if (!(error as any).message?.includes('duplicate')) return { data: null, error }
+  }
+  return { data: null, error: { message: 'Could not generate a unique code — please try again.' } as any }
+}
+
+export const listJoinCodes = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('join_codes')
+    .select('*')
+    .eq('organisation_id', organisationId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const revokeJoinCode = async (codeId: string) => {
+  const { error } = await supabase.from('join_codes').update({ revoked: true }).eq('id', codeId)
+  return { error }
 }
 
 // Users

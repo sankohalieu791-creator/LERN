@@ -15,6 +15,10 @@ const config: Config = {
         accent: '#00D9FF',
         success: '#2ECC71',
         danger: '#FF3B30',
+        // v2 brand — light/clean, matches the marketing site
+        paper: '#FFFDF9',
+        ink: '#1A1A1A',
+        brand: '#F26B21',
       },
     },
   },

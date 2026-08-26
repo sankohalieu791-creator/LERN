@@ -1,86 +1,54 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { signIn } from '@/lib/supabase'
-import { Eye, EyeOff } from 'lucide-react'
+import AuthShell from '@/components/v2/AuthShell'
+import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
+import { signIn, getUserProfile } from '@/lib/supabase'
+import { routeForRole } from '@/lib/roleRouting'
+import { useAuth } from '@/context/AuthContext'
 
 export default function LoginPage() {
-  const [email,    setEmail]    = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [show,     setShow]     = useState(false)
-  const [error,    setError]    = useState('')
-  const [loading,  setLoading]  = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const { refreshUser } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-    try {
-      const { error } = await signIn(email, password)
-      if (error) setError(error.message)
-      else router.push('/feed')
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
+    const { data, error: signInError } = await signIn(email.trim(), password)
+    if (signInError || !data.user) {
       setLoading(false)
+      setError(signInError?.message || 'Could not sign in.')
+      return
     }
+    // Role/org routing reads from the verified database row, not
+    // anything client-side — a student can't reach an org view by
+    // guessing a URL, since that destination page checks role itself too.
+    const { data: profile } = await getUserProfile(data.user.id)
+    await refreshUser()
+    setLoading(false)
+    router.replace(routeForRole(profile?.role))
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] flex flex-col items-center justify-center px-6">
-
-      <div className="mb-10 text-center">
-        <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] bg-clip-text text-transparent">LERN</h1>
-      </div>
-
-      <div className="w-full max-w-sm space-y-4">
-        {error && (
-          <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-xl px-4 py-3 text-center">
-            {error}
-          </p>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="Email"
-            required
-            className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.09)] rounded-2xl px-4 py-4 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.22)] transition"
-          />
-
-          <div className="relative">
-            <input
-              type={show ? 'text' : 'password'}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Password"
-              required
-              className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.09)] rounded-2xl px-4 py-4 pr-12 text-white text-sm placeholder-[#444] outline-none focus:border-[rgba(255,255,255,0.22)] transition"
-            />
-            <button type="button" onClick={() => setShow(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#555]">
-              {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || !email || !password}
-            className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold py-4 rounded-2xl disabled:opacity-40 active:scale-[0.98] transition mt-2"
-          >
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
-
-        <p className="text-center text-[#555] text-sm pt-2">
-          Don&apos;t have an account?{' '}
-          <Link href="/auth/signup" className="text-white font-semibold">Sign up</Link>
-        </p>
-      </div>
-    </div>
+    <AuthShell title="Welcome back" subtitle="Log in to your LERN account.">
+      <ErrorBanner message={error} />
+      <form onSubmit={handleSubmit}>
+        <TextField label="Email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" autoFocus />
+        <TextField label="Password" type="password" value={password} onChange={setPassword} placeholder="Your password" />
+        <PrimaryButton type="submit" loading={loading} disabled={!email || !password}>Log in</PrimaryButton>
+      </form>
+      <p className="text-center text-[13px] text-[#8A8373] mt-6">
+        New to LERN?{' '}
+        <button onClick={() => router.push('/auth/start')} className="text-brand font-semibold hover:underline">
+          Sign up
+        </button>
+      </p>
+    </AuthShell>
   )
 }

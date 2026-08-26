@@ -3,6 +3,7 @@
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
+import { routeForRole } from '@/lib/roleRouting'
 
 export default function HomePage() {
   const { user, loading } = useAuth()
@@ -10,13 +11,12 @@ export default function HomePage() {
 
   useEffect(() => {
     if (loading) return
-    if (user) router.replace('/feed')
-    else router.replace('/auth/signup')
+    router.replace(user ? routeForRole(user.role) : '/auth/start')
   }, [user, loading, router])
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-[#333] border-t-[#FF6B2B] rounded-full animate-spin" />
+    <div className="min-h-screen bg-paper flex items-center justify-center">
+      <span className="w-6 h-6 border-2 border-[#E2DDD1] border-t-brand rounded-full animate-spin" />
     </div>
   )
 }

@@ -1,66 +1,32 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/context/AuthContext'
-import { LanguageProvider } from '@/context/LanguageContext'
-import ConditionalNavbar from '@/components/ConditionalNavbar'
-import BottomNav from '@/components/BottomNav'
-import ThemeProvider from '@/components/ThemeProvider'
-import ClientShell from '@/components/ClientShell'
-import PushNotificationSetup from '@/components/PushNotificationSetup'
-import OnboardingTour from '@/components/OnboardingTour'
-import SafetyGate from '@/components/SafetyGate'
-import DobPrompt from '@/components/DobPrompt'
-import AuthGate from '@/components/AuthGate'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 
+// v2 rebuild: desktop/laptop-first, light theme (paper/ink/orange) —
+// the old mobile app-shell chrome (bottom nav, PWA gates, onboarding
+// tour, dark-mode toggle) belonged to the v1 TikTok-style product and
+// doesn't apply here. Removed rather than adapted, per the "start
+// fresh on app structure" direction.
 export const metadata: Metadata = {
   title: 'LERN',
-  description: 'Live Social Learning Platform',
-  manifest: '/manifest.json',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'LERN',
-  },
+  description: 'Verified work, safely.',
 }
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  viewportFit: 'cover',
-  themeColor: '#0f0f0f',
+  themeColor: '#FFFDF9',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <head>
-        <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
-        <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-      </head>
-      <body>
-        <LanguageProvider>
+    <html lang="en">
+      <body className="bg-paper text-ink">
         <AuthProvider>
-          <AuthGate />
-          <ThemeProvider />
-          <PushNotificationSetup />
-          <ConditionalNavbar />
-          <ClientShell>
-            {children}
-          </ClientShell>
-          <BottomNav />
-          <SafetyGate />
-          <DobPrompt />
-          <OnboardingTour />
+          {children}
         </AuthProvider>
-        </LanguageProvider>
         <Analytics />
         <SpeedInsights />
       </body>
