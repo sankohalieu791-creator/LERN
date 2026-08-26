@@ -2,73 +2,25 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import DashboardShell from '@/components/v2/DashboardShell'
-import { supabase, generateJoinCode, revokeJoinCode, listJoinCodes } from '@/lib/supabase'
-import type { Organisation, JoinCode } from '@/lib/types'
-import BriefsPanel from '@/components/v2/BriefsPanel'
-import ReviewQueuePanel from '@/components/v2/ReviewQueuePanel'
+import { generateJoinCode, revokeJoinCode, listJoinCodes } from '@/lib/supabase'
+import type { JoinCode } from '@/lib/types'
 import { Copy, Check, Ban } from 'lucide-react'
 
-type Tab = 'review' | 'briefs' | 'codes'
-
-export default function OrgDashboard() {
-  const { user } = useAuth()
-  const [org, setOrg] = useState<Organisation | null>(null)
-  const [tab, setTab] = useState<Tab>('review')
-
-  useEffect(() => {
-    if (!user?.organisation_id) return
-    supabase.from('organisations').select('*').eq('id', user.organisation_id).single()
-      .then(({ data }) => setOrg(data))
-  }, [user?.organisation_id])
-
-  return (
-    <DashboardShell orgName={org?.name}>
-      <h1 className="text-2xl font-bold text-ink mb-1">{org?.name || 'Your organisation'}</h1>
-      <p className="text-[#6B6558] mb-8">
-        {org?.safeguarding_lead_id === user?.id
-          ? "You're the safeguarding lead — every review here is logged and visible to you."
-          : 'Organisation dashboard.'}
-      </p>
-
-      <div className="flex gap-1 mb-6 border-b border-[#EDE9E1]">
-        {([['review', 'Review queue'], ['briefs', 'Briefs & courses'], ['codes', 'Join codes']] as [Tab, string][]).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`px-4 py-2.5 text-[14px] font-semibold border-b-2 -mb-px transition ${
-              tab === key ? 'text-ink border-brand' : 'text-[#8A8373] border-transparent hover:text-ink'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6">
-        {tab === 'review' && <ReviewQueuePanel />}
-        {tab === 'briefs' && <BriefsPanel />}
-        {tab === 'codes' && <JoinCodesPanel organisationId={org?.id} />}
-      </div>
-    </DashboardShell>
-  )
-}
-
-function JoinCodesPanel({ organisationId }: { organisationId?: string }) {
+export default function JoinCodesPanel() {
   const { user } = useAuth()
   const [codes, setCodes] = useState<JoinCode[]>([])
   const [generating, setGenerating] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!organisationId) return
-    listJoinCodes(organisationId).then(({ data }) => setCodes(data || []))
-  }, [organisationId])
+    if (!user?.organisation_id) return
+    listJoinCodes(user.organisation_id).then(({ data }) => setCodes(data || []))
+  }, [user?.organisation_id])
 
   const handleGenerate = async () => {
-    if (!organisationId || !user) return
+    if (!user?.organisation_id) return
     setGenerating(true)
-    const { data } = await generateJoinCode(organisationId, user.id, null)
+    const { data } = await generateJoinCode(user.organisation_id, user.id, null)
     setGenerating(false)
     if (data) setCodes(prev => [data as JoinCode, ...prev])
   }

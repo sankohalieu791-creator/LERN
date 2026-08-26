@@ -196,6 +196,41 @@ export const setShareVisibility = async (verificationId: string, visibility: 'or
   return { error }
 }
 
+// Institution "Students" section: the org's students with a rollup of
+// their submitted/verified work counts (enrolment + progress; attendance
+// tracking isn't built yet).
+export const getOrgStudents = async (organisationId: string) => {
+  const { data: students, error } = await supabase
+    .from('users')
+    .select('id, full_name, email, created_at')
+    .eq('organisation_id', organisationId)
+    .eq('role', 'student')
+    .order('full_name')
+  if (error || !students) return { data: null, error }
+
+  const ids = students.map(s => s.id)
+  const { data: subs } = ids.length
+    ? await supabase.from('submissions').select('student_id, status').in('student_id', ids)
+    : { data: [] as any[] }
+
+  const counts: Record<string, { submitted: number; verified: number }> = {}
+  for (const s of subs || []) {
+    counts[s.student_id] ??= { submitted: 0, verified: 0 }
+    counts[s.student_id].submitted++
+    if (s.status === 'verified') counts[s.student_id].verified++
+  }
+
+  return { data: students.map(s => ({ ...s, ...(counts[s.id] || { submitted: 0, verified: 0 }) })), error: null }
+}
+
+// Sidebar collapsed/expanded state — remembered server-side per the org
+// layout spec, not browser-only (localStorage), so it follows the user
+// across devices/logins.
+export const setSidebarCollapsed = async (userId: string, collapsed: boolean) => {
+  const { error } = await supabase.from('users').update({ sidebar_collapsed: collapsed }).eq('id', userId)
+  return { error }
+}
+
 // Users
 export const createUserProfile = async (userId: string, username: string, email: string) => {
   const { data, error } = await supabase

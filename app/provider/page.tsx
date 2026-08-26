@@ -1,12 +1,10 @@
 'use client'
 
-import RoleGate from '@/components/v2/RoleGate'
-import OrgDashboard from '@/components/v2/OrgDashboard'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
-export default function ProviderPage() {
-  return (
-    <RoleGate allow="provider_staff">
-      <OrgDashboard />
-    </RoleGate>
-  )
+export default function ProviderRootPage() {
+  const router = useRouter()
+  useEffect(() => { router.replace('/provider/dashboard') }, [router])
+  return null
 }

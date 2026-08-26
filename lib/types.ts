@@ -12,6 +12,7 @@ export interface User {
   email: string
   date_of_birth?: string
   organisation_id?: string
+  sidebar_collapsed?: boolean
   created_at: string
 }
 
