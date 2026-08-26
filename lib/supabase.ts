@@ -97,6 +97,105 @@ export const revokeJoinCode = async (codeId: string) => {
   return { error }
 }
 
+// ── Verify loop (v2) ────────────────────────────────────────────
+
+// Org staff: briefs/courses they've set for their organisation.
+export const getWorkItems = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('work_items')
+    .select('*')
+    .eq('organisation_id', organisationId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const createWorkItem = async (
+  organisationId: string, createdBy: string,
+  fields: { type: 'brief' | 'course' | 'workshop'; title: string; description?: string; criteria: string; visibility?: 'public' | 'private' }
+) => {
+  const { data, error } = await supabase
+    .from('work_items')
+    .insert([{ organisation_id: organisationId, created_by: createdBy, visibility: 'private', ...fields }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+// Student: every work item their own organisation has open to them.
+export const getVisibleWorkItems = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('work_items')
+    .select('*')
+    .eq('organisation_id', organisationId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// Student: every submission they've made, most recent first, with the
+// work item's title/criteria and (if verified) the tick's details.
+export const getMySubmissions = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('submissions')
+    .select('*, work_items(title, criteria), verifications(id, verified_by, verified_at, visibility, revoked_at)')
+    .eq('student_id', studentId)
+    .order('submitted_at', { ascending: false })
+  return { data, error }
+}
+
+export const submitWork = async (studentId: string, workItemId: string, content: string) => {
+  const { data, error } = await supabase
+    .from('submissions')
+    .insert([{ student_id: studentId, work_item_id: workItemId, content }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+// Org staff: everything submitted against their org's work items,
+// newest first — the review queue.
+export const getReviewQueue = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('submissions')
+    .select('*, users(full_name), work_items!inner(title, criteria, organisation_id)')
+    .eq('work_items.organisation_id', organisationId)
+    .order('submitted_at', { ascending: false })
+  return { data, error }
+}
+
+// The one write that drives the whole loop — see handle_review_decision()
+// in the DB: this single insert cascades to submissions.status, a
+// verifications row (or its revoke fields), and a notification, all in
+// the same transaction.
+export const submitReview = async (
+  submissionId: string, reviewerId: string, decision: 'verified' | 'returned' | 'revoked', feedback: string
+) => {
+  const { data, error } = await supabase
+    .from('reviews')
+    .insert([{ submission_id: submissionId, reviewer_id: reviewerId, decision, feedback: feedback || null }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const setModeration = async (submissionId: string, status: 'clear' | 'flagged' | 'hidden', reason?: string) => {
+  const { error } = await supabase
+    .from('submissions')
+    .update({ moderation_status: status, flagged_reason: reason || null })
+    .eq('id', submissionId)
+  return { error }
+}
+
+// Student: choose who can see a piece of verified work. The DB trigger
+// is the actual enforcement — under-18 is rejected there regardless of
+// what's sent here, this just surfaces that outcome to the caller.
+export const setShareVisibility = async (verificationId: string, visibility: 'organisation' | 'public') => {
+  const { error } = await supabase
+    .from('verifications')
+    .update({ visibility })
+    .eq('id', verificationId)
+  return { error }
+}
+
 // Users
 export const createUserProfile = async (userId: string, username: string, email: string) => {
   const { data, error } = await supabase
