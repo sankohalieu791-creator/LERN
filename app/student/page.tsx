@@ -4,6 +4,7 @@ import { useState } from 'react'
 import RoleGate from '@/components/v2/RoleGate'
 import DashboardShell from '@/components/v2/DashboardShell'
 import MyWorkPanel from '@/components/v2/MyWorkPanel'
+import FeedPanel from '@/components/v2/FeedPanel'
 import { useAuth } from '@/context/AuthContext'
 
 type Tab = 'work' | 'feed' | 'profile'
@@ -36,9 +37,10 @@ function StudentHome() {
           <MyWorkPanel />
         </div>
       )}
-      {tab !== 'work' && (
+      {tab === 'feed' && <FeedPanel />}
+      {tab === 'profile' && (
         <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6 h-40 flex items-center justify-center">
-          <span className="text-[#A39C8A] font-semibold capitalize">{tab} — coming next</span>
+          <span className="text-[#A39C8A] font-semibold capitalize">Profile — coming next</span>
         </div>
       )}
     </DashboardShell>

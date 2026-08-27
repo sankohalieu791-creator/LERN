@@ -1,7 +1,7 @@
 'use client'
 
-import ComingSoon from '@/components/v2/ComingSoon'
+import FeedPanel from '@/components/v2/FeedPanel'
 
 export default function InstitutionFeedPage() {
-  return <ComingSoon title="Feed" />
+  return <FeedPanel />
 }

@@ -5,7 +5,8 @@ import { useAuth } from '@/context/AuthContext'
 import { getVisibleWorkItems, getMySubmissions, submitWork, uploadSubmissionFile, setShareVisibility, getSignedFileUrl } from '@/lib/supabase'
 import { PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
 import type { WorkItem, Submission } from '@/lib/types'
-import { CheckCircle2, Clock, RotateCcw, Ban, Globe, Users, Paperclip, X } from 'lucide-react'
+import { CheckCircle2, Clock, RotateCcw, Ban, Globe, Users, Paperclip, X, Video, MapPin } from 'lucide-react'
+import WorkshopSession from '@/components/v2/WorkshopSession'
 
 const STATUS: Record<string, { label: string; cls: string; icon: any }> = {
   submitted: { label: 'Awaiting review', cls: 'bg-[#FFF3E4] text-[#B3651E]', icon: Clock },
@@ -69,6 +70,7 @@ function WorkItemCard({
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [inSession, setInSession] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const status = latest ? STATUS[latest.status] : null
   const canSubmit = !latest || latest.status === 'returned'
@@ -110,6 +112,22 @@ function WorkItemCard({
         <div className="px-4 pb-4 border-t border-[#EDE9E1] pt-4">
           <p className="text-[12px] font-semibold text-[#8A8373] uppercase tracking-wide mb-1">Criteria</p>
           <p className="text-[13px] text-[#4A453B] mb-4">{item.criteria}</p>
+
+          {item.type === 'workshop' && (
+            <div className="mb-4">
+              {item.mode === 'online' ? (
+                <button
+                  onClick={() => setInSession(true)}
+                  className="flex items-center gap-1.5 bg-[#1E7A34] text-white font-semibold text-[13px] px-4 py-2 rounded-lg hover:bg-[#186229] transition"
+                >
+                  <Video className="w-4 h-4" /> Join session
+                </button>
+              ) : item.location && (
+                <p className="flex items-center gap-1.5 text-[13px] text-[#6B6558]"><MapPin className="w-4 h-4" /> {item.location}</p>
+              )}
+            </div>
+          )}
+          {inSession && <WorkshopSession workItemId={item.id} title={item.title} onClose={() => setInSession(false)} />}
 
           {allSubs.length > 0 && (
             <div className="space-y-2 mb-4">

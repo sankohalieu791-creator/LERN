@@ -7,8 +7,9 @@ import {
   uploadWorkItemAttachment, uploadSubmissionFileFor, submitWorkForStudents, getSignedFileUrl,
 } from '@/lib/supabase'
 import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
+import WorkshopSession from '@/components/v2/WorkshopSession'
 import type { WorkItem, Group } from '@/lib/types'
-import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2 } from 'lucide-react'
+import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin } from 'lucide-react'
 
 type ItemType = 'brief' | 'course' | 'workshop'
 
@@ -76,6 +77,7 @@ export default function WorkItemsPanel({ type }: { type: ItemType }) {
 
 function WorkItemCard({ item }: { item: any }) {
   const attachments = item.work_item_attachments || []
+  const [inSession, setInSession] = useState(false)
   return (
     <div className="border border-[#EDE9E1] rounded-xl px-4 py-3.5">
       <div className="flex items-center justify-between mb-1">
@@ -92,12 +94,27 @@ function WorkItemCard({ item }: { item: any }) {
           <span className="flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Due {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
         )}
         <span className="flex items-center gap-1"><Users2 className="w-3.5 h-3.5" /> {item.groups?.name || 'Whole organisation'}</span>
+        {item.type === 'workshop' && item.mode === 'online' && (
+          <span className="flex items-center gap-1 text-[#1E7A34] font-semibold"><Video className="w-3.5 h-3.5" /> Online</span>
+        )}
+        {item.type === 'workshop' && item.mode === 'in_person' && (
+          <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {item.location || 'In person'}</span>
+        )}
       </div>
+      {item.type === 'workshop' && item.mode === 'online' && (
+        <button
+          onClick={() => setInSession(true)}
+          className="flex items-center gap-1.5 bg-[#1E7A34] text-white font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3 hover:bg-[#186229] transition"
+        >
+          <Video className="w-3.5 h-3.5" /> Start / join session
+        </button>
+      )}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2.5 border-t border-[#EDE9E1]">
           {attachments.map((a: any) => <AttachmentChip key={a.id} attachment={a} />)}
         </div>
       )}
+      {inSession && <WorkshopSession workItemId={item.id} title={item.title} onClose={() => setInSession(false)} />}
     </div>
   )
 }
@@ -227,6 +244,8 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
   const [description, setDescription] = useState('')
   const [criteria, setCriteria] = useState('')
   const [visibility, setVisibility] = useState<'public' | 'private'>('private')
+  const [mode, setMode] = useState<'online' | 'in_person'>('online')
+  const [location, setLocation] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -234,15 +253,17 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
     setError('')
     if (!title.trim()) return setError('Give it a title.')
     if (!criteria.trim()) return setError('Criteria is required — this is what the tutor checks the work against, and what makes the green tick mean something.')
+    if (type === 'workshop' && mode === 'in_person' && !location.trim()) return setError('Add where the workshop is happening.')
     if (!user?.organisation_id) return
 
     setLoading(true)
     const { error: createError } = await createWorkItem(user.organisation_id, user.id, {
       type, title: title.trim(), description: description.trim() || undefined, criteria: criteria.trim(), visibility,
+      ...(type === 'workshop' ? { mode, location: mode === 'in_person' ? location.trim() : undefined } : {}),
     })
     setLoading(false)
     if (createError) return setError(createError.message)
-    setTitle(''); setDescription(''); setCriteria('')
+    setTitle(''); setDescription(''); setCriteria(''); setLocation('')
     onCreated()
   }
 
@@ -257,6 +278,31 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
         placeholder="e.g. Original, scalable to 16px, with a one-paragraph rationale"
         hint="Visible to students too. This is what a tutor checks the work against when they verify it."
       />
+      {type === 'workshop' && (
+        <label className="block mb-4">
+          <span className="block text-[13px] font-semibold text-ink mb-1.5">Where</span>
+          <div className="flex gap-2 mb-2">
+            {(['online', 'in_person'] as const).map(m => (
+              <button
+                key={m} type="button" onClick={() => setMode(m)}
+                className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${
+                  mode === m ? 'bg-brand text-white' : 'bg-white border border-[#E2DDD1] text-[#6B6558]'
+                }`}
+              >
+                {m === 'online' ? 'Online' : 'In person'}
+              </button>
+            ))}
+          </div>
+          {mode === 'in_person' ? (
+            <input
+              value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Room 4B, main campus"
+              className="w-full bg-white border border-[#E2DDD1] rounded-lg px-3 py-2.5 text-[13px] text-ink placeholder-[#A39C8A] outline-none focus:border-brand transition"
+            />
+          ) : (
+            <p className="text-[12px] text-[#8A8373]">A live video room is created automatically — everyone joins from the workshop card.</p>
+          )}
+        </label>
+      )}
       <label className="block mb-5">
         <span className="block text-[13px] font-semibold text-ink mb-1.5">Visibility</span>
         <div className="flex gap-2">

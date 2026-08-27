@@ -5,6 +5,18 @@
 export type Role = 'student' | 'institution_staff' | 'provider_staff' | 'employer'
 export type OrgType = 'institution' | 'provider'
 
+export type ReactionType = 'congratulations' | 'well_done' | 'keep_going' | 'thumbs_up' | 'celebrate_lern'
+
+export interface Post {
+  id: string
+  organisation_id: string
+  author_id: string
+  content?: string
+  image_path?: string
+  visibility: 'organisation' | 'public'
+  created_at: string
+}
+
 export interface User {
   id: string
   role: Role
@@ -62,6 +74,8 @@ export interface WorkItem {
   assignment?: string
   deadline?: string
   group_id?: string
+  mode?: 'online' | 'in_person'
+  location?: string
   criteria: string
   visibility: 'public' | 'private'
   created_by?: string

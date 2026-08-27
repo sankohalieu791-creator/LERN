@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import { signOut } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
+import Logo from '@/components/v2/Logo'
 
 export default function DashboardShell({ orgName, children }: { orgName?: string | null; children: React.ReactNode }) {
   const { user } = useAuth()
@@ -18,7 +19,7 @@ export default function DashboardShell({ orgName, children }: { orgName?: string
     <div className="min-h-screen bg-paper">
       <header className="border-b border-[#EDE9E1] px-10 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-xl font-bold tracking-tight text-ink">LERN</span>
+          <Logo />
           {orgName && (
             <>
               <span className="text-[#C9C2B2]">/</span>

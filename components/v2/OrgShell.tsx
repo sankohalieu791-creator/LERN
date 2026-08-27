@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { setSidebarCollapsed, signOut, supabase } from '@/lib/supabase'
 import { ChevronLeft, ChevronRight, Bell, Settings, User as UserIcon, Plus, LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import Logo from '@/components/v2/Logo'
 
 export interface NavItem { key: string; label: string; icon: LucideIcon; href: string }
 
@@ -53,7 +54,7 @@ export default function OrgShell({
       {/* ── Laptop sidebar ── */}
       <aside className={`hidden lg:flex flex-col border-r border-[#EDE9E1] bg-white transition-[width] duration-150 flex-shrink-0 ${collapsed ? 'w-[72px]' : 'w-60'}`}>
         <div className={`flex items-center h-16 px-4 flex-shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>
-          {!collapsed && <span className="text-lg font-bold text-ink">LERN</span>}
+          {!collapsed && <Logo />}
           <button
             onClick={toggleCollapsed}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -81,7 +82,7 @@ export default function OrgShell({
       <div className="flex-1 min-w-0 flex flex-col">
         {/* ── Top bar ── */}
         <header className="flex items-center justify-between h-16 px-5 lg:px-8 border-b border-[#EDE9E1] flex-shrink-0">
-          <div className="lg:hidden font-bold text-ink">LERN</div>
+          <div className="lg:hidden"><Logo size="sm" /></div>
           <div className="hidden lg:block text-[14px] font-semibold text-[#6B6558] truncate">{orgName}</div>
           <div className="flex items-center gap-1">
             <button aria-label="Notifications" className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#F5F1E8] text-[#6B6558] transition">
@@ -125,7 +126,10 @@ export default function OrgShell({
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#EDE9E1] flex items-center justify-around h-16 z-10">
         <PhoneNavItem item={phoneItems[0]} active={isActive(phoneItems[0].href)} />
         <PhoneNavItem item={phoneItems[1]} active={isActive(phoneItems[1].href)} />
-        <button aria-label="Post" className="w-11 h-11 rounded-full bg-brand text-white flex items-center justify-center -mt-1 flex-shrink-0">
+        <button
+          aria-label="Post" onClick={() => router.push(phoneItems[0].href)}
+          className="w-11 h-11 rounded-full bg-brand text-white flex items-center justify-center -mt-1 flex-shrink-0"
+        >
           <Plus className="w-5 h-5" />
         </button>
         <PhoneNavItem item={phoneItems[2]} active={isActive(phoneItems[2].href)} />

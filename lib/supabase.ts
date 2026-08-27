@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import type { ReactionType } from '@/lib/types'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -114,6 +115,7 @@ export const createWorkItem = async (
   fields: {
     type: 'brief' | 'course' | 'workshop'; title: string; description?: string; criteria: string
     visibility?: 'public' | 'private'; topic?: string; assignment?: string; deadline?: string | null; group_id?: string | null
+    mode?: 'online' | 'in_person'; location?: string
   }
 ) => {
   const { data, error } = await supabase
@@ -149,7 +151,7 @@ export const getWorkItemAttachments = async (workItemId: string) => {
 
 // Both submission-files and work-item-attachments are private buckets --
 // a signed URL is the only way to actually view/download an object.
-export const getSignedFileUrl = async (bucket: 'submission-files' | 'work-item-attachments', path: string) => {
+export const getSignedFileUrl = async (bucket: 'submission-files' | 'work-item-attachments' | 'post-images', path: string) => {
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600)
   return { url: data?.signedUrl ?? null, error }
 }
@@ -418,4 +420,53 @@ export const updateUserProfile = async (userId: string, updates: any) => {
     return { data: null, error: { message: 'Could not save profile — please sign out and back in, then try again.' } as any }
   }
   return { data, error }
+}
+
+// ── Feed ──────────────────────────────────────────────────────
+// Org-wide + any public posts, newest first. RLS already narrows this to
+// what the caller's allowed to see.
+export const getFeed = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('posts')
+    .select('*, users(full_name, role), post_reactions(id, user_id, reaction)')
+    .or(`organisation_id.eq.${organisationId},visibility.eq.public`)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  return { data, error }
+}
+
+export const uploadPostImage = async (userId: string, file: File) => {
+  const path = `${userId}/${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from('post-images').upload(path, file)
+  return { path: error ? null : path, error }
+}
+
+export const createPost = async (
+  organisationId: string, authorId: string,
+  fields: { content?: string; image_path?: string; visibility?: 'organisation' | 'public' }
+) => {
+  const { data, error } = await supabase
+    .from('posts')
+    .insert([{ organisation_id: organisationId, author_id: authorId, visibility: 'organisation', ...fields }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const deletePost = async (postId: string) => {
+  const { error } = await supabase.from('posts').delete().eq('id', postId)
+  return { error }
+}
+
+// One reaction per user per post — upsert swaps it if they tap a
+// different one, and tapping the same one again removes it.
+export const setPostReaction = async (postId: string, userId: string, reaction: ReactionType | null) => {
+  if (reaction === null) {
+    const { error } = await supabase.from('post_reactions').delete().eq('post_id', postId).eq('user_id', userId)
+    return { error }
+  }
+  const { error } = await supabase
+    .from('post_reactions')
+    .upsert([{ post_id: postId, user_id: userId, reaction }], { onConflict: 'post_id,user_id' })
+  return { error }
 }

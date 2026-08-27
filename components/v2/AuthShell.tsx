@@ -1,5 +1,7 @@
 'use client'
 
+import Logo from '@/components/v2/Logo'
+
 // Shared layout for every auth/onboarding screen: desktop/laptop-first
 // (generous centered column, not a mobile card), paper/ink/orange theme.
 export default function AuthShell({
@@ -15,7 +17,7 @@ export default function AuthShell({
   return (
     <div className="min-h-screen bg-paper flex flex-col">
       <header className="flex-shrink-0 px-10 py-7">
-        <span className="text-xl font-bold tracking-tight text-ink">LERN</span>
+        <Logo />
       </header>
 
       <main className="flex-1 flex items-start justify-center px-6 pb-20">
