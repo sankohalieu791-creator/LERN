@@ -113,6 +113,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+-- ── Briefs, properly: topic, assignment text, deadline, group targeting ──
+-- (must come before the work_items RLS policy below, which reads group_id)
+ALTER TABLE public.work_items ADD COLUMN IF NOT EXISTS topic TEXT;
+ALTER TABLE public.work_items ADD COLUMN IF NOT EXISTS assignment TEXT;
+ALTER TABLE public.work_items ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
+ALTER TABLE public.work_items ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES public.groups(id) ON DELETE SET NULL;
+
 -- A work_item assigned to a specific group should only be visible to
 -- students in that group -- staff still see everything in their org
 -- regardless of group, since they manage all of it.
@@ -127,12 +134,6 @@ CREATE POLICY "work_items: org member read" ON public.work_items FOR SELECT
       AND (group_id IS NULL OR group_id = (SELECT group_id FROM public.users WHERE id = auth.uid()))
     )
   );
-
--- ── Briefs, properly: topic, assignment text, deadline, group targeting ──
-ALTER TABLE public.work_items ADD COLUMN IF NOT EXISTS topic TEXT;
-ALTER TABLE public.work_items ADD COLUMN IF NOT EXISTS assignment TEXT;
-ALTER TABLE public.work_items ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
-ALTER TABLE public.work_items ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES public.groups(id) ON DELETE SET NULL;
 
 -- ── Brief attachments (slides, docs, resources the tutor attaches) ──
 CREATE TABLE IF NOT EXISTS public.work_item_attachments (
