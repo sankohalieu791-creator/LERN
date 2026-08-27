@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
-import { signUp, redeemJoinCode, recordConsent, getUserProfile, supabase } from '@/lib/supabase'
+import { signUp, signIn, redeemJoinCode, recordConsent, getUserProfile, supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { ShieldCheck } from 'lucide-react'
 
@@ -38,24 +38,27 @@ export default function StudentSignupPage() {
   // A2
   const [code, setCode] = useState('')
 
-  // Resume an unfinished signup instead of re-running it -- a returning
-  // visitor who already has a session (created an account but never
-  // entered a join code, or never accepted the safeguarding step) would
-  // otherwise hit "User already registered" retrying step 1, or get
-  // dumped on an empty dashboard by RoleGate. Land them back on whichever
-  // step they actually still need.
+  // Resume an unfinished signup instead of re-running it -- e.g. an account
+  // was created but never got a join code or never accepted the
+  // safeguarding step. Returns true if it actually found and resumed a
+  // student profile, false otherwise (caller decides what to do next).
+  const resumeFromSession = async (authUser: { id: string }) => {
+    const { data: profile } = await getUserProfile(authUser.id)
+    if (!profile || profile.role !== 'student') return false
+    setFullName(profile.full_name || '')
+    setEmail(profile.email || '')
+    setDob(profile.date_of_birth || '')
+    if (!profile.organisation_id) setStep(2)
+    else if (!profile.consented_at) setStep(3)
+    else router.replace('/student')
+    return true
+  }
+
+  // Covers a returning visitor who still has this browser's session live.
   useEffect(() => {
     (async () => {
       const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (!authUser) return
-      const { data: profile } = await getUserProfile(authUser.id)
-      if (!profile || profile.role !== 'student') return
-      setFullName(profile.full_name || '')
-      setEmail(profile.email || '')
-      setDob(profile.date_of_birth || '')
-      if (!profile.organisation_id) setStep(2)
-      else if (!profile.consented_at) setStep(3)
-      else router.replace('/student')
+      if (authUser) await resumeFromSession(authUser)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -71,9 +74,25 @@ export default function StudentSignupPage() {
     const { error: signUpError } = await signUp(email.trim(), password, {
       role: 'student', full_name: fullName.trim(), date_of_birth: dob,
     })
+    if (!signUpError) { setLoading(false); setStep(2); return }
+
+    // "Already registered" doesn't necessarily mean someone else's email --
+    // it's very often the same person coming back to an unfinished signup
+    // in a new tab/session with no live token to detect above. Try signing
+    // them in with what they just typed instead of dead-ending on an error
+    // they have no way to act on.
+    if (signUpError.message?.toLowerCase().includes('already registered')) {
+      const { data: signInData, error: signInError } = await signIn(email.trim(), password)
+      if (!signInError && signInData?.user && await resumeFromSession(signInData.user)) {
+        setLoading(false)
+        return
+      }
+      setLoading(false)
+      return setError('An account already exists for this email. If that’s you, double-check the password above, or log in instead.')
+    }
+
     setLoading(false)
-    if (signUpError) return setError(signUpError.message)
-    setStep(2)
+    setError(signUpError.message)
   }
 
   const handleA2Submit = async () => {

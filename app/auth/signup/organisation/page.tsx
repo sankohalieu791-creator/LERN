@@ -4,7 +4,7 @@ import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
-import { signUp, createOrganisationAndJoin, recordConsent, generateJoinCode, supabase } from '@/lib/supabase'
+import { signUp, signIn, createOrganisationAndJoin, recordConsent, generateJoinCode, getUserProfile, supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { ShieldCheck, Copy, Check } from 'lucide-react'
 
@@ -43,9 +43,33 @@ function OrganisationSignupInner() {
     const { error: signUpError } = await signUp(email.trim(), password, { role: 'student', full_name: fullName.trim() })
     // role is a placeholder here — create_organisation_and_join (step O1->O3)
     // overwrites it to institution_staff/provider_staff once the org exists.
-    if (signUpError) { setLoading(false); return setError(signUpError.message) }
+    if (!signUpError) { setLoading(false); setStep(2); return }
+
+    // Same class of bug as the student wizard: someone coming back to an
+    // unfinished org signup with no live session hits "already registered"
+    // on step 1 with no way forward. Try signing them in with what they
+    // just typed and resume from wherever they actually got to.
+    if (signUpError.message?.toLowerCase().includes('already registered')) {
+      const { data: signInData, error: signInError } = await signIn(email.trim(), password)
+      if (!signInError && signInData?.user) {
+        const { data: profile } = await getUserProfile(signInData.user.id)
+        if (profile?.organisation_id && (profile.role === 'institution_staff' || profile.role === 'provider_staff')) {
+          router.replace(profile.role === 'institution_staff' ? '/institution' : '/provider')
+          return
+        }
+        if (profile?.role === 'student' && !profile.organisation_id) {
+          setFullName(profile.full_name || fullName)
+          setLoading(false)
+          setStep(2)
+          return
+        }
+      }
+      setLoading(false)
+      return setError('An account already exists for this email. If that’s you, double-check the password above, or log in instead.')
+    }
+
     setLoading(false)
-    setStep(2)
+    setError(signUpError.message)
   }
 
   const handleAgreement = async (accepted: boolean) => {
