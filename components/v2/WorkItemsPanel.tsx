@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getWorkItems, createWorkItem } from '@/lib/supabase'
+import { getWorkItems, createWorkItem, getOrgStudents, submitWorkForStudents } from '@/lib/supabase'
 import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
 import type { WorkItem } from '@/lib/types'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, Check } from 'lucide-react'
 
 type ItemType = 'brief' | 'course' | 'workshop'
 
@@ -48,7 +48,11 @@ export default function WorkItemsPanel({ type }: { type: ItemType }) {
         </button>
       </div>
 
-      {showCreate && <CreateWorkItemForm type={type} onCreated={() => { setShowCreate(false); load() }} />}
+      {showCreate && (
+        type === 'brief'
+          ? <CreateBriefForm onCreated={() => { setShowCreate(false); load() }} />
+          : <CreateWorkItemForm type={type} onCreated={() => { setShowCreate(false); load() }} />
+      )}
 
       {loading ? (
         <p className="text-[#8A8373] text-[14px]">Loading…</p>
@@ -130,6 +134,124 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
         </div>
       </label>
       <PrimaryButton onClick={handleSubmit} loading={loading}>Create</PrimaryButton>
+    </div>
+  )
+}
+
+type BriefMode = 'new' | 'existing'
+
+// Briefs' "two ways": set a new brief (the normal flow above), or upload
+// coursework/exam work students already produced elsewhere and mark it
+// for verification directly — no new marking, straight into the review
+// queue as a submission ready to check against criteria.
+function CreateBriefForm({ onCreated }: { onCreated: () => void }) {
+  const [mode, setMode] = useState<BriefMode>('new')
+  return (
+    <div className="mb-5">
+      <div className="flex gap-2 mb-3">
+        {([['new', 'Set a new brief'], ['existing', 'Upload work students already do']] as [BriefMode, string][]).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setMode(key)}
+            className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${
+              mode === key ? 'bg-brand text-white' : 'bg-white border border-[#E2DDD1] text-[#6B6558]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === 'new'
+        ? <CreateWorkItemForm type="brief" onCreated={onCreated} />
+        : <UploadExistingWorkForm onCreated={onCreated} />}
+    </div>
+  )
+}
+
+function UploadExistingWorkForm({ onCreated }: { onCreated: () => void }) {
+  const { user } = useAuth()
+  const [title, setTitle] = useState('')
+  const [criteria, setCriteria] = useState('')
+  const [content, setContent] = useState('')
+  const [students, setStudents] = useState<any[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!user?.organisation_id) return
+    getOrgStudents(user.organisation_id).then(({ data }) => setStudents(data || []))
+  }, [user?.organisation_id])
+
+  const toggle = (id: string) => setSelected(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const handleSubmit = async () => {
+    setError('')
+    if (!title.trim()) return setError('Give it a title.')
+    if (!criteria.trim()) return setError('Criteria is required — this is what makes the tick mean something.')
+    if (!content.trim()) return setError('Describe or reference the existing work being marked.')
+    if (selected.size === 0) return setError('Select at least one student this work belongs to.')
+    if (!user?.organisation_id) return
+
+    setLoading(true)
+    const { data: workItem, error: createError } = await createWorkItem(user.organisation_id, user.id, {
+      type: 'brief', title: title.trim(), criteria: criteria.trim(), visibility: 'private',
+    })
+    if (createError || !workItem) { setLoading(false); return setError(createError?.message || 'Could not create the brief.') }
+
+    const { error: submitError } = await submitWorkForStudents(Array.from(selected), (workItem as any).id, content.trim())
+    setLoading(false)
+    if (submitError) return setError(`Brief created, but attaching the work failed: ${submitError.message}`)
+    setTitle(''); setCriteria(''); setContent(''); setSelected(new Set())
+    onCreated()
+  }
+
+  return (
+    <div className="bg-[#FBF9F4] border border-[#EDE9E1] rounded-xl p-5">
+      <ErrorBanner message={error} />
+      <TextField label="Title" value={title} onChange={setTitle} placeholder="Year 11 Coursework — Unit 3" autoFocus />
+      <TextField
+        label="Criteria — what success looks like"
+        value={criteria} onChange={setCriteria}
+        placeholder="e.g. Meets the exam board's grade 5+ descriptor"
+        hint="What a tutor checks the existing work against when they verify it."
+      />
+      <TextField
+        label="The existing work"
+        value={content} onChange={setContent}
+        placeholder="Describe or reference the coursework/exam work being marked (a link, file reference, or summary)"
+        hint="This already happened outside LERN — no new marking, just verification."
+      />
+      <label className="block mb-5">
+        <span className="block text-[13px] font-semibold text-ink mb-1.5">Which students is this for?</span>
+        {students.length === 0 ? (
+          <p className="text-[13px] text-[#8A8373]">No students have joined yet.</p>
+        ) : (
+          <div className="max-h-48 overflow-y-auto border border-[#E2DDD1] rounded-lg divide-y divide-[#EDE9E1]">
+            {students.map(s => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => toggle(s.id)}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 text-left hover:bg-white transition"
+              >
+                <span className="text-[13px] text-ink">{s.full_name}</span>
+                <span className={`w-4.5 h-4.5 rounded flex items-center justify-center flex-shrink-0 ${
+                  selected.has(s.id) ? 'bg-brand text-white' : 'border border-[#C9C2B2]'
+                }`}>
+                  {selected.has(s.id) && <Check className="w-3 h-3" />}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </label>
+      <PrimaryButton onClick={handleSubmit} loading={loading}>Create and send to review</PrimaryButton>
     </div>
   )
 }

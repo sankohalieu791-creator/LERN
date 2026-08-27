@@ -151,14 +151,45 @@ export const submitWork = async (studentId: string, workItemId: string, content:
   return { data, error }
 }
 
-// Org staff: everything submitted against their org's work items,
-// newest first — the review queue.
+// Briefs "Upload existing work" — org staff attach coursework a student (or
+// several) already produced elsewhere as a submission ready to verify,
+// skipping the "student submits it themselves" step. Same submissions
+// table/RLS-checked insert as submitWork, just with student_id set to
+// someone other than the caller — allowed by the org-staff insert policy
+// in 2026-08-27-org-sections-build.sql. One insert per student so a
+// moderation/review decision on one doesn't affect the others.
+export const submitWorkForStudents = async (studentIds: string[], workItemId: string, content: string) => {
+  const { data, error } = await supabase
+    .from('submissions')
+    .insert(studentIds.map(student_id => ({ student_id, work_item_id: workItemId, content })))
+    .select()
+  return { data, error }
+}
+
+// Org staff: everything submitted against their org's work items, oldest
+// first — the review queue works oldest-waiting-first so nothing sits
+// forgotten at the bottom.
 export const getReviewQueue = async (organisationId: string) => {
   const { data, error } = await supabase
     .from('submissions')
     .select('*, users(full_name), work_items!inner(title, criteria, organisation_id)')
     .eq('work_items.organisation_id', organisationId)
-    .order('submitted_at', { ascending: false })
+    .order('submitted_at', { ascending: true })
+  return { data, error }
+}
+
+// Org staff, mid-review: a student's past review decisions across all
+// their submissions, for context on the submission currently open —
+// requires the reviews RLS widen in 2026-08-27-org-sections-build.sql
+// (previously a reviewer could only see reviews they personally wrote).
+export const getStudentReviewHistory = async (studentId: string, excludeSubmissionId?: string) => {
+  let query = supabase
+    .from('reviews')
+    .select('id, decision, feedback, created_at, submission_id, users(full_name), submissions!inner(student_id, work_items(title))')
+    .eq('submissions.student_id', studentId)
+    .order('created_at', { ascending: false })
+  if (excludeSubmissionId) query = query.neq('submission_id', excludeSubmissionId)
+  const { data, error } = await query
   return { data, error }
 }
 
