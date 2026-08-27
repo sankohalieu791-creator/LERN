@@ -16,7 +16,7 @@ export default function StudentsPanel() {
   }, [user?.organisation_id])
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5">
       <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6">
         <p className="font-bold text-ink text-[15px] mb-5">Students ({students.length})</p>
         {loading ? (

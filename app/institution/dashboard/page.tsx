@@ -32,7 +32,7 @@ export default function InstitutionDashboardPage() {
   }, [user?.organisation_id])
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-ink mb-1">{org?.name || 'Dashboard'}</h1>
         <p className="text-[#6B6558]">

@@ -36,7 +36,7 @@ export default function ProviderDashboardPage() {
   }, [user?.organisation_id])
 
   return (
-    <div className="max-w-3xl">
+    <div>
       <h1 className="text-2xl font-bold text-ink mb-1">{org?.name || 'Dashboard'}</h1>
       <p className="text-[#6B6558] mb-6">Reviewing and verifying learner work happens here.</p>
 
