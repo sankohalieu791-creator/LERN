@@ -435,6 +435,20 @@ export const getFeed = async (organisationId: string) => {
   return { data, error }
 }
 
+// Explore mode (no organisation yet): "a public, safe educational feed —
+// LERN's own and general educational content only." RLS already limits
+// an org-less caller to public posts regardless, this just avoids
+// passing a null organisation_id into the .or() filter above.
+export const getPublicFeed = async () => {
+  const { data, error } = await supabase
+    .from('posts')
+    .select('*, users(full_name, role), post_reactions(id, user_id, reaction)')
+    .eq('visibility', 'public')
+    .order('created_at', { ascending: false })
+    .limit(50)
+  return { data, error }
+}
+
 export const uploadPostImage = async (userId: string, file: File) => {
   const path = `${userId}/${Date.now()}_${file.name}`
   const { error } = await supabase.storage.from('post-images').upload(path, file)

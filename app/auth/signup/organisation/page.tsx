@@ -3,6 +3,7 @@
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
+import LoginGreeting from '@/components/v2/LoginGreeting'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
 import { signUp, signIn, createOrganisationAndJoin, recordConsent, generateJoinCode, getUserProfile, supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
@@ -31,6 +32,7 @@ function OrganisationSignupInner() {
   const [orgId, setOrgId] = useState<string | null>(null)
   const [generatedCode, setGeneratedCode] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [showGreeting, setShowGreeting] = useState(false)
 
   const handleO1Submit = async () => {
     setError('')
@@ -102,6 +104,10 @@ function OrganisationSignupInner() {
     setTimeout(() => setCopied(false), 1500)
   }
 
+  if (showGreeting) {
+    return <LoginGreeting name={fullName} onDone={() => router.replace(orgType === 'institution' ? '/institution' : '/provider')} />
+  }
+
   return (
     <AuthShell
       step={step}
@@ -170,8 +176,8 @@ function OrganisationSignupInner() {
           <p className="text-[14px] text-[#6B6558] mb-6 leading-relaxed">
             Students enter this code when they sign up to join {orgName}. You can generate more codes, set expiry dates, or revoke this one from your dashboard.
           </p>
-          <PrimaryButton onClick={() => router.replace(orgType === 'institution' ? '/institution' : '/provider')}>
-            Go to my dashboard
+          <PrimaryButton onClick={() => setShowGreeting(true)}>
+            Continue
           </PrimaryButton>
         </div>
       )}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
+import LoginGreeting from '@/components/v2/LoginGreeting'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
 import { signUp, signIn, redeemJoinCode, recordConsent, getUserProfile, supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
@@ -37,19 +38,19 @@ export default function StudentSignupPage() {
 
   // A2
   const [code, setCode] = useState('')
+  const [showGreeting, setShowGreeting] = useState(false)
 
   // Resume an unfinished signup instead of re-running it -- e.g. an account
-  // was created but never got a join code or never accepted the
-  // safeguarding step. Returns true if it actually found and resumed a
-  // student profile, false otherwise (caller decides what to do next).
+  // was created but never accepted the safeguarding step. A join code is
+  // optional (explore-without-code), so it's no longer what decides
+  // whether the signup is "finished" -- only consent is.
   const resumeFromSession = async (authUser: { id: string }) => {
     const { data: profile } = await getUserProfile(authUser.id)
     if (!profile || profile.role !== 'student') return false
     setFullName(profile.full_name || '')
     setEmail(profile.email || '')
     setDob(profile.date_of_birth || '')
-    if (!profile.organisation_id) setStep(2)
-    else if (!profile.consented_at) setStep(3)
+    if (!profile.consented_at) setStep(3)
     else router.replace('/student')
     return true
   }
@@ -116,8 +117,10 @@ export default function StudentSignupPage() {
     if (user) await recordConsent(user.id)
     await refreshUser()
     setLoading(false)
-    router.replace('/student')
+    setShowGreeting(true)
   }
+
+  if (showGreeting) return <LoginGreeting name={fullName} onDone={() => router.replace('/student')} />
 
   return (
     <AuthShell
@@ -130,7 +133,7 @@ export default function StudentSignupPage() {
       }
       subtitle={
         step === 1 ? 'Your date of birth drives every age-based rule on LERN — it’s never shown publicly.'
-        : step === 2 ? 'Enter the code your school, college or training provider gave you. It tells us which organisation you belong to.'
+        : step === 2 ? 'Enter the code your school, college or training provider gave you — or skip this and add it later. Without one you can look around, but you can\'t post, submit work, or be seen by anyone.'
         : undefined
       }
     >
@@ -150,6 +153,12 @@ export default function StudentSignupPage() {
         <div>
           <TextField label="Join code" value={code} onChange={v => setCode(v.toUpperCase())} placeholder="e.g. 7K3P9XQZ" autoFocus />
           <PrimaryButton onClick={handleA2Submit} loading={loading}>Continue</PrimaryButton>
+          <button
+            onClick={() => { setError(''); setCode(''); setStep(3) }}
+            className="block w-full text-center text-[13px] font-semibold text-[#8A8373] hover:text-ink transition mt-4"
+          >
+            I don't have a code yet — skip for now
+          </button>
         </div>
       )}
 

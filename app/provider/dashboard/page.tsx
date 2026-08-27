@@ -5,13 +5,11 @@ import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
-import ReviewQueuePanel from '@/components/v2/ReviewQueuePanel'
 import {
-  BookOpen, ClipboardCheck, CheckCircle2, Users, AlertTriangle, Flag, Briefcase, Clock,
+  BookOpen, ClipboardCheck, CheckCircle2, Users, AlertTriangle, Flag, Clock,
   KeyRound, TrendingUp, TrendingDown, ClipboardList, PlusCircle, Ticket,
 } from 'lucide-react'
 
-type Tab = 'review' | 'codes'
 const OVERDUE_HOURS = 48
 const EXPIRING_DAYS = 7
 const HEAVY_USE = 20
@@ -25,7 +23,6 @@ export default function ProviderDashboardPage() {
   const [attentionCodes, setAttentionCodes] = useState<any[]>([])
   const [activity, setActivity] = useState<any[]>([])
   const [trend, setTrend] = useState<{ thisWeek: number; lastWeek: number } | null>(null)
-  const [tab, setTab] = useState<Tab>('review')
 
   useEffect(() => {
     if (!user?.organisation_id) return
@@ -99,11 +96,9 @@ export default function ProviderDashboardPage() {
       </div>
 
       <div className="flex gap-3 mb-6">
-        <QuickAction onClick={() => setTab('review')} icon={ClipboardList} label="Review queue" />
-        <Link href="/provider/courses" className="flex items-center gap-2 bg-white border border-[#E2DDD1] rounded-xl px-4 py-2.5 text-[13px] font-semibold text-ink hover:border-brand hover:text-brand transition">
-          <PlusCircle className="w-4 h-4" /> Create a course
-        </Link>
-        <QuickAction onClick={() => setTab('codes')} icon={Ticket} label="Generate join code" />
+        <QuickLink href="/provider/review" icon={ClipboardList} label="Review queue" />
+        <QuickLink href="/provider/courses" icon={PlusCircle} label="Create a course" />
+        <QuickLink href="#join-codes" icon={Ticket} label="Generate join code" />
       </div>
 
       {needsAttention > 0 && (
@@ -175,45 +170,21 @@ export default function ProviderDashboardPage() {
               </div>
             )}
           </div>
-          <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6 flex items-start gap-3">
-            <div className="w-9 h-9 rounded-full bg-[#F5F1E8] flex items-center justify-center flex-shrink-0">
-              <Briefcase className="w-4 h-4 text-[#8A8373]" />
-            </div>
-            <div>
-              <p className="font-semibold text-ink text-[14px]">Job-application tracking</p>
-              <p className="text-[13px] text-[#8A8373]">Coming soon — through LERN only, once live.</p>
-            </div>
-          </div>
         </div>
       </div>
 
-      <div className="flex gap-1 mb-5 border-b border-[#EDE9E1]">
-        {([['review', 'Review'], ['codes', 'Join codes']] as [Tab, string][]).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`px-4 py-2.5 text-[14px] font-semibold border-b-2 -mb-px transition ${
-              tab === key ? 'text-ink border-brand' : 'text-[#8A8373] border-transparent hover:text-ink'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6">
-        {tab === 'review' && <ReviewQueuePanel />}
-        {tab === 'codes' && <JoinCodesPanel />}
+      <div id="join-codes" className="bg-white border border-[#E2DDD1] rounded-2xl p-6">
+        <JoinCodesPanel />
       </div>
     </div>
   )
 }
 
-function QuickAction({ onClick, icon: Icon, label }: { onClick: () => void; icon: any; label: string }) {
+function QuickLink({ href, icon: Icon, label }: { href: string; icon: any; label: string }) {
   return (
-    <button onClick={onClick} className="flex items-center gap-2 bg-white border border-[#E2DDD1] rounded-xl px-4 py-2.5 text-[13px] font-semibold text-ink hover:border-brand hover:text-brand transition">
+    <Link href={href} className="flex items-center gap-2 bg-white border border-[#E2DDD1] rounded-xl px-4 py-2.5 text-[13px] font-semibold text-ink hover:border-brand hover:text-brand transition">
       <Icon className="w-4 h-4" /> {label}
-    </button>
+    </Link>
   )
 }
 

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
+import LoginGreeting from '@/components/v2/LoginGreeting'
 import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
 import { signIn, getUserProfile } from '@/lib/supabase'
 import { routeForRole } from '@/lib/roleRouting'
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [greeting, setGreeting] = useState<{ name: string; dest: string } | null>(null)
   const router = useRouter()
   const { refreshUser } = useAuth()
 
@@ -32,8 +34,10 @@ export default function LoginPage() {
     const { data: profile } = await getUserProfile(data.user.id)
     await refreshUser()
     setLoading(false)
-    router.replace(routeForRole(profile?.role))
+    setGreeting({ name: profile?.full_name || '', dest: routeForRole(profile?.role) })
   }
+
+  if (greeting) return <LoginGreeting name={greeting.name} onDone={() => router.replace(greeting.dest)} />
 
   return (
     <AuthShell title="Welcome back" subtitle="Log in to your LERN account.">

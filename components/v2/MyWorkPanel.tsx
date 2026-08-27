@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getVisibleWorkItems, getMySubmissions, submitWork, uploadSubmissionFile, setShareVisibility, getSignedFileUrl } from '@/lib/supabase'
-import { PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
+import { getVisibleWorkItems, getMySubmissions, submitWork, uploadSubmissionFile, setShareVisibility, getSignedFileUrl, redeemJoinCode } from '@/lib/supabase'
+import { PrimaryButton, SecondaryButton, TextField, ErrorBanner } from '@/components/v2/Field'
 import type { WorkItem, Submission } from '@/lib/types'
-import { CheckCircle2, Clock, RotateCcw, Ban, Globe, Users, Paperclip, X, Video, MapPin } from 'lucide-react'
+import { CheckCircle2, Clock, RotateCcw, Ban, Globe, Users, Paperclip, X, Video, MapPin, KeyRound } from 'lucide-react'
 import WorkshopSession from '@/components/v2/WorkshopSession'
 
 const STATUS: Record<string, { label: string; cls: string; icon: any }> = {
@@ -22,7 +22,7 @@ function isAdult(dob?: string): boolean {
 }
 
 export default function MyWorkPanel() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const [workItems, setWorkItems] = useState<WorkItem[]>([])
   const [submissions, setSubmissions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,6 +40,11 @@ export default function MyWorkPanel() {
     })
   }
   useEffect(load, [user?.organisation_id, user?.id])
+
+  // Explore mode: signed up without a code yet. Not an error state --
+  // just inert until they link to an organisation, which they can only
+  // do here.
+  if (!user?.organisation_id) return <JoinCodePrompt onJoined={refreshUser} />
 
   if (loading) return <p className="text-[#8A8373] text-[14px]">Loading…</p>
 
@@ -220,6 +225,39 @@ function SubmissionHistoryRow({ submission }: { submission: any }) {
       {submission.status === 'revoked' && verification?.revocation_reason && (
         <p className="text-[12px] text-[#B3401E] mt-1">Revoked: {verification.revocation_reason}</p>
       )}
+    </div>
+  )
+}
+
+// "Entering a valid code (via My Work, Private) links them to their
+// organisation and unlocks everything" — this is that entry point.
+function JoinCodePrompt({ onJoined }: { onJoined: () => Promise<void> }) {
+  const [code, setCode] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleJoin = async () => {
+    setError('')
+    if (!code.trim()) return setError('Enter your join code.')
+    setLoading(true)
+    const { error: redeemError } = await redeemJoinCode(code)
+    if (redeemError) { setLoading(false); return setError('That code isn’t valid, has expired, or has been revoked. Check it with your school, college or provider.') }
+    await onJoined()
+    setLoading(false)
+  }
+
+  return (
+    <div className="bg-white border border-[#E2DDD1] rounded-2xl p-8 text-center max-w-md mx-auto">
+      <div className="w-11 h-11 rounded-full bg-[#FCEEE4] flex items-center justify-center mx-auto mb-4">
+        <KeyRound className="w-5 h-5 text-brand" />
+      </div>
+      <p className="font-bold text-ink text-[16px] mb-1.5">You're not linked to an organisation yet</p>
+      <p className="text-[13px] text-[#8A8373] mb-5 leading-relaxed">
+        Enter the code your school, college or training provider gave you to unlock briefs, courses, and submitting your own work.
+      </p>
+      <ErrorBanner message={error} />
+      <TextField label="Join code" value={code} onChange={v => setCode(v.toUpperCase())} placeholder="e.g. 7K3P9XQZ" />
+      <PrimaryButton onClick={handleJoin} loading={loading}>Join</PrimaryButton>
     </div>
   )
 }

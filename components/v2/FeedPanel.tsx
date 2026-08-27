@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getFeed, createPost, deletePost, uploadPostImage, setPostReaction, getSignedFileUrl } from '@/lib/supabase'
+import { getFeed, getPublicFeed, createPost, deletePost, uploadPostImage, setPostReaction, getSignedFileUrl } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
 import { ImagePlus, X, Globe, Users, Trash2, PartyPopper } from 'lucide-react'
 
@@ -34,16 +34,27 @@ export default function FeedPanel() {
   const { user } = useAuth()
   const [posts, setPosts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  // Explore mode: no organisation yet. Public, safe educational content
+  // only — fully inert otherwise (no composer, no reacting isn't blocked
+  // by RLS but there's nothing here to build a profile from either way).
+  const exploring = !user?.organisation_id
 
   const load = () => {
-    if (!user?.organisation_id) return
-    getFeed(user.organisation_id).then(({ data }) => { setPosts(data || []); setLoading(false) })
+    (exploring ? getPublicFeed() : getFeed(user!.organisation_id!)).then(({ data }) => { setPosts(data || []); setLoading(false) })
   }
   useEffect(load, [user?.organisation_id])
 
   return (
     <div className="max-w-xl mx-auto space-y-4">
-      <Composer onPosted={load} />
+      {exploring ? (
+        <div className="bg-[#FBF9F4] border border-[#E2DDD1] rounded-2xl px-5 py-4">
+          <p className="text-[13px] text-[#6B6558]">
+            You're not linked to an organisation yet, so you're only seeing public educational content — you can look around, but you can't post or be seen by anyone. Enter your join code in My Work to unlock everything.
+          </p>
+        </div>
+      ) : (
+        <Composer onPosted={load} />
+      )}
 
       {loading ? (
         <div className="space-y-3">
@@ -52,7 +63,7 @@ export default function FeedPanel() {
       ) : posts.length === 0 ? (
         <div className="bg-white border border-[#E2DDD1] rounded-2xl p-10 text-center">
           <p className="font-semibold text-ink text-[14px] mb-1">Nothing here yet</p>
-          <p className="text-[13px] text-[#8A8373]">Educational updates and celebrations from your organisation will show up here.</p>
+          <p className="text-[13px] text-[#8A8373]">Educational updates and celebrations {exploring ? '' : 'from your organisation '}will show up here.</p>
         </div>
       ) : (
         posts.map(p => <PostCard key={p.id} post={p} onChanged={load} />)

@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
 import {
-  Users, ClipboardCheck, CheckCircle2, FileText, AlertTriangle, Flag, Briefcase, Clock,
+  Users, ClipboardCheck, CheckCircle2, FileText, AlertTriangle, Flag, Clock,
   KeyRound, TrendingUp, TrendingDown, ClipboardList, PlusCircle, Ticket,
 } from 'lucide-react'
 
@@ -175,15 +175,6 @@ export default function InstitutionDashboardPage() {
                 )}
               </div>
             )}
-          </div>
-          <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6 flex items-start gap-3">
-            <div className="w-9 h-9 rounded-full bg-[#F5F1E8] flex items-center justify-center flex-shrink-0">
-              <Briefcase className="w-4 h-4 text-[#8A8373]" />
-            </div>
-            <div>
-              <p className="font-semibold text-ink text-[14px]">Job-application tracking</p>
-              <p className="text-[13px] text-[#8A8373]">Coming soon — through LERN only, once live.</p>
-            </div>
           </div>
         </div>
       </div>
