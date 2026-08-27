@@ -1,12 +1,18 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
-import { Users, ClipboardCheck, CheckCircle2, FileText, AlertTriangle, Flag, Briefcase, Clock } from 'lucide-react'
+import {
+  Users, ClipboardCheck, CheckCircle2, FileText, AlertTriangle, Flag, Briefcase, Clock,
+  KeyRound, TrendingUp, TrendingDown, ClipboardList, PlusCircle, Ticket,
+} from 'lucide-react'
 
 const OVERDUE_HOURS = 48
+const EXPIRING_DAYS = 7
+const HEAVY_USE = 20
 
 export default function InstitutionDashboardPage() {
   const { user } = useAuth()
@@ -14,7 +20,9 @@ export default function InstitutionDashboardPage() {
   const [stats, setStats] = useState({ students: 0, briefs: 0, pending: 0, verified: 0 })
   const [overdue, setOverdue] = useState<any[]>([])
   const [flagged, setFlagged] = useState<any[]>([])
+  const [attentionCodes, setAttentionCodes] = useState<any[]>([])
   const [activity, setActivity] = useState<any[]>([])
+  const [trend, setTrend] = useState<{ thisWeek: number; lastWeek: number } | null>(null)
 
   useEffect(() => {
     if (!user?.organisation_id) return
@@ -45,14 +53,35 @@ export default function InstitutionDashboardPage() {
       })
 
     supabase.from('reviews')
-      .select('id, decision, created_at, users(full_name), submissions!inner(work_items!inner(title, organisation_id))')
+      .select('id, decision, feedback, created_at, users(full_name), submissions!inner(work_items!inner(title, organisation_id))')
       .eq('submissions.work_items.organisation_id', orgId)
       .order('created_at', { ascending: false })
       .limit(6)
       .then(({ data }) => setActivity((data as any[]) || []))
+
+    supabase.from('verifications')
+      .select('verified_at, submissions!inner(work_items!inner(organisation_id))')
+      .eq('submissions.work_items.organisation_id', orgId)
+      .gte('verified_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
+      .then(({ data }) => {
+        const rows = (data as any[]) || []
+        const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+        setTrend({
+          thisWeek: rows.filter(r => new Date(r.verified_at).getTime() >= weekAgo).length,
+          lastWeek: rows.filter(r => new Date(r.verified_at).getTime() < weekAgo).length,
+        })
+      })
+
+    supabase.from('join_codes').select('*').eq('organisation_id', orgId).eq('revoked', false)
+      .then(({ data }) => {
+        const cutoff = Date.now() + EXPIRING_DAYS * 24 * 60 * 60 * 1000
+        setAttentionCodes((data || []).filter((c: any) =>
+          (c.expires_at && new Date(c.expires_at).getTime() < cutoff) || c.used_count >= HEAVY_USE
+        ))
+      })
   }, [user?.organisation_id])
 
-  const needsAttention = overdue.length + flagged.length
+  const needsAttention = overdue.length + flagged.length + attentionCodes.length
 
   return (
     <div className="space-y-6">
@@ -70,6 +99,12 @@ export default function InstitutionDashboardPage() {
         <StatCard icon={FileText} label="Active briefs" value={stats.briefs} />
         <StatCard icon={ClipboardCheck} label="Awaiting review" value={stats.pending} accent={stats.pending > 0} />
         <StatCard icon={CheckCircle2} label="Verified" value={stats.verified} />
+      </div>
+
+      <div className="flex gap-3">
+        <QuickAction href="/institution/review" icon={ClipboardList} label="Review queue" />
+        <QuickAction href="/institution/briefs" icon={PlusCircle} label="Create a brief" />
+        <QuickAction href="/institution/dashboard#join-codes" icon={Ticket} label="Generate join code" />
       </div>
 
       {needsAttention > 0 && (
@@ -90,6 +125,15 @@ export default function InstitutionDashboardPage() {
                 <span className="flex items-center gap-1.5 text-[#B3401E] font-semibold"><Flag className="w-3.5 h-3.5" /> Flagged</span>
               </div>
             ))}
+            {attentionCodes.map(c => (
+              <div key={c.id} className="flex items-center justify-between text-[13px] px-3.5 py-2.5 bg-[#FFF7ED] rounded-lg">
+                <span className="text-ink font-mono">{c.code}</span>
+                <span className="flex items-center gap-1.5 text-[#B3651E] font-semibold">
+                  <KeyRound className="w-3.5 h-3.5" />
+                  {c.used_count >= HEAVY_USE ? `Used ${c.used_count} times` : `Expires ${new Date(c.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -100,7 +144,7 @@ export default function InstitutionDashboardPage() {
           {activity.length === 0 ? (
             <p className="text-[13px] text-[#8A8373]">No reviews yet.</p>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {activity.map(a => (
                 <div key={a.id} className="text-[13px] text-[#6B6558]">
                   <span className="font-semibold text-ink capitalize">{a.decision}</span>
@@ -108,27 +152,54 @@ export default function InstitutionDashboardPage() {
                   <span className="block text-[12px] text-[#8A8373]">
                     {a.users?.full_name} · {new Date(a.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                   </span>
+                  {a.feedback && <span className="block text-[12px] text-[#6B6558] italic mt-0.5">"{a.feedback}"</span>}
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6 flex items-start gap-3">
-          <div className="w-9 h-9 rounded-full bg-[#F5F1E8] flex items-center justify-center flex-shrink-0">
-            <Briefcase className="w-4 h-4 text-[#8A8373]" />
+        <div className="space-y-4">
+          <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6">
+            <p className="font-bold text-ink text-[15px] mb-3">Verified this week</p>
+            {trend === null ? (
+              <p className="text-[13px] text-[#8A8373]">Loading…</p>
+            ) : (
+              <div className="flex items-center gap-2.5">
+                <p className="text-2xl font-bold text-ink">{trend.thisWeek}</p>
+                {trend.thisWeek !== trend.lastWeek && (
+                  <span className={`flex items-center gap-1 text-[12px] font-semibold ${trend.thisWeek >= trend.lastWeek ? 'text-[#1E7A34]' : 'text-[#B3401E]'}`}>
+                    {trend.thisWeek >= trend.lastWeek ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                    vs {trend.lastWeek} last week
+                  </span>
+                )}
+              </div>
+            )}
           </div>
-          <div>
-            <p className="font-semibold text-ink text-[14px]">Job-application tracking &amp; funder/Ofsted analytics</p>
-            <p className="text-[13px] text-[#8A8373]">Coming soon — through LERN only, once live.</p>
+          <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6 flex items-start gap-3">
+            <div className="w-9 h-9 rounded-full bg-[#F5F1E8] flex items-center justify-center flex-shrink-0">
+              <Briefcase className="w-4 h-4 text-[#8A8373]" />
+            </div>
+            <div>
+              <p className="font-semibold text-ink text-[14px]">Job-application tracking</p>
+              <p className="text-[13px] text-[#8A8373]">Coming soon — through LERN only, once live.</p>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6">
+      <div id="join-codes" className="bg-white border border-[#E2DDD1] rounded-2xl p-6">
         <JoinCodesPanel />
       </div>
     </div>
+  )
+}
+
+function QuickAction({ href, icon: Icon, label }: { href: string; icon: any; label: string }) {
+  return (
+    <Link href={href} className="flex items-center gap-2 bg-white border border-[#E2DDD1] rounded-xl px-4 py-2.5 text-[13px] font-semibold text-ink hover:border-brand hover:text-brand transition">
+      <Icon className="w-4 h-4" /> {label}
+    </Link>
   )
 }
 

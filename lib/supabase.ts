@@ -103,7 +103,7 @@ export const revokeJoinCode = async (codeId: string) => {
 export const getWorkItems = async (organisationId: string) => {
   const { data, error } = await supabase
     .from('work_items')
-    .select('*')
+    .select('*, groups(name), work_item_attachments(id, file_name, file_path, file_size_bytes)')
     .eq('organisation_id', organisationId)
     .order('created_at', { ascending: false })
   return { data, error }
@@ -111,7 +111,10 @@ export const getWorkItems = async (organisationId: string) => {
 
 export const createWorkItem = async (
   organisationId: string, createdBy: string,
-  fields: { type: 'brief' | 'course' | 'workshop'; title: string; description?: string; criteria: string; visibility?: 'public' | 'private' }
+  fields: {
+    type: 'brief' | 'course' | 'workshop'; title: string; description?: string; criteria: string
+    visibility?: 'public' | 'private'; topic?: string; assignment?: string; deadline?: string | null; group_id?: string | null
+  }
 ) => {
   const { data, error } = await supabase
     .from('work_items')
@@ -121,11 +124,42 @@ export const createWorkItem = async (
   return { data, error }
 }
 
-// Student: every work item their own organisation has open to them.
+// Attachments a tutor adds to a brief when creating it (slides, docs,
+// resources) — org-scoped read, staff-only write, enforced by RLS.
+export const uploadWorkItemAttachment = async (workItemId: string, uploadedBy: string, file: File) => {
+  const path = `${workItemId}/${Date.now()}_${file.name}`
+  const { error: uploadError } = await supabase.storage.from('work-item-attachments').upload(path, file)
+  if (uploadError) return { data: null, error: uploadError }
+  const { data, error } = await supabase
+    .from('work_item_attachments')
+    .insert([{ work_item_id: workItemId, file_path: path, file_name: file.name, file_size_bytes: file.size, uploaded_by: uploadedBy }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const getWorkItemAttachments = async (workItemId: string) => {
+  const { data, error } = await supabase
+    .from('work_item_attachments')
+    .select('*')
+    .eq('work_item_id', workItemId)
+    .order('created_at', { ascending: true })
+  return { data, error }
+}
+
+// Both submission-files and work-item-attachments are private buckets --
+// a signed URL is the only way to actually view/download an object.
+export const getSignedFileUrl = async (bucket: 'submission-files' | 'work-item-attachments', path: string) => {
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600)
+  return { url: data?.signedUrl ?? null, error }
+}
+
+// Student: every work item their own organisation has open to them
+// (RLS already narrows this to their group + org-wide/ungrouped items).
 export const getVisibleWorkItems = async (organisationId: string) => {
   const { data, error } = await supabase
     .from('work_items')
-    .select('*')
+    .select('*, work_item_attachments(id, file_name, file_path, file_size_bytes)')
     .eq('organisation_id', organisationId)
     .order('created_at', { ascending: false })
   return { data, error }
@@ -142,10 +176,24 @@ export const getMySubmissions = async (studentId: string) => {
   return { data, error }
 }
 
-export const submitWork = async (studentId: string, workItemId: string, content: string) => {
+// Uploads to the student's own folder in the private submission-files
+// bucket — RLS only lets a student upload under their own auth.uid()
+// prefix (already enforced by the "owner upload" storage policy).
+export const uploadSubmissionFile = async (studentId: string, file: File) => {
+  const path = `${studentId}/${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from('submission-files').upload(path, file)
+  return { path: error ? null : path, error }
+}
+
+export const submitWork = async (
+  studentId: string, workItemId: string, content: string, file?: { path: string; type: string; size: number }
+) => {
   const { data, error } = await supabase
     .from('submissions')
-    .insert([{ student_id: studentId, work_item_id: workItemId, content }])
+    .insert([{
+      student_id: studentId, work_item_id: workItemId, content: content || null,
+      ...(file ? { file_path: file.path, file_type: file.type, file_size_bytes: file.size } : {}),
+    }])
     .select()
     .single()
   return { data, error }
@@ -158,10 +206,24 @@ export const submitWork = async (studentId: string, workItemId: string, content:
 // someone other than the caller — allowed by the org-staff insert policy
 // in 2026-08-27-org-sections-build.sql. One insert per student so a
 // moderation/review decision on one doesn't affect the others.
-export const submitWorkForStudents = async (studentIds: string[], workItemId: string, content: string) => {
+// Staff-side upload into a student's own submission-files folder — allowed
+// by the "org staff upload for student" storage policy, scoped to
+// students actually in the caller's org.
+export const uploadSubmissionFileFor = async (studentId: string, file: File) => {
+  const path = `${studentId}/${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from('submission-files').upload(path, file)
+  return { path: error ? null : path, error }
+}
+
+export const submitWorkForStudents = async (
+  studentIds: string[], workItemId: string, content: string, file?: { path: string; type: string; size: number }
+) => {
   const { data, error } = await supabase
     .from('submissions')
-    .insert(studentIds.map(student_id => ({ student_id, work_item_id: workItemId, content })))
+    .insert(studentIds.map(student_id => ({
+      student_id, work_item_id: workItemId, content: content || null,
+      ...(file ? { file_path: file.path, file_type: file.type, file_size_bytes: file.size } : {}),
+    })))
     .select()
   return { data, error }
 }
@@ -228,12 +290,11 @@ export const setShareVisibility = async (verificationId: string, visibility: 'or
 }
 
 // Institution "Students" section: the org's students with a rollup of
-// their submitted/verified work counts (enrolment + progress; attendance
-// tracking isn't built yet).
+// their submitted/verified work counts and their group (enrolment + progress).
 export const getOrgStudents = async (organisationId: string) => {
   const { data: students, error } = await supabase
     .from('users')
-    .select('id, full_name, email, created_at')
+    .select('id, full_name, email, created_at, group_id, groups(name)')
     .eq('organisation_id', organisationId)
     .eq('role', 'student')
     .order('full_name')
@@ -252,6 +313,80 @@ export const getOrgStudents = async (organisationId: string) => {
   }
 
   return { data: students.map(s => ({ ...s, ...(counts[s.id] || { submitted: 0, verified: 0 }) })), error: null }
+}
+
+// ── Groups (classes) ────────────────────────────────────────────
+export const getGroups = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('groups')
+    .select('*')
+    .eq('organisation_id', organisationId)
+    .order('name')
+  return { data, error }
+}
+
+export const getGroupMembers = async (groupId: string) => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, full_name, email')
+    .eq('group_id', groupId)
+    .eq('role', 'student')
+    .order('full_name')
+  return { data, error }
+}
+
+export const createGroup = async (organisationId: string, createdBy: string, name: string) => {
+  const { data, error } = await supabase
+    .from('groups')
+    .insert([{ organisation_id: organisationId, created_by: createdBy, name }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+// Staff-only re-assignment, via the set_student_group() RPC — the tamper
+// guard on users.group_id means a direct client PATCH is blocked, this is
+// the only legitimate write path.
+export const setStudentGroup = async (studentId: string, groupId: string) => {
+  const { error } = await supabase.rpc('set_student_group', { p_student_id: studentId, p_group_id: groupId })
+  return { error }
+}
+
+// ── Attendance register ─────────────────────────────────────────
+// One row per student for a given group+session date. Staff-marked only.
+export const getAttendanceForSession = async (groupId: string, sessionDate: string) => {
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .select('*')
+    .eq('group_id', groupId)
+    .eq('session_date', sessionDate)
+  return { data, error }
+}
+
+export const markAttendance = async (
+  groupId: string, studentId: string, sessionDate: string, status: 'present' | 'absent' | 'late', markedBy: string
+) => {
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .upsert([{ group_id: groupId, student_id: studentId, session_date: sessionDate, status, marked_by: markedBy, updated_at: new Date().toISOString() }],
+      { onConflict: 'group_id,student_id,session_date' })
+    .select()
+    .single()
+  return { data, error }
+}
+
+// A student's overall attendance summary — percentage present over every
+// session they've been marked for, shown on their detail page.
+export const getStudentAttendanceSummary = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .select('status')
+    .eq('student_id', studentId)
+  if (error || !data) return { data: null, error }
+  const total = data.length
+  const present = data.filter(r => r.status === 'present').length
+  const late = data.filter(r => r.status === 'late').length
+  return { data: { total, present, late, absent: total - present - late, percentPresent: total ? Math.round(((present + late) / total) * 100) : null }, error: null }
 }
 
 // Sidebar collapsed/expanded state — remembered server-side per the org

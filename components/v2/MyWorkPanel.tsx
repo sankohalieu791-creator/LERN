@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getVisibleWorkItems, getMySubmissions, submitWork, setShareVisibility } from '@/lib/supabase'
+import { getVisibleWorkItems, getMySubmissions, submitWork, uploadSubmissionFile, setShareVisibility, getSignedFileUrl } from '@/lib/supabase'
 import { PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
 import type { WorkItem, Submission } from '@/lib/types'
-import { CheckCircle2, Clock, RotateCcw, Ban, Globe, Users } from 'lucide-react'
+import { CheckCircle2, Clock, RotateCcw, Ban, Globe, Users, Paperclip, X } from 'lucide-react'
 
 const STATUS: Record<string, { label: string; cls: string; icon: any }> = {
   submitted: { label: 'Awaiting review', cls: 'bg-[#FFF3E4] text-[#B3651E]', icon: Clock },
@@ -66,21 +66,29 @@ function WorkItemCard({
 }: { item: WorkItem; latest: any; allSubs: any[]; open: boolean; onToggle: () => void; onSubmitted: () => void }) {
   const { user } = useAuth()
   const [content, setContent] = useState('')
+  const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
   const status = latest ? STATUS[latest.status] : null
   const canSubmit = !latest || latest.status === 'returned'
   const StatusIcon = status?.icon
 
   const handleSubmit = async () => {
     setError('')
-    if (!content.trim()) return setError('Write or link your work before submitting.')
+    if (!content.trim() && !file) return setError('Write, link, or attach your work before submitting.')
     if (!user) return
     setLoading(true)
-    const { error: submitError } = await submitWork(user.id, item.id, content.trim())
+    let fileInfo: { path: string; type: string; size: number } | undefined
+    if (file) {
+      const { path, error: uploadError } = await uploadSubmissionFile(user.id, file)
+      if (uploadError || !path) { setLoading(false); return setError(uploadError?.message || 'File upload failed.') }
+      fileInfo = { path, type: file.type, size: file.size }
+    }
+    const { error: submitError } = await submitWork(user.id, item.id, content.trim(), fileInfo)
     setLoading(false)
     if (submitError) return setError(submitError.message)
-    setContent('')
+    setContent(''); setFile(null)
     onSubmitted()
   }
 
@@ -119,6 +127,16 @@ function WorkItemCard({
                 rows={4}
                 className="w-full bg-white border border-[#E2DDD1] rounded-xl px-4 py-3 text-[14px] text-ink placeholder-[#A39C8A] outline-none focus:border-brand transition mb-3 resize-none"
               />
+              <button
+                type="button" onClick={() => fileRef.current?.click()}
+                className="flex items-center gap-1.5 text-[12px] font-semibold text-[#6B6558] hover:text-brand transition mb-3"
+              >
+                <Paperclip className="w-3.5 h-3.5" /> {file ? file.name : 'Attach a file (optional)'}
+                {file && (
+                  <span onClick={e => { e.stopPropagation(); setFile(null) }} className="hover:text-[#B3401E]"><X className="w-3.5 h-3.5" /></span>
+                )}
+              </button>
+              <input ref={fileRef} type="file" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
               <PrimaryButton onClick={handleSubmit} loading={loading}>
                 {latest?.status === 'returned' ? 'Resubmit' : 'Submit work'}
               </PrimaryButton>
@@ -136,6 +154,11 @@ function SubmissionHistoryRow({ submission }: { submission: any }) {
   const verification = (submission.verifications || []).find((v: any) => !v.revoked_at) || submission.verifications?.[0]
   const adult = isAdult(user?.date_of_birth)
   const [busy, setBusy] = useState(false)
+  const [fileUrl, setFileUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (submission.file_path) getSignedFileUrl('submission-files', submission.file_path).then(({ url }) => setFileUrl(url))
+  }, [submission.file_path])
 
   const toggleVisibility = async () => {
     if (!verification || submission.status !== 'verified') return
@@ -151,7 +174,12 @@ function SubmissionHistoryRow({ submission }: { submission: any }) {
         <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${status.cls}`}>{status.label}</span>
         <span className="text-[11px] text-[#8A8373]">{new Date(submission.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
       </div>
-      <p className="text-[13px] text-[#4A453B] whitespace-pre-wrap mb-1">{submission.content}</p>
+      {submission.content && <p className="text-[13px] text-[#4A453B] whitespace-pre-wrap mb-1">{submission.content}</p>}
+      {submission.file_path && (
+        <a href={fileUrl || '#'} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[12px] font-semibold text-brand hover:underline mb-1">
+          <Paperclip className="w-3 h-3" /> {submission.file_path.split('/').pop()}
+        </a>
+      )}
 
       {submission.status === 'verified' && verification && !verification.revoked_at && (
         <div className="mt-2 pt-2 border-t border-[#EDE9E1] flex items-center justify-between">

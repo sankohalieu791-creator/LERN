@@ -12,8 +12,17 @@ export interface User {
   email: string
   date_of_birth?: string
   organisation_id?: string
+  group_id?: string
   sidebar_collapsed?: boolean
   consented_at?: string
+  created_at: string
+}
+
+export interface Group {
+  id: string
+  organisation_id: string
+  name: string
+  created_by?: string
   created_at: string
 }
 
@@ -38,6 +47,7 @@ export interface JoinCode {
   code: string
   expires_at?: string
   revoked: boolean
+  used_count: number
   created_by?: string
   created_at: string
 }
@@ -48,10 +58,37 @@ export interface WorkItem {
   type: 'brief' | 'course' | 'workshop'
   title: string
   description?: string
+  topic?: string
+  assignment?: string
+  deadline?: string
+  group_id?: string
   criteria: string
   visibility: 'public' | 'private'
   created_by?: string
   created_at: string
+}
+
+export interface WorkItemAttachment {
+  id: string
+  work_item_id: string
+  file_path: string
+  file_name: string
+  file_size_bytes?: number
+  uploaded_by?: string
+  created_at: string
+}
+
+export type AttendanceStatus = 'present' | 'absent' | 'late'
+
+export interface AttendanceRecord {
+  id: string
+  group_id: string
+  student_id: string
+  session_date: string
+  status: AttendanceStatus
+  marked_by?: string
+  created_at: string
+  updated_at: string
 }
 
 export interface Enrolment {
@@ -69,6 +106,7 @@ export interface Submission {
   student_id: string
   work_item_id: string
   content?: string
+  file_path?: string
   file_type?: string
   file_size_bytes?: number
   moderation_status: ModerationStatus

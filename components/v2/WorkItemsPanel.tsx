@@ -1,11 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getWorkItems, createWorkItem, getOrgStudents, submitWorkForStudents } from '@/lib/supabase'
+import {
+  getWorkItems, createWorkItem, getGroups, createGroup, getGroupMembers,
+  uploadWorkItemAttachment, uploadSubmissionFileFor, submitWorkForStudents, getSignedFileUrl,
+} from '@/lib/supabase'
 import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
-import type { WorkItem } from '@/lib/types'
-import { Plus, X, Check } from 'lucide-react'
+import type { WorkItem, Group } from '@/lib/types'
+import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2 } from 'lucide-react'
 
 type ItemType = 'brief' | 'course' | 'workshop'
 
@@ -16,12 +19,16 @@ const COPY: Record<ItemType, { heading: string; button: string; empty: string }>
 }
 
 // Institution "Briefs", provider "Courses", and both roles' "Workshops"
-// are the same underlying work_items table, filtered by type — one
-// panel, reused three ways, per the layout spec's own build order
-// ("Briefs is already built").
+// are the same underlying work_items table, filtered by type. Briefs
+// gets the full rebuilt form (topic/assignment/attachments/deadline/
+// group) per spec; Courses/Workshops keep the simpler creation form —
+// the old platform's course system was a whole separate multi-week
+// session-scheduling engine (course_sessions, live classrooms, project
+// days) that doesn't exist in this schema, so "match the old flow" here
+// means the field set, not resurrecting that entire subsystem.
 export default function WorkItemsPanel({ type }: { type: ItemType }) {
   const { user } = useAuth()
-  const [items, setItems] = useState<WorkItem[]>([])
+  const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const copy = COPY[type]
@@ -29,7 +36,7 @@ export default function WorkItemsPanel({ type }: { type: ItemType }) {
   const load = () => {
     if (!user?.organisation_id) return
     getWorkItems(user.organisation_id).then(({ data }) => {
-      setItems((data || []).filter(i => i.type === type))
+      setItems((data || []).filter((i: any) => i.type === type))
       setLoading(false)
     })
   }
@@ -60,19 +67,152 @@ export default function WorkItemsPanel({ type }: { type: ItemType }) {
         <p className="text-[#8A8373] text-[14px]">{copy.empty}</p>
       ) : (
         <div className="space-y-3">
-          {items.map(item => (
-            <div key={item.id} className="border border-[#EDE9E1] rounded-xl px-4 py-3.5">
-              <div className="flex items-center justify-between mb-1">
-                <p className="font-bold text-ink text-[14px]">{item.title}</p>
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-[#8A8373] bg-[#F5F1E8] px-2 py-0.5 rounded-full">
-                  {item.visibility}
-                </span>
-              </div>
-              {item.description && <p className="text-[13px] text-[#6B6558] mb-2">{item.description}</p>}
-              <p className="text-[12px] text-[#8A8373]">
-                <span className="font-semibold">Criteria:</span> {item.criteria}
-              </p>
-            </div>
+          {items.map(item => <WorkItemCard key={item.id} item={item} />)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function WorkItemCard({ item }: { item: any }) {
+  const attachments = item.work_item_attachments || []
+  return (
+    <div className="border border-[#EDE9E1] rounded-xl px-4 py-3.5">
+      <div className="flex items-center justify-between mb-1">
+        <p className="font-bold text-ink text-[14px]">{item.title}</p>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#8A8373] bg-[#F5F1E8] px-2 py-0.5 rounded-full">
+          {item.visibility}
+        </span>
+      </div>
+      {item.topic && <p className="text-[12px] text-[#8A8373] mb-1.5">{item.topic}</p>}
+      {(item.assignment || item.description) && <p className="text-[13px] text-[#6B6558] mb-2 whitespace-pre-wrap">{item.assignment || item.description}</p>}
+      <p className="text-[12px] text-[#8A8373] mb-2"><span className="font-semibold">Criteria:</span> {item.criteria}</p>
+      <div className="flex items-center gap-3.5 flex-wrap text-[12px] text-[#8A8373]">
+        {item.deadline && (
+          <span className="flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Due {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+        )}
+        <span className="flex items-center gap-1"><Users2 className="w-3.5 h-3.5" /> {item.groups?.name || 'Whole organisation'}</span>
+      </div>
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2.5 border-t border-[#EDE9E1]">
+          {attachments.map((a: any) => <AttachmentChip key={a.id} attachment={a} />)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AttachmentChip({ attachment }: { attachment: any }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const open = async () => {
+    if (url) return window.open(url, '_blank')
+    const { url: signed } = await getSignedFileUrl('work-item-attachments', attachment.file_path)
+    if (signed) { setUrl(signed); window.open(signed, '_blank') }
+  }
+  return (
+    <button onClick={open} className="flex items-center gap-1.5 bg-[#FBF9F4] border border-[#E2DDD1] rounded-full px-2.5 py-1 text-[11px] font-semibold text-[#6B6558] hover:border-brand transition">
+      <Paperclip className="w-3 h-3" /> {attachment.file_name}
+    </button>
+  )
+}
+
+// Assign-to picker: pick an existing group, or create one inline --
+// orgs start with zero groups, so this has to be usable from empty.
+function GroupPicker({ organisationId, value, onChange, required }: { organisationId?: string; value: string; onChange: (id: string) => void; required?: boolean }) {
+  const { user } = useAuth()
+  const [groups, setGroups] = useState<Group[]>([])
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = () => {
+    if (!organisationId) return
+    getGroups(organisationId).then(({ data }) => setGroups(data || []))
+  }
+  useEffect(load, [organisationId])
+
+  const handleCreate = async () => {
+    if (!newName.trim() || !organisationId || !user) return
+    setBusy(true)
+    const { data, error } = await createGroup(organisationId, user.id, newName.trim())
+    setBusy(false)
+    if (!error && data) {
+      setGroups(prev => [...prev, data as Group])
+      onChange((data as Group).id)
+      setNewName(''); setCreating(false)
+    }
+  }
+
+  return (
+    <label className="block mb-5">
+      <span className="block text-[13px] font-semibold text-ink mb-1.5">
+        Assign to {required ? '' : <span className="text-[#8A8373] font-normal">(leave blank for the whole organisation)</span>}
+      </span>
+      <div className="flex gap-2">
+        <select
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className="flex-1 bg-white border border-[#E2DDD1] rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+        >
+          <option value="">{required ? 'Select a group…' : 'Whole organisation'}</option>
+          {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+        </select>
+        <button type="button" onClick={() => setCreating(v => !v)} className="px-3 py-2.5 rounded-lg border border-[#E2DDD1] text-[13px] font-semibold text-[#6B6558] hover:border-brand transition flex-shrink-0">
+          + New group
+        </button>
+      </div>
+      {creating && (
+        <div className="flex gap-2 mt-2">
+          <input
+            value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Year 12 Media Studies" autoFocus
+            className="flex-1 bg-white border border-[#E2DDD1] rounded-lg px-3 py-2 text-[13px] text-ink placeholder-[#A39C8A] outline-none focus:border-brand transition"
+          />
+          <button type="button" onClick={handleCreate} disabled={busy || !newName.trim()} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[13px] font-semibold disabled:opacity-40">
+            Add
+          </button>
+        </div>
+      )}
+    </label>
+  )
+}
+
+function FileDropzone({ files, onChange, multiple }: { files: File[]; onChange: (files: File[]) => void; multiple?: boolean }) {
+  const [dragOver, setDragOver] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const addFiles = (list: FileList | null) => {
+    if (!list) return
+    onChange(multiple ? [...files, ...Array.from(list)] : [Array.from(list)[0]])
+  }
+
+  return (
+    <div className="mb-5">
+      <div
+        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={e => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files) }}
+        onClick={() => inputRef.current?.click()}
+        className={`flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-xl py-7 cursor-pointer transition ${
+          dragOver ? 'border-brand bg-[#FCEEE4]' : 'border-[#E2DDD1] hover:border-[#C9C2B2]'
+        }`}
+      >
+        <UploadCloud className="w-5 h-5 text-[#8A8373]" />
+        <p className="text-[13px] font-semibold text-ink">Drag and drop, or click to choose {multiple ? 'files' : 'a file'}</p>
+        <p className="text-[11px] text-[#A39C8A]">PDF, Word, PowerPoint, or image · up to 25MB</p>
+        <input
+          ref={inputRef} type="file" multiple={multiple} className="hidden"
+          onChange={e => addFiles(e.target.files)}
+        />
+      </div>
+      {files.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {files.map((f, i) => (
+            <span key={i} className="flex items-center gap-1.5 bg-[#FBF9F4] border border-[#E2DDD1] rounded-full pl-2.5 pr-1.5 py-1 text-[11px] font-semibold text-[#6B6558]">
+              <FileText className="w-3 h-3" /> {f.name}
+              <button type="button" onClick={() => onChange(files.filter((_, j) => j !== i))} className="hover:text-[#B3401E]">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
           ))}
         </div>
       )}
@@ -80,6 +220,7 @@ export default function WorkItemsPanel({ type }: { type: ItemType }) {
   )
 }
 
+// Courses/Workshops — same simpler field set as before.
 function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: () => void }) {
   const { user } = useAuth()
   const [title, setTitle] = useState('')
@@ -140,10 +281,9 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
 
 type BriefMode = 'new' | 'existing'
 
-// Briefs' "two ways": set a new brief (the normal flow above), or upload
-// coursework/exam work students already produced elsewhere and mark it
-// for verification directly — no new marking, straight into the review
-// queue as a submission ready to check against criteria.
+// Briefs' "two ways": set a new brief, or upload coursework/exam work a
+// group already produced elsewhere and mark it for verification directly
+// — no new marking, straight into the review queue.
 function CreateBriefForm({ onCreated }: { onCreated: () => void }) {
   const [mode, setMode] = useState<BriefMode>('new')
   return (
@@ -162,9 +302,94 @@ function CreateBriefForm({ onCreated }: { onCreated: () => void }) {
           </button>
         ))}
       </div>
-      {mode === 'new'
-        ? <CreateWorkItemForm type="brief" onCreated={onCreated} />
-        : <UploadExistingWorkForm onCreated={onCreated} />}
+      {mode === 'new' ? <NewBriefForm onCreated={onCreated} /> : <UploadExistingWorkForm onCreated={onCreated} />}
+    </div>
+  )
+}
+
+function NewBriefForm({ onCreated }: { onCreated: () => void }) {
+  const { user } = useAuth()
+  const [title, setTitle] = useState('')
+  const [topic, setTopic] = useState('')
+  const [assignment, setAssignment] = useState('')
+  const [criteria, setCriteria] = useState('')
+  const [deadline, setDeadline] = useState('')
+  const [groupId, setGroupId] = useState('')
+  const [visibility, setVisibility] = useState<'public' | 'private'>('private')
+  const [files, setFiles] = useState<File[]>([])
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async () => {
+    setError('')
+    if (!title.trim()) return setError('Give it a title.')
+    if (!assignment.trim()) return setError('Write what the student has to do.')
+    if (!criteria.trim()) return setError('Success criteria is required — this is what makes the tick mean something.')
+    if (!user?.organisation_id) return
+
+    setLoading(true)
+    const { data: workItem, error: createError } = await createWorkItem(user.organisation_id, user.id, {
+      type: 'brief', title: title.trim(), topic: topic.trim() || undefined, assignment: assignment.trim(),
+      criteria: criteria.trim(), deadline: deadline || null, group_id: groupId || null, visibility,
+    })
+    if (createError || !workItem) { setLoading(false); return setError(createError?.message || 'Could not create the brief.') }
+
+    for (const file of files) {
+      const { error: attachError } = await uploadWorkItemAttachment((workItem as any).id, user.id, file)
+      if (attachError) { setLoading(false); return setError(`Brief created, but "${file.name}" failed to attach: ${attachError.message}`) }
+    }
+    setLoading(false)
+    setTitle(''); setTopic(''); setAssignment(''); setCriteria(''); setDeadline(''); setGroupId(''); setFiles([])
+    onCreated()
+  }
+
+  return (
+    <div className="bg-[#FBF9F4] border border-[#EDE9E1] rounded-xl p-5">
+      <ErrorBanner message={error} />
+      <TextField label="Title" value={title} onChange={setTitle} placeholder="Design a mobile app icon" autoFocus />
+      <TextField label="Topic / subject" value={topic} onChange={setTopic} placeholder="e.g. Graphic Design" />
+      <label className="block mb-4">
+        <span className="block text-[13px] font-semibold text-ink mb-1.5">Assignment — what the student has to do</span>
+        <textarea
+          value={assignment} onChange={e => setAssignment(e.target.value)}
+          placeholder="Write the full instructions here — as much room as you need."
+          rows={6}
+          className="w-full bg-white border border-[#E2DDD1] rounded-xl px-4 py-3 text-[14px] text-ink placeholder-[#A39C8A] outline-none focus:border-brand transition resize-none leading-relaxed"
+        />
+      </label>
+      <label className="block mb-1.5">
+        <span className="block text-[13px] font-semibold text-ink mb-1.5">Attachments (optional)</span>
+      </label>
+      <FileDropzone files={files} onChange={setFiles} multiple />
+      <TextField
+        label="Success criteria" value={criteria} onChange={setCriteria}
+        placeholder="e.g. Original, scalable to 16px, with a one-paragraph rationale"
+        hint="Visible to the student too. What a tutor checks the work against when they verify it."
+      />
+      <label className="block mb-5">
+        <span className="block text-[13px] font-semibold text-ink mb-1.5">Deadline (optional)</span>
+        <input
+          type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
+          className="w-full bg-white border border-[#E2DDD1] rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+        />
+      </label>
+      <GroupPicker organisationId={user?.organisation_id} value={groupId} onChange={setGroupId} />
+      <label className="block mb-5">
+        <span className="block text-[13px] font-semibold text-ink mb-1.5">Visibility</span>
+        <div className="flex gap-2">
+          {(['private', 'public'] as const).map(v => (
+            <button
+              key={v} type="button" onClick={() => setVisibility(v)}
+              className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold capitalize transition ${
+                visibility === v ? 'bg-brand text-white' : 'bg-white border border-[#E2DDD1] text-[#6B6558]'
+              }`}
+            >
+              {v === 'private' ? 'Private — join code only' : 'Public'}
+            </button>
+          ))}
+        </div>
+      </label>
+      <PrimaryButton onClick={handleSubmit} loading={loading}>Create</PrimaryButton>
     </div>
   )
 }
@@ -172,42 +397,43 @@ function CreateBriefForm({ onCreated }: { onCreated: () => void }) {
 function UploadExistingWorkForm({ onCreated }: { onCreated: () => void }) {
   const { user } = useAuth()
   const [title, setTitle] = useState('')
+  const [topic, setTopic] = useState('')
   const [criteria, setCriteria] = useState('')
-  const [content, setContent] = useState('')
-  const [students, setStudents] = useState<any[]>([])
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [groupId, setGroupId] = useState('')
+  const [files, setFiles] = useState<File[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    if (!user?.organisation_id) return
-    getOrgStudents(user.organisation_id).then(({ data }) => setStudents(data || []))
-  }, [user?.organisation_id])
-
-  const toggle = (id: string) => setSelected(prev => {
-    const next = new Set(prev)
-    next.has(id) ? next.delete(id) : next.add(id)
-    return next
-  })
 
   const handleSubmit = async () => {
     setError('')
     if (!title.trim()) return setError('Give it a title.')
     if (!criteria.trim()) return setError('Criteria is required — this is what makes the tick mean something.')
-    if (!content.trim()) return setError('Describe or reference the existing work being marked.')
-    if (selected.size === 0) return setError('Select at least one student this work belongs to.')
+    if (!groupId) return setError('Choose which class/group this work belongs to.')
+    if (files.length === 0) return setError('Attach the existing work — drag it in or choose a file.')
     if (!user?.organisation_id) return
 
     setLoading(true)
+    const { data: members, error: membersError } = await getGroupMembers(groupId)
+    if (membersError || !members || members.length === 0) {
+      setLoading(false)
+      return setError('That group has no students in it yet.')
+    }
+
     const { data: workItem, error: createError } = await createWorkItem(user.organisation_id, user.id, {
-      type: 'brief', title: title.trim(), criteria: criteria.trim(), visibility: 'private',
+      type: 'brief', title: title.trim(), topic: topic.trim() || undefined,
+      criteria: criteria.trim(), group_id: groupId, visibility: 'private',
     })
     if (createError || !workItem) { setLoading(false); return setError(createError?.message || 'Could not create the brief.') }
 
-    const { error: submitError } = await submitWorkForStudents(Array.from(selected), (workItem as any).id, content.trim())
+    const file = files[0]
+    for (const member of members) {
+      const { path, error: uploadError } = await uploadSubmissionFileFor(member.id, file)
+      if (uploadError || !path) { setLoading(false); return setError(`Brief created, but uploading for ${member.full_name} failed: ${uploadError?.message}`); }
+      const { error: submitError } = await submitWorkForStudents([member.id], (workItem as any).id, '', { path, type: file.type, size: file.size })
+      if (submitError) { setLoading(false); return setError(`Brief created, but marking ${member.full_name}'s work failed: ${submitError.message}`) }
+    }
     setLoading(false)
-    if (submitError) return setError(`Brief created, but attaching the work failed: ${submitError.message}`)
-    setTitle(''); setCriteria(''); setContent(''); setSelected(new Set())
+    setTitle(''); setTopic(''); setCriteria(''); setGroupId(''); setFiles([])
     onCreated()
   }
 
@@ -215,42 +441,18 @@ function UploadExistingWorkForm({ onCreated }: { onCreated: () => void }) {
     <div className="bg-[#FBF9F4] border border-[#EDE9E1] rounded-xl p-5">
       <ErrorBanner message={error} />
       <TextField label="Title" value={title} onChange={setTitle} placeholder="Year 11 Coursework — Unit 3" autoFocus />
+      <TextField label="Topic / subject" value={topic} onChange={setTopic} placeholder="e.g. GCSE Photography" />
+      <label className="block mb-1.5">
+        <span className="block text-[13px] font-semibold text-ink mb-1.5">The existing work</span>
+      </label>
+      <FileDropzone files={files} onChange={setFiles} />
       <TextField
-        label="Criteria — what success looks like"
-        value={criteria} onChange={setCriteria}
+        label="Success criteria" value={criteria} onChange={setCriteria}
         placeholder="e.g. Meets the exam board's grade 5+ descriptor"
         hint="What a tutor checks the existing work against when they verify it."
       />
-      <TextField
-        label="The existing work"
-        value={content} onChange={setContent}
-        placeholder="Describe or reference the coursework/exam work being marked (a link, file reference, or summary)"
-        hint="This already happened outside LERN — no new marking, just verification."
-      />
-      <label className="block mb-5">
-        <span className="block text-[13px] font-semibold text-ink mb-1.5">Which students is this for?</span>
-        {students.length === 0 ? (
-          <p className="text-[13px] text-[#8A8373]">No students have joined yet.</p>
-        ) : (
-          <div className="max-h-48 overflow-y-auto border border-[#E2DDD1] rounded-lg divide-y divide-[#EDE9E1]">
-            {students.map(s => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => toggle(s.id)}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 text-left hover:bg-white transition"
-              >
-                <span className="text-[13px] text-ink">{s.full_name}</span>
-                <span className={`w-4.5 h-4.5 rounded flex items-center justify-center flex-shrink-0 ${
-                  selected.has(s.id) ? 'bg-brand text-white' : 'border border-[#C9C2B2]'
-                }`}>
-                  {selected.has(s.id) && <Check className="w-3 h-3" />}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </label>
+      <GroupPicker organisationId={user?.organisation_id} value={groupId} onChange={setGroupId} required />
+      <p className="text-[12px] text-[#8A8373] mb-4">This already happened outside LERN — no new marking, just verification. Every student currently in the group gets this marked as their submission, ready to review.</p>
       <PrimaryButton onClick={handleSubmit} loading={loading}>Create and send to review</PrimaryButton>
     </div>
   )
