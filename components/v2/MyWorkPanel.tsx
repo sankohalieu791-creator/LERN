@@ -118,7 +118,7 @@ function WorkItemCard({
           <p className="text-[12px] font-semibold text-[#8A8373] uppercase tracking-wide mb-1">Criteria</p>
           <p className="text-[13px] text-[#4A453B] mb-4">{item.criteria}</p>
 
-          {item.type === 'workshop' && (
+          {(item.type === 'workshop' || item.type === 'course') && (
             <div className="mb-4">
               {item.mode === 'online' && item.ended_at ? (
                 <span className="inline-flex items-center gap-1.5 bg-[#F5F1E8] text-[#8A8373] font-semibold text-[13px] px-4 py-2 rounded-lg">

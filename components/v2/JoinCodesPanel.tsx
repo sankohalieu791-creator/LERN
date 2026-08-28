@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { generateJoinCode, revokeJoinCode, listJoinCodes } from '@/lib/supabase'
 import type { JoinCode } from '@/lib/types'
+import { ErrorBanner } from '@/components/v2/Field'
 import { Copy, Check, Ban } from 'lucide-react'
 
 export default function JoinCodesPanel() {
@@ -11,22 +12,30 @@ export default function JoinCodesPanel() {
   const [codes, setCodes] = useState<JoinCode[]>([])
   const [generating, setGenerating] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [error, setError] = useState('')
 
-  useEffect(() => {
+  const load = () => {
     if (!user?.organisation_id) return
-    listJoinCodes(user.organisation_id).then(({ data }) => setCodes(data || []))
-  }, [user?.organisation_id])
+    listJoinCodes(user.organisation_id).then(({ data, error: err }) => {
+      if (err) return setError(err.message)
+      setCodes(data || [])
+    })
+  }
+  useEffect(load, [user?.organisation_id])
 
   const handleGenerate = async () => {
-    if (!user?.organisation_id) return
-    setGenerating(true)
-    const { data } = await generateJoinCode(user.organisation_id, user.id, null)
+    if (!user?.organisation_id) { setError('No organisation found on your account — try signing out and back in.'); return }
+    setGenerating(true); setError('')
+    const { data, error: err } = await generateJoinCode(user.organisation_id, user.id, null)
     setGenerating(false)
+    if (err) return setError(err.message)
     if (data) setCodes(prev => [data as JoinCode, ...prev])
   }
 
   const handleRevoke = async (id: string) => {
-    await revokeJoinCode(id)
+    setError('')
+    const { error: err } = await revokeJoinCode(id)
+    if (err) return setError(err.message)
     setCodes(prev => prev.map(c => c.id === id ? { ...c, revoked: true } : c))
   }
 
@@ -38,6 +47,7 @@ export default function JoinCodesPanel() {
 
   return (
     <div>
+      <ErrorBanner message={error} />
       <div className="flex items-center justify-between mb-5">
         <p className="font-bold text-ink text-[15px]">Join codes</p>
         <button

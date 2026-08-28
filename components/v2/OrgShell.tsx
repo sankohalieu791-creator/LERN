@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { useResolvedTheme } from '@/context/ThemeProvider'
 import { setSidebarCollapsed, signOut, supabase } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight, Bell, Settings, User as UserIcon, Plus, LogOut } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Settings, User as UserIcon, Plus, LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import Logo from '@/components/v2/Logo'
+import NotificationsBell from '@/components/v2/NotificationsBell'
 
 export interface NavItem { key: string; label: string; icon: LucideIcon; href: string }
 
@@ -23,6 +25,7 @@ export default function OrgShell({
   children: React.ReactNode
 }) {
   const { user } = useAuth()
+  const theme = useResolvedTheme()
   const pathname = usePathname()
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
@@ -50,7 +53,7 @@ export default function OrgShell({
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
 
   return (
-    <div className="min-h-screen bg-paper flex">
+    <div data-theme={theme} className="min-h-screen bg-paper flex">
       {/* ── Laptop sidebar ── */}
       <aside className={`hidden lg:flex flex-col border-r border-edge-subtle bg-surface transition-[width] duration-150 flex-shrink-0 ${collapsed ? 'w-[72px]' : 'w-60'}`}>
         <div className={`flex items-center h-16 px-4 flex-shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>
@@ -85,9 +88,7 @@ export default function OrgShell({
           <div className="lg:hidden"><Logo size="sm" /></div>
           <div className="hidden lg:block text-[14px] font-semibold text-ink-secondary truncate">{orgName}</div>
           <div className="flex items-center gap-1">
-            <button aria-label="Notifications" className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition">
-              <Bell className="w-[18px] h-[18px]" />
-            </button>
+            <NotificationsBell />
             <button
               aria-label="Settings" onClick={() => router.push(`${sections[0].href.split('/').slice(0, 2).join('/')}/settings`)}
               className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition"

@@ -94,14 +94,14 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
           <span className="flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Due {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
         )}
         <span className="flex items-center gap-1"><Users2 className="w-3.5 h-3.5" /> {item.groups?.name || 'Whole organisation'}</span>
-        {item.type === 'workshop' && item.mode === 'online' && (
+        {(item.type === 'workshop' || item.type === 'course') && item.mode === 'online' && (
           <span className="flex items-center gap-1 text-success-text font-semibold"><Video className="w-3.5 h-3.5" /> Online</span>
         )}
-        {item.type === 'workshop' && item.mode === 'in_person' && (
+        {(item.type === 'workshop' || item.type === 'course') && item.mode === 'in_person' && (
           <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {item.location || 'In person'}</span>
         )}
       </div>
-      {item.type === 'workshop' && item.mode === 'online' && (
+      {(item.type === 'workshop' || item.type === 'course') && item.mode === 'online' && (
         item.ended_at ? (
           <span className="inline-flex items-center gap-1.5 bg-surface-muted text-ink-tertiary font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3">
             <Video className="w-3.5 h-3.5" /> Ended
@@ -249,12 +249,15 @@ function FileDropzone({ files, onChange, multiple }: { files: File[]; onChange: 
   )
 }
 
-// Courses/Workshops — same simpler field set as before.
+// Courses/Workshops — both online-or-in-person, both with a real
+// deadline and topic/description, not just a bare title+criteria.
 function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: () => void }) {
   const { user } = useAuth()
   const [title, setTitle] = useState('')
+  const [topic, setTopic] = useState('')
   const [description, setDescription] = useState('')
   const [criteria, setCriteria] = useState('')
+  const [deadline, setDeadline] = useState('')
   const [visibility, setVisibility] = useState<'public' | 'private'>('private')
   const [mode, setMode] = useState<'online' | 'in_person'>('online')
   const [location, setLocation] = useState('')
@@ -265,17 +268,18 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
     setError('')
     if (!title.trim()) return setError('Give it a title.')
     if (!criteria.trim()) return setError('Criteria is required — this is what the tutor checks the work against, and what makes the green tick mean something.')
-    if (type === 'workshop' && mode === 'in_person' && !location.trim()) return setError('Add where the workshop is happening.')
+    if (mode === 'in_person' && !location.trim()) return setError(`Add where the ${type} is happening.`)
     if (!user?.organisation_id) return
 
     setLoading(true)
     const { error: createError } = await createWorkItem(user.organisation_id, user.id, {
-      type, title: title.trim(), description: description.trim() || undefined, criteria: criteria.trim(), visibility,
-      ...(type === 'workshop' ? { mode, location: mode === 'in_person' ? location.trim() : undefined } : {}),
+      type, title: title.trim(), topic: topic.trim() || undefined, description: description.trim() || undefined,
+      criteria: criteria.trim(), visibility, deadline: deadline || null,
+      mode, location: mode === 'in_person' ? location.trim() : undefined,
     })
     setLoading(false)
     if (createError) return setError(createError.message)
-    setTitle(''); setDescription(''); setCriteria(''); setLocation('')
+    setTitle(''); setTopic(''); setDescription(''); setCriteria(''); setDeadline(''); setLocation('')
     onCreated()
   }
 
@@ -283,38 +287,44 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
     <div className="bg-surface-subtle border border-edge-subtle rounded-xl p-5 mb-5">
       <ErrorBanner message={error} />
       <TextField label="Title" value={title} onChange={setTitle} placeholder={type === 'course' ? 'Intro to Web Development' : 'Design a mobile app icon'} autoFocus />
-      <TextField label="Description (optional)" value={description} onChange={setDescription} placeholder="What's this about?" />
+      <TextField label="Topic / subject (optional)" value={topic} onChange={setTopic} placeholder={type === 'course' ? 'e.g. Web Development' : 'e.g. Graphic Design'} />
+      <TextField label="Description" value={description} onChange={setDescription} placeholder="What will students learn or do?" />
       <TextField
         label="Criteria — what success looks like"
         value={criteria} onChange={setCriteria}
         placeholder="e.g. Original, scalable to 16px, with a one-paragraph rationale"
         hint="Visible to students too. This is what a tutor checks the work against when they verify it."
       />
-      {type === 'workshop' && (
-        <label className="block mb-4">
-          <span className="block text-[13px] font-semibold text-ink mb-1.5">Where</span>
-          <div className="flex gap-2 mb-2">
-            {(['online', 'in_person'] as const).map(m => (
-              <button
-                key={m} type="button" onClick={() => setMode(m)}
-                className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${
-                  mode === m ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
-                }`}
-              >
-                {m === 'online' ? 'Online' : 'In person'}
-              </button>
-            ))}
-          </div>
-          {mode === 'in_person' ? (
-            <input
-              value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Room 4B, main campus"
-              className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
-            />
-          ) : (
-            <p className="text-[12px] text-ink-tertiary">A live video room is created automatically — everyone joins from the workshop card.</p>
-          )}
-        </label>
-      )}
+      <label className="block mb-4">
+        <span className="block text-[13px] font-semibold text-ink mb-1.5">Deadline (optional)</span>
+        <input
+          type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
+          className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+        />
+      </label>
+      <label className="block mb-4">
+        <span className="block text-[13px] font-semibold text-ink mb-1.5">Where</span>
+        <div className="flex gap-2 mb-2">
+          {(['online', 'in_person'] as const).map(m => (
+            <button
+              key={m} type="button" onClick={() => setMode(m)}
+              className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${
+                mode === m ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
+              }`}
+            >
+              {m === 'online' ? 'Online' : 'In person'}
+            </button>
+          ))}
+        </div>
+        {mode === 'in_person' ? (
+          <input
+            value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Room 4B, main campus"
+            className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
+          />
+        ) : (
+          <p className="text-[12px] text-ink-tertiary">A live video room is created automatically — everyone joins from the {type} card.</p>
+        )}
+      </label>
       <label className="block mb-5">
         <span className="block text-[13px] font-semibold text-ink mb-1.5">Visibility</span>
         <div className="flex gap-2">

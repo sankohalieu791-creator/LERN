@@ -586,3 +586,33 @@ export const resolveReport = async (reportId: string, reviewerId: string, status
     .eq('id', reportId)
   return { error }
 }
+
+// ── In-app notifications ─────────────────────────────────────────
+export const getMyNotifications = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, type, read, created_at, submissions(work_items(title))')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(30)
+  return { data, error }
+}
+
+export const getUnreadNotificationCount = async (userId: string) => {
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('read', false)
+  return { count: count || 0, error }
+}
+
+export const markNotificationRead = async (id: string) => {
+  const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id)
+  return { error }
+}
+
+export const markAllNotificationsRead = async (userId: string) => {
+  const { error } = await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false)
+  return { error }
+}
