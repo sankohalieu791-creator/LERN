@@ -148,6 +148,7 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
   const [inSession, setInSession] = useState(false)
   const [confirmingRevoke, setConfirmingRevoke] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState('')
 
   const start = async () => {
     await startWorkItemSession(item.id) // fans out "session has started, join now" the first time only
@@ -157,16 +158,20 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
 
   const revoke = async () => {
     setBusy(true)
-    await closeWorkItem(item.id)
+    setActionError('')
+    const { error } = await closeWorkItem(item.id)
     setBusy(false)
     setConfirmingRevoke(false)
+    if (error) { setActionError(error.message); return }
     onChanged()
   }
 
   const reopen = async () => {
     setBusy(true)
-    await reopenWorkItem(item.id)
+    setActionError('')
+    const { error } = await reopenWorkItem(item.id)
     setBusy(false)
+    if (error) { setActionError(error.message); return }
     onChanged()
   }
 
@@ -233,6 +238,7 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
           </button>
         )
       )}
+      {actionError && <p className="text-[12px] text-danger-text mt-2">{actionError}</p>}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2.5 border-t border-edge-subtle">
           {attachments.map((a: any) => <AttachmentChip key={a.id} attachment={a} />)}

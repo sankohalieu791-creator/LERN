@@ -158,13 +158,21 @@ export const endWorkshop = async (workItemId: string) => {
 // Staff-only — revoke/withdraw a brief, course, or workshop. Never a
 // delete: a student's submissions/verifications against it stay intact
 // and reviewable, it just stops being offered to students from here on.
+// .select().single() is deliberate here, not decoration — an UPDATE
+// that RLS silently narrows to zero matching rows still comes back as
+// { error: null } from a bare .update(), so a caller with no
+// organisation_id match (e.g. the work item belongs to a different
+// org) would look like it worked and just... not do anything. Asking
+// for the row back turns that into a real, visible error.
 export const closeWorkItem = async (workItemId: string) => {
-  const { error } = await supabase.from('work_items').update({ closed_at: new Date().toISOString() }).eq('id', workItemId)
+  const { data, error } = await supabase.from('work_items').update({ closed_at: new Date().toISOString() }).eq('id', workItemId).select().single()
+  if (!error && !data) return { error: { message: "Couldn't revoke this — it may not belong to your organisation." } as any }
   return { error }
 }
 
 export const reopenWorkItem = async (workItemId: string) => {
-  const { error } = await supabase.from('work_items').update({ closed_at: null }).eq('id', workItemId)
+  const { data, error } = await supabase.from('work_items').update({ closed_at: null }).eq('id', workItemId).select().single()
+  if (!error && !data) return { error: { message: "Couldn't reopen this — it may not belong to your organisation." } as any }
   return { error }
 }
 
