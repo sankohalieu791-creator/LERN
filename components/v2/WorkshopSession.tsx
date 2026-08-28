@@ -2,25 +2,57 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack, ILocalVideoTrack } from 'agora-rtc-sdk-ng'
-import { X, Mic, MicOff, Video, VideoOff, ScreenShare, PhoneOff, Users, Square } from 'lucide-react'
-import { endWorkshop } from '@/lib/supabase'
+import { useAuth } from '@/context/AuthContext'
+import { supabase, endWorkshop, getWorkshopMessages, sendWorkshopMessage } from '@/lib/supabase'
+import {
+  X, Mic, MicOff, Video, VideoOff, ScreenShare, PhoneOff, Users, Square,
+  MessageSquare, HelpCircle, Send,
+} from 'lucide-react'
 
 const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!
 
-// A live online workshop room — real Agora RTC (camera, mic, screen share,
-// everyone's video tiles), same SDK/token pattern as the old platform's
-// classroom. Deliberately leaner than that one: no waiting room / hand-
-// raise / force-mute moderation layer, just "everyone in the room can see
-// and hear each other and share their screen" — the actual ask here.
+// A LERN user id doesn't fit Agora's numeric uid requirement, so the
+// channel uid is derived deterministically from it — stable across
+// rejoins, and the Presence channel below maps it back to a real name.
+function uidFromUserId(userId: string): number {
+  let hash = 0
+  for (let i = 0; i < userId.length; i++) hash = (hash * 31 + userId.charCodeAt(i)) | 0
+  return (Math.abs(hash) % 2147483646) + 1
+}
+
+function initials(name?: string) {
+  if (!name) return '?'
+  return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
+}
+
+type Participant = { uid: number; name: string; isHost: boolean }
+
+// A live online session room. Main-stage layout (Microsoft/Zoom-style):
+// one big feed up top, everyone else as a name+avatar strip underneath —
+// click a strip tile to bring that person's video to the main stage.
+// Real Agora RTC for media; a Supabase Realtime Presence channel
+// alongside it maps Agora's opaque numeric uids back to real names,
+// since Agora has no concept of a LERN identity on its own. Chat and
+// Q&A are a persisted table + Realtime subscription, not just a
+// broadcast, so someone joining late still sees what was said.
+//
+// Deliberately not in this pass, flagged rather than rushed: a waiting
+// room / admit-to-join gate, host mute/kick of a participant, and cloud
+// recording (the last one needs Agora Cloud Recording + a storage
+// bucket set up outside this codebase).
 export default function WorkshopSession({
   workItemId, title, canEnd, onClose, onEnded,
 }: { workItemId: string; title: string; canEnd?: boolean; onClose: () => void; onEnded?: () => void }) {
+  const { user } = useAuth()
   const channelName = `workshop-${workItemId}`
+  const myUid = user ? uidFromUserId(user.id) : 0
+
   const clientRef = useRef<IAgoraRTCClient | null>(null)
   const cameraRef = useRef<ICameraVideoTrack | null>(null)
   const micRef = useRef<IMicrophoneAudioTrack | null>(null)
   const screenRef = useRef<ILocalVideoTrack | null>(null)
-  const selfTileRef = useRef<HTMLDivElement>(null)
+  const mainStageRef = useRef<HTMLDivElement>(null)
+  const presenceRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const [connecting, setConnecting] = useState(true)
   const [joined, setJoined] = useState(false)
@@ -29,15 +61,20 @@ export default function WorkshopSession({
   const [cameraOn, setCameraOn] = useState(false)
   const [micOn, setMicOn] = useState(false)
   const [screenSharing, setScreenSharing] = useState(false)
+  const [mainUid, setMainUid] = useState<number>(myUid) // whose feed is on the main stage — starts on self
+  const [participants, setParticipants] = useState<Record<number, Participant>>({})
+  const [panel, setPanel] = useState<'none' | 'chat' | 'qa'>('none')
+  const [messages, setMessages] = useState<any[]>([])
+  const [draft, setDraft] = useState('')
 
   const join = useCallback(async () => {
-    if (clientRef.current) return
+    if (clientRef.current || !user) return
     setConnecting(true)
     setError('')
     try {
       let token: string | null = null
       try {
-        const res = await fetch(`/api/agora-token?channel=${encodeURIComponent(channelName)}&uid=0`)
+        const res = await fetch(`/api/agora-token?channel=${encodeURIComponent(channelName)}&uid=${myUid}`)
         if (res.ok) token = (await res.json()).token ?? null
       } catch {}
 
@@ -48,7 +85,7 @@ export default function WorkshopSession({
       client.on('user-published', async (remoteUser, mediaType) => {
         await client.subscribe(remoteUser, mediaType)
         if (mediaType === 'audio') remoteUser.audioTrack?.play()
-        setRemoteUsers(prev => prev.find(u => u.uid === remoteUser.uid) ? [...prev] : [...prev, remoteUser])
+        setRemoteUsers(prev => prev.find(u => u.uid === remoteUser.uid) ? prev.map(u => u.uid === remoteUser.uid ? remoteUser : u) : [...prev, remoteUser])
       })
       client.on('user-unpublished', (remoteUser, mediaType) => {
         if (mediaType === 'video') remoteUser.videoTrack?.stop()
@@ -59,15 +96,31 @@ export default function WorkshopSession({
       })
 
       clientRef.current = client
-      await client.join(APP_ID, channelName, token, null)
+      await client.join(APP_ID, channelName, token, myUid)
       setJoined(true)
+
+      // Presence: tell everyone else who's actually behind this uid.
+      const presence = supabase.channel(`presence-${channelName}`, { config: { presence: { key: String(myUid) } } })
+      presence.on('presence', { event: 'sync' }, () => {
+        const state = presence.presenceState()
+        const next: Record<number, Participant> = {}
+        for (const key of Object.keys(state)) {
+          const entry: any = (state[key] as any[])[0]
+          if (entry) next[Number(key)] = { uid: Number(key), name: entry.name, isHost: entry.isHost }
+        }
+        setParticipants(next)
+      })
+      presence.subscribe(async status => {
+        if (status === 'SUBSCRIBED') await presence.track({ name: user.full_name, isHost: !!canEnd })
+      })
+      presenceRef.current = presence
     } catch (err: any) {
       setError(err?.message || 'Could not connect to the session.')
       clientRef.current = null
     } finally {
       setConnecting(false)
     }
-  }, [channelName])
+  }, [channelName, myUid, user, canEnd])
 
   useEffect(() => {
     join()
@@ -77,18 +130,36 @@ export default function WorkshopSession({
       screenRef.current?.close()
       clientRef.current?.leave().catch(() => {})
       clientRef.current = null
+      presenceRef.current?.unsubscribe()
+      presenceRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Re-render remote video into their tile whenever the DOM node for that
-  // uid exists (tiles mount after remoteUsers updates).
+  // Chat / Q&A: load history once, then live-append via Realtime.
   useEffect(() => {
-    for (const u of remoteUsers) {
-      const el = document.getElementById(`remote-${u.uid}`)
-      if (el && u.videoTrack) u.videoTrack.play(el)
+    getWorkshopMessages(workItemId).then(({ data }) => setMessages(data || []))
+    const channel = supabase
+      .channel(`workshop-messages-${workItemId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'workshop_messages', filter: `work_item_id=eq.${workItemId}` },
+        payload => setMessages(prev => [...prev, payload.new]))
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [workItemId])
+
+  // Whichever uid is "on stage" gets its video played into the main
+  // element — self and remote share the same mechanism, just a
+  // different track source.
+  useEffect(() => {
+    if (!mainStageRef.current) return
+    if (mainUid === myUid) {
+      if (cameraOn && cameraRef.current) cameraRef.current.play(mainStageRef.current)
+      else if (screenSharing && screenRef.current) screenRef.current.play(mainStageRef.current)
+    } else {
+      const remote = remoteUsers.find(u => u.uid === mainUid)
+      if (remote?.videoTrack) remote.videoTrack.play(mainStageRef.current)
     }
-  }, [remoteUsers])
+  }, [mainUid, cameraOn, screenSharing, remoteUsers, myUid])
 
   const toggleCamera = async () => {
     if (!clientRef.current) return
@@ -98,7 +169,7 @@ export default function WorkshopSession({
         const video = await AgoraRTC.createCameraVideoTrack()
         cameraRef.current = video
         await clientRef.current.publish([video])
-        if (selfTileRef.current) video.play(selfTileRef.current)
+        if (mainUid === myUid && mainStageRef.current) video.play(mainStageRef.current)
         setCameraOn(true)
       } else {
         if (cameraRef.current) {
@@ -144,7 +215,8 @@ export default function WorkshopSession({
         const track = Array.isArray(result) ? result[0] : result
         screenRef.current = track
         await clientRef.current.publish([track])
-        if (selfTileRef.current) track.play(selfTileRef.current)
+        setMainUid(myUid) // sharing your screen brings you to the main stage
+        if (mainStageRef.current) track.play(mainStageRef.current)
         setScreenSharing(true)
         track.on('track-ended', async () => {
           await clientRef.current?.unpublish([track])
@@ -178,16 +250,40 @@ export default function WorkshopSession({
     onEnded?.()
   }
 
+  const send = async () => {
+    if (!draft.trim() || !user) return
+    await sendWorkshopMessage(workItemId, user.id, panel === 'qa' ? 'question' : 'chat', draft.trim())
+    setDraft('')
+  }
+
+  const allTiles: Participant[] = [
+    { uid: myUid, name: user?.full_name ? `${user.full_name} (you)` : 'You', isHost: !!canEnd },
+    ...remoteUsers.map(u => participants[u.uid as number] || { uid: u.uid as number, name: 'Participant', isHost: false }),
+  ]
+  const visibleMessages = messages.filter(m => panel === 'qa' ? m.kind === 'question' : m.kind === 'chat')
+
   return (
     <div className="fixed inset-0 z-50 bg-[#141110] flex flex-col">
       <div className="flex items-center justify-between px-5 py-3.5 flex-shrink-0">
         <div>
           <p className="text-white font-bold text-[15px]">{title}</p>
           <p className="text-[#8A8373] text-[12px] flex items-center gap-1.5">
-            <Users className="w-3.5 h-3.5" /> {remoteUsers.length + (joined ? 1 : 0)} in the room
+            <Users className="w-3.5 h-3.5" /> {allTiles.length} in the room
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPanel(p => p === 'chat' ? 'none' : 'chat')}
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition ${panel === 'chat' ? 'bg-brand text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+          >
+            <MessageSquare className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setPanel(p => p === 'qa' ? 'none' : 'qa')}
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition ${panel === 'qa' ? 'bg-brand text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
           {canEnd && (
             <button onClick={endForEveryone} className="flex items-center gap-1.5 bg-[#B3401E] hover:bg-[#9c3419] text-white text-[12px] font-semibold px-3 py-2 rounded-full transition">
               <Square className="w-3 h-3 fill-current" /> End for everyone
@@ -199,26 +295,80 @@ export default function WorkshopSession({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 pb-4">
-        {connecting ? (
-          <div className="h-full flex items-center justify-center text-[#8A8373]">Connecting…</div>
-        ) : error ? (
-          <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
-            <p className="text-white font-semibold">{error}</p>
-            <button onClick={join} className="text-brand font-semibold text-[13px]">Try again</button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div ref={selfTileRef} className="aspect-video bg-[#221D19] rounded-xl relative overflow-hidden flex items-center justify-center">
-              {!cameraOn && !screenSharing && <VideoOff className="w-6 h-6 text-[#5A544A]" />}
-              <span className="absolute bottom-2 left-2.5 text-white text-[11px] font-semibold bg-black/40 px-2 py-0.5 rounded-full">You</span>
+      <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col px-5 pb-4 min-w-0">
+          {connecting ? (
+            <div className="flex-1 flex items-center justify-center text-[#8A8373]">Connecting…</div>
+          ) : error ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
+              <p className="text-white font-semibold">{error}</p>
+              <button onClick={join} className="text-brand font-semibold text-[13px]">Try again</button>
             </div>
-            {remoteUsers.map(u => (
-              <div key={u.uid} id={`remote-${u.uid}`} className="aspect-video bg-[#221D19] rounded-xl relative overflow-hidden flex items-center justify-center">
-                <VideoOff className="w-6 h-6 text-[#5A544A]" />
-                <span className="absolute bottom-2 left-2.5 text-white text-[11px] font-semibold bg-black/40 px-2 py-0.5 rounded-full">Participant</span>
+          ) : (
+            <>
+              {/* Main stage — one big rectangle */}
+              <div ref={mainStageRef} className="flex-1 min-h-0 bg-[#221D19] rounded-xl relative overflow-hidden flex items-center justify-center mb-3">
+                {!((mainUid === myUid && (cameraOn || screenSharing)) || remoteUsers.find(u => u.uid === mainUid)?.videoTrack) && (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-xl">
+                      {initials(participants[mainUid]?.name || (mainUid === myUid ? user?.full_name : undefined))}
+                    </div>
+                    <VideoOff className="w-4 h-4 text-[#5A544A]" />
+                  </div>
+                )}
+                <span className="absolute bottom-3 left-3.5 text-white text-[12px] font-semibold bg-black/40 px-2.5 py-1 rounded-full">
+                  {mainUid === myUid ? 'You' : participants[mainUid]?.name || 'Participant'}
+                </span>
               </div>
-            ))}
+
+              {/* Everyone else — name + avatar strip, click to bring to the main stage */}
+              <div className="flex gap-2.5 overflow-x-auto flex-shrink-0 pb-1">
+                {allTiles.map(p => (
+                  <button
+                    key={p.uid} onClick={() => setMainUid(p.uid)}
+                    className={`flex flex-col items-center gap-1.5 flex-shrink-0 w-16 rounded-lg py-2 transition ${p.uid === mainUid ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                  >
+                    <div className="relative">
+                      <div className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-[13px]">
+                        {initials(p.name)}
+                      </div>
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#1E7A34] border-2 border-[#141110]" />
+                    </div>
+                    <span className="text-[10px] text-[#B8AE9C] truncate w-full text-center">{p.isHost ? 'Host' : p.name.split(' ')[0]}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {panel !== 'none' && (
+          <div className="w-72 flex-shrink-0 border-l border-white/10 flex flex-col">
+            <div className="px-4 py-3 border-b border-white/10">
+              <p className="text-white font-semibold text-[13px]">{panel === 'qa' ? 'Q&A' : 'Chat'}</p>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5">
+              {visibleMessages.length === 0 ? (
+                <p className="text-[#8A8373] text-[12px]">{panel === 'qa' ? 'No questions yet.' : 'No messages yet.'}</p>
+              ) : (
+                visibleMessages.map(m => (
+                  <div key={m.id} className="text-[12px]">
+                    <span className="font-semibold text-white">{m.users?.full_name || 'Someone'}</span>
+                    <p className="text-[#D9D2C4] leading-snug">{m.content}</p>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="p-3 border-t border-white/10 flex gap-2">
+              <input
+                value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()}
+                placeholder={panel === 'qa' ? 'Ask a question…' : 'Say something…'}
+                className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-[12px] text-white placeholder-[#8A8373] outline-none"
+              />
+              <button onClick={send} className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white flex-shrink-0">
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -115,7 +115,7 @@ export const createWorkItem = async (
   fields: {
     type: 'brief' | 'course' | 'workshop'; title: string; description?: string; criteria: string
     visibility?: 'public' | 'private'; topic?: string; assignment?: string; deadline?: string | null; group_id?: string | null
-    mode?: 'online' | 'in_person'; location?: string
+    mode?: 'online' | 'in_person'; location?: string; starts_at?: string | null
   }
 ) => {
   const { data, error } = await supabase
@@ -145,6 +145,14 @@ export const uploadWorkItemAttachment = async (workItemId: string, uploadedBy: s
 // existing "work_items: staff update" RLS policy, no new policy needed.
 export const endWorkshop = async (workItemId: string) => {
   const { error } = await supabase.from('work_items').update({ ended_at: new Date().toISOString() }).eq('id', workItemId)
+  return { error }
+}
+
+// Staff-only, called the moment the host actually opens the room —
+// records started_at and fans out a "session has started, join now"
+// notification (first time only; rejoining doesn't re-notify).
+export const startWorkItemSession = async (workItemId: string) => {
+  const { error } = await supabase.rpc('start_work_item_session', { p_work_item_id: workItemId })
   return { error }
 }
 
@@ -612,7 +620,7 @@ export const resolveReport = async (reportId: string, reviewerId: string, status
 export const getMyNotifications = async (userId: string) => {
   const { data, error } = await supabase
     .from('notifications')
-    .select('id, type, read, created_at, submissions(work_items(title))')
+    .select('id, type, read, created_at, submissions(work_items(title)), work_items(title)')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(30)
@@ -635,5 +643,21 @@ export const markNotificationRead = async (id: string) => {
 
 export const markAllNotificationsRead = async (userId: string) => {
   const { error } = await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false)
+  return { error }
+}
+
+// ── Live-session chat / Q&A ─────────────────────────────────────
+export const getWorkshopMessages = async (workItemId: string) => {
+  const { data, error } = await supabase
+    .from('workshop_messages')
+    .select('id, sender_id, kind, content, created_at, users(full_name)')
+    .eq('work_item_id', workItemId)
+    .order('created_at', { ascending: true })
+    .limit(200)
+  return { data, error }
+}
+
+export const sendWorkshopMessage = async (workItemId: string, senderId: string, kind: 'chat' | 'question', content: string) => {
+  const { error } = await supabase.from('workshop_messages').insert([{ work_item_id: workItemId, sender_id: senderId, kind, content }])
   return { error }
 }

@@ -91,6 +91,8 @@ export interface WorkItem {
   group_id?: string
   mode?: 'online' | 'in_person'
   location?: string
+  starts_at?: string
+  started_at?: string
   ended_at?: string
   criteria: string
   visibility: 'public' | 'private'

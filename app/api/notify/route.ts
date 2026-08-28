@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
       id, type,
       users!notifications_user_id_fkey(email, full_name, notification_prefs),
       submissions(id, work_items(title)),
+      work_items(title),
       reports(reason)
     `)
     .eq('id', notification_id)
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ skipped: true, reason: 'opted out' })
   }
 
-  const workTitle = (notification as any).submissions?.work_items?.title
+  const workTitle = (notification as any).submissions?.work_items?.title || (notification as any).work_items?.title
   const first = recipient.full_name?.split(' ')[0] || 'there'
 
   const copy: Record<string, { subject: string; body: string }> = {
@@ -86,6 +87,10 @@ export async function POST(req: NextRequest) {
     report: {
       subject: 'A concern has been reported',
       body: `Hi ${first},\n\nSomeone has raised a concern that needs your organisation's attention. It's already been auto-hidden pending review.\n\nReview it: ${APP_URL}`,
+    },
+    session_started: {
+      subject: `The session has started — join now${workTitle ? `: ${workTitle}` : ''}`,
+      body: `Hi ${first},\n\n${workTitle ? `"${workTitle}"` : 'Your session'} has started.\n\nJoin now: ${APP_URL}`,
     },
   }
 

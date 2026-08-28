@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { getVisibleWorkItems, getMySubmissions, submitWork, uploadSubmissionFile, setShareVisibility, getSignedFileUrl, redeemJoinCode } from '@/lib/supabase'
 import { PrimaryButton, SecondaryButton, TextField, ErrorBanner } from '@/components/v2/Field'
 import type { WorkItem, Submission } from '@/lib/types'
-import { CheckCircle2, Clock, RotateCcw, Ban, Globe, Users, Paperclip, X, Video, MapPin, KeyRound } from 'lucide-react'
+import { CheckCircle2, Clock, RotateCcw, Ban, Globe, Users, Paperclip, X, Video, MapPin, KeyRound, CalendarClock } from 'lucide-react'
 import WorkshopSession from '@/components/v2/WorkshopSession'
 
 const STATUS: Record<string, { label: string; cls: string; icon: any }> = {
@@ -124,6 +124,10 @@ function WorkItemCard({
                 <span className="inline-flex items-center gap-1.5 bg-[#F5F1E8] text-[#8A8373] font-semibold text-[13px] px-4 py-2 rounded-lg">
                   <Video className="w-4 h-4" /> Ended
                 </span>
+              ) : item.mode === 'online' && !item.started_at && item.starts_at && new Date(item.starts_at) > new Date() ? (
+                <p className="flex items-center gap-1.5 text-[13px] text-[#6B6558]">
+                  <CalendarClock className="w-4 h-4" /> Starts {new Date(item.starts_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} — the join button appears once it's started.
+                </p>
               ) : item.mode === 'online' ? (
                 <button
                   onClick={() => setInSession(true)}

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getWorkItems, createWorkItem, getGroups, createGroup, getGroupMembers,
-  uploadWorkItemAttachment, uploadSubmissionFileFor, submitWorkForStudents, getSignedFileUrl,
+  uploadWorkItemAttachment, uploadSubmissionFileFor, submitWorkForStudents, getSignedFileUrl, startWorkItemSession,
 } from '@/lib/supabase'
 import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
 import WorkshopSession from '@/components/v2/WorkshopSession'
@@ -145,6 +145,13 @@ function BriefsPanel() {
 function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void }) {
   const attachments = item.work_item_attachments || []
   const [inSession, setInSession] = useState(false)
+
+  const start = async () => {
+    await startWorkItemSession(item.id) // fans out "session has started, join now" the first time only
+    setInSession(true)
+    onChanged()
+  }
+
   return (
     <div className="border border-edge-subtle rounded-xl px-4 py-3.5">
       <div className="flex items-center justify-between mb-1">
@@ -167,6 +174,9 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
         {(item.type === 'workshop' || item.type === 'course') && item.mode === 'in_person' && (
           <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {item.location || 'In person'}</span>
         )}
+        {(item.type === 'workshop' || item.type === 'course') && item.mode === 'online' && item.starts_at && !item.started_at && (
+          <span className="flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Starts {new Date(item.starts_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+        )}
       </div>
       {(item.type === 'workshop' || item.type === 'course') && item.mode === 'online' && (
         item.ended_at ? (
@@ -175,10 +185,10 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
           </span>
         ) : (
           <button
-            onClick={() => setInSession(true)}
+            onClick={start}
             className="flex items-center gap-1.5 bg-success-solid text-white font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3 hover:bg-success-solid-hover transition"
           >
-            <Video className="w-3.5 h-3.5" /> Start / join session
+            <Video className="w-3.5 h-3.5" /> {item.started_at ? 'Join session' : 'Start session'}
           </button>
         )
       )}
@@ -328,6 +338,7 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
   const [visibility, setVisibility] = useState<'public' | 'private'>('private')
   const [mode, setMode] = useState<'online' | 'in_person'>('online')
   const [location, setLocation] = useState('')
+  const [startsAt, setStartsAt] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -343,10 +354,11 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
       type, title: title.trim(), topic: topic.trim() || undefined, description: description.trim() || undefined,
       criteria: criteria.trim(), visibility, deadline: deadline || null,
       mode, location: mode === 'in_person' ? location.trim() : undefined,
+      starts_at: mode === 'online' && startsAt ? new Date(startsAt).toISOString() : null,
     })
     setLoading(false)
     if (createError) return setError(createError.message)
-    setTitle(''); setTopic(''); setDescription(''); setCriteria(''); setDeadline(''); setLocation('')
+    setTitle(''); setTopic(''); setDescription(''); setCriteria(''); setDeadline(''); setLocation(''); setStartsAt('')
     onCreated()
   }
 
@@ -389,7 +401,15 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
             className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
           />
         ) : (
-          <p className="text-[12px] text-ink-tertiary">A live video room is created automatically — everyone joins from the {type} card.</p>
+          <>
+            <p className="text-[12px] text-ink-tertiary mb-2">A live video room is created automatically — everyone joins from the {type} card.</p>
+            <span className="block text-[12px] font-semibold text-ink-secondary mb-1">Starts at (optional)</span>
+            <input
+              type="datetime-local" value={startsAt} onChange={e => setStartsAt(e.target.value)}
+              className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+            />
+            <p className="text-[11px] text-ink-tertiary mt-1">Students won't see a join button until this time. Leave blank to make it joinable right away.</p>
+          </>
         )}
       </label>
       <label className="block mb-5">

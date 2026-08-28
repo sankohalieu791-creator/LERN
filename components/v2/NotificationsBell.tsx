@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { getMyNotifications, getUnreadNotificationCount, markNotificationRead, markAllNotificationsRead } from '@/lib/supabase'
-import { Bell, CheckCircle2, RotateCcw, ClipboardCheck, Briefcase, Flag } from 'lucide-react'
+import { Bell, CheckCircle2, RotateCcw, ClipboardCheck, Briefcase, Flag, Video } from 'lucide-react'
 
 const TYPE_META: Record<string, { label: string; icon: any }> = {
   submission_received: { label: 'New work submitted for review', icon: ClipboardCheck },
@@ -11,6 +11,7 @@ const TYPE_META: Record<string, { label: string; icon: any }> = {
   work_returned: { label: 'Your work was returned for revision', icon: RotateCcw },
   employer_interest: { label: 'An employer showed interest', icon: Briefcase },
   report: { label: 'A concern was reported', icon: Flag },
+  session_started: { label: 'The session has started — join now', icon: Video },
 }
 
 function timeAgo(dateStr: string) {
@@ -96,7 +97,7 @@ export default function NotificationsBell() {
               {items.map(n => {
                 const meta = TYPE_META[n.type] || { label: 'Notification', icon: Bell }
                 const Icon = meta.icon
-                const title = n.submissions?.work_items?.title
+                const title = n.submissions?.work_items?.title || n.work_items?.title
                 return (
                   <button
                     key={n.id} onClick={() => openOne(n.id, n.read)}
