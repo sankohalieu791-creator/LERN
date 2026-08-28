@@ -25,6 +25,21 @@ function initials(name?: string) {
   return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
 }
 
+// The generic "Camera access denied" text was actively misleading —
+// most getUserMedia failures aren't a permission denial at all (no
+// device found, already in use by another app/tab, or the browser
+// rejecting the requested resolution). Surfacing the real reason is
+// the difference between a dead end and something the person can
+// actually act on.
+function cameraErrorMessage(e: any): string {
+  const name = (e?.name || '').toLowerCase()
+  if (name.includes('notallowed') || name.includes('permission')) return 'Camera/mic permission was denied — allow it in your browser\'s site settings and try again.'
+  if (name.includes('notfound') || name.includes('devicesnotfound')) return 'No camera or microphone found on this device.'
+  if (name.includes('notreadable') || name.includes('trackstart')) return 'Your camera or mic is already in use by another app or browser tab.'
+  if (name.includes('overconstrained')) return "Your camera doesn't support the requested video quality."
+  return `Camera/mic error: ${e?.message || e?.name || 'unknown failure'}`
+}
+
 // A dropped screen-share picker (user hits Cancel) surfaces under a few
 // different names/messages depending on browser — none of these are a
 // real failure worth showing an "Agora permission" error over.
@@ -187,27 +202,45 @@ export default function WorkshopSession({
 
   const toggleCamera = async () => {
     if (!clientRef.current) return
-    try {
+    if (!cameraOn) {
       const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
-      if (!cameraOn) {
-        // Square capture (not the default 16:9) so a chest-up framing
-        // actually fits the tile instead of a wide horizontal sliver.
-        // Higher resolution than before since the main stage now renders
-        // this much larger — 480p looked soft blown up to fill the box.
-        const video = await AgoraRTC.createCameraVideoTrack({ encoderConfig: { width: 720, height: 720, frameRate: 24, bitrateMax: 1200 } })
+      // Square capture (not the default 16:9) so a chest-up framing
+      // actually fits the tile instead of a wide horizontal sliver.
+      // Higher resolution than before since the main stage now renders
+      // this much larger — 480p looked soft blown up to fill the box.
+      let video: ICameraVideoTrack
+      try {
+        video = await AgoraRTC.createCameraVideoTrack({ encoderConfig: { width: 720, height: 720, frameRate: 24, bitrateMax: 1200 } })
+      } catch (e: any) {
+        // Not every webcam accepts a forced square capture (some reject
+        // an exact-resolution request outright — OverconstrainedError).
+        // Retry with the SDK's own default before giving up, so a strict
+        // resolution ask never means "camera just doesn't work."
+        try {
+          video = await AgoraRTC.createCameraVideoTrack()
+        } catch (e2: any) {
+          setActionError(cameraErrorMessage(e2))
+          return
+        }
+      }
+      try {
         cameraRef.current = video
         await clientRef.current.publish([video])
         if (mainUid === myUid && mainStageRef.current) video.play(mainStageRef.current, { fit: 'cover' })
         setCameraOn(true)
-      } else {
-        if (cameraRef.current) {
-          await clientRef.current.unpublish([cameraRef.current])
-          cameraRef.current.close()
-          cameraRef.current = null
-        }
-        setCameraOn(false)
+      } catch (e: any) {
+        video.close()
+        cameraRef.current = null
+        setActionError(cameraErrorMessage(e))
       }
-    } catch { setActionError('Camera access denied.') }
+    } else {
+      if (cameraRef.current) {
+        await clientRef.current.unpublish([cameraRef.current])
+        cameraRef.current.close()
+        cameraRef.current = null
+      }
+      setCameraOn(false)
+    }
   }
 
   const toggleMic = async () => {
@@ -227,7 +260,7 @@ export default function WorkshopSession({
         }
         setMicOn(false)
       }
-    } catch { setActionError('Microphone access denied.') }
+    } catch (e: any) { setActionError(cameraErrorMessage(e)) }
   }
 
   const toggleScreenShare = async () => {
