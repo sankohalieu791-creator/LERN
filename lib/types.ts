@@ -27,6 +27,21 @@ export interface User {
   group_id?: string
   sidebar_collapsed?: boolean
   consented_at?: string
+  theme_preference?: 'light' | 'dark' | 'system'
+  notification_prefs?: Record<string, boolean>
+  created_at: string
+}
+
+export interface Report {
+  id: string
+  reporter_id?: string
+  organisation_id?: string
+  target_type: 'post' | 'user' | 'submission' | 'general'
+  target_id?: string
+  reason: string
+  status: 'pending' | 'reviewed' | 'dismissed' | 'actioned'
+  reviewed_by?: string
+  reviewed_at?: string
   created_at: string
 }
 

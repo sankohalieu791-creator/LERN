@@ -88,7 +88,10 @@ export default function OrgShell({
             <button aria-label="Notifications" className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#F5F1E8] text-[#6B6558] transition">
               <Bell className="w-[18px] h-[18px]" />
             </button>
-            <button aria-label="Settings" className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#F5F1E8] text-[#6B6558] transition">
+            <button
+              aria-label="Settings" onClick={() => router.push(`${sections[0].href.split('/').slice(0, 2).join('/')}/settings`)}
+              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#F5F1E8] text-[#6B6558] transition"
+            >
               <Settings className="w-[18px] h-[18px]" />
             </button>
             <div className="relative">

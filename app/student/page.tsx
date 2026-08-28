@@ -5,9 +5,10 @@ import RoleGate from '@/components/v2/RoleGate'
 import DashboardShell from '@/components/v2/DashboardShell'
 import MyWorkPanel from '@/components/v2/MyWorkPanel'
 import FeedPanel from '@/components/v2/FeedPanel'
+import SettingsPanel from '@/components/v2/SettingsPanel'
 import { useAuth } from '@/context/AuthContext'
 
-type Tab = 'work' | 'feed' | 'profile'
+type Tab = 'work' | 'feed' | 'settings'
 
 function StudentHome() {
   const { user } = useAuth()
@@ -19,7 +20,7 @@ function StudentHome() {
       <p className="text-[#6B6558] mb-8">Submit work, track feedback, and see what's been verified.</p>
 
       <div className="flex gap-1 mb-6 border-b border-[#EDE9E1]">
-        {([['work', 'My Work'], ['feed', 'Feed'], ['profile', 'Profile']] as [Tab, string][]).map(([key, label]) => (
+        {([['work', 'My Work'], ['feed', 'Feed'], ['settings', 'Settings']] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -38,11 +39,7 @@ function StudentHome() {
         </div>
       )}
       {tab === 'feed' && <FeedPanel />}
-      {tab === 'profile' && (
-        <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6 h-40 flex items-center justify-center">
-          <span className="text-[#A39C8A] font-semibold capitalize">Profile — coming next</span>
-        </div>
-      )}
+      {tab === 'settings' && <SettingsPanel />}
     </DashboardShell>
   )
 }

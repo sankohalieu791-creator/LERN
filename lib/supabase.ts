@@ -492,3 +492,97 @@ export const setPostReaction = async (postId: string, userId: string, reaction: 
     .upsert([{ post_id: postId, user_id: userId, reaction }], { onConflict: 'post_id,user_id' })
   return { error }
 }
+
+// ── Settings: account ────────────────────────────────────────────
+export const changePassword = async (newPassword: string) => {
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  return { error }
+}
+
+export const setThemePreference = async (userId: string, theme: 'light' | 'dark' | 'system') => {
+  const { error } = await supabase.from('users').update({ theme_preference: theme }).eq('id', userId)
+  return { error }
+}
+
+export const setNotificationPrefs = async (userId: string, prefs: Record<string, boolean>) => {
+  const { error } = await supabase.from('users').update({ notification_prefs: prefs }).eq('id', userId)
+  return { error }
+}
+
+// GDPR "download my data" — every table that references this user,
+// bundled into one object. Read-only, RLS already scopes every query to
+// rows the caller is allowed to see (which for their own id is everything).
+export const exportMyData = async (userId: string) => {
+  const [profile, submissions, reviewsWritten, verifications, posts, reactions, attendance] = await Promise.all([
+    supabase.from('users').select('*').eq('id', userId).single(),
+    supabase.from('submissions').select('*').eq('student_id', userId),
+    supabase.from('reviews').select('*').eq('reviewer_id', userId),
+    supabase.from('verifications').select('*, submissions!inner(student_id)').eq('submissions.student_id', userId),
+    supabase.from('posts').select('*').eq('author_id', userId),
+    supabase.from('post_reactions').select('*').eq('user_id', userId),
+    supabase.from('attendance_records').select('*').eq('student_id', userId),
+  ])
+  return {
+    profile: profile.data,
+    submissions: submissions.data || [],
+    reviews_written: reviewsWritten.data || [],
+    verifications: verifications.data || [],
+    posts: posts.data || [],
+    reactions: reactions.data || [],
+    attendance: attendance.data || [],
+    exported_at: new Date().toISOString(),
+  }
+}
+
+// GDPR "delete my account and data" — cascades through everything via
+// delete_my_account()'s DELETE FROM auth.users.
+export const deleteMyAccount = async () => {
+  const { error } = await supabase.rpc('delete_my_account')
+  return { error }
+}
+
+// ── Settings: organisation admin ──────────────────────────────────
+export const updateOrganisationProfile = async (organisationId: string, updates: { name?: string; safeguarding_lead_id?: string }) => {
+  const { error } = await supabase.from('organisations').update(updates).eq('id', organisationId)
+  return { error }
+}
+
+export const getOrgStaff = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, full_name, email, role, created_at')
+    .eq('organisation_id', organisationId)
+    .in('role', ['institution_staff', 'provider_staff'])
+    .order('full_name')
+  return { data, error }
+}
+
+// ── Reporting ───────────────────────────────────────────────────
+export const submitReport = async (
+  reporterId: string, organisationId: string | null,
+  targetType: 'post' | 'user' | 'submission' | 'general', reason: string, targetId?: string
+) => {
+  const { data, error } = await supabase
+    .from('reports')
+    .insert([{ reporter_id: reporterId, organisation_id: organisationId, target_type: targetType, target_id: targetId || null, reason }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const getOrgReports = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('reports')
+    .select('*, users!reports_reporter_id_fkey(full_name)')
+    .eq('organisation_id', organisationId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const resolveReport = async (reportId: string, reviewerId: string, status: 'reviewed' | 'dismissed' | 'actioned') => {
+  const { error } = await supabase
+    .from('reports')
+    .update({ status, reviewed_by: reviewerId, reviewed_at: new Date().toISOString() })
+    .eq('id', reportId)
+  return { error }
+}
