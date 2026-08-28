@@ -31,7 +31,7 @@ export default function ChooseRolePage() {
             onClick={() => router.push('/auth/signup/student')}
             className="w-full flex items-center justify-center bg-white border border-[#E2DDD1] rounded-2xl px-5 py-3.5 text-[14px] font-semibold text-ink hover:border-brand transition"
           >
-            Young person sign up
+            Student sign up
           </button>
           <button
             onClick={() => router.push('/auth/signup/organisation?type=institution')}
@@ -44,6 +44,12 @@ export default function ChooseRolePage() {
             className="w-full flex items-center justify-center bg-white border border-[#E2DDD1] rounded-2xl px-5 py-3.5 text-[14px] font-semibold text-ink hover:border-brand transition"
           >
             Training provider sign up
+          </button>
+          <button
+            onClick={() => router.push('/auth/signup/employer')}
+            className="w-full flex items-center justify-center bg-white border border-[#E2DDD1] rounded-2xl px-5 py-3.5 text-[14px] font-semibold text-ink hover:border-brand transition"
+          >
+            Employer sign up (invite only)
           </button>
         </div>
       ) : (

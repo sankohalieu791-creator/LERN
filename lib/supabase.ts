@@ -13,7 +13,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 export const signUp = async (
   email: string,
   password: string,
-  meta: { role: 'student' | 'institution_staff' | 'provider_staff'; full_name: string; date_of_birth?: string }
+  meta: { role: 'student' | 'institution_staff' | 'provider_staff' | 'employer'; full_name: string; date_of_birth?: string }
 ) => {
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -664,5 +664,108 @@ export const sendWorkshopMessage = async (workItemId: string, senderId: string, 
 
 export const setPresenceStatus = async (userId: string, status: 'active' | 'busy' | 'away') => {
   const { error } = await supabase.from('users').update({ presence_status: status }).eq('id', userId)
+  return { error }
+}
+
+// ── Session recording ────────────────────────────────────────────
+export const startRecording = async (workItemId: string, userId: string) => {
+  const res = await fetch('/api/recording/start', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ workItemId, userId }),
+  })
+  const data = await res.json()
+  return { recordingId: data.recordingId as string | undefined, error: res.ok ? null : data }
+}
+
+export const stopRecording = async (recordingId: string) => {
+  const res = await fetch('/api/recording/stop', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recordingId }),
+  })
+  const data = await res.json()
+  return { error: res.ok ? null : data }
+}
+
+export const getWorkItemRecordings = async (workItemId: string) => {
+  const { data, error } = await supabase
+    .from('work_item_recordings')
+    .select('*')
+    .eq('work_item_id', workItemId)
+    .order('started_at', { ascending: false })
+  return { data, error }
+}
+
+// ── Employer: Discover ───────────────────────────────────────────
+// Only rows the student themselves chose to make public reach here —
+// RLS enforces this independently (an employer session literally
+// cannot read an organisation-only verification), this query just
+// mirrors that boundary. Never selects the student's email or DOB —
+// RLS controls which ROWS an employer can read, not which COLUMNS, so
+// "no contact details" for a minor is enforced here at the query
+// level, deliberately, not left to chance.
+export const getDiscoverWork = async (filters?: { type?: string; q?: string }) => {
+  let query = supabase
+    .from('verifications')
+    .select(`
+      id, verified_at, submission_id,
+      verifier:users!verifications_verified_by_fkey(full_name),
+      submissions!inner(
+        id, content, student_id,
+        student:users!submissions_student_id_fkey(id, full_name),
+        work_items!inner(id, title, description, type)
+      )
+    `)
+    .eq('visibility', 'public')
+    .is('revoked_at', null)
+    .order('verified_at', { ascending: false })
+    .limit(60)
+
+  if (filters?.type) query = query.eq('submissions.work_items.type', filters.type)
+  if (filters?.q) query = query.or(`title.ilike.%${filters.q}%,description.ilike.%${filters.q}%`, { referencedTable: 'submissions.work_items' })
+
+  const { data, error } = await query
+  return { data, error }
+}
+
+// One row per (employer, student) — checked before showing "Express
+// interest" so an employer sees the status of interest they've
+// already raised instead of a button that silently no-ops or a
+// duplicate row. Never contact info: this table only ever carries a
+// status, never a channel to reach the student directly.
+export const getMyInterest = async (employerId: string) => {
+  const { data, error } = await supabase.from('interest').select('*').eq('employer_id', employerId)
+  return { data, error }
+}
+
+export const expressInterest = async (employerId: string, studentId: string) => {
+  const { data, error } = await supabase
+    .from('interest')
+    .insert([{ employer_id: employerId, student_id: studentId }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+// ── Employer: Opportunities ──────────────────────────────────────
+export const getMyOpportunities = async (employerId: string) => {
+  const { data, error } = await supabase
+    .from('opportunities')
+    .select('*')
+    .eq('employer_id', employerId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const createOpportunity = async (employerId: string, fields: { title: string; description?: string }) => {
+  const { data, error } = await supabase
+    .from('opportunities')
+    .insert([{ employer_id: employerId, ...fields }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const deleteOpportunity = async (id: string) => {
+  const { error } = await supabase.from('opportunities').delete().eq('id', id)
   return { error }
 }

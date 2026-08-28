@@ -180,7 +180,7 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
       </div>
       {(item.type === 'workshop' || item.type === 'course') && item.mode === 'online' && (
         item.ended_at ? (
-          <span className="inline-flex items-center gap-1.5 bg-surface-muted text-ink-tertiary font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3">
+          <span className="inline-flex items-center gap-1.5 bg-danger-bg text-danger-text font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3">
             <Video className="w-3.5 h-3.5" /> Ended
           </span>
         ) : (

@@ -1,4 +1,4 @@
-import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase } from 'lucide-react'
+import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase, Search, Megaphone } from 'lucide-react'
 import type { NavItem } from '@/components/v2/OrgShell'
 
 // Review is its own section for both roles now — Job tracking too (not
@@ -33,4 +33,23 @@ export const providerPhoneItems: [NavItem, NavItem, NavItem] = [
   providerSections[0], // Feed
   providerSections[2], // Courses
   providerSections[5], // Dashboard
+]
+
+// Employer sidebar per the build spec, in the given order — Discover
+// first (browse verified work), Job Tracker before Opportunities in
+// the sidebar reads oddly against the spec's prose order but the
+// spec's own numbered build order is Discover -> Opportunities ->
+// Job Tracker -> Briefs, so that's what's reflected here too.
+export const employerSections: NavItem[] = [
+  { key: 'discover',      label: 'Discover',      icon: Search,          href: '/employer/discover' },
+  { key: 'opportunities', label: 'Opportunities',  icon: Megaphone,       href: '/employer/opportunities' },
+  { key: 'job-tracker',   label: 'Job Tracker',    icon: Briefcase,       href: '/employer/job-tracker' },
+  { key: 'briefs',        label: 'Briefs',         icon: FileText,        href: '/employer/briefs' },
+  { key: 'dashboard',     label: 'Dashboard',      icon: LayoutDashboard, href: '/employer/dashboard' },
+]
+
+export const employerPhoneItems: [NavItem, NavItem, NavItem] = [
+  employerSections[0], // Discover
+  employerSections[1], // Opportunities
+  employerSections[4], // Dashboard
 ]

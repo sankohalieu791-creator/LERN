@@ -121,7 +121,7 @@ function WorkItemCard({
           {(item.type === 'workshop' || item.type === 'course') && (
             <div className="mb-4">
               {item.mode === 'online' && item.ended_at ? (
-                <span className="inline-flex items-center gap-1.5 bg-[#F5F1E8] text-[#8A8373] font-semibold text-[13px] px-4 py-2 rounded-lg">
+                <span className="inline-flex items-center gap-1.5 bg-[#FDEEEA] text-[#B3401E] font-semibold text-[13px] px-4 py-2 rounded-lg">
                   <Video className="w-4 h-4" /> Ended
                 </span>
               ) : item.mode === 'online' && !item.started_at && item.starts_at && new Date(item.starts_at) > new Date() ? (

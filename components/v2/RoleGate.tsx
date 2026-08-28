@@ -22,19 +22,20 @@ export default function RoleGate({ allow, children }: { allow: Role; children: R
   // permission error the first time they try to do something.
   const unconfirmed = !!authUser && !authUser.email_confirmed_at
 
-  // A student can end up with a valid session but an unfinished signup --
-  // never accepted the safeguarding step. A missing organisation_id is NOT
-  // incomplete on its own: explore-without-code is a real, legitimate,
-  // permanent state until they enter a code, not something to bounce back
-  // to the wizard for.
-  const incomplete = allow === 'student' && !!user && !user.consented_at
+  // A student or employer can end up with a valid session but an
+  // unfinished signup -- never accepted the safeguarding step. A missing
+  // organisation_id is NOT incomplete on its own for a student:
+  // explore-without-code is a real, legitimate, permanent state until
+  // they enter a code, not something to bounce back to the wizard for.
+  const incomplete = (allow === 'student' || allow === 'employer') && !!user && !user.consented_at
+  const wizardRoute = allow === 'employer' ? '/auth/signup/employer' : '/auth/signup/student'
 
   useEffect(() => {
     if (loading) return
     if (!user) { router.replace('/auth/login'); return }
     if (user.role !== allow) { router.replace(routeForRole(user.role)); return }
-    if (incomplete) router.replace('/auth/signup/student')
-  }, [user, loading, allow, incomplete, router])
+    if (incomplete) router.replace(wizardRoute)
+  }, [user, loading, allow, incomplete, wizardRoute, router])
 
   if (loading || !user || user.role !== allow || incomplete) {
     return (
