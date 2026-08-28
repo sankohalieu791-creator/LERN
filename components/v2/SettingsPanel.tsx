@@ -25,9 +25,9 @@ const NOTIFICATION_LABELS: Record<string, string> = {
 
 function Card({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6">
+    <div className="bg-surface border border-edge rounded-2xl p-6">
       <p className="font-bold text-ink text-[15px] mb-4 flex items-center gap-2">
-        <Icon className="w-4 h-4 text-[#8A8373]" /> {title}
+        <Icon className="w-4 h-4 text-ink-tertiary" /> {title}
       </p>
       {children}
     </div>
@@ -53,7 +53,7 @@ export default function SettingsPanel() {
 
       <button
         onClick={async () => { await signOut(); router.replace('/auth/login') }}
-        className="flex items-center gap-2 text-[13px] font-semibold text-[#B3401E] hover:underline"
+        className="flex items-center gap-2 text-[13px] font-semibold text-danger-text hover:underline"
       >
         <LogOut className="w-4 h-4" /> Sign out
       </button>
@@ -93,15 +93,15 @@ function AccountCard() {
   return (
     <Card icon={User} title="Account">
       <ErrorBanner message={error} />
-      {notice && <p className="text-[13px] text-[#1E7A34] font-semibold mb-3">{notice}</p>}
+      {notice && <p className="text-[13px] text-success-text font-semibold mb-3">{notice}</p>}
       <TextField label="Full name" value={fullName} onChange={setFullName} placeholder="Your name" />
       <SecondaryButton onClick={saveName} disabled={savingName}>{savingName ? "Saving…" : "Save name"}</SecondaryButton>
       <div className="mt-2 mb-4">
         <label className="block text-[13px] font-semibold text-ink mb-1.5">Email</label>
-        <p className="text-[14px] text-[#6B6558]">{user?.email}</p>
+        <p className="text-[14px] text-ink-secondary">{user?.email}</p>
       </div>
       <div className="flex items-center gap-2 mb-1.5">
-        <Lock className="w-3.5 h-3.5 text-[#8A8373]" />
+        <Lock className="w-3.5 h-3.5 text-ink-tertiary" />
         <span className="text-[13px] font-semibold text-ink">Change password</span>
       </div>
       <TextField label="" value={newPassword} onChange={setNewPassword} type="password" placeholder="New password (min 8 characters)" />
@@ -130,14 +130,14 @@ function ThemeCard() {
           <button
             key={key} onClick={() => choose(key)} disabled={saving}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold transition ${
-              current === key ? 'bg-brand text-white' : 'bg-[#FBF9F4] border border-[#E2DDD1] text-[#6B6558]'
+              current === key ? 'bg-brand text-white' : 'bg-surface-subtle border border-edge text-ink-secondary'
             }`}
           >
             <Icon className="w-3.5 h-3.5" /> {label}
           </button>
         ))}
       </div>
-      <p className="text-[12px] text-[#8A8373] mt-3">Dark mode is still being finished across every screen — light is the safest choice until then.</p>
+      <p className="text-[12px] text-ink-tertiary mt-3">Dark mode is still being finished across every screen — light is the safest choice until then.</p>
     </Card>
   )
 }
@@ -164,14 +164,14 @@ function NotificationsCard() {
             <span className="text-[13px] text-ink">{label}</span>
             <button
               onClick={() => toggle(key)} disabled={saving}
-              className={`w-10 h-6 rounded-full transition relative flex-shrink-0 ${prefs[key] ? 'bg-brand' : 'bg-[#E2DDD1]'}`}
+              className={`w-10 h-6 rounded-full transition relative flex-shrink-0 ${prefs[key] ? 'bg-brand' : 'bg-edge'}`}
             >
               <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition ${prefs[key] ? 'left-[18px]' : 'left-0.5'}`} />
             </button>
           </label>
         ))}
       </div>
-      <p className="text-[12px] text-[#8A8373]">These preferences are saved now and will govern email notifications once those go live.</p>
+      <p className="text-[12px] text-ink-tertiary">These preferences are saved now and will govern email notifications once those go live.</p>
     </Card>
   )
 }
@@ -196,11 +196,11 @@ function ReportCard() {
 
   return (
     <Card icon={Flag} title="Raise a concern">
-      <p className="text-[13px] text-[#6B6558] mb-3">
+      <p className="text-[13px] text-ink-secondary mb-3">
         Something wrong with content or a person on LERN? Tell us here — a human reviews every report, never an automated ban.
         Concerns about an adult at LERN follow the independent safeguarding route, not your organisation.
       </p>
-      {sent && <p className="text-[13px] text-[#1E7A34] font-semibold mb-3">Sent — thank you. Someone will follow up.</p>}
+      {sent && <p className="text-[13px] text-success-text font-semibold mb-3">Sent — thank you. Someone will follow up.</p>}
       {!open ? (
         <SecondaryButton onClick={() => setOpen(true)}>Report a concern</SecondaryButton>
       ) : (
@@ -209,7 +209,7 @@ function ReportCard() {
           <textarea
             value={reason} onChange={e => setReason(e.target.value)}
             placeholder="What happened?" rows={3}
-            className="w-full bg-white border border-[#E2DDD1] rounded-xl px-4 py-3 text-[14px] text-ink placeholder-[#A39C8A] outline-none focus:border-brand transition mb-3 resize-none"
+            className="w-full bg-surface border border-edge rounded-xl px-4 py-3 text-[14px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition mb-3 resize-none"
           />
           <PrimaryButton onClick={send} loading={loading}>Send report</PrimaryButton>
         </>
@@ -252,24 +252,24 @@ function DataPrivacyCard() {
 
   return (
     <Card icon={Download} title="Data and privacy">
-      <p className="text-[13px] text-[#6B6558] mb-4">Everything LERN holds about you, and your rights over it under UK GDPR.</p>
+      <p className="text-[13px] text-ink-secondary mb-4">Everything LERN holds about you, and your rights over it under UK GDPR.</p>
       <SecondaryButton onClick={download} disabled={downloading}>{downloading ? "Preparing…" : "Download my data"}</SecondaryButton>
 
-      <div className="mt-4 pt-4 border-t border-[#EDE9E1]">
+      <div className="mt-4 pt-4 border-t border-edge-subtle">
         <ErrorBanner message={error} />
         {!confirmingDelete ? (
-          <button onClick={() => setConfirmingDelete(true)} className="flex items-center gap-1.5 text-[13px] font-semibold text-[#B3401E] hover:underline">
+          <button onClick={() => setConfirmingDelete(true)} className="flex items-center gap-1.5 text-[13px] font-semibold text-danger-text hover:underline">
             <Trash2 className="w-3.5 h-3.5" /> Delete my account and data
           </button>
         ) : (
           <div>
-            <p className="text-[13px] text-[#B3401E] font-semibold mb-2">This permanently deletes your account and everything attached to it. It can't be undone.</p>
+            <p className="text-[13px] text-danger-text font-semibold mb-2">This permanently deletes your account and everything attached to it. It can't be undone.</p>
             <TextField label={`Type "${user?.email}" to confirm`} value={confirmText} onChange={setConfirmText} placeholder={user?.email} />
             <div className="flex gap-2">
               <SecondaryButton onClick={() => setConfirmingDelete(false)}>Cancel</SecondaryButton>
               <button
                 onClick={doDelete} disabled={deleting || confirmText !== user?.email}
-                className="flex-1 bg-[#B3401E] text-white font-semibold text-[14px] py-3 rounded-xl disabled:opacity-40 hover:bg-[#9c3419] transition"
+                className="flex-1 bg-danger-solid text-white font-semibold text-[14px] py-3 rounded-xl disabled:opacity-40 hover:bg-danger-solid-hover transition"
               >
                 {deleting ? 'Deleting…' : 'Permanently delete'}
               </button>
@@ -335,7 +335,7 @@ function OrganisationCard() {
   return (
     <Card icon={Users2} title="Organisation">
       <ErrorBanner message={error} />
-      {notice && <p className="text-[13px] text-[#1E7A34] font-semibold mb-3">{notice}</p>}
+      {notice && <p className="text-[13px] text-success-text font-semibold mb-3">{notice}</p>}
 
       <TextField label="Organisation name" value={name} onChange={setName} />
       <SecondaryButton onClick={saveName} disabled={savingName}>{savingName ? "Saving…" : "Save name"}</SecondaryButton>
@@ -346,7 +346,7 @@ function OrganisationCard() {
         </span>
         <select
           value={org?.safeguarding_lead_id || ''} onChange={e => changeLead(e.target.value)} disabled={savingLead}
-          className="w-full bg-white border border-[#E2DDD1] rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+          className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
         >
           <option value="" disabled>Choose a staff member…</option>
           {staff.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
@@ -357,16 +357,16 @@ function OrganisationCard() {
         <p className="text-[13px] font-semibold text-ink mb-2">Staff ({staff.length})</p>
         <div className="space-y-1.5">
           {staff.map(s => (
-            <div key={s.id} className="flex items-center justify-between text-[13px] px-3 py-2 bg-[#FBF9F4] rounded-lg">
+            <div key={s.id} className="flex items-center justify-between text-[13px] px-3 py-2 bg-surface-subtle rounded-lg">
               <span className="text-ink">{s.full_name}</span>
               {org?.safeguarding_lead_id === s.id && <span className="text-[11px] font-semibold text-brand">Safeguarding lead</span>}
             </div>
           ))}
         </div>
-        <p className="text-[12px] text-[#8A8373] mt-2">Inviting new staff and removing existing staff isn't built yet — right now only whoever set up the organisation has staff access.</p>
+        <p className="text-[12px] text-ink-tertiary mt-2">Inviting new staff and removing existing staff isn't built yet — right now only whoever set up the organisation has staff access.</p>
       </div>
 
-      <div className="pt-4 border-t border-[#EDE9E1]">
+      <div className="pt-4 border-t border-edge-subtle">
         <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink mb-3"><Ticket className="w-3.5 h-3.5" /> Join codes</p>
         <JoinCodesPanel />
       </div>

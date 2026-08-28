@@ -49,7 +49,7 @@ export default function WorkItemsPanel({ type }: { type: ItemType }) {
         <p className="font-bold text-ink text-[15px]">{copy.heading}</p>
         <button
           onClick={() => setShowCreate(v => !v)}
-          className="flex items-center gap-1.5 bg-brand text-white font-semibold text-[13px] px-4 py-2 rounded-lg hover:bg-[#D95E17] transition"
+          className="flex items-center gap-1.5 bg-brand text-white font-semibold text-[13px] px-4 py-2 rounded-lg hover:bg-brand-hover transition"
         >
           {showCreate ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
           {showCreate ? 'Cancel' : copy.button}
@@ -63,9 +63,9 @@ export default function WorkItemsPanel({ type }: { type: ItemType }) {
       )}
 
       {loading ? (
-        <p className="text-[#8A8373] text-[14px]">Loading…</p>
+        <p className="text-ink-tertiary text-[14px]">Loading…</p>
       ) : items.length === 0 ? (
-        <p className="text-[#8A8373] text-[14px]">{copy.empty}</p>
+        <p className="text-ink-tertiary text-[14px]">{copy.empty}</p>
       ) : (
         <div className="space-y-3">
           {items.map(item => <WorkItemCard key={item.id} item={item} onChanged={load} />)}
@@ -79,23 +79,23 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
   const attachments = item.work_item_attachments || []
   const [inSession, setInSession] = useState(false)
   return (
-    <div className="border border-[#EDE9E1] rounded-xl px-4 py-3.5">
+    <div className="border border-edge-subtle rounded-xl px-4 py-3.5">
       <div className="flex items-center justify-between mb-1">
         <p className="font-bold text-ink text-[14px]">{item.title}</p>
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#8A8373] bg-[#F5F1E8] px-2 py-0.5 rounded-full">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary bg-surface-muted px-2 py-0.5 rounded-full">
           {item.visibility}
         </span>
       </div>
-      {item.topic && <p className="text-[12px] text-[#8A8373] mb-1.5">{item.topic}</p>}
-      {(item.assignment || item.description) && <p className="text-[13px] text-[#6B6558] mb-2 whitespace-pre-wrap">{item.assignment || item.description}</p>}
-      <p className="text-[12px] text-[#8A8373] mb-2"><span className="font-semibold">Criteria:</span> {item.criteria}</p>
-      <div className="flex items-center gap-3.5 flex-wrap text-[12px] text-[#8A8373]">
+      {item.topic && <p className="text-[12px] text-ink-tertiary mb-1.5">{item.topic}</p>}
+      {(item.assignment || item.description) && <p className="text-[13px] text-ink-secondary mb-2 whitespace-pre-wrap">{item.assignment || item.description}</p>}
+      <p className="text-[12px] text-ink-tertiary mb-2"><span className="font-semibold">Criteria:</span> {item.criteria}</p>
+      <div className="flex items-center gap-3.5 flex-wrap text-[12px] text-ink-tertiary">
         {item.deadline && (
           <span className="flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Due {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
         )}
         <span className="flex items-center gap-1"><Users2 className="w-3.5 h-3.5" /> {item.groups?.name || 'Whole organisation'}</span>
         {item.type === 'workshop' && item.mode === 'online' && (
-          <span className="flex items-center gap-1 text-[#1E7A34] font-semibold"><Video className="w-3.5 h-3.5" /> Online</span>
+          <span className="flex items-center gap-1 text-success-text font-semibold"><Video className="w-3.5 h-3.5" /> Online</span>
         )}
         {item.type === 'workshop' && item.mode === 'in_person' && (
           <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {item.location || 'In person'}</span>
@@ -103,20 +103,20 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
       </div>
       {item.type === 'workshop' && item.mode === 'online' && (
         item.ended_at ? (
-          <span className="inline-flex items-center gap-1.5 bg-[#F5F1E8] text-[#8A8373] font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3">
+          <span className="inline-flex items-center gap-1.5 bg-surface-muted text-ink-tertiary font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3">
             <Video className="w-3.5 h-3.5" /> Ended
           </span>
         ) : (
           <button
             onClick={() => setInSession(true)}
-            className="flex items-center gap-1.5 bg-[#1E7A34] text-white font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3 hover:bg-[#186229] transition"
+            className="flex items-center gap-1.5 bg-success-solid text-white font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3 hover:bg-success-solid-hover transition"
           >
             <Video className="w-3.5 h-3.5" /> Start / join session
           </button>
         )
       )}
       {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2.5 border-t border-[#EDE9E1]">
+        <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2.5 border-t border-edge-subtle">
           {attachments.map((a: any) => <AttachmentChip key={a.id} attachment={a} />)}
         </div>
       )}
@@ -139,7 +139,7 @@ function AttachmentChip({ attachment }: { attachment: any }) {
     if (signed) { setUrl(signed); window.open(signed, '_blank') }
   }
   return (
-    <button onClick={open} className="flex items-center gap-1.5 bg-[#FBF9F4] border border-[#E2DDD1] rounded-full px-2.5 py-1 text-[11px] font-semibold text-[#6B6558] hover:border-brand transition">
+    <button onClick={open} className="flex items-center gap-1.5 bg-surface-subtle border border-edge rounded-full px-2.5 py-1 text-[11px] font-semibold text-ink-secondary hover:border-brand transition">
       <Paperclip className="w-3 h-3" /> {attachment.file_name}
     </button>
   )
@@ -175,18 +175,18 @@ function GroupPicker({ organisationId, value, onChange, required }: { organisati
   return (
     <label className="block mb-5">
       <span className="block text-[13px] font-semibold text-ink mb-1.5">
-        Assign to {required ? '' : <span className="text-[#8A8373] font-normal">(leave blank for the whole organisation)</span>}
+        Assign to {required ? '' : <span className="text-ink-tertiary font-normal">(leave blank for the whole organisation)</span>}
       </span>
       <div className="flex gap-2">
         <select
           value={value}
           onChange={e => onChange(e.target.value)}
-          className="flex-1 bg-white border border-[#E2DDD1] rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+          className="flex-1 bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
         >
           <option value="">{required ? 'Select a group…' : 'Whole organisation'}</option>
           {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
         </select>
-        <button type="button" onClick={() => setCreating(v => !v)} className="px-3 py-2.5 rounded-lg border border-[#E2DDD1] text-[13px] font-semibold text-[#6B6558] hover:border-brand transition flex-shrink-0">
+        <button type="button" onClick={() => setCreating(v => !v)} className="px-3 py-2.5 rounded-lg border border-edge text-[13px] font-semibold text-ink-secondary hover:border-brand transition flex-shrink-0">
           + New group
         </button>
       </div>
@@ -194,7 +194,7 @@ function GroupPicker({ organisationId, value, onChange, required }: { organisati
         <div className="flex gap-2 mt-2">
           <input
             value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Year 12 Media Studies" autoFocus
-            className="flex-1 bg-white border border-[#E2DDD1] rounded-lg px-3 py-2 text-[13px] text-ink placeholder-[#A39C8A] outline-none focus:border-brand transition"
+            className="flex-1 bg-surface border border-edge rounded-lg px-3 py-2 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
           />
           <button type="button" onClick={handleCreate} disabled={busy || !newName.trim()} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[13px] font-semibold disabled:opacity-40">
             Add
@@ -222,12 +222,12 @@ function FileDropzone({ files, onChange, multiple }: { files: File[]; onChange: 
         onDrop={e => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files) }}
         onClick={() => inputRef.current?.click()}
         className={`flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-xl py-7 cursor-pointer transition ${
-          dragOver ? 'border-brand bg-[#FCEEE4]' : 'border-[#E2DDD1] hover:border-[#C9C2B2]'
+          dragOver ? 'border-brand bg-accent-bg' : 'border-edge hover:border-edge-input'
         }`}
       >
-        <UploadCloud className="w-5 h-5 text-[#8A8373]" />
+        <UploadCloud className="w-5 h-5 text-ink-tertiary" />
         <p className="text-[13px] font-semibold text-ink">Drag and drop, or click to choose {multiple ? 'files' : 'a file'}</p>
-        <p className="text-[11px] text-[#A39C8A]">PDF, Word, PowerPoint, or image · up to 25MB</p>
+        <p className="text-[11px] text-ink-quaternary">PDF, Word, PowerPoint, or image · up to 25MB</p>
         <input
           ref={inputRef} type="file" multiple={multiple} className="hidden"
           onChange={e => addFiles(e.target.files)}
@@ -236,9 +236,9 @@ function FileDropzone({ files, onChange, multiple }: { files: File[]; onChange: 
       {files.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2">
           {files.map((f, i) => (
-            <span key={i} className="flex items-center gap-1.5 bg-[#FBF9F4] border border-[#E2DDD1] rounded-full pl-2.5 pr-1.5 py-1 text-[11px] font-semibold text-[#6B6558]">
+            <span key={i} className="flex items-center gap-1.5 bg-surface-subtle border border-edge rounded-full pl-2.5 pr-1.5 py-1 text-[11px] font-semibold text-ink-secondary">
               <FileText className="w-3 h-3" /> {f.name}
-              <button type="button" onClick={() => onChange(files.filter((_, j) => j !== i))} className="hover:text-[#B3401E]">
+              <button type="button" onClick={() => onChange(files.filter((_, j) => j !== i))} className="hover:text-danger-text">
                 <X className="w-3 h-3" />
               </button>
             </span>
@@ -280,7 +280,7 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
   }
 
   return (
-    <div className="bg-[#FBF9F4] border border-[#EDE9E1] rounded-xl p-5 mb-5">
+    <div className="bg-surface-subtle border border-edge-subtle rounded-xl p-5 mb-5">
       <ErrorBanner message={error} />
       <TextField label="Title" value={title} onChange={setTitle} placeholder={type === 'course' ? 'Intro to Web Development' : 'Design a mobile app icon'} autoFocus />
       <TextField label="Description (optional)" value={description} onChange={setDescription} placeholder="What's this about?" />
@@ -298,7 +298,7 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
               <button
                 key={m} type="button" onClick={() => setMode(m)}
                 className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${
-                  mode === m ? 'bg-brand text-white' : 'bg-white border border-[#E2DDD1] text-[#6B6558]'
+                  mode === m ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
                 }`}
               >
                 {m === 'online' ? 'Online' : 'In person'}
@@ -308,10 +308,10 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
           {mode === 'in_person' ? (
             <input
               value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Room 4B, main campus"
-              className="w-full bg-white border border-[#E2DDD1] rounded-lg px-3 py-2.5 text-[13px] text-ink placeholder-[#A39C8A] outline-none focus:border-brand transition"
+              className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
             />
           ) : (
-            <p className="text-[12px] text-[#8A8373]">A live video room is created automatically — everyone joins from the workshop card.</p>
+            <p className="text-[12px] text-ink-tertiary">A live video room is created automatically — everyone joins from the workshop card.</p>
           )}
         </label>
       )}
@@ -324,7 +324,7 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
               type="button"
               onClick={() => setVisibility(v)}
               className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold capitalize transition ${
-                visibility === v ? 'bg-brand text-white' : 'bg-white border border-[#E2DDD1] text-[#6B6558]'
+                visibility === v ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
               }`}
             >
               {v === 'private' ? 'Private — join code only' : 'Public'}
@@ -353,7 +353,7 @@ function CreateBriefForm({ onCreated }: { onCreated: () => void }) {
             type="button"
             onClick={() => setMode(key)}
             className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${
-              mode === key ? 'bg-brand text-white' : 'bg-white border border-[#E2DDD1] text-[#6B6558]'
+              mode === key ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
             }`}
           >
             {label}
@@ -402,7 +402,7 @@ function NewBriefForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="bg-[#FBF9F4] border border-[#EDE9E1] rounded-xl p-5">
+    <div className="bg-surface-subtle border border-edge-subtle rounded-xl p-5">
       <ErrorBanner message={error} />
       <TextField label="Title" value={title} onChange={setTitle} placeholder="Design a mobile app icon" autoFocus />
       <TextField label="Topic / subject" value={topic} onChange={setTopic} placeholder="e.g. Graphic Design" />
@@ -412,7 +412,7 @@ function NewBriefForm({ onCreated }: { onCreated: () => void }) {
           value={assignment} onChange={e => setAssignment(e.target.value)}
           placeholder="Write the full instructions here — as much room as you need."
           rows={6}
-          className="w-full bg-white border border-[#E2DDD1] rounded-xl px-4 py-3 text-[14px] text-ink placeholder-[#A39C8A] outline-none focus:border-brand transition resize-none leading-relaxed"
+          className="w-full bg-surface border border-edge rounded-xl px-4 py-3 text-[14px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none leading-relaxed"
         />
       </label>
       <label className="block mb-1.5">
@@ -428,7 +428,7 @@ function NewBriefForm({ onCreated }: { onCreated: () => void }) {
         <span className="block text-[13px] font-semibold text-ink mb-1.5">Deadline (optional)</span>
         <input
           type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
-          className="w-full bg-white border border-[#E2DDD1] rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+          className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
         />
       </label>
       <GroupPicker organisationId={user?.organisation_id} value={groupId} onChange={setGroupId} />
@@ -439,7 +439,7 @@ function NewBriefForm({ onCreated }: { onCreated: () => void }) {
             <button
               key={v} type="button" onClick={() => setVisibility(v)}
               className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold capitalize transition ${
-                visibility === v ? 'bg-brand text-white' : 'bg-white border border-[#E2DDD1] text-[#6B6558]'
+                visibility === v ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
               }`}
             >
               {v === 'private' ? 'Private — join code only' : 'Public'}
@@ -496,7 +496,7 @@ function UploadExistingWorkForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="bg-[#FBF9F4] border border-[#EDE9E1] rounded-xl p-5">
+    <div className="bg-surface-subtle border border-edge-subtle rounded-xl p-5">
       <ErrorBanner message={error} />
       <TextField label="Title" value={title} onChange={setTitle} placeholder="Year 11 Coursework — Unit 3" autoFocus />
       <TextField label="Topic / subject" value={topic} onChange={setTopic} placeholder="e.g. GCSE Photography" />
@@ -510,7 +510,7 @@ function UploadExistingWorkForm({ onCreated }: { onCreated: () => void }) {
         hint="What a tutor checks the existing work against when they verify it."
       />
       <GroupPicker organisationId={user?.organisation_id} value={groupId} onChange={setGroupId} required />
-      <p className="text-[12px] text-[#8A8373] mb-4">This already happened outside LERN — no new marking, just verification. Every student currently in the group gets this marked as their submission, ready to review.</p>
+      <p className="text-[12px] text-ink-tertiary mb-4">This already happened outside LERN — no new marking, just verification. Every student currently in the group gets this marked as their submission, ready to review.</p>
       <PrimaryButton onClick={handleSubmit} loading={loading}>Create and send to review</PrimaryButton>
     </div>
   )

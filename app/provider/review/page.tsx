@@ -4,7 +4,7 @@ import ReviewQueuePanel from '@/components/v2/ReviewQueuePanel'
 
 export default function ProviderReviewPage() {
   return (
-    <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6">
+    <div className="bg-surface border border-edge rounded-2xl p-6">
       <ReviewQueuePanel />
     </div>
   )

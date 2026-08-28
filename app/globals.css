@@ -22,29 +22,82 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 
-/* ── Theme tokens ─────────────────────────────────────────── */
+/* ── v2 theme tokens ──────────────────────────────────────────
+   Light values live on :root. Dark overrides live under
+   [data-theme="dark"], set explicitly on <html> by ThemeProvider
+   (context/ThemeProvider.tsx) once it resolves the user's stored
+   preference (light/dark/system) — no CSS media-query guessing,
+   the attribute is always set deliberately.
+   paper/ink/brand are wired into tailwind.config.ts so every
+   existing bg-paper / text-ink / bg-brand / text-brand usage
+   already gets dark mode for free. Everything else (surfaces,
+   borders, secondary text, status colors) is the --token below,
+   referenced as e.g. bg-[var(--surface)]. */
 :root {
-  --bg-app:     #0f0f0f;
-  --bg-card:    #1a1a1a;
-  --bg-nav:     #111111;
-  --bg-input:   #1a1a1a;
-  --text-1:     #ffffff;
-  --text-2:     #888888;
-  --text-3:     #444444;
-  --border:     rgba(255,255,255,0.07);
-  --border-mid: rgba(255,255,255,0.12);
+  --paper: #FFFDF9;
+  --ink: #1A1A1A;
+  --surface: #FFFFFF;
+  --surface-subtle: #FBF9F4;
+  --surface-muted: #F5F1E8;
+  --border: #E2DDD1;
+  --border-subtle: #EDE9E1;
+  --border-input: #C9C2B2;
+  --text-secondary: #6B6558;
+  --text-tertiary: #8A8373;
+  --text-quaternary: #A39C8A;
+  --text-body: #4A453B;
+  --brand: #F26B21;
+  --brand-hover: #D95E17;
+  --success-text: #1E7A34;
+  --success-bg: #E9F6EC;
+  --success-hover: #186229;
+  --danger-text: #B3401E;
+  --danger-bg: #FDEEEA;
+  --danger-hover: #9C3419;
+  --warning-text: #B3651E;
+  --warning-bg: #FFF3E4;
+  --warning-bg-soft: #FFF7ED;
+  --accent-bg: #FCEEE4;
+  --accent-bg-soft: #F3C9BC;
+  /* Solid-fill buttons (paired with white label text) — deliberately the
+     SAME value in both themes, not redefined below. Contrast is against
+     their own white label, not the page background, so they don't need
+     to invert brightness the way the -text/-bg status-badge tokens do;
+     doing that here would put white text on a bright dark-mode green and
+     fail WCAG AA. */
+  --success-solid: #1E7A34;
+  --success-solid-hover: #186229;
+  --danger-solid: #B3401E;
+  --danger-solid-hover: #9C3419;
+  --warning-solid: #B3651E;
 }
 
-html.light {
-  --bg-app:     #f2f2f2;
-  --bg-card:    #ffffff;
-  --bg-nav:     #fafafa;
-  --bg-input:   #f5f5f5;
-  --text-1:     #0a0a0a;
-  --text-2:     #555555;
-  --text-3:     #aaaaaa;
-  --border:     rgba(0,0,0,0.07);
-  --border-mid: rgba(0,0,0,0.12);
+[data-theme="dark"] {
+  --paper: #131110;
+  --ink: #F3EEE6;
+  --surface: #1D1917;
+  --surface-subtle: #211D1A;
+  --surface-muted: #29241F;
+  --border: #38322B;
+  --border-subtle: #2C2721;
+  --border-input: #4A4238;
+  --text-secondary: #BDB3A2;
+  --text-tertiary: #948A78;
+  --text-quaternary: #736A5A;
+  --text-body: #DED6C6;
+  --brand: #FF7A3D;
+  --brand-hover: #FF9159;
+  --success-text: #4FCE7C;
+  --success-bg: #16301F;
+  --success-hover: #63DA8F;
+  --danger-text: #FF6B4E;
+  --danger-bg: #3A1710;
+  --danger-hover: #FF8368;
+  --warning-text: #FFA05C;
+  --warning-bg: #3A2710;
+  --warning-bg-soft: #33220E;
+  --accent-bg: #3A2414;
+  --accent-bg-soft: #4A2E1C;
 }
 
 * {
@@ -58,10 +111,8 @@ html {
 }
 
 body {
-  background: var(--bg-app);
-  color: var(--text-1);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  transition: background 0.25s, color 0.25s;
+  transition: background-color 0.15s, color 0.15s;
 }
 
 /* overflow-x clip on the scroll wrapper only — NOT body/html/any element
@@ -73,134 +124,6 @@ main {
   min-height: 100vh;
   min-height: 100dvh;
 }
-
-/* ── Light-mode: full-app overrides ──────────────────────────
-   Targets every hardcoded Tailwind arbitrary-value class used
-   across the codebase so light mode works on every page.      */
-
-/* CSS-var helper classes (used in newer pages) */
-html.light .theme-bg    { background-color: var(--bg-app)   !important; }
-html.light .theme-card  { background-color: var(--bg-card)  !important; }
-html.light .theme-nav   { background-color: var(--bg-nav)   !important; border-color: var(--border) !important; }
-html.light .theme-input { background-color: var(--bg-input) !important; border-color: var(--border-mid) !important; color: var(--text-1) !important; }
-html.light .theme-text-1 { color: var(--text-1) !important; }
-html.light .theme-text-2 { color: var(--text-2) !important; }
-html.light .theme-border { border-color: var(--border)      !important; }
-
-/* Page / section backgrounds */
-html.light .bg-\[\#0f0f0f\]  { background-color: #f2f2f2 !important; }
-html.light .bg-\[\#0a0a0a\]  { background-color: #ebebeb !important; }
-html.light .bg-\[\#111\]     { background-color: #fafafa !important; }
-html.light .bg-\[\#111111\]  { background-color: #fafafa !important; }
-html.light .bg-\[\#1a1a1a\]  { background-color: #ffffff !important; }
-html.light .bg-\[\#1e1e1e\]  { background-color: #f5f5f5 !important; }
-html.light .bg-\[\#141414\]  { background-color: #ebebeb !important; }
-html.light .bg-\[\#2a2a2a\]  { background-color: #e0e0e0 !important; }
-html.light .bg-\[\#252525\]  { background-color: #e8e8e8 !important; }
-html.light .bg-\[\#222\]     { background-color: #e8e8e8 !important; }
-html.light .bg-\[\#333\]     { background-color: #d5d5d5 !important; }
-html.light .bg-\[\#2a2a2a\]  { background-color: #e0e0e0 !important; }
-html.light .bg-\[\#181818\]  { background-color: #f0f0f0 !important; }
-html.light .bg-\[\#161616\]  { background-color: #ececec !important; }
-html.light .bg-\[\#1f1f1f\]  { background-color: #eeeeee !important; }
-html.light .bg-\[\#2e2e2e\]  { background-color: #d8d8d8 !important; }
-html.light .bg-\[\#2a2000\]  { background-color: #fff3d6 !important; }
-html.light .bg-\[\#261a00\]  { background-color: #fdf0d5 !important; }
-
-/* Text */
-html.light .text-white        { color: #0a0a0a !important; }
-html.light .text-\[\#aaa\]    { color: #555    !important; }
-html.light .text-\[\#888\]    { color: #555    !important; }
-html.light .text-\[\#777\]    { color: #666    !important; }
-html.light .text-\[\#666\]    { color: #666    !important; }
-html.light .text-\[\#555\]    { color: #666    !important; }
-html.light .text-\[\#444\]    { color: #777    !important; }
-html.light .text-\[\#333\]    { color: #888    !important; }
-html.light .text-\[\#2a2a2a\] { color: #999    !important; }
-html.light .text-\[\#222\]    { color: #999    !important; }
-html.light .text-\[\#999\]    { color: #555    !important; }
-html.light .text-\[\#ccc\]    { color: #444    !important; }
-
-/* Colorful CTA buttons/badges (gradients, brand-accent solids, red) are
-   designed with white text against a saturated background in BOTH themes —
-   the blanket ".text-white -> near-black" rule above is meant for plain
-   dark cards/backgrounds and must not touch these, or every gradient
-   button (signup, tour, "post", etc.) loses its label in light mode. */
-html.light .gradient-btn,
-html.light .gradient-btn .text-white,
-html.light [class*="bg-gradient-to"].text-white,
-html.light [class*="bg-gradient-to"] .text-white,
-html.light [class*="bg-red-"].text-white,
-html.light [class*="bg-red-"] .text-white,
-html.light [class*="bg-orange-"].text-white,
-html.light [class*="bg-purple-"].text-white,
-html.light [class*="bg-blue-"].text-white,
-html.light [class*="bg-green-"].text-white,
-html.light [class*="bg-[#FF6B2B]"].text-white,
-html.light [class*="bg-[#7C3AED]"].text-white,
-html.light [class*="bg-[#C026D3]"].text-white,
-html.light [class*="bg-[#E91E8C]"].text-white,
-html.light [class*="bg-[#1d9bf0]"].text-white {
-  color: #fff !important;
-}
-
-/* Borders */
-html.light .border-\[rgba\(255\,255\,255\,0\.04\)\] { border-color: rgba(0,0,0,.05)  !important; }
-html.light .border-\[rgba\(255\,255\,255\,0\.05\)\] { border-color: rgba(0,0,0,.06)  !important; }
-html.light .border-\[rgba\(255\,255\,255\,0\.06\)\] { border-color: rgba(0,0,0,.08)  !important; }
-html.light .border-\[rgba\(255\,255\,255\,0\.07\)\] { border-color: rgba(0,0,0,.10)  !important; }
-html.light .border-\[rgba\(255\,255\,255\,0\.08\)\] { border-color: rgba(0,0,0,.12)  !important; }
-html.light .border-\[rgba\(255\,255\,255\,0\.09\)\] { border-color: rgba(0,0,0,.13)  !important; }
-html.light .border-\[rgba\(255\,255\,255\,0\.1\)\]  { border-color: rgba(0,0,0,.14)  !important; }
-html.light .border-\[rgba\(255\,255\,255\,0\.12\)\] { border-color: rgba(0,0,0,.16)  !important; }
-html.light .border-\[rgba\(255\,255\,255\,0\.15\)\] { border-color: rgba(0,0,0,.20)  !important; }
-html.light .border-\[rgba\(255\,255\,255\,0\.2\)\]  { border-color: rgba(0,0,0,.25)  !important; }
-html.light .border-\[rgba\(255\,255\,255\,0\.22\)\] { border-color: rgba(0,0,0,.27)  !important; }
-html.light .border-\[rgba\(255\,255\,255\,0\.25\)\] { border-color: rgba(0,0,0,.30)  !important; }
-html.light .border-\[rgba\(255\,255\,255\,0\.3\)\]  { border-color: rgba(0,0,0,.35)  !important; }
-
-/* Inputs & placeholders */
-html.light input,
-html.light textarea,
-html.light select {
-  color: #0a0a0a !important;
-}
-html.light input::placeholder,
-html.light textarea::placeholder {
-  color: #aaa !important;
-}
-
-/* Scrollbar */
-html.light ::-webkit-scrollbar-track { background: #e0e0e0; }
-
-/* Nav bar */
-html.light nav { background-color: #fafafa !important; }
-
-/* Sticky headers */
-html.light .sticky { background-color: inherit !important; }
-
-/* Video/card overlay chips — keep dark so text is readable over thumbnails */
-html.light .bg-black\/80  { background-color: rgba(0,0,0,0.80) !important; color: #fff !important; }
-html.light .bg-black\/70  { background-color: rgba(0,0,0,0.70) !important; color: #fff !important; }
-html.light .bg-black\/60  { background-color: rgba(0,0,0,0.60) !important; color: #fff !important; }
-html.light .bg-black\/40  { background-color: rgba(0,0,0,0.40) !important; color: #fff !important; }
-
-/* Pure-black video/media surfaces stay black in both themes */
-html.light .bg-black { background-color: #000 !important; }
-
-/* Camera capture UI (record/preview screens) is intentionally always-dark,
-   like every native camera app — a light viewfinder would hurt contrast
-   while framing a shot. These compound selectors are more specific than
-   the blanket rules above, so they win regardless of source order and
-   opt anything inside .camera-ui back out of light-mode remapping. */
-html.light .camera-ui .text-white          { color: #fff !important; }
-html.light .camera-ui .bg-\[\#111\]        { background-color: #111 !important; }
-html.light .camera-ui .bg-\[\#252525\]     { background-color: #252525 !important; }
-html.light .camera-ui .text-\[\#888\]      { color: #888 !important; }
-html.light .camera-ui .text-\[\#444\]      { color: #444 !important; }
-html.light .camera-ui .text-\[\#333\]      { color: #333 !important; }
-html.light .camera-ui .border-\[rgba\(255\,255\,255\,0\.08\)\] { border-color: rgba(255,255,255,0.08) !important; }
-html.light .camera-ui .border-\[rgba\(255\,255\,255\,0\.2\)\]  { border-color: rgba(255,255,255,0.2)  !important; }
 
 ::-webkit-scrollbar {
   width: 8px;

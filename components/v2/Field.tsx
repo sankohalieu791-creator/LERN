@@ -22,9 +22,9 @@ export function TextField({
         placeholder={placeholder}
         required={required}
         autoFocus={autoFocus}
-        className="w-full bg-white border border-[#E2DDD1] rounded-xl px-4 py-3 text-[15px] text-ink placeholder-[#A39C8A] outline-none focus:border-brand transition"
+        className="w-full bg-surface border border-edge rounded-xl px-4 py-3 text-[15px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
       />
-      {hint && <span className="block text-[13px] text-[#8A8373] mt-1.5">{hint}</span>}
+      {hint && <span className="block text-[13px] text-ink-tertiary mt-1.5">{hint}</span>}
     </label>
   )
 }
@@ -43,7 +43,7 @@ export function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={disabled || loading}
-      className="w-full bg-brand text-white font-bold text-[15px] py-3.5 rounded-xl hover:bg-[#D95E17] active:scale-[0.99] transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      className="w-full bg-brand text-white font-bold text-[15px] py-3.5 rounded-xl hover:bg-brand-hover active:scale-[0.99] transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
     >
       {loading ? <Spinner /> : null}
       {children}
@@ -57,7 +57,7 @@ export function SecondaryButton({ children, onClick, disabled }: { children: Rea
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="w-full bg-white border border-[#E2DDD1] text-ink font-semibold text-[15px] py-3.5 rounded-xl hover:border-[#C9C2B2] active:scale-[0.99] transition disabled:opacity-40"
+      className="w-full bg-surface border border-edge text-ink font-semibold text-[15px] py-3.5 rounded-xl hover:border-edge-input active:scale-[0.99] transition disabled:opacity-40"
     >
       {children}
     </button>
@@ -71,7 +71,7 @@ export function Spinner() {
 export function ErrorBanner({ message }: { message: string }) {
   if (!message) return null
   return (
-    <div className="bg-[#FDEEEA] border border-[#F3C9BC] text-[#B3401E] text-sm rounded-xl px-4 py-3 mb-5">
+    <div className="bg-danger-bg border border-accent-bg-soft text-danger-text text-sm rounded-xl px-4 py-3 mb-5">
       {message}
     </div>
   )

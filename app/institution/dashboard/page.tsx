@@ -87,7 +87,7 @@ export default function InstitutionDashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-ink mb-1">{org?.name || 'Dashboard'}</h1>
-        <p className="text-[#6B6558]">
+        <p className="text-ink-secondary">
           {org?.safeguarding_lead_id === user?.id
             ? "You're the safeguarding lead — every review is logged and visible to you."
             : 'Overview.'}
@@ -108,27 +108,27 @@ export default function InstitutionDashboardPage() {
       </div>
 
       {needsAttention > 0 && (
-        <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6">
+        <div className="bg-surface border border-edge rounded-2xl p-6">
           <p className="font-bold text-ink text-[15px] mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-[#B3401E]" /> Needs attention ({needsAttention})
+            <AlertTriangle className="w-4 h-4 text-danger-text" /> Needs attention ({needsAttention})
           </p>
           <div className="space-y-2">
             {overdue.map(r => (
-              <div key={r.id} className="flex items-center justify-between text-[13px] px-3.5 py-2.5 bg-[#FFF7ED] rounded-lg">
+              <div key={r.id} className="flex items-center justify-between text-[13px] px-3.5 py-2.5 bg-warning-bg-soft rounded-lg">
                 <span className="text-ink">{r.users?.full_name} — {r.work_items?.title}</span>
-                <span className="flex items-center gap-1.5 text-[#B3651E] font-semibold"><Clock className="w-3.5 h-3.5" /> Overdue &gt;{OVERDUE_HOURS}h</span>
+                <span className="flex items-center gap-1.5 text-warning-text font-semibold"><Clock className="w-3.5 h-3.5" /> Overdue &gt;{OVERDUE_HOURS}h</span>
               </div>
             ))}
             {flagged.map(r => (
-              <div key={r.id} className="flex items-center justify-between text-[13px] px-3.5 py-2.5 bg-[#FDEEEA] rounded-lg">
+              <div key={r.id} className="flex items-center justify-between text-[13px] px-3.5 py-2.5 bg-danger-bg rounded-lg">
                 <span className="text-ink">{r.users?.full_name} — {r.work_items?.title}</span>
-                <span className="flex items-center gap-1.5 text-[#B3401E] font-semibold"><Flag className="w-3.5 h-3.5" /> Flagged</span>
+                <span className="flex items-center gap-1.5 text-danger-text font-semibold"><Flag className="w-3.5 h-3.5" /> Flagged</span>
               </div>
             ))}
             {attentionCodes.map(c => (
-              <div key={c.id} className="flex items-center justify-between text-[13px] px-3.5 py-2.5 bg-[#FFF7ED] rounded-lg">
+              <div key={c.id} className="flex items-center justify-between text-[13px] px-3.5 py-2.5 bg-warning-bg-soft rounded-lg">
                 <span className="text-ink font-mono">{c.code}</span>
-                <span className="flex items-center gap-1.5 text-[#B3651E] font-semibold">
+                <span className="flex items-center gap-1.5 text-warning-text font-semibold">
                   <KeyRound className="w-3.5 h-3.5" />
                   {c.used_count >= HEAVY_USE ? `Used ${c.used_count} times` : `Expires ${new Date(c.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
                 </span>
@@ -139,20 +139,20 @@ export default function InstitutionDashboardPage() {
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6">
+        <div className="bg-surface border border-edge rounded-2xl p-6">
           <p className="font-bold text-ink text-[15px] mb-4">Recent activity</p>
           {activity.length === 0 ? (
-            <p className="text-[13px] text-[#8A8373]">No reviews yet.</p>
+            <p className="text-[13px] text-ink-tertiary">No reviews yet.</p>
           ) : (
             <div className="space-y-3">
               {activity.map(a => (
-                <div key={a.id} className="text-[13px] text-[#6B6558]">
+                <div key={a.id} className="text-[13px] text-ink-secondary">
                   <span className="font-semibold text-ink capitalize">{a.decision}</span>
                   {' — '}{a.submissions?.work_items?.title}
-                  <span className="block text-[12px] text-[#8A8373]">
+                  <span className="block text-[12px] text-ink-tertiary">
                     {a.users?.full_name} · {new Date(a.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                   </span>
-                  {a.feedback && <span className="block text-[12px] text-[#6B6558] italic mt-0.5">"{a.feedback}"</span>}
+                  {a.feedback && <span className="block text-[12px] text-ink-secondary italic mt-0.5">"{a.feedback}"</span>}
                 </div>
               ))}
             </div>
@@ -160,15 +160,15 @@ export default function InstitutionDashboardPage() {
         </div>
 
         <div className="space-y-4">
-          <div className="bg-white border border-[#E2DDD1] rounded-2xl p-6">
+          <div className="bg-surface border border-edge rounded-2xl p-6">
             <p className="font-bold text-ink text-[15px] mb-3">Verified this week</p>
             {trend === null ? (
-              <p className="text-[13px] text-[#8A8373]">Loading…</p>
+              <p className="text-[13px] text-ink-tertiary">Loading…</p>
             ) : (
               <div className="flex items-center gap-2.5">
                 <p className="text-2xl font-bold text-ink">{trend.thisWeek}</p>
                 {trend.thisWeek !== trend.lastWeek && (
-                  <span className={`flex items-center gap-1 text-[12px] font-semibold ${trend.thisWeek >= trend.lastWeek ? 'text-[#1E7A34]' : 'text-[#B3401E]'}`}>
+                  <span className={`flex items-center gap-1 text-[12px] font-semibold ${trend.thisWeek >= trend.lastWeek ? 'text-success-text' : 'text-danger-text'}`}>
                     {trend.thisWeek >= trend.lastWeek ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                     vs {trend.lastWeek} last week
                   </span>
@@ -179,7 +179,7 @@ export default function InstitutionDashboardPage() {
         </div>
       </div>
 
-      <div id="join-codes" className="bg-white border border-[#E2DDD1] rounded-2xl p-6">
+      <div id="join-codes" className="bg-surface border border-edge rounded-2xl p-6">
         <JoinCodesPanel />
       </div>
     </div>
@@ -188,7 +188,7 @@ export default function InstitutionDashboardPage() {
 
 function QuickAction({ href, icon: Icon, label }: { href: string; icon: any; label: string }) {
   return (
-    <Link href={href} className="flex items-center gap-2 bg-white border border-[#E2DDD1] rounded-xl px-4 py-2.5 text-[13px] font-semibold text-ink hover:border-brand hover:text-brand transition">
+    <Link href={href} className="flex items-center gap-2 bg-surface border border-edge rounded-xl px-4 py-2.5 text-[13px] font-semibold text-ink hover:border-brand hover:text-brand transition">
       <Icon className="w-4 h-4" /> {label}
     </Link>
   )
@@ -196,12 +196,12 @@ function QuickAction({ href, icon: Icon, label }: { href: string; icon: any; lab
 
 function StatCard({ icon: Icon, label, value, accent }: { icon: any; label: string; value: number; accent?: boolean }) {
   return (
-    <div className="bg-white border border-[#E2DDD1] rounded-2xl p-5">
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${accent ? 'bg-[#FCEEE4]' : 'bg-[#F5F1E8]'}`}>
-        <Icon className={`w-4 h-4 ${accent ? 'text-brand' : 'text-[#8A8373]'}`} />
+    <div className="bg-surface border border-edge rounded-2xl p-5">
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${accent ? 'bg-accent-bg' : 'bg-surface-muted'}`}>
+        <Icon className={`w-4 h-4 ${accent ? 'text-brand' : 'text-ink-tertiary'}`} />
       </div>
       <p className="text-2xl font-bold text-ink">{value}</p>
-      <p className="text-[13px] text-[#8A8373]">{label}</p>
+      <p className="text-[13px] text-ink-tertiary">{label}</p>
     </div>
   )
 }

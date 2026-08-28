@@ -8,10 +8,10 @@ import type { Submission } from '@/lib/types'
 import { CheckCircle, RotateCcw, Flag, ShieldOff, Ban, Clock, History, FileText, ExternalLink, PartyPopper } from 'lucide-react'
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
-  submitted: { label: 'Awaiting review', cls: 'bg-[#FFF3E4] text-[#B3651E]' },
-  returned: { label: 'Returned for revision', cls: 'bg-[#F5F1E8] text-[#8A8373]' },
-  verified: { label: 'Verified', cls: 'bg-[#E9F6EC] text-[#1E7A34]' },
-  revoked: { label: 'Revoked', cls: 'bg-[#FDEEEA] text-[#B3401E]' },
+  submitted: { label: 'Awaiting review', cls: 'bg-warning-bg text-warning-text' },
+  returned: { label: 'Returned for revision', cls: 'bg-surface-muted text-ink-tertiary' },
+  verified: { label: 'Verified', cls: 'bg-success-bg text-success-text' },
+  revoked: { label: 'Revoked', cls: 'bg-danger-bg text-danger-text' },
 }
 
 const DECISION_LABEL: Record<string, string> = { verified: 'Verified', returned: 'Returned', revoked: 'Revoked' }
@@ -21,7 +21,7 @@ function waitingInfo(dateStr: string): { label: string; cls: string } {
   const hours = Math.floor(ms / (1000 * 60 * 60))
   const mins = Math.floor(ms / 60000)
   const label = hours < 1 ? `${Math.max(mins, 0)}m waiting` : hours < 24 ? `${hours}h waiting` : `${Math.floor(hours / 24)}d waiting`
-  const cls = hours >= 48 ? 'text-[#B3401E]' : hours >= 24 ? 'text-[#B3651E]' : 'text-[#8A8373]'
+  const cls = hours >= 48 ? 'text-danger-text' : hours >= 24 ? 'text-warning-text' : 'text-ink-tertiary'
   return { label, cls }
 }
 
@@ -47,13 +47,13 @@ export default function ReviewQueuePanel() {
       <div className="flex items-baseline justify-between mb-5">
         <p className="font-bold text-ink text-[15px]">Review queue</p>
         {!loading && pending.length > 0 && (
-          <p className="text-[13px] text-[#8A8373]">{pending.length} waiting</p>
+          <p className="text-[13px] text-ink-tertiary">{pending.length} waiting</p>
         )}
       </div>
 
       {loading ? (
         <div className="space-y-3">
-          {[0, 1, 2].map(i => <div key={i} className="h-16 rounded-xl bg-[#F5F1E8] animate-pulse" />)}
+          {[0, 1, 2].map(i => <div key={i} className="h-16 rounded-xl bg-surface-muted animate-pulse" />)}
         </div>
       ) : pending.length === 0 && decided.length === 0 ? (
         <EmptyState />
@@ -68,8 +68,8 @@ export default function ReviewQueuePanel() {
           )}
           {decided.length > 0 && (
             <>
-              <div className="h-px bg-[#EDE9E1] my-4" />
-              <p className="text-[12px] font-semibold text-[#8A8373] uppercase tracking-wide mb-1">Already decided</p>
+              <div className="h-px bg-edge-subtle my-4" />
+              <p className="text-[12px] font-semibold text-ink-tertiary uppercase tracking-wide mb-1">Already decided</p>
               {decided.map(s => (
                 <SubmissionRow key={s.id} submission={s} open={openId === s.id} onToggle={() => setOpenId(o => o === s.id ? null : s.id)} onDecided={load} />
               ))}
@@ -84,11 +84,11 @@ export default function ReviewQueuePanel() {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center text-center py-14">
-      <div className="w-12 h-12 rounded-full bg-[#F5F1E8] flex items-center justify-center mb-3">
-        <FileText className="w-5 h-5 text-[#A39C8A]" />
+      <div className="w-12 h-12 rounded-full bg-surface-muted flex items-center justify-center mb-3">
+        <FileText className="w-5 h-5 text-ink-quaternary" />
       </div>
       <p className="font-semibold text-ink text-[14px] mb-1">Nothing submitted yet</p>
-      <p className="text-[13px] text-[#8A8373]">Work will land here once students start submitting against your briefs.</p>
+      <p className="text-[13px] text-ink-tertiary">Work will land here once students start submitting against your briefs.</p>
     </div>
   )
 }
@@ -96,11 +96,11 @@ function EmptyState() {
 function AllCaughtUp() {
   return (
     <div className="flex flex-col items-center text-center py-14 mb-2">
-      <div className="w-12 h-12 rounded-full bg-[#E9F6EC] flex items-center justify-center mb-3">
-        <CheckCircle className="w-5 h-5 text-[#1E7A34]" />
+      <div className="w-12 h-12 rounded-full bg-success-bg flex items-center justify-center mb-3">
+        <CheckCircle className="w-5 h-5 text-success-text" />
       </div>
       <p className="font-semibold text-ink text-[14px] mb-1">All caught up</p>
-      <p className="text-[13px] text-[#8A8373]">Nothing waiting for review right now.</p>
+      <p className="text-[13px] text-ink-tertiary">Nothing waiting for review right now.</p>
     </div>
   )
 }
@@ -153,20 +153,20 @@ function SubmissionRow({
   const isImage = submission.file_type && IMAGE_TYPES.includes(submission.file_type)
 
   return (
-    <div className="border border-[#EDE9E1] rounded-xl overflow-hidden relative">
+    <div className="border border-edge-subtle rounded-xl overflow-hidden relative">
       {justVerified && (
-        <div className="absolute inset-0 z-10 bg-white/95 flex flex-col items-center justify-center gap-2 animate-fadeIn">
-          <div className="w-11 h-11 rounded-full bg-[#E9F6EC] flex items-center justify-center">
-            <PartyPopper className="w-5 h-5 text-[#1E7A34]" />
+        <div className="absolute inset-0 z-10 bg-surface/95 flex flex-col items-center justify-center gap-2 animate-fadeIn">
+          <div className="w-11 h-11 rounded-full bg-success-bg flex items-center justify-center">
+            <PartyPopper className="w-5 h-5 text-success-text" />
           </div>
-          <p className="font-bold text-[#1E7A34] text-[14px]">Verified — on {submission.users?.full_name}'s profile</p>
+          <p className="font-bold text-success-text text-[14px]">Verified — on {submission.users?.full_name}'s profile</p>
         </div>
       )}
 
-      <button onClick={onToggle} className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-[#FBF9F4] transition">
+      <button onClick={onToggle} className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-surface-subtle transition">
         <div className="min-w-0">
           <p className="font-semibold text-ink text-[14px] truncate">{submission.users?.full_name} — {submission.work_items?.title}</p>
-          <p className="text-[12px] text-[#8A8373] flex items-center gap-2">
+          <p className="text-[12px] text-ink-tertiary flex items-center gap-2">
             <span>{new Date(submission.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
             {waiting && (
               <span className={`flex items-center gap-1 font-semibold ${waiting.cls}`}>
@@ -176,50 +176,50 @@ function SubmissionRow({
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {isFlagged && <Flag className="w-3.5 h-3.5 text-[#B3401E]" />}
+          {isFlagged && <Flag className="w-3.5 h-3.5 text-danger-text" />}
           <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${status.cls}`}>{status.label}</span>
         </div>
       </button>
 
       {open && (
-        <div className="px-5 pb-5 border-t border-[#EDE9E1] pt-5">
+        <div className="px-5 pb-5 border-t border-edge-subtle pt-5">
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-[#FBF9F4] rounded-xl p-4">
-              <p className="text-[11px] font-semibold text-[#8A8373] uppercase tracking-wide mb-1.5">Success criteria</p>
-              <p className="text-[13.5px] text-[#4A453B] leading-relaxed">{submission.work_items?.criteria}</p>
+            <div className="bg-surface-subtle rounded-xl p-4">
+              <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-1.5">Success criteria</p>
+              <p className="text-[13.5px] text-ink-body leading-relaxed">{submission.work_items?.criteria}</p>
             </div>
-            <div className="bg-[#FBF9F4] rounded-xl p-4">
-              <p className="text-[11px] font-semibold text-[#8A8373] uppercase tracking-wide mb-1.5">Submitted work</p>
+            <div className="bg-surface-subtle rounded-xl p-4">
+              <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-1.5">Submitted work</p>
               {isImage && fileUrl ? (
-                <img src={fileUrl} alt="Submitted work" className="max-h-56 w-auto rounded-lg border border-[#E2DDD1] mb-2" />
+                <img src={fileUrl} alt="Submitted work" className="max-h-56 w-auto rounded-lg border border-edge mb-2" />
               ) : submission.file_path ? (
                 <a
                   href={fileUrl || '#'} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-2 bg-white border border-[#E2DDD1] rounded-lg px-3 py-2.5 text-[13px] font-semibold text-ink hover:border-brand transition mb-2"
+                  className="flex items-center gap-2 bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] font-semibold text-ink hover:border-brand transition mb-2"
                 >
-                  <FileText className="w-4 h-4 text-[#8A8373] flex-shrink-0" />
+                  <FileText className="w-4 h-4 text-ink-tertiary flex-shrink-0" />
                   <span className="truncate flex-1">{submission.file_path.split('/').pop()}</span>
-                  <ExternalLink className="w-3.5 h-3.5 text-[#8A8373] flex-shrink-0" />
+                  <ExternalLink className="w-3.5 h-3.5 text-ink-tertiary flex-shrink-0" />
                 </a>
               ) : null}
-              {submission.content && <p className="text-[13.5px] text-[#4A453B] whitespace-pre-wrap leading-relaxed">{submission.content}</p>}
-              {!submission.content && !submission.file_path && <p className="text-[13px] text-[#A39C8A] italic">Nothing attached.</p>}
+              {submission.content && <p className="text-[13.5px] text-ink-body whitespace-pre-wrap leading-relaxed">{submission.content}</p>}
+              {!submission.content && !submission.file_path && <p className="text-[13px] text-ink-quaternary italic">Nothing attached.</p>}
             </div>
           </div>
 
           {history !== null && history.length > 0 && (
             <div className="mb-4">
-              <p className="text-[11px] font-semibold text-[#8A8373] uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+              <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
                 <History className="w-3.5 h-3.5" /> Past reviews for {submission.users?.full_name}
               </p>
               <div className="space-y-1.5">
                 {history.map(h => (
-                  <div key={h.id} className="text-[12px] text-[#6B6558] border-l-2 border-[#EDE9E1] pl-2.5">
+                  <div key={h.id} className="text-[12px] text-ink-secondary border-l-2 border-edge-subtle pl-2.5">
                     <span className="font-semibold text-ink">{DECISION_LABEL[h.decision] || h.decision}</span>
                     {' — '}{h.submissions?.work_items?.title}
                     {' · '}{new Date(h.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                     {' · '}{h.users?.full_name}
-                    {h.feedback && <span className="block italic text-[#8A8373]">"{h.feedback}"</span>}
+                    {h.feedback && <span className="block italic text-ink-tertiary">"{h.feedback}"</span>}
                   </div>
                 ))}
               </div>
@@ -230,13 +230,13 @@ function SubmissionRow({
 
           {canDecide && (
             <>
-              <p className="text-[11px] font-semibold text-[#8A8373] uppercase tracking-wide mb-1.5">Your feedback</p>
+              <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-1.5">Your feedback</p>
               <textarea
                 value={feedback}
                 onChange={e => setFeedback(e.target.value)}
                 placeholder="Check the work against the criteria above, then write your feedback here — logged against this submission, never a private chat."
                 rows={4}
-                className="w-full bg-white border border-[#E2DDD1] rounded-xl px-4 py-3.5 text-[14px] text-ink placeholder-[#A39C8A] outline-none focus:border-brand transition mb-3.5 resize-none leading-relaxed"
+                className="w-full bg-surface border border-edge rounded-xl px-4 py-3.5 text-[14px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition mb-3.5 resize-none leading-relaxed"
               />
               <div className="flex gap-2.5">
                 <SecondaryButton onClick={() => decide('returned')} disabled={loading}>
@@ -246,12 +246,12 @@ function SubmissionRow({
                   <span className="flex items-center gap-1.5"><CheckCircle className="w-4 h-4" /> Verify</span>
                 </PrimaryButton>
               </div>
-              {isFlagged && <p className="text-[12px] text-[#B3401E] mt-2">Flagged for moderation — clear it before verifying.</p>}
+              {isFlagged && <p className="text-[12px] text-danger-text mt-2">Flagged for moderation — clear it before verifying.</p>}
             </>
           )}
 
-          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[#EDE9E1]">
-            <button onClick={toggleFlag} className="flex items-center gap-1.5 text-[12px] font-semibold text-[#8A8373] hover:text-ink transition">
+          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-edge-subtle">
+            <button onClick={toggleFlag} className="flex items-center gap-1.5 text-[12px] font-semibold text-ink-tertiary hover:text-ink transition">
               <ShieldOff className="w-3.5 h-3.5" /> {isFlagged ? 'Clear flag' : 'Flag for moderation'}
             </button>
             {canRevoke && (
@@ -261,9 +261,9 @@ function SubmissionRow({
                   onChange={e => setFeedback(e.target.value)}
                   placeholder="Reason for revoking (required)"
                   rows={1}
-                  className="flex-1 bg-white border border-[#E2DDD1] rounded-lg px-3 py-1.5 text-[12px] text-ink placeholder-[#A39C8A] outline-none focus:border-brand transition"
+                  className="flex-1 bg-surface border border-edge rounded-lg px-3 py-1.5 text-[12px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
                 />
-                <button onClick={() => decide('revoked')} disabled={loading} className="flex items-center gap-1.5 text-[12px] font-semibold text-[#B3401E] hover:underline flex-shrink-0">
+                <button onClick={() => decide('revoked')} disabled={loading} className="flex items-center gap-1.5 text-[12px] font-semibold text-danger-text hover:underline flex-shrink-0">
                   <Ban className="w-3.5 h-3.5" /> Revoke
                 </button>
               </div>
