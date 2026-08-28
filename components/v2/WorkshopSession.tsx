@@ -174,11 +174,14 @@ export default function WorkshopSession({
   useEffect(() => {
     if (!mainStageRef.current) return
     if (mainUid === myUid) {
-      if (cameraOn && cameraRef.current) cameraRef.current.play(mainStageRef.current)
-      else if (screenSharing && screenRef.current) screenRef.current.play(mainStageRef.current)
+      // Camera fills the box edge to edge (crops the square capture to
+      // whatever shape the box is); screen share stays uncropped so
+      // shared text/slides don't get cut off.
+      if (cameraOn && cameraRef.current) cameraRef.current.play(mainStageRef.current, { fit: 'cover' })
+      else if (screenSharing && screenRef.current) screenRef.current.play(mainStageRef.current, { fit: 'contain' })
     } else {
       const remote = remoteUsers.find(u => u.uid === mainUid)
-      if (remote?.videoTrack) remote.videoTrack.play(mainStageRef.current)
+      if (remote?.videoTrack) remote.videoTrack.play(mainStageRef.current, { fit: 'cover' })
     }
   }, [mainUid, cameraOn, screenSharing, remoteUsers, myUid])
 
@@ -194,7 +197,7 @@ export default function WorkshopSession({
         const video = await AgoraRTC.createCameraVideoTrack({ encoderConfig: { width: 720, height: 720, frameRate: 24, bitrateMax: 1200 } })
         cameraRef.current = video
         await clientRef.current.publish([video])
-        if (mainUid === myUid && mainStageRef.current) video.play(mainStageRef.current)
+        if (mainUid === myUid && mainStageRef.current) video.play(mainStageRef.current, { fit: 'cover' })
         setCameraOn(true)
       } else {
         if (cameraRef.current) {
@@ -241,7 +244,7 @@ export default function WorkshopSession({
         screenRef.current = track
         await clientRef.current.publish([track])
         setMainUid(myUid) // sharing your screen brings you to the main stage
-        if (mainStageRef.current) track.play(mainStageRef.current)
+        if (mainStageRef.current) track.play(mainStageRef.current, { fit: 'contain' })
         setScreenSharing(true)
         track.on('track-ended', async () => {
           // Fires when the browser's own "Stop sharing" bar is used —
@@ -367,24 +370,25 @@ export default function WorkshopSession({
             </div>
           ) : (
             <>
-              {/* Main stage — a square box, as big as the available height
-                  allows (not stretched into a rectangle) so a chest-up
-                  framing actually reads as a proper close-up rather than a
-                  small tile lost in a wide dark bar. */}
-              <div className="flex-1 min-h-0 flex items-center justify-center mb-3">
-                <div ref={mainStageRef} className="h-full max-w-full aspect-square bg-[#221D19] rounded-xl relative overflow-hidden flex items-center justify-center">
-                  {!((mainUid === myUid && (cameraOn || screenSharing)) || remoteUsers.find(u => u.uid === mainUid)?.videoTrack) && (
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-xl">
-                        {initials(participants[mainUid]?.name || (mainUid === myUid ? user?.full_name : undefined))}
-                      </div>
-                      <VideoOff className="w-4 h-4 text-[#5A544A]" />
+              {/* Main stage — fills the whole available area (not boxed
+                  down to a small square anymore). The camera capture
+                  itself is still a tight, square-cropped shot (below),
+                  so playing it here with fit:'cover' crops it to fill
+                  this wider rectangle edge to edge, chest-up framing
+                  intact, instead of leaving black bars around a tiny
+                  centered tile. */}
+              <div ref={mainStageRef} className="flex-1 min-h-0 bg-[#221D19] rounded-xl relative overflow-hidden flex items-center justify-center mb-3">
+                {!((mainUid === myUid && (cameraOn || screenSharing)) || remoteUsers.find(u => u.uid === mainUid)?.videoTrack) && (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-xl">
+                      {initials(participants[mainUid]?.name || (mainUid === myUid ? user?.full_name : undefined))}
                     </div>
-                  )}
-                  <span className="absolute bottom-3 left-3.5 text-white text-[12px] font-semibold bg-black/40 px-2.5 py-1 rounded-full">
-                    {mainUid === myUid ? 'You' : participants[mainUid]?.name || 'Participant'}
-                  </span>
-                </div>
+                    <VideoOff className="w-4 h-4 text-[#5A544A]" />
+                  </div>
+                )}
+                <span className="absolute bottom-3 left-3.5 text-white text-[12px] font-semibold bg-black/40 px-2.5 py-1 rounded-full">
+                  {mainUid === myUid ? 'You' : participants[mainUid]?.name || 'Participant'}
+                </span>
               </div>
 
               {/* Everyone else — name + avatar strip, click to bring to the main stage */}
@@ -465,12 +469,14 @@ export default function WorkshopSession({
         >
           <ScreenShare className="w-[18px] h-[18px]" />
         </button>
-        <button
-          onClick={toggleHand} disabled={!joined}
-          className={`w-11 h-11 rounded-full flex items-center justify-center transition ${handRaised ? 'bg-brand text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
-        >
-          <Hand className="w-[18px] h-[18px]" />
-        </button>
+        {!canEnd && (
+          <button
+            onClick={toggleHand} disabled={!joined}
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition ${handRaised ? 'bg-brand text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+          >
+            <Hand className="w-[18px] h-[18px]" />
+          </button>
+        )}
         <button onClick={leave} className="w-11 h-11 rounded-full bg-[#B3401E] text-white flex items-center justify-center hover:bg-[#9c3419] transition">
           <PhoneOff className="w-[18px] h-[18px]" />
         </button>
