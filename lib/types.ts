@@ -28,6 +28,7 @@ export interface User {
   sidebar_collapsed?: boolean
   consented_at?: string
   theme_preference?: 'light' | 'dark' | 'system'
+  presence_status?: 'active' | 'busy' | 'away'
   notification_prefs?: Record<string, boolean>
   created_at: string
 }

@@ -661,3 +661,8 @@ export const sendWorkshopMessage = async (workItemId: string, senderId: string, 
   const { error } = await supabase.from('workshop_messages').insert([{ work_item_id: workItemId, sender_id: senderId, kind, content }])
   return { error }
 }
+
+export const setPresenceStatus = async (userId: string, status: 'active' | 'busy' | 'away') => {
+  const { error } = await supabase.from('users').update({ presence_status: status }).eq('id', userId)
+  return { error }
+}

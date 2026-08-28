@@ -5,13 +5,19 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
-import { setSidebarCollapsed, signOut, supabase } from '@/lib/supabase'
+import { setSidebarCollapsed, setPresenceStatus, signOut, supabase } from '@/lib/supabase'
 import { ChevronLeft, ChevronRight, Settings, User as UserIcon, Plus, LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import Logo from '@/components/v2/Logo'
 import NotificationsBell from '@/components/v2/NotificationsBell'
 
 export interface NavItem { key: string; label: string; icon: LucideIcon; href: string }
+
+const PRESENCE_DOT: Record<string, string> = {
+  active: 'bg-success-solid',
+  busy: 'bg-danger-solid',
+  away: 'bg-ink-quaternary',
+}
 
 // The shared shell for both organisation roles — collapsible sidebar on
 // laptop (state remembered server-side, not just localStorage), bottom
@@ -24,7 +30,7 @@ export default function OrgShell({
   phoneItems: [NavItem, NavItem, NavItem] // feed, role-specific second item, dashboard — Plus and Profile are inserted around these
   children: React.ReactNode
 }) {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const theme = useResolvedTheme()
   const pathname = usePathname()
   const router = useRouter()
@@ -99,17 +105,34 @@ export default function OrgShell({
               <button
                 onClick={() => setProfileOpen(v => !v)}
                 aria-label="Profile menu"
-                className="w-9 h-9 flex items-center justify-center rounded-full bg-accent-bg text-brand font-bold text-[13px] ml-1"
+                className="relative w-9 h-9 flex items-center justify-center rounded-full bg-accent-bg text-brand font-bold text-[13px] ml-1"
               >
                 {user?.full_name?.[0]?.toUpperCase() || <UserIcon className="w-4 h-4" />}
+                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface ${PRESENCE_DOT[user?.presence_status || 'active']}`} />
               </button>
               {profileOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setProfileOpen(false)} />
-                  <div className="absolute right-0 top-11 bg-surface border border-edge rounded-xl shadow-lg py-1.5 w-48 z-20">
+                  <div className="absolute right-0 top-11 bg-surface border border-edge rounded-xl shadow-lg py-1.5 w-52 z-20">
                     <div className="px-3.5 py-2 border-b border-edge-subtle">
                       <p className="text-[13px] font-semibold text-ink truncate">{user?.full_name}</p>
                       <p className="text-[12px] text-ink-tertiary truncate">{user?.email}</p>
+                    </div>
+                    <div className="px-3.5 py-2.5 border-b border-edge-subtle">
+                      <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-1.5">Status</p>
+                      <div className="flex gap-1.5">
+                        {(['active', 'busy', 'away'] as const).map(s => (
+                          <button
+                            key={s}
+                            onClick={async () => { if (user) { await setPresenceStatus(user.id, s); await refreshUser() } }}
+                            className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-[11px] font-semibold capitalize transition ${
+                              (user?.presence_status || 'active') === s ? 'bg-surface-muted text-ink' : 'text-ink-tertiary hover:bg-surface-muted'
+                            }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${PRESENCE_DOT[s]}`} /> {s}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <button onClick={handleSignOut} className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] text-ink-secondary hover:bg-surface-muted transition">
                       <LogOut className="w-3.5 h-3.5" /> Log out
