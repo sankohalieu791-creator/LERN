@@ -95,6 +95,7 @@ export interface WorkItem {
   starts_at?: string
   started_at?: string
   ended_at?: string
+  closed_at?: string
   criteria: string
   visibility: 'public' | 'private'
   created_by?: string

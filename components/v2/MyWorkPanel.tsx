@@ -78,7 +78,7 @@ function WorkItemCard({
   const [inSession, setInSession] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const status = latest ? STATUS[latest.status] : null
-  const canSubmit = !latest || latest.status === 'returned'
+  const canSubmit = (!latest || latest.status === 'returned') && !item.closed_at
   const StatusIcon = status?.icon
 
   const handleSubmit = async () => {
@@ -106,11 +106,16 @@ function WorkItemCard({
           <p className="font-semibold text-ink text-[14px] truncate">{item.title}</p>
           <span className="text-[11px] font-semibold uppercase tracking-wide text-[#8A8373]">{item.type}</span>
         </div>
-        {status && StatusIcon && (
-          <span className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${status.cls}`}>
-            <StatusIcon className="w-3 h-3" /> {status.label}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {item.closed_at && (
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-[#F5F1E8] text-[#8A8373]">Withdrawn</span>
+          )}
+          {status && StatusIcon && (
+            <span className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${status.cls}`}>
+              <StatusIcon className="w-3 h-3" /> {status.label}
+            </span>
+          )}
+        </div>
       </button>
 
       {open && (
@@ -120,7 +125,11 @@ function WorkItemCard({
 
           {(item.type === 'workshop' || item.type === 'course') && (
             <div className="mb-4">
-              {item.mode === 'online' && item.ended_at ? (
+              {item.closed_at ? (
+                <span className="inline-flex items-center gap-1.5 bg-[#F5F1E8] text-[#8A8373] font-semibold text-[13px] px-4 py-2 rounded-lg">
+                  <Video className="w-4 h-4" /> Withdrawn by your organisation
+                </span>
+              ) : item.mode === 'online' && item.ended_at ? (
                 <span className="inline-flex items-center gap-1.5 bg-[#FDEEEA] text-[#B3401E] font-semibold text-[13px] px-4 py-2 rounded-lg">
                   <Video className="w-4 h-4" /> Ended
                 </span>

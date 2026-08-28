@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { getReviewQueue, submitReview, setModeration, getStudentReviewHistory, getSignedFileUrl } from '@/lib/supabase'
 import { PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
 import type { Submission } from '@/lib/types'
-import { CheckCircle, RotateCcw, Flag, ShieldOff, Ban, Clock, History, FileText, ExternalLink, PartyPopper } from 'lucide-react'
+import { CheckCircle, RotateCcw, Flag, ShieldOff, Ban, Clock, History, FileText, ExternalLink, PartyPopper, ClipboardList } from 'lucide-react'
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   submitted: { label: 'Awaiting review', cls: 'bg-warning-bg text-warning-text' },
@@ -43,11 +43,16 @@ export default function ReviewQueuePanel() {
   const decided = items.filter(i => i.status !== 'submitted')
 
   return (
-    <div>
-      <div className="flex items-baseline justify-between mb-5">
+    <div className="max-w-3xl">
+      <div className="flex items-center justify-between mb-5">
         <p className="font-bold text-ink text-[15px]">Review queue</p>
-        {!loading && pending.length > 0 && (
-          <p className="text-[13px] text-ink-tertiary">{pending.length} waiting</p>
+        {!loading && (
+          <span className={`flex items-center gap-1.5 text-[13px] font-semibold px-3 py-1.5 rounded-full ${
+            pending.length > 0 ? 'bg-warning-bg text-warning-text' : 'bg-success-bg text-success-text'
+          }`}>
+            <ClipboardList className="w-3.5 h-3.5" />
+            {pending.length > 0 ? `${pending.length} work item${pending.length === 1 ? '' : 's'} left to review` : 'All caught up'}
+          </span>
         )}
       </div>
 

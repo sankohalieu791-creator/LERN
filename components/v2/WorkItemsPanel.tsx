@@ -5,11 +5,12 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getWorkItems, createWorkItem, getGroups, createGroup, getGroupMembers,
   uploadWorkItemAttachment, uploadSubmissionFileFor, submitWorkForStudents, getSignedFileUrl, startWorkItemSession,
+  closeWorkItem, reopenWorkItem,
 } from '@/lib/supabase'
 import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
 import WorkshopSession from '@/components/v2/WorkshopSession'
 import type { WorkItem, Group } from '@/lib/types'
-import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin } from 'lucide-react'
+import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw } from 'lucide-react'
 
 type ItemType = 'brief' | 'course' | 'workshop'
 
@@ -145,6 +146,8 @@ function BriefsPanel() {
 function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void }) {
   const attachments = item.work_item_attachments || []
   const [inSession, setInSession] = useState(false)
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   const start = async () => {
     await startWorkItemSession(item.id) // fans out "session has started, join now" the first time only
@@ -152,13 +155,51 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
     onChanged()
   }
 
+  const revoke = async () => {
+    setBusy(true)
+    await closeWorkItem(item.id)
+    setBusy(false)
+    setConfirmingRevoke(false)
+    onChanged()
+  }
+
+  const reopen = async () => {
+    setBusy(true)
+    await reopenWorkItem(item.id)
+    setBusy(false)
+    onChanged()
+  }
+
   return (
-    <div className="border border-edge-subtle rounded-xl px-4 py-3.5">
-      <div className="flex items-center justify-between mb-1">
-        <p className="font-bold text-ink text-[14px]">{item.title}</p>
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary bg-surface-muted px-2 py-0.5 rounded-full">
-          {item.visibility}
-        </span>
+    <div className={`border border-edge-subtle rounded-xl px-4 py-3.5 ${item.closed_at ? 'opacity-70' : ''}`}>
+      <div className="flex items-center justify-between mb-1 gap-2">
+        <p className="font-bold text-ink text-[14px] min-w-0 truncate">{item.title}</p>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {item.closed_at ? (
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-danger-text bg-danger-bg px-2 py-0.5 rounded-full">
+              Revoked
+            </span>
+          ) : (
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary bg-surface-muted px-2 py-0.5 rounded-full">
+              {item.visibility}
+            </span>
+          )}
+          {confirmingRevoke ? (
+            <span className="flex items-center gap-1 text-[11px]">
+              <span className="text-ink-tertiary">Revoke?</span>
+              <button onClick={revoke} disabled={busy} className="font-semibold text-danger-text hover:underline">Yes</button>
+              <button onClick={() => setConfirmingRevoke(false)} className="font-semibold text-ink-tertiary hover:underline">Cancel</button>
+            </span>
+          ) : item.closed_at ? (
+            <button onClick={reopen} disabled={busy} title="Reopen" className="text-ink-tertiary hover:text-brand transition">
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <button onClick={() => setConfirmingRevoke(true)} title="Revoke — stop offering this to students" className="text-ink-tertiary hover:text-danger-text transition">
+              <Ban className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
       {item.topic && <p className="text-[12px] text-ink-tertiary mb-1.5">{item.topic}</p>}
       {(item.assignment || item.description) && <p className="text-[13px] text-ink-secondary mb-2 whitespace-pre-wrap">{item.assignment || item.description}</p>}
@@ -178,7 +219,7 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
           <span className="flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Starts {new Date(item.starts_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
         )}
       </div>
-      {(item.type === 'workshop' || item.type === 'course') && item.mode === 'online' && (
+      {(item.type === 'workshop' || item.type === 'course') && item.mode === 'online' && !item.closed_at && (
         item.ended_at ? (
           <span className="inline-flex items-center gap-1.5 bg-danger-bg text-danger-text font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3">
             <Video className="w-3.5 h-3.5" /> Ended

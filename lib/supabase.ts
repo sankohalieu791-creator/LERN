@@ -66,22 +66,29 @@ export const recordConsent = async (userId: string) => {
   return { error }
 }
 
-// Screen O3 — generate a join code for the caller's own organisation.
-// Retries on the rare code collision (unique constraint).
-export const generateJoinCode = async (organisationId: string, createdBy: string, expiresAt?: string | null) => {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const code = Array.from({ length: 8 }, () =>
-      '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random() * 32)]
-    ).join('')
-    const { data, error } = await supabase
-      .from('join_codes')
-      .insert([{ organisation_id: organisationId, code, created_by: createdBy, expires_at: expiresAt ?? null }])
-      .select()
-      .single()
-    if (!error) return { data, error: null }
-    if (!(error as any).message?.includes('duplicate')) return { data: null, error }
+// Used only to bootstrap an organisation's very first code at signup,
+// before staff have had a chance to pick their own — JoinCodesPanel
+// itself always takes a staff-chosen code, never calls this.
+export const randomJoinCode = () =>
+  Array.from({ length: 6 }, () => '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random() * 32)]).join('')
+
+// Screen O3 — staff choose their own code (4-6 characters) rather than
+// getting a random string, so it's actually memorable/writable on a
+// whiteboard. Defaults to a 2-week expiry unless the caller overrides
+// it. A collision surfaces as a clear error rather than silently
+// generating something else — the whole point is the code is theirs.
+export const generateJoinCode = async (organisationId: string, createdBy: string, code: string, expiresAt?: string | null) => {
+  const normalized = code.trim().toUpperCase()
+  const defaultExpiry = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+  const { data, error } = await supabase
+    .from('join_codes')
+    .insert([{ organisation_id: organisationId, code: normalized, created_by: createdBy, expires_at: expiresAt !== undefined ? expiresAt : defaultExpiry }])
+    .select()
+    .single()
+  if (error && (error as any).message?.includes('duplicate')) {
+    return { data: null, error: { message: 'That code is already in use — try a different one.' } as any }
   }
-  return { data: null, error: { message: 'Could not generate a unique code — please try again.' } as any }
+  return { data, error }
 }
 
 export const listJoinCodes = async (organisationId: string) => {
@@ -145,6 +152,19 @@ export const uploadWorkItemAttachment = async (workItemId: string, uploadedBy: s
 // existing "work_items: staff update" RLS policy, no new policy needed.
 export const endWorkshop = async (workItemId: string) => {
   const { error } = await supabase.from('work_items').update({ ended_at: new Date().toISOString() }).eq('id', workItemId)
+  return { error }
+}
+
+// Staff-only — revoke/withdraw a brief, course, or workshop. Never a
+// delete: a student's submissions/verifications against it stay intact
+// and reviewable, it just stops being offered to students from here on.
+export const closeWorkItem = async (workItemId: string) => {
+  const { error } = await supabase.from('work_items').update({ closed_at: new Date().toISOString() }).eq('id', workItemId)
+  return { error }
+}
+
+export const reopenWorkItem = async (workItemId: string) => {
+  const { error } = await supabase.from('work_items').update({ closed_at: null }).eq('id', workItemId)
   return { error }
 }
 

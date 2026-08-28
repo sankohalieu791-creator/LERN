@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
-import { signUp, signIn, createOrganisationAndJoin, recordConsent, generateJoinCode, getUserProfile, supabase } from '@/lib/supabase'
+import { signUp, signIn, createOrganisationAndJoin, recordConsent, generateJoinCode, randomJoinCode, getUserProfile, supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { ShieldCheck, Copy, Check } from 'lucide-react'
 
@@ -88,7 +88,7 @@ function OrganisationSignupInner() {
     if (user) await recordConsent(user.id)
     await refreshUser()
 
-    const { data: codeRow, error: codeError } = await generateJoinCode(newOrgId, user!.id, null)
+    const { data: codeRow, error: codeError } = await generateJoinCode(newOrgId, user!.id, randomJoinCode())
     setLoading(false)
     if (codeError || !codeRow) return setError('Organisation created, but the join code failed to generate — you can create one from your dashboard.')
 

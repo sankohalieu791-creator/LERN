@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase, endWorkshop, getWorkshopMessages, sendWorkshopMessage, startRecording, stopRecording } from '@/lib/supabase'
 import {
   Mic, MicOff, Video, VideoOff, ScreenShare, PhoneOff, Users, Square,
-  HelpCircle, Send, Hand, Circle, StopCircle,
+  HelpCircle, Send, Hand, Circle, StopCircle, X,
 } from 'lucide-react'
 
 const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!
@@ -63,7 +63,8 @@ export default function WorkshopSession({
 
   const [connecting, setConnecting] = useState(true)
   const [joined, setJoined] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState('') // fatal — no session to show, replaces the whole stage
+  const [actionError, setActionError] = useState('') // transient — camera/mic/share/recording hiccups; never hides the call
   const [remoteUsers, setRemoteUsers] = useState<IAgoraRTCRemoteUser[]>([])
   const [cameraOn, setCameraOn] = useState(false)
   const [micOn, setMicOn] = useState(false)
@@ -150,6 +151,12 @@ export default function WorkshopSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    if (!actionError) return
+    const t = setTimeout(() => setActionError(''), 6000)
+    return () => clearTimeout(t)
+  }, [actionError])
+
   // Q&A: load history once, then live-append via Realtime.
   useEffect(() => {
     getWorkshopMessages(workItemId).then(({ data }) => setMessages(data || []))
@@ -182,7 +189,9 @@ export default function WorkshopSession({
       if (!cameraOn) {
         // Square capture (not the default 16:9) so a chest-up framing
         // actually fits the tile instead of a wide horizontal sliver.
-        const video = await AgoraRTC.createCameraVideoTrack({ encoderConfig: { width: 480, height: 480, frameRate: 24, bitrateMax: 700 } })
+        // Higher resolution than before since the main stage now renders
+        // this much larger — 480p looked soft blown up to fill the box.
+        const video = await AgoraRTC.createCameraVideoTrack({ encoderConfig: { width: 720, height: 720, frameRate: 24, bitrateMax: 1200 } })
         cameraRef.current = video
         await clientRef.current.publish([video])
         if (mainUid === myUid && mainStageRef.current) video.play(mainStageRef.current)
@@ -195,7 +204,7 @@ export default function WorkshopSession({
         }
         setCameraOn(false)
       }
-    } catch { setError('Camera access denied.') }
+    } catch { setActionError('Camera access denied.') }
   }
 
   const toggleMic = async () => {
@@ -215,13 +224,13 @@ export default function WorkshopSession({
         }
         setMicOn(false)
       }
-    } catch { setError('Microphone access denied.') }
+    } catch { setActionError('Microphone access denied.') }
   }
 
   const toggleScreenShare = async () => {
     if (!clientRef.current) return
     if (typeof navigator === 'undefined' || typeof navigator.mediaDevices?.getDisplayMedia !== 'function') {
-      setError('Screen sharing needs a desktop browser.')
+      setActionError('Screen sharing needs a desktop browser.')
       return
     }
     try {
@@ -253,7 +262,7 @@ export default function WorkshopSession({
     } catch (e: any) {
       // Cancelling the browser's share picker throws too — that's not a
       // failure worth surfacing as an "Agora permission" error.
-      if (!isBenignCancel(e)) setError('Screen sharing failed: ' + (e?.message || 'Unknown error'))
+      if (!isBenignCancel(e)) setActionError('Screen sharing failed: ' + (e?.message || 'Unknown error'))
     }
   }
 
@@ -282,7 +291,7 @@ export default function WorkshopSession({
     setRecordingBusy(true)
     if (!recordingId) {
       const { recordingId: id, error: err } = await startRecording(workItemId, user.id)
-      if (err) setError(err.message || "Recording isn't set up yet — see the migration file for what's needed.")
+      if (err) setActionError(err.message || "Recording isn't set up yet — see the migration file for what's needed.")
       else setRecordingId(id || null)
     } else {
       await stopRecording(recordingId)
@@ -338,6 +347,15 @@ export default function WorkshopSession({
         </div>
       </div>
 
+      {actionError && (
+        <div className="mx-5 mb-2 flex-shrink-0 flex items-center justify-between gap-3 bg-[#3A241C] border border-[#5A3226] rounded-lg px-4 py-2.5">
+          <p className="text-[13px] text-[#FFB89E]">{actionError}</p>
+          <button onClick={() => setActionError('')} className="text-[#FFB89E] hover:text-white flex-shrink-0">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col px-5 pb-4 min-w-0">
           {connecting ? (
@@ -349,19 +367,24 @@ export default function WorkshopSession({
             </div>
           ) : (
             <>
-              {/* Main stage — one big rectangle */}
-              <div ref={mainStageRef} className="flex-1 min-h-0 bg-[#221D19] rounded-xl relative overflow-hidden flex items-center justify-center mb-3">
-                {!((mainUid === myUid && (cameraOn || screenSharing)) || remoteUsers.find(u => u.uid === mainUid)?.videoTrack) && (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-xl">
-                      {initials(participants[mainUid]?.name || (mainUid === myUid ? user?.full_name : undefined))}
+              {/* Main stage — a square box, as big as the available height
+                  allows (not stretched into a rectangle) so a chest-up
+                  framing actually reads as a proper close-up rather than a
+                  small tile lost in a wide dark bar. */}
+              <div className="flex-1 min-h-0 flex items-center justify-center mb-3">
+                <div ref={mainStageRef} className="h-full max-w-full aspect-square bg-[#221D19] rounded-xl relative overflow-hidden flex items-center justify-center">
+                  {!((mainUid === myUid && (cameraOn || screenSharing)) || remoteUsers.find(u => u.uid === mainUid)?.videoTrack) && (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-xl">
+                        {initials(participants[mainUid]?.name || (mainUid === myUid ? user?.full_name : undefined))}
+                      </div>
+                      <VideoOff className="w-4 h-4 text-[#5A544A]" />
                     </div>
-                    <VideoOff className="w-4 h-4 text-[#5A544A]" />
-                  </div>
-                )}
-                <span className="absolute bottom-3 left-3.5 text-white text-[12px] font-semibold bg-black/40 px-2.5 py-1 rounded-full">
-                  {mainUid === myUid ? 'You' : participants[mainUid]?.name || 'Participant'}
-                </span>
+                  )}
+                  <span className="absolute bottom-3 left-3.5 text-white text-[12px] font-semibold bg-black/40 px-2.5 py-1 rounded-full">
+                    {mainUid === myUid ? 'You' : participants[mainUid]?.name || 'Participant'}
+                  </span>
+                </div>
               </div>
 
               {/* Everyone else — name + avatar strip, click to bring to the main stage */}

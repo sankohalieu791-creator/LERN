@@ -6,7 +6,7 @@ import {
   getOrgStudents, getMySubmissions, getGroups, createGroup, setStudentGroup,
   getAttendanceForSession, markAttendance, getStudentAttendanceSummary,
 } from '@/lib/supabase'
-import { Clock, ChevronDown, ChevronUp, CheckCircle2, RotateCcw, Ban, Users2, ClipboardList } from 'lucide-react'
+import { Clock, ChevronDown, ChevronUp, CheckCircle2, RotateCcw, Ban, Users2, ClipboardList, RefreshCw } from 'lucide-react'
 import type { Group, AttendanceStatus } from '@/lib/types'
 
 const STATUS_ICON: Record<string, { icon: any; cls: string }> = {
@@ -34,6 +34,16 @@ export default function StudentsPanel() {
   }
   useEffect(load, [user?.organisation_id])
 
+  // A student can join mid-session in a different tab/device — refetch
+  // when staff come back to this tab instead of leaving them staring at
+  // a stale list until they think to hit Refresh themselves.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.organisation_id])
+
   const visible = filterGroup === 'all' ? students : students.filter(s => s.group_id === filterGroup)
 
   return (
@@ -55,15 +65,23 @@ export default function StudentsPanel() {
         <div className="bg-surface border border-edge rounded-2xl p-6">
           <div className="flex items-center justify-between mb-5">
             <p className="font-bold text-ink text-[15px]">Students ({visible.length})</p>
-            {groups.length > 0 && (
-              <select
-                value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
-                className="bg-surface border border-edge rounded-lg px-3 py-1.5 text-[13px] text-ink outline-none focus:border-brand transition"
+            <div className="flex items-center gap-2">
+              {groups.length > 0 && (
+                <select
+                  value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
+                  className="bg-surface border border-edge rounded-lg px-3 py-1.5 text-[13px] text-ink outline-none focus:border-brand transition"
+                >
+                  <option value="all">All groups</option>
+                  {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              )}
+              <button
+                onClick={load}
+                className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-secondary hover:text-brand transition px-2 py-1.5"
               >
-                <option value="all">All groups</option>
-                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
-            )}
+                <RefreshCw className="w-3.5 h-3.5" /> Refresh
+              </button>
+            </div>
           </div>
           {loading ? (
             <p className="text-ink-tertiary text-[14px]">Loading…</p>
@@ -82,7 +100,7 @@ export default function StudentsPanel() {
           )}
         </div>
       ) : (
-        <AttendanceRegister groups={groups} students={students} />
+        <AttendanceRegister groups={groups} students={students} onChanged={load} />
       )}
     </div>
   )
@@ -172,7 +190,7 @@ function StudentRow({
 // Staff-marked, per session date -- pick a group and a date, mark each
 // student present/absent/late, save. Not automatic, no fabricated data:
 // a session with nothing marked just shows blank until staff mark it.
-function AttendanceRegister({ groups, students }: { groups: Group[]; students: any[] }) {
+function AttendanceRegister({ groups, students, onChanged }: { groups: Group[]; students: any[]; onChanged: () => void }) {
   const { user } = useAuth()
   const [groupId, setGroupId] = useState('')
   const [newGroupName, setNewGroupName] = useState('')
@@ -181,6 +199,28 @@ function AttendanceRegister({ groups, students }: { groups: Group[]; students: a
   const [marks, setMarks] = useState<Record<string, AttendanceStatus>>({})
 
   const members = students.filter(s => s.group_id === groupId)
+
+  // One group, or none yet — skip making staff pick from a dropdown of
+  // one, or type a group name just to get started. Attendance is
+  // group-scoped under the hood, but for the common case (one class)
+  // that should be invisible.
+  useEffect(() => {
+    if (!groupId && groups.length === 1) setGroupId(groups[0].id)
+  }, [groups, groupId])
+
+  // Only offered when there are zero groups yet, so every student is
+  // still ungrouped — safe to drop all of them straight into it rather
+  // than making staff assign each one by hand before they can take a
+  // single register.
+  const handleQuickStart = async () => {
+    if (!user?.organisation_id) return
+    const { data } = await createGroup(user.organisation_id, user.id, 'All students')
+    if (!data) return
+    const newGroup = data as Group
+    await Promise.all(students.map(s => setStudentGroup(s.id, newGroup.id)))
+    setGroupId(newGroup.id)
+    onChanged()
+  }
 
   useEffect(() => {
     if (!groupId || !date) { setMarks({}); return }
@@ -208,15 +248,24 @@ function AttendanceRegister({ groups, students }: { groups: Group[]; students: a
   if (groups.length === 0) {
     return (
       <div className="bg-surface border border-edge rounded-2xl p-6">
-        <p className="font-bold text-ink text-[15px] mb-2">No groups yet</p>
-        <p className="text-[13px] text-ink-tertiary mb-4">Create a group to start taking a register — assign students to it from the Students tab.</p>
-        <div className="flex gap-2 max-w-sm">
-          <input
-            value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="e.g. Year 12 Media Studies"
-            className="flex-1 bg-surface border border-edge rounded-lg px-3 py-2 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
-          />
-          <button onClick={handleCreateGroup} disabled={!newGroupName.trim()} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[13px] font-semibold disabled:opacity-40">Create</button>
-        </div>
+        <p className="font-bold text-ink text-[15px] mb-2">Take attendance</p>
+        <p className="text-[13px] text-ink-tertiary mb-4">First time here — start with everyone in one register, or split into classes if you'd rather.</p>
+        <button onClick={handleQuickStart} disabled={students.length === 0} className="px-4 py-2.5 rounded-lg bg-brand text-white text-[13px] font-semibold disabled:opacity-40 mb-4">
+          {students.length === 0 ? 'No students yet' : 'Start with all students'}
+        </button>
+        {!creatingGroup ? (
+          <button onClick={() => setCreatingGroup(true)} className="block text-[12px] font-semibold text-ink-secondary hover:text-brand transition">
+            Or split into named classes instead
+          </button>
+        ) : (
+          <div className="flex gap-2 max-w-sm">
+            <input
+              value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="e.g. Year 12 Media Studies" autoFocus
+              className="flex-1 bg-surface border border-edge rounded-lg px-3 py-2 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
+            />
+            <button onClick={handleCreateGroup} disabled={!newGroupName.trim()} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[13px] font-semibold disabled:opacity-40">Create</button>
+          </div>
+        )}
       </div>
     )
   }
