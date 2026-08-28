@@ -42,7 +42,7 @@ export default function SettingsPanel() {
   if (!user) return null
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-4xl space-y-5">
       <AccountCard />
       <ThemeCard />
       <NotificationsCard />

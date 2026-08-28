@@ -179,7 +179,6 @@ function AttendanceRegister({ groups, students }: { groups: Group[]; students: a
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0])
   const [marks, setMarks] = useState<Record<string, AttendanceStatus>>({})
-  const [saving, setSaving] = useState<string | null>(null)
 
   const members = students.filter(s => s.group_id === groupId)
 
@@ -194,10 +193,10 @@ function AttendanceRegister({ groups, students }: { groups: Group[]; students: a
 
   const mark = async (studentId: string, status: AttendanceStatus) => {
     if (!user) return
-    setSaving(studentId)
+    const previous = marks[studentId]
+    setMarks(prev => ({ ...prev, [studentId]: status })) // instant — don't wait on the round trip
     const { error } = await markAttendance(groupId, studentId, date, status, user.id)
-    setSaving(null)
-    if (!error) setMarks(prev => ({ ...prev, [studentId]: status }))
+    if (error) setMarks(prev => ({ ...prev, [studentId]: previous })) // roll back only on real failure
   }
 
   const handleCreateGroup = async () => {
@@ -263,7 +262,7 @@ function AttendanceRegister({ groups, students }: { groups: Group[]; students: a
               <div className="flex gap-1.5">
                 {(['present', 'late', 'absent'] as AttendanceStatus[]).map(status => (
                   <button
-                    key={status} onClick={() => mark(m.id, status)} disabled={saving === m.id}
+                    key={status} onClick={() => mark(m.id, status)}
                     className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold capitalize transition ${
                       marks[m.id] === status
                         ? status === 'present' ? 'bg-success-solid text-white'

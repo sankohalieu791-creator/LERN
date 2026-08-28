@@ -182,10 +182,10 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-full bg-surface-muted flex items-center justify-center text-[12px] font-bold text-ink-secondary flex-shrink-0">
-            {initials(post.users?.full_name)}
+            {initials(post.author_name)}
           </div>
           <div>
-            <p className="font-semibold text-ink text-[13.5px]">{post.users?.full_name}</p>
+            <p className="font-semibold text-ink text-[13.5px]">{post.author_name}</p>
             <p className="text-[11px] text-ink-tertiary flex items-center gap-1">
               {timeAgo(post.created_at)} · {post.visibility === 'public' ? <Globe className="w-3 h-3" /> : <Users className="w-3 h-3" />}
             </p>

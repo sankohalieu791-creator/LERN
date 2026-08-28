@@ -23,6 +23,7 @@ export default function ProviderDashboardPage() {
   const [attentionCodes, setAttentionCodes] = useState<any[]>([])
   const [activity, setActivity] = useState<any[]>([])
   const [trend, setTrend] = useState<{ thisWeek: number; lastWeek: number } | null>(null)
+  const [myReviews, setMyReviews] = useState<{ total: number; verified: number; returned: number } | null>(null)
 
   useEffect(() => {
     if (!user?.organisation_id) return
@@ -69,6 +70,16 @@ export default function ProviderDashboardPage() {
         setTrend({
           thisWeek: rows.filter(r => new Date(r.verified_at).getTime() >= weekAgo).length,
           lastWeek: rows.filter(r => new Date(r.verified_at).getTime() < weekAgo).length,
+        })
+      })
+
+    supabase.from('reviews').select('decision').eq('reviewer_id', user.id)
+      .then(({ data }) => {
+        const rows = data || []
+        setMyReviews({
+          total: rows.length,
+          verified: rows.filter((r: any) => r.decision === 'verified').length,
+          returned: rows.filter((r: any) => r.decision === 'returned').length,
         })
       })
 
@@ -169,6 +180,19 @@ export default function ProviderDashboardPage() {
                 )}
               </div>
             )}
+          </div>
+          <div className="bg-surface border border-edge rounded-2xl p-6">
+            <p className="font-bold text-ink text-[15px] mb-3">Your reviews</p>
+            {myReviews === null ? (
+              <p className="text-[13px] text-ink-tertiary">Loading…</p>
+            ) : (
+              <div className="flex items-center gap-5">
+                <div><p className="text-2xl font-bold text-ink">{myReviews.total}</p><p className="text-[12px] text-ink-tertiary">marked</p></div>
+                <div><p className="text-2xl font-bold text-success-text">{myReviews.verified}</p><p className="text-[12px] text-ink-tertiary">verified</p></div>
+                <div><p className="text-2xl font-bold text-warning-text">{myReviews.returned}</p><p className="text-[12px] text-ink-tertiary">returned</p></div>
+              </div>
+            )}
+            <Link href="/provider/review" className="block mt-3 text-[12px] font-semibold text-brand hover:underline">Go to review queue →</Link>
           </div>
         </div>
       </div>

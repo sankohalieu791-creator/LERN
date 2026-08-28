@@ -28,6 +28,8 @@ const COPY: Record<ItemType, { heading: string; button: string; empty: string }>
 // days) that doesn't exist in this schema, so "match the old flow" here
 // means the field set, not resurrecting that entire subsystem.
 export default function WorkItemsPanel({ type }: { type: ItemType }) {
+  if (type === 'brief') return <BriefsPanel />
+
   const { user } = useAuth()
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,11 +58,7 @@ export default function WorkItemsPanel({ type }: { type: ItemType }) {
         </button>
       </div>
 
-      {showCreate && (
-        type === 'brief'
-          ? <CreateBriefForm onCreated={() => { setShowCreate(false); load() }} />
-          : <CreateWorkItemForm type={type} onCreated={() => { setShowCreate(false); load() }} />
-      )}
+      {showCreate && <CreateWorkItemForm type={type} onCreated={() => { setShowCreate(false); load() }} />}
 
       {loading ? (
         <p className="text-ink-tertiary text-[14px]">Loading…</p>
@@ -69,6 +67,75 @@ export default function WorkItemsPanel({ type }: { type: ItemType }) {
       ) : (
         <div className="space-y-3">
           {items.map(item => <WorkItemCard key={item.id} item={item} onChanged={load} />)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Briefs get their own top-level tabs, not a button that reveals a
+// toggle — "Briefs" (the list + create-new) and "Upload work students
+// already do" are two separate, always-reachable places.
+type BriefTab = 'briefs' | 'upload'
+
+function BriefsPanel() {
+  const { user } = useAuth()
+  const [tab, setTab] = useState<BriefTab>('briefs')
+  const [items, setItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showCreate, setShowCreate] = useState(false)
+
+  const load = () => {
+    if (!user?.organisation_id) return
+    getWorkItems(user.organisation_id).then(({ data }) => {
+      setItems((data || []).filter((i: any) => i.type === 'brief'))
+      setLoading(false)
+    })
+  }
+  useEffect(load, [user?.organisation_id])
+
+  return (
+    <div>
+      <div className="flex gap-1 mb-5 border-b border-edge-subtle">
+        {([['briefs', 'Briefs'], ['upload', 'Upload work students already do']] as [BriefTab, string][]).map(([key, label]) => (
+          <button
+            key={key} onClick={() => setTab(key)}
+            className={`px-4 py-2.5 text-[14px] font-semibold border-b-2 -mb-px transition ${
+              tab === key ? 'text-ink border-brand' : 'text-ink-tertiary border-transparent hover:text-ink'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'briefs' ? (
+        <div>
+          <div className="flex items-center justify-between mb-5">
+            <p className="font-bold text-ink text-[15px]">Briefs</p>
+            <button
+              onClick={() => setShowCreate(v => !v)}
+              className="flex items-center gap-1.5 bg-brand text-white font-semibold text-[13px] px-4 py-2 rounded-lg hover:bg-brand-hover transition"
+            >
+              {showCreate ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+              {showCreate ? 'Cancel' : 'New brief'}
+            </button>
+          </div>
+          {showCreate && <NewBriefForm onCreated={() => { setShowCreate(false); load() }} />}
+          {loading ? (
+            <p className="text-ink-tertiary text-[14px]">Loading…</p>
+          ) : items.length === 0 ? (
+            <p className="text-ink-tertiary text-[14px]">No briefs yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {items.map(item => <WorkItemCard key={item.id} item={item} onChanged={load} />)}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div>
+          <p className="font-bold text-ink text-[15px] mb-5">Upload work students already do</p>
+          <UploadExistingWorkForm onCreated={() => { setTab('briefs'); load() }} />
         </div>
       )}
     </div>
@@ -347,34 +414,9 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
   )
 }
 
-type BriefMode = 'new' | 'existing'
-
 // Briefs' "two ways": set a new brief, or upload coursework/exam work a
 // group already produced elsewhere and mark it for verification directly
 // — no new marking, straight into the review queue.
-function CreateBriefForm({ onCreated }: { onCreated: () => void }) {
-  const [mode, setMode] = useState<BriefMode>('new')
-  return (
-    <div className="mb-5">
-      <div className="flex gap-2 mb-3">
-        {([['new', 'Set a new brief'], ['existing', 'Upload work students already do']] as [BriefMode, string][]).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setMode(key)}
-            className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${
-              mode === key ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {mode === 'new' ? <NewBriefForm onCreated={onCreated} /> : <UploadExistingWorkForm onCreated={onCreated} />}
-    </div>
-  )
-}
-
 function NewBriefForm({ onCreated }: { onCreated: () => void }) {
   const { user } = useAuth()
   const [title, setTitle] = useState('')

@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
 import {
   Users, ClipboardCheck, CheckCircle2, FileText, AlertTriangle, Flag, Clock,
-  KeyRound, TrendingUp, TrendingDown, ClipboardList, PlusCircle, Ticket,
+  KeyRound, TrendingUp, TrendingDown, ClipboardList, Ticket,
 } from 'lucide-react'
 
 const OVERDUE_HOURS = 48
@@ -23,6 +23,7 @@ export default function InstitutionDashboardPage() {
   const [attentionCodes, setAttentionCodes] = useState<any[]>([])
   const [activity, setActivity] = useState<any[]>([])
   const [trend, setTrend] = useState<{ thisWeek: number; lastWeek: number } | null>(null)
+  const [myReviews, setMyReviews] = useState<{ total: number; verified: number; returned: number } | null>(null)
 
   useEffect(() => {
     if (!user?.organisation_id) return
@@ -72,6 +73,18 @@ export default function InstitutionDashboardPage() {
         })
       })
 
+    // "How many have I marked?" -- a tutor's own review history, not just
+    // the org-wide totals above.
+    supabase.from('reviews').select('decision').eq('reviewer_id', user.id)
+      .then(({ data }) => {
+        const rows = data || []
+        setMyReviews({
+          total: rows.length,
+          verified: rows.filter((r: any) => r.decision === 'verified').length,
+          returned: rows.filter((r: any) => r.decision === 'returned').length,
+        })
+      })
+
     supabase.from('join_codes').select('*').eq('organisation_id', orgId).eq('revoked', false)
       .then(({ data }) => {
         const cutoff = Date.now() + EXPIRING_DAYS * 24 * 60 * 60 * 1000
@@ -103,7 +116,6 @@ export default function InstitutionDashboardPage() {
 
       <div className="flex gap-3">
         <QuickAction href="/institution/review" icon={ClipboardList} label="Review queue" />
-        <QuickAction href="/institution/briefs" icon={PlusCircle} label="Create a brief" />
         <QuickAction href="/institution/dashboard#join-codes" icon={Ticket} label="Generate join code" />
       </div>
 
@@ -175,6 +187,19 @@ export default function InstitutionDashboardPage() {
                 )}
               </div>
             )}
+          </div>
+          <div className="bg-surface border border-edge rounded-2xl p-6">
+            <p className="font-bold text-ink text-[15px] mb-3">Your reviews</p>
+            {myReviews === null ? (
+              <p className="text-[13px] text-ink-tertiary">Loading…</p>
+            ) : (
+              <div className="flex items-center gap-5">
+                <div><p className="text-2xl font-bold text-ink">{myReviews.total}</p><p className="text-[12px] text-ink-tertiary">marked</p></div>
+                <div><p className="text-2xl font-bold text-success-text">{myReviews.verified}</p><p className="text-[12px] text-ink-tertiary">verified</p></div>
+                <div><p className="text-2xl font-bold text-warning-text">{myReviews.returned}</p><p className="text-[12px] text-ink-tertiary">returned</p></div>
+              </div>
+            )}
+            <Link href="/institution/review" className="block mt-3 text-[12px] font-semibold text-brand hover:underline">Go to review queue →</Link>
           </div>
         </div>
       </div>

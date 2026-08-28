@@ -433,14 +433,33 @@ export const updateUserProfile = async (userId: string, updates: any) => {
 // ── Feed ──────────────────────────────────────────────────────
 // Org-wide + any public posts, newest first. RLS already narrows this to
 // what the caller's allowed to see.
+// Reactions can't be embedded through posts_feed (it's a view, not an
+// FK-linked table PostgREST can auto-join) — fetched separately and
+// merged in here instead.
+const attachReactions = async (posts: any[]) => {
+  if (posts.length === 0) return posts
+  const { data: reactions } = await supabase
+    .from('post_reactions')
+    .select('id, post_id, user_id, reaction')
+    .in('post_id', posts.map(p => p.id))
+  const byPost = new Map<string, any[]>()
+  for (const r of reactions || []) byPost.set(r.post_id, [...(byPost.get(r.post_id) || []), r])
+  return posts.map(p => ({ ...p, post_reactions: byPost.get(p.id) || [] }))
+}
+
+// posts_feed pre-computes author_name/author_anonymised server-side
+// (see 2026-08-28-feed-under18-anonymity.sql) -- an under-18 author's
+// real name never leaves the database for a viewer outside their org.
 export const getFeed = async (organisationId: string) => {
   const { data, error } = await supabase
-    .from('posts')
-    .select('*, users(full_name, role), post_reactions(id, user_id, reaction)')
+    .from('posts_feed')
+    .select('*')
     .or(`organisation_id.eq.${organisationId},visibility.eq.public`)
+    .eq('hidden', false)
     .order('created_at', { ascending: false })
     .limit(50)
-  return { data, error }
+  if (error || !data) return { data, error }
+  return { data: await attachReactions(data), error: null }
 }
 
 // Explore mode (no organisation yet): "a public, safe educational feed —
@@ -449,12 +468,14 @@ export const getFeed = async (organisationId: string) => {
 // passing a null organisation_id into the .or() filter above.
 export const getPublicFeed = async () => {
   const { data, error } = await supabase
-    .from('posts')
-    .select('*, users(full_name, role), post_reactions(id, user_id, reaction)')
+    .from('posts_feed')
+    .select('*')
     .eq('visibility', 'public')
+    .eq('hidden', false)
     .order('created_at', { ascending: false })
     .limit(50)
-  return { data, error }
+  if (error || !data) return { data, error }
+  return { data: await attachReactions(data), error: null }
 }
 
 export const uploadPostImage = async (userId: string, file: File) => {
