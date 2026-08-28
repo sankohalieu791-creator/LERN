@@ -140,6 +140,14 @@ export const uploadWorkItemAttachment = async (workItemId: string, uploadedBy: s
   return { data, error }
 }
 
+// Staff-only, ends an online workshop for everyone — after this the card
+// shows "Ended" instead of still inviting people to start/join. Uses the
+// existing "work_items: staff update" RLS policy, no new policy needed.
+export const endWorkshop = async (workItemId: string) => {
+  const { error } = await supabase.from('work_items').update({ ended_at: new Date().toISOString() }).eq('id', workItemId)
+  return { error }
+}
+
 export const getWorkItemAttachments = async (workItemId: string) => {
   const { data, error } = await supabase
     .from('work_item_attachments')

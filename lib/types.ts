@@ -76,6 +76,7 @@ export interface WorkItem {
   group_id?: string
   mode?: 'online' | 'in_person'
   location?: string
+  ended_at?: string
   criteria: string
   visibility: 'public' | 'private'
   created_by?: string

@@ -68,14 +68,14 @@ export default function WorkItemsPanel({ type }: { type: ItemType }) {
         <p className="text-[#8A8373] text-[14px]">{copy.empty}</p>
       ) : (
         <div className="space-y-3">
-          {items.map(item => <WorkItemCard key={item.id} item={item} />)}
+          {items.map(item => <WorkItemCard key={item.id} item={item} onChanged={load} />)}
         </div>
       )}
     </div>
   )
 }
 
-function WorkItemCard({ item }: { item: any }) {
+function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void }) {
   const attachments = item.work_item_attachments || []
   const [inSession, setInSession] = useState(false)
   return (
@@ -102,19 +102,31 @@ function WorkItemCard({ item }: { item: any }) {
         )}
       </div>
       {item.type === 'workshop' && item.mode === 'online' && (
-        <button
-          onClick={() => setInSession(true)}
-          className="flex items-center gap-1.5 bg-[#1E7A34] text-white font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3 hover:bg-[#186229] transition"
-        >
-          <Video className="w-3.5 h-3.5" /> Start / join session
-        </button>
+        item.ended_at ? (
+          <span className="inline-flex items-center gap-1.5 bg-[#F5F1E8] text-[#8A8373] font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3">
+            <Video className="w-3.5 h-3.5" /> Ended
+          </span>
+        ) : (
+          <button
+            onClick={() => setInSession(true)}
+            className="flex items-center gap-1.5 bg-[#1E7A34] text-white font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3 hover:bg-[#186229] transition"
+          >
+            <Video className="w-3.5 h-3.5" /> Start / join session
+          </button>
+        )
       )}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2.5 border-t border-[#EDE9E1]">
           {attachments.map((a: any) => <AttachmentChip key={a.id} attachment={a} />)}
         </div>
       )}
-      {inSession && <WorkshopSession workItemId={item.id} title={item.title} onClose={() => setInSession(false)} />}
+      {inSession && (
+        <WorkshopSession
+          workItemId={item.id} title={item.title} canEnd
+          onClose={() => setInSession(false)}
+          onEnded={onChanged}
+        />
+      )}
     </div>
   )
 }

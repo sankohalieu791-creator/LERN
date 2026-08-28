@@ -120,7 +120,11 @@ function WorkItemCard({
 
           {item.type === 'workshop' && (
             <div className="mb-4">
-              {item.mode === 'online' ? (
+              {item.mode === 'online' && item.ended_at ? (
+                <span className="inline-flex items-center gap-1.5 bg-[#F5F1E8] text-[#8A8373] font-semibold text-[13px] px-4 py-2 rounded-lg">
+                  <Video className="w-4 h-4" /> Ended
+                </span>
+              ) : item.mode === 'online' ? (
                 <button
                   onClick={() => setInSession(true)}
                   className="flex items-center gap-1.5 bg-[#1E7A34] text-white font-semibold text-[13px] px-4 py-2 rounded-lg hover:bg-[#186229] transition"
