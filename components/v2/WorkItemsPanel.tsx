@@ -5,12 +5,12 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getWorkItems, createWorkItem, getGroups, createGroup, getGroupMembers,
   uploadWorkItemAttachment, uploadSubmissionFileFor, submitWorkForStudents, getSignedFileUrl, startWorkItemSession,
-  closeWorkItem, reopenWorkItem,
+  closeWorkItem, reopenWorkItem, getWorkItemRecordings,
 } from '@/lib/supabase'
 import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
 import WorkshopSession from '@/components/v2/WorkshopSession'
 import type { WorkItem, Group } from '@/lib/types'
-import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw } from 'lucide-react'
+import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw, Film, Download } from 'lucide-react'
 
 type ItemType = 'brief' | 'course' | 'workshop'
 
@@ -149,6 +149,14 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
   const [confirmingRevoke, setConfirmingRevoke] = useState(false)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [recordings, setRecordings] = useState<any[] | null>(null)
+
+  const isSession = item.type === 'workshop' || item.type === 'course'
+  useEffect(() => {
+    if (!isSession) return
+    getWorkItemRecordings(item.id).then(({ data }) => setRecordings(data || []))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id, inSession])
 
   const start = async () => {
     await startWorkItemSession(item.id) // fans out "session has started, join now" the first time only
@@ -239,6 +247,16 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
         )
       )}
       {actionError && <p className="text-[12px] text-danger-text mt-2">{actionError}</p>}
+      {recordings && recordings.length > 0 && (
+        <div className="mt-2.5 pt-2.5 border-t border-edge-subtle">
+          <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+            <Film className="w-3 h-3" /> Recordings
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {recordings.filter(r => r.status === 'available').map(r => <RecordingChip key={r.id} recording={r} />)}
+          </div>
+        </div>
+      )}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2.5 border-t border-edge-subtle">
           {attachments.map((a: any) => <AttachmentChip key={a.id} attachment={a} />)}
@@ -252,6 +270,29 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
         />
       )}
     </div>
+  )
+}
+
+// file_list is a JSONB array — [{ path, size }] for a recording saved
+// via the local (host-only) path, vs Agora's own file list shape once
+// Cloud Recording is live. Only the first file is offered here; a
+// mixed multi-file Cloud Recording result can be extended later.
+function RecordingChip({ recording }: { recording: any }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const file = recording.file_list?.[0]
+  const isLocal = recording.resource_id === 'local'
+  const open = async () => {
+    if (!file?.path) return
+    if (url) return window.open(url, '_blank')
+    const { url: signed } = await getSignedFileUrl('session-recordings', file.path)
+    if (signed) { setUrl(signed); window.open(signed, '_blank') }
+  }
+  return (
+    <button onClick={open} className="flex items-center gap-1.5 bg-surface-subtle border border-edge rounded-full px-2.5 py-1 text-[11px] font-semibold text-ink-secondary hover:border-brand transition">
+      <Download className="w-3 h-3" />
+      {new Date(recording.started_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+      {isLocal && <span className="text-ink-quaternary font-normal">· host only</span>}
+    </button>
   )
 }
 

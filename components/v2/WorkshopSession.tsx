@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack, ILocalVideoTrack } from 'agora-rtc-sdk-ng'
 import { useAuth } from '@/context/AuthContext'
-import { supabase, endWorkshop, getWorkshopMessages, sendWorkshopMessage, startRecording, stopRecording } from '@/lib/supabase'
+import { supabase, endWorkshop, getWorkshopMessages, sendWorkshopMessage } from '@/lib/supabase'
 import {
   Mic, MicOff, Video, VideoOff, ScreenShare, PhoneOff, Users, Square,
-  HelpCircle, Send, Hand, Circle, StopCircle, X,
+  HelpCircle, Send, Hand, Circle, StopCircle, X, Download, Save, Loader2,
 } from 'lucide-react'
 
 const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!
@@ -75,6 +75,9 @@ export default function WorkshopSession({
   const screenRef = useRef<ILocalVideoTrack | null>(null)
   const mainStageRef = useRef<HTMLDivElement>(null)
   const presenceRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordedChunksRef = useRef<Blob[]>([])
+  const recordingStreamRef = useRef<MediaStream | null>(null)
 
   const [connecting, setConnecting] = useState(true)
   const [joined, setJoined] = useState(false)
@@ -90,8 +93,13 @@ export default function WorkshopSession({
   const [qaOpen, setQaOpen] = useState(false)
   const [messages, setMessages] = useState<any[]>([])
   const [draft, setDraft] = useState('')
-  const [recordingId, setRecordingId] = useState<string | null>(null)
-  const [recordingBusy, setRecordingBusy] = useState(false)
+  // Client-side recording (MediaRecorder against the host's own local
+  // camera/mic) — the pre-rebuild app's approach, brought back while
+  // Agora Cloud Recording's external credentials are still pending. It
+  // only ever captures the host's own feed, never the full mixed call.
+  const [recording, setRecording] = useState(false)
+  const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null)
+  const [savingRecording, setSavingRecording] = useState(false)
 
   const trackPresence = useCallback((extra?: Partial<Participant>) => {
     presenceRef.current?.track({ name: user?.full_name, isHost: !!canEnd, handRaised, ...extra })
@@ -162,6 +170,8 @@ export default function WorkshopSession({
       clientRef.current = null
       presenceRef.current?.unsubscribe()
       presenceRef.current = null
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop()
+      recordingStreamRef.current?.getTracks().forEach(t => t.stop())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -316,24 +326,70 @@ export default function WorkshopSession({
   }
 
   const endForEveryone = async () => {
-    if (recordingId) await stopRecording(recordingId)
+    if (recording) stopRecording() // keeps whatever was captured so far, ready to save from the end screen
     await endWorkshop(workItemId)
     await leave()
     onEnded?.()
   }
 
-  const toggleRecording = async () => {
-    if (!user) return
-    setRecordingBusy(true)
-    if (!recordingId) {
-      const { recordingId: id, error: err } = await startRecording(workItemId, user.id)
-      if (err) setActionError(err.message || "Recording isn't set up yet — see the migration file for what's needed.")
-      else setRecordingId(id || null)
-    } else {
-      await stopRecording(recordingId)
-      setRecordingId(null)
+  const startRecording = async () => {
+    try {
+      // A separate getUserMedia call, deliberately not reusing the
+      // published Agora tracks — same approach as before, and it means
+      // recording works even if camera/mic are off in the call itself.
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+        ? 'video/webm;codecs=vp9,opus'
+        : MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : ''
+      recordedChunksRef.current = []
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+      recorder.ondataavailable = e => { if (e.data.size > 0) recordedChunksRef.current.push(e.data) }
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || 'video/webm' })
+        setRecordingBlob(blob)
+        stream.getTracks().forEach(t => t.stop())
+      }
+      recorder.start(1000)
+      mediaRecorderRef.current = recorder
+      recordingStreamRef.current = stream
+      setRecordingBlob(null)
+      setRecording(true)
+    } catch (e: any) {
+      setActionError(cameraErrorMessage(e))
     }
-    setRecordingBusy(false)
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop()
+    setRecording(false)
+  }
+
+  const toggleRecording = () => { recording ? stopRecording() : startRecording() }
+
+  const downloadRecording = () => {
+    if (!recordingBlob) return
+    const ext = recordingBlob.type.includes('mp4') ? 'mp4' : 'webm'
+    const url = URL.createObjectURL(recordingBlob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${title.replace(/\s+/g, '_')}_recording.${ext}`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const saveRecordingToLern = async () => {
+    if (!recordingBlob || !user) return
+    setSavingRecording(true)
+    const ext = recordingBlob.type.includes('mp4') ? 'mp4' : 'webm'
+    const path = `${workItemId}/${Date.now()}_recording.${ext}`
+    const { error: upErr } = await supabase.storage.from('session-recordings').upload(path, recordingBlob, { contentType: recordingBlob.type })
+    if (upErr) { setSavingRecording(false); setActionError('Could not save the recording: ' + upErr.message); return }
+    const { error: dbErr } = await supabase.from('work_item_recordings').insert([{
+      work_item_id: workItemId, status: 'available', file_list: [{ path, size: recordingBlob.size }], started_by: user.id,
+    }])
+    setSavingRecording(false)
+    if (dbErr) { setActionError('Saved the file, but could not log it against this session: ' + dbErr.message); return }
+    setRecordingBlob(null)
   }
 
   const send = async () => {
@@ -355,17 +411,18 @@ export default function WorkshopSession({
           <p className="text-white font-bold text-[15px]">{title}</p>
           <p className="text-[#8A8373] text-[12px] flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5" /> {allTiles.length} in the room
-            {recordingId && <span className="flex items-center gap-1 text-[#FF6B4E] font-semibold ml-1"><Circle className="w-2 h-2 fill-current" /> Recording</span>}
+            {recording && <span className="flex items-center gap-1 text-[#FF6B4E] font-semibold ml-1"><Circle className="w-2 h-2 fill-current" /> Recording</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {canEnd && (
             <button
-              onClick={toggleRecording} disabled={recordingBusy}
-              className={`flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-full transition ${recordingId ? 'bg-[#B3401E] hover:bg-[#9c3419] text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+              onClick={toggleRecording}
+              title="Records your own camera/mic only, not the full call"
+              className={`flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-full transition ${recording ? 'bg-[#B3401E] hover:bg-[#9c3419] text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
             >
-              {recordingId ? <StopCircle className="w-3.5 h-3.5" /> : <Circle className="w-3 h-3 fill-current text-[#FF6B4E]" />}
-              {recordingId ? 'Stop recording' : 'Record'}
+              {recording ? <StopCircle className="w-3.5 h-3.5" /> : <Circle className="w-3 h-3 fill-current text-[#FF6B4E]" />}
+              {recording ? 'Stop recording' : 'Record'}
             </button>
           )}
           <button
@@ -389,6 +446,34 @@ export default function WorkshopSession({
           <button onClick={() => setActionError('')} className="text-[#FFB89E] hover:text-white flex-shrink-0">
             <X className="w-3.5 h-3.5" />
           </button>
+        </div>
+      )}
+
+      {recordingBlob && (
+        <div className="mx-5 mb-2 flex-shrink-0 bg-[#1E1A16] border border-white/10 rounded-xl px-4 py-3.5">
+          <div className="flex items-center justify-between gap-3 mb-2.5">
+            <p className="text-white text-[13px] font-semibold">
+              Recording ready — {(recordingBlob.size / 1024 / 1024).toFixed(1)} MB
+            </p>
+            <button onClick={() => setRecordingBlob(null)} className="text-[#8A8373] hover:text-white flex-shrink-0">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={saveRecordingToLern} disabled={savingRecording}
+              className="flex items-center gap-1.5 bg-brand text-white text-[12px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50"
+            >
+              {savingRecording ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              {savingRecording ? 'Saving…' : 'Save to LERN'}
+            </button>
+            <button
+              onClick={downloadRecording}
+              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-[12px] font-semibold px-3.5 py-2 rounded-lg transition"
+            >
+              <Download className="w-3.5 h-3.5" /> Save to device
+            </button>
+          </div>
         </div>
       )}
 

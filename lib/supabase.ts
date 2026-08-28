@@ -195,7 +195,7 @@ export const getWorkItemAttachments = async (workItemId: string) => {
 
 // Both submission-files and work-item-attachments are private buckets --
 // a signed URL is the only way to actually view/download an object.
-export const getSignedFileUrl = async (bucket: 'submission-files' | 'work-item-attachments' | 'post-images', path: string) => {
+export const getSignedFileUrl = async (bucket: 'submission-files' | 'work-item-attachments' | 'post-images' | 'session-recordings', path: string) => {
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600)
   return { url: data?.signedUrl ?? null, error }
 }
