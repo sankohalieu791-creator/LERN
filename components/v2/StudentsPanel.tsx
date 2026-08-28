@@ -5,8 +5,9 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getOrgStudents, getMySubmissions, getGroups, createGroup, setStudentGroup,
   getAttendanceForSession, markAttendance, getStudentAttendanceSummary,
+  createGuestInviteForStudent, getGuestInvites, revokeGuestInvite,
 } from '@/lib/supabase'
-import { Clock, ChevronDown, ChevronUp, CheckCircle2, RotateCcw, Ban, Users2, ClipboardList, RefreshCw } from 'lucide-react'
+import { Clock, ChevronDown, ChevronUp, CheckCircle2, RotateCcw, Ban, Users2, ClipboardList, RefreshCw, UserPlus, Copy, Check } from 'lucide-react'
 import type { Group, AttendanceStatus } from '@/lib/types'
 
 const STATUS_ICON: Record<string, { icon: any; cls: string }> = {
@@ -16,7 +17,7 @@ const STATUS_ICON: Record<string, { icon: any; cls: string }> = {
   revoked: { icon: Ban, cls: 'text-danger-text' },
 }
 
-type Tab = 'students' | 'attendance'
+type Tab = 'students' | 'attendance' | 'guests'
 
 export default function StudentsPanel() {
   const { user } = useAuth()
@@ -49,7 +50,7 @@ export default function StudentsPanel() {
   return (
     <div className="space-y-5">
       <div className="flex gap-1 border-b border-edge-subtle">
-        {([['students', 'Students'], ['attendance', 'Attendance register']] as [Tab, string][]).map(([key, label]) => (
+        {([['students', 'Students'], ['attendance', 'Attendance register'], ['guests', 'Guest invites']] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key} onClick={() => setTab(key)}
             className={`px-4 py-2.5 text-[14px] font-semibold border-b-2 -mb-px transition ${
@@ -99,8 +100,10 @@ export default function StudentsPanel() {
             </div>
           )}
         </div>
-      ) : (
+      ) : tab === 'attendance' ? (
         <AttendanceRegister groups={groups} students={students} onChanged={load} />
+      ) : (
+        <GuestInvitesPanel students={students} />
       )}
     </div>
   )
@@ -326,6 +329,113 @@ function AttendanceRegister({ groups, students, onChanged }: { groups: Group[]; 
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Org-wide list of guest invites, plus generating a new one scoped to
+// a chosen student — the org-side half of the guest employer flow.
+// A guest sees only what's shared here; nothing about this panel
+// exposes more than a name + a shareable link.
+function GuestInvitesPanel({ students }: { students: any[] }) {
+  const { user } = useAuth()
+  const [invites, setInvites] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [studentId, setStudentId] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [newLink, setNewLink] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  const load = () => {
+    if (!user?.organisation_id) return
+    getGuestInvites(user.organisation_id).then(({ data }) => { setInvites(data || []); setLoading(false) })
+  }
+  useEffect(load, [user?.organisation_id])
+
+  const handleCreate = async () => {
+    if (!studentId || !user?.organisation_id) return
+    setCreating(true)
+    setNewLink(null)
+    const { data, error } = await createGuestInviteForStudent(user.organisation_id, user.id, studentId)
+    setCreating(false)
+    if (!error && data) {
+      setNewLink(`${window.location.origin}/guest/${(data as any).token}`)
+      setStudentId('')
+      load()
+    }
+  }
+
+  const handleRevoke = async (id: string) => {
+    await revokeGuestInvite(id)
+    setInvites(prev => prev.map(i => i.id === id ? { ...i, revoked_at: new Date().toISOString() } : i))
+  }
+
+  const copy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 1500)
+  }
+
+  return (
+    <div className="bg-surface border border-edge rounded-2xl p-6">
+      <p className="font-bold text-ink text-[15px] mb-1.5 flex items-center gap-1.5"><UserPlus className="w-4 h-4" /> Invite an employer</p>
+      <p className="text-[13px] text-ink-tertiary mb-4">Bring in one employer to see one student's verified work — no account, no browsing the rest of LERN. Interest they raise routes straight back to you.</p>
+
+      <div className="flex gap-2 mb-5">
+        <select
+          value={studentId} onChange={e => setStudentId(e.target.value)}
+          className="flex-1 bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+        >
+          <option value="">Choose a student…</option>
+          {students.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+        </select>
+        <button onClick={handleCreate} disabled={!studentId || creating} className="px-4 py-2.5 rounded-lg bg-brand text-white text-[13px] font-semibold disabled:opacity-40 flex-shrink-0">
+          {creating ? 'Creating…' : 'Create invite link'}
+        </button>
+      </div>
+
+      {newLink && (
+        <div className="flex items-center gap-2 bg-success-bg border border-success-text/20 rounded-lg px-3.5 py-2.5 mb-5">
+          <p className="text-[12.5px] text-ink flex-1 truncate font-mono">{newLink}</p>
+          <button onClick={() => copy(newLink, 'new')} className="text-success-text hover:opacity-70 transition flex-shrink-0">
+            {copiedId === 'new' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <p className="text-ink-tertiary text-[14px]">Loading…</p>
+      ) : invites.length === 0 ? (
+        <p className="text-ink-tertiary text-[14px]">No guest invites yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {invites.map(inv => {
+            const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/guest/${inv.token}`
+            const share = inv.guest_invite_shares?.[0]
+            const status = inv.revoked_at ? 'Revoked' : inv.claimed_by ? 'Claimed' : 'Pending'
+            return (
+              <div key={inv.id} className="flex items-center justify-between border border-edge-subtle rounded-xl px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-ink truncate">{share?.users?.full_name || 'Student'}</p>
+                  <p className="text-[11px] text-ink-tertiary">{status} · {new Date(inv.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  {!inv.revoked_at && !inv.claimed_by && (
+                    <button onClick={() => copy(link, inv.id)} className="text-ink-secondary hover:text-brand transition">
+                      {copiedId === inv.id ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  )}
+                  {!inv.revoked_at && (
+                    <button onClick={() => handleRevoke(inv.id)} className="text-ink-secondary hover:text-danger-text transition">
+                      <Ban className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

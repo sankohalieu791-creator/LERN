@@ -797,3 +797,84 @@ export const deleteOpportunity = async (id: string) => {
   const { error } = await supabase.from('opportunities').delete().eq('id', id)
   return { error }
 }
+
+// ── Guest employer invite (Type 1 — org-invited, scoped to one
+// student, no browsing beyond what's explicitly shared) ──────────
+
+// Org staff: create an invite scoped to one student, in one step —
+// there's no reason to split "create the invite" from "pick who it's
+// for" into two screens for the simple, most-common case.
+export const createGuestInviteForStudent = async (organisationId: string, createdBy: string, studentId: string) => {
+  const token = crypto.randomUUID()
+  const { data: invite, error } = await supabase
+    .from('guest_invites')
+    .insert([{ organisation_id: organisationId, created_by: createdBy, token }])
+    .select()
+    .single()
+  if (error || !invite) return { data: null, error }
+  const { error: shareError } = await supabase
+    .from('guest_invite_shares')
+    .insert([{ invite_id: (invite as any).id, student_id: studentId }])
+  if (shareError) return { data: null, error: shareError }
+  return { data: invite, error: null }
+}
+
+export const getGuestInvites = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('guest_invites')
+    .select('*, guest_invite_shares(student_id, verification_id, users:student_id(full_name))')
+    .eq('organisation_id', organisationId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const revokeGuestInvite = async (id: string) => {
+  const { error } = await supabase.from('guest_invites').update({ revoked_at: new Date().toISOString() }).eq('id', id)
+  return { error }
+}
+
+// Public lookup (unauthenticated) — the claim page needs to show who
+// invited them before any session exists, so this goes through a
+// service-role API route rather than a client RLS read.
+export const getGuestInviteInfo = async (token: string) => {
+  const res = await fetch(`/api/guest/invite/${encodeURIComponent(token)}`)
+  const data = await res.json()
+  return { data: res.ok ? data : null, error: res.ok ? null : data }
+}
+
+// Magic-link sign-in, not a password — "click it and get a guest
+// pass" is the whole point; guest_invite_id in metadata is what lets
+// handle_new_user() punch through the founder allowlist, but only
+// because it re-validates that id server-side against a real,
+// unclaimed, unrevoked row before trusting it.
+export const claimGuestInvite = async (inviteId: string, fullName: string, email: string) => {
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      data: { role: 'employer', full_name: fullName, guest_invite_id: inviteId },
+      emailRedirectTo: `${window.location.origin}/guest/confirm`,
+    },
+  })
+  return { error }
+}
+
+// Guest's own scoped view once signed in — RLS (guest_can_see_*)
+// already narrows this to exactly what was shared, so no extra
+// filtering needed here beyond what an independent employer's
+// Discover query does for the public case.
+export const getGuestSharedWork = async () => {
+  const { data, error } = await supabase
+    .from('verifications')
+    .select(`
+      id, verified_at, submission_id,
+      verifier:users!verifications_verified_by_fkey(full_name),
+      submissions!inner(
+        id, content, student_id,
+        student:users!submissions_student_id_fkey(id, full_name),
+        work_items!inner(id, title, description, type)
+      )
+    `)
+    .is('revoked_at', null)
+    .order('verified_at', { ascending: false })
+  return { data, error }
+}

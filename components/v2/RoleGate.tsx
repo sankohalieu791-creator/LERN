@@ -27,7 +27,10 @@ export default function RoleGate({ allow, children }: { allow: Role; children: R
   // organisation_id is NOT incomplete on its own for a student:
   // explore-without-code is a real, legitimate, permanent state until
   // they enter a code, not something to bounce back to the wizard for.
-  const incomplete = (allow === 'student' || allow === 'employer') && !!user && !user.consented_at
+  // A guest employer never goes through the independent-employer
+  // wizard at all -- their consent is recorded straight off the claim
+  // page (see /guest/confirm) -- so they're never routed there.
+  const incomplete = (allow === 'student' || (allow === 'employer' && !user?.is_guest)) && !!user && !user.consented_at
   const wizardRoute = allow === 'employer' ? '/auth/signup/employer' : '/auth/signup/student'
 
   useEffect(() => {

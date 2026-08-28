@@ -27,9 +27,9 @@ export default function EmployerDashboardPanel() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={Megaphone} label="Active opportunities" value={stats.opportunities} href="/employer/opportunities" />
-        <StatCard icon={Users} label="Candidates in pipeline" value={stats.pipeline} href="/employer/job-tracker" />
+        <StatCard icon={Users} label="Candidates in pipeline" value={stats.pipeline} href="/employer/candidates" />
         <ComingCard icon={FileText} label="Briefs out" href="/employer/briefs" />
-        <ComingCard icon={Briefcase} label="Job Tracker" href="/employer/job-tracker" />
+        <ComingCard icon={Briefcase} label="Candidates" href="/employer/candidates" />
       </div>
 
       <div className="bg-surface border border-edge rounded-2xl p-6">

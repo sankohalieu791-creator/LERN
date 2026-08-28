@@ -35,21 +35,23 @@ export const providerPhoneItems: [NavItem, NavItem, NavItem] = [
   providerSections[5], // Dashboard
 ]
 
-// Employer sidebar per the build spec, in the given order — Discover
-// first (browse verified work), Job Tracker before Opportunities in
-// the sidebar reads oddly against the spec's prose order but the
-// spec's own numbered build order is Discover -> Opportunities ->
-// Job Tracker -> Briefs, so that's what's reflected here too.
+// Independent employer sidebar — Feed, Discover, Briefs, Opportunities,
+// Candidates, Dashboard, per the "Employer side (two types) +
+// connections" spec. ("Job Tracker" from the earlier draft is the same
+// place as "Candidates" here — renamed to match, not a new page.)
+// This nav is never shown to a guest employer (Type 1) — see
+// GuestEmployerShell, which replaces OrgShell entirely for them.
 export const employerSections: NavItem[] = [
-  { key: 'discover',      label: 'Discover',      icon: Search,          href: '/employer/discover' },
-  { key: 'opportunities', label: 'Opportunities',  icon: Megaphone,       href: '/employer/opportunities' },
-  { key: 'job-tracker',   label: 'Job Tracker',    icon: Briefcase,       href: '/employer/job-tracker' },
-  { key: 'briefs',        label: 'Briefs',         icon: FileText,        href: '/employer/briefs' },
-  { key: 'dashboard',     label: 'Dashboard',      icon: LayoutDashboard, href: '/employer/dashboard' },
+  { key: 'feed',           label: 'Feed',          icon: Home,            href: '/employer/feed' },
+  { key: 'discover',       label: 'Discover',      icon: Search,          href: '/employer/discover' },
+  { key: 'briefs',         label: 'Briefs',        icon: FileText,        href: '/employer/briefs' },
+  { key: 'opportunities',  label: 'Opportunities', icon: Megaphone,       href: '/employer/opportunities' },
+  { key: 'candidates',     label: 'Candidates',    icon: Briefcase,       href: '/employer/candidates' },
+  { key: 'dashboard',      label: 'Dashboard',     icon: LayoutDashboard, href: '/employer/dashboard' },
 ]
 
 export const employerPhoneItems: [NavItem, NavItem, NavItem] = [
-  employerSections[0], // Discover
-  employerSections[1], // Opportunities
-  employerSections[4], // Dashboard
+  employerSections[1], // Discover
+  employerSections[3], // Opportunities
+  employerSections[5], // Dashboard
 ]

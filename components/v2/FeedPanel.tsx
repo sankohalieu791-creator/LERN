@@ -49,7 +49,9 @@ export default function FeedPanel() {
       {exploring ? (
         <div className="bg-surface-subtle border border-edge rounded-2xl px-5 py-4">
           <p className="text-[13px] text-ink-secondary">
-            You're not linked to an organisation yet, so you're only seeing public educational content — you can look around, but you can't post or be seen by anyone. Enter your join code in My Work to unlock everything.
+            {user?.role === 'employer'
+              ? "You're seeing public educational content only — employers can look around but never post here."
+              : "You're not linked to an organisation yet, so you're only seeing public educational content — you can look around, but you can't post or be seen by anyone. Enter your join code in My Work to unlock everything."}
           </p>
         </div>
       ) : (

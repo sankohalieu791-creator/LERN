@@ -30,6 +30,8 @@ export interface User {
   theme_preference?: 'light' | 'dark' | 'system'
   presence_status?: 'active' | 'busy' | 'away'
   notification_prefs?: Record<string, boolean>
+  is_guest?: boolean
+  guest_invite_id?: string
   created_at: string
 }
 
