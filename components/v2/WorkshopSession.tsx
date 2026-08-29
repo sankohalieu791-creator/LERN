@@ -88,7 +88,8 @@ export default function WorkshopSession({
   const [micOn, setMicOn] = useState(false)
   const [screenSharing, setScreenSharing] = useState(false)
   const [handRaised, setHandRaised] = useState(false)
-  const [mainUid, setMainUid] = useState<number>(myUid) // whose feed is on the main stage — starts on self
+  const [mainUid, setMainUid] = useState<number>(myUid) // whose feed is on the main stage — starts on self, follows the host once known (see effect below)
+  const pickedMainRef = useRef(false) // true once someone (not this component) has chosen who's featured — stops the auto-follow-host effect from overriding a manual pick
   const [participants, setParticipants] = useState<Record<number, Participant>>({})
   const [qaOpen, setQaOpen] = useState(false)
   const [messages, setMessages] = useState<any[]>([])
@@ -210,6 +211,18 @@ export default function WorkshopSession({
     }
   }, [mainUid, cameraOn, screenSharing, remoteUsers, myUid])
 
+  // Everyone who isn't the host lands on their OWN camera as "main"
+  // by default (mainUid starts at myUid) -- which meant a student
+  // never actually saw the host large unless they clicked the host's
+  // tile themselves. Once presence tells us who the host is, follow
+  // them automatically -- but only until someone (this student) picks
+  // a different tile on purpose.
+  useEffect(() => {
+    if (canEnd || pickedMainRef.current) return
+    const host = Object.values(participants).find(p => p.isHost)
+    if (host && host.uid !== mainUid) setMainUid(host.uid)
+  }, [participants, canEnd, mainUid])
+
   const toggleCamera = async () => {
     if (!clientRef.current) return
     if (!cameraOn) {
@@ -286,6 +299,7 @@ export default function WorkshopSession({
         const track = Array.isArray(result) ? result[0] : result
         screenRef.current = track
         await clientRef.current.publish([track])
+        pickedMainRef.current = true // don't let the auto-follow-host effect snap this back
         setMainUid(myUid) // sharing your screen brings you to the main stage
         if (mainStageRef.current) track.play(mainStageRef.current, { fit: 'contain' })
         setScreenSharing(true)
@@ -414,30 +428,11 @@ export default function WorkshopSession({
             {recording && <span className="flex items-center gap-1 text-[#FF6B4E] font-semibold ml-1"><Circle className="w-2 h-2 fill-current" /> Recording</span>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {canEnd && (
-            <button
-              onClick={toggleRecording}
-              title="Records your own camera/mic only, not the full call"
-              className={`flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-full transition ${recording ? 'bg-[#B3401E] hover:bg-[#9c3419] text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
-            >
-              {recording ? <StopCircle className="w-3.5 h-3.5" /> : <Circle className="w-3 h-3 fill-current text-[#FF6B4E]" />}
-              {recording ? 'Stop recording' : 'Record'}
-            </button>
-          )}
-          <button
-            onClick={() => setQaOpen(v => !v)}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition relative ${qaOpen ? 'bg-brand text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
-          >
-            <HelpCircle className="w-4 h-4" />
-            {raisedHands.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand text-white text-[9px] font-bold flex items-center justify-center">{raisedHands.length}</span>}
+        {canEnd && (
+          <button onClick={endForEveryone} className="flex items-center gap-1.5 bg-[#B3401E] hover:bg-[#9c3419] text-white text-[12px] font-semibold px-3.5 py-2 rounded-full transition flex-shrink-0">
+            <Square className="w-3 h-3 fill-current" /> End for everyone
           </button>
-          {canEnd && (
-            <button onClick={endForEveryone} className="flex items-center gap-1.5 bg-[#B3401E] hover:bg-[#9c3419] text-white text-[12px] font-semibold px-3 py-2 rounded-full transition">
-              <Square className="w-3 h-3 fill-current" /> End for everyone
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {actionError && (
@@ -509,27 +504,38 @@ export default function WorkshopSession({
                 </span>
               </div>
 
-              {/* Everyone else — name + avatar strip, click to bring to the main stage */}
-              <div className="flex gap-2.5 overflow-x-auto flex-shrink-0 pb-1">
-                {allTiles.map(p => (
+              {/* Everyone else — a proper grid (like Zoom/Meet), not a
+                  horizontal-scroll strip. Capped at 10 visible tiles;
+                  a "+N" tile absorbs the rest rather than the row
+                  growing forever. */}
+              <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 flex-shrink-0">
+                {allTiles.slice(0, 10).map(p => (
                   <button
-                    key={p.uid} onClick={() => setMainUid(p.uid)}
-                    className={`flex flex-col items-center gap-1.5 flex-shrink-0 w-16 rounded-lg py-2 transition ${p.uid === mainUid ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                    key={p.uid} onClick={() => { pickedMainRef.current = true; setMainUid(p.uid) }}
+                    className={`flex flex-col items-center gap-1.5 rounded-xl py-2.5 transition ${p.uid === mainUid ? 'bg-white/10 ring-1 ring-white/20' : 'hover:bg-white/5'}`}
                   >
                     <div className="relative">
-                      <div className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-[13px]">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[12px] shadow-inner">
                         {initials(p.name)}
                       </div>
-                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#1E7A34] border-2 border-[#141110]" />
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#1E7A34] border-2 border-[#141110]" />
                       {p.handRaised && (
-                        <span className="absolute -top-1 -right-1 w-4.5 h-4.5 rounded-full bg-brand border-2 border-[#141110] flex items-center justify-center">
+                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-brand border-2 border-[#141110] flex items-center justify-center">
                           <Hand className="w-2.5 h-2.5 text-white" />
                         </span>
                       )}
                     </div>
-                    <span className="text-[10px] text-[#B8AE9C] truncate w-full text-center">{p.isHost ? 'Host' : p.name.split(' ')[0]}</span>
+                    <span className="text-[10px] text-[#B8AE9C] truncate w-full text-center px-0.5">{p.isHost ? 'Host' : p.name.split(' ')[0]}</span>
                   </button>
                 ))}
+                {allTiles.length > 10 && (
+                  <div className="flex flex-col items-center justify-center gap-1.5 rounded-xl py-2.5">
+                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-[11px]">
+                      +{allTiles.length - 10}
+                    </div>
+                    <span className="text-[10px] text-[#B8AE9C]">more</span>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -578,6 +584,9 @@ export default function WorkshopSession({
         )}
       </div>
 
+      {/* Every control lives here now — camera/mic/share same as any
+          other video call, plus Q&A and Record alongside them instead
+          of stranded up in the header. */}
       <div className="flex items-center justify-center gap-3 px-5 py-4 flex-shrink-0 border-t border-white/10">
         <RoomButton active={micOn} onClick={toggleMic} onIcon={Mic} offIcon={MicOff} disabled={!joined} />
         <RoomButton active={cameraOn} onClick={toggleCamera} onIcon={Video} offIcon={VideoOff} disabled={!joined} />
@@ -595,6 +604,23 @@ export default function WorkshopSession({
             <Hand className="w-[18px] h-[18px]" />
           </button>
         )}
+        {canEnd && (
+          <button
+            onClick={toggleRecording}
+            title="Records your own camera/mic only, not the full call"
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition ${recording ? 'bg-[#B3401E] hover:bg-[#9c3419] text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+          >
+            {recording ? <StopCircle className="w-[18px] h-[18px]" /> : <Circle className="w-[15px] h-[15px] fill-current text-[#FF6B4E]" />}
+          </button>
+        )}
+        <button
+          onClick={() => setQaOpen(v => !v)}
+          className={`w-11 h-11 rounded-full flex items-center justify-center transition relative ${qaOpen ? 'bg-brand text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+        >
+          <HelpCircle className="w-[18px] h-[18px]" />
+          {raisedHands.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand text-white text-[9px] font-bold flex items-center justify-center border-2 border-[#141110]">{raisedHands.length}</span>}
+        </button>
+        <div className="w-px h-7 bg-white/10 mx-1" />
         <button onClick={leave} className="w-11 h-11 rounded-full bg-[#B3401E] text-white flex items-center justify-center hover:bg-[#9c3419] transition">
           <PhoneOff className="w-[18px] h-[18px]" />
         </button>

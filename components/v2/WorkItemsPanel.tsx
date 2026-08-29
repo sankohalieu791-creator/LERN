@@ -435,7 +435,7 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
     if (!title.trim()) return setError('Give it a title.')
     if (!criteria.trim()) return setError('Criteria is required — this is what the tutor checks the work against, and what makes the green tick mean something.')
     if (mode === 'in_person' && !location.trim()) return setError(`Add where the ${type} is happening.`)
-    if (!user?.organisation_id) return
+    if (!user?.organisation_id) return setError("Your account isn't linked to an organisation yet — try refreshing the page.")
 
     setLoading(true)
     const { error: createError } = await createWorkItem(user.organisation_id, user.id, {
@@ -543,7 +543,7 @@ function NewBriefForm({ onCreated }: { onCreated: () => void }) {
     if (!title.trim()) return setError('Give it a title.')
     if (!assignment.trim()) return setError('Write what the student has to do.')
     if (!criteria.trim()) return setError('Success criteria is required — this is what makes the tick mean something.')
-    if (!user?.organisation_id) return
+    if (!user?.organisation_id) return setError("Your account isn't linked to an organisation yet — try refreshing the page.")
 
     setLoading(true)
     const { data: workItem, error: createError } = await createWorkItem(user.organisation_id, user.id, {
@@ -628,7 +628,7 @@ function UploadExistingWorkForm({ onCreated }: { onCreated: () => void }) {
     if (!criteria.trim()) return setError('Criteria is required — this is what makes the tick mean something.')
     if (!groupId) return setError('Choose which class/group this work belongs to.')
     if (files.length === 0) return setError('Attach the existing work — drag it in or choose a file.')
-    if (!user?.organisation_id) return
+    if (!user?.organisation_id) return setError("Your account isn't linked to an organisation yet — try refreshing the page.")
 
     setLoading(true)
     const { data: members, error: membersError } = await getGroupMembers(groupId)

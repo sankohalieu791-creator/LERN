@@ -310,16 +310,17 @@ function AttendanceRegister({ groups, students, onChanged }: { groups: Group[]; 
         <div className="space-y-1.5">
           {members.map(m => (
             <div key={m.id} className="flex items-center justify-between px-3.5 py-2.5 border border-edge-subtle rounded-lg">
-              <span className="text-[13px] font-semibold text-ink">{m.full_name}</span>
+              <div className="min-w-0">
+                <span className="text-[13px] font-semibold text-ink">{m.full_name}</span>
+                <span className="ml-2 text-[11px] text-success-text font-semibold">{m.verified || 0} verified</span>
+              </div>
               <div className="flex gap-1.5">
-                {(['present', 'late', 'absent'] as AttendanceStatus[]).map(status => (
+                {(['present', 'absent'] as AttendanceStatus[]).map(status => (
                   <button
                     key={status} onClick={() => mark(m.id, status)}
                     className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold capitalize transition ${
                       marks[m.id] === status
-                        ? status === 'present' ? 'bg-success-solid text-white'
-                        : status === 'late' ? 'bg-warning-solid text-white'
-                        : 'bg-danger-solid text-white'
+                        ? status === 'present' ? 'bg-success-solid text-white' : 'bg-danger-solid text-white'
                         : 'bg-surface-muted text-ink-tertiary hover:bg-edge-subtle'
                     }`}
                   >
