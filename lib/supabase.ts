@@ -878,3 +878,19 @@ export const getGuestSharedWork = async () => {
     .order('verified_at', { ascending: false })
   return { data, error }
 }
+
+// ── Dev login (testing stage only — see app/api/dev-login) ───────
+// No password: a shared secret (set once, kept in this browser) plus
+// the DB's own allowlist check stand in for one. token_hash comes
+// back from an admin-generated magic link that's exchanged for a real
+// session here, without ever sending an actual email.
+export const devLogin = async (email: string, secret: string) => {
+  const res = await fetch('/api/dev-login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, secret }),
+  })
+  const body = await res.json()
+  if (!res.ok) return { error: body }
+  const { error } = await supabase.auth.verifyOtp({ email, token_hash: body.tokenHash, type: 'magiclink' })
+  return { error }
+}

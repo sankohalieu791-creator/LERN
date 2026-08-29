@@ -53,6 +53,9 @@ export default function LoginPage() {
           Sign up
         </button>
       </p>
+      <button onClick={() => router.push('/auth/dev-login')} className="block mx-auto text-[11px] text-[#C9C2B2] hover:text-[#8A8373] transition mt-4">
+        Dev login
+      </button>
     </AuthShell>
   )
 }
