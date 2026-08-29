@@ -56,10 +56,11 @@ CREATE POLICY "verifications: student or org staff read" ON public.verifications
 -- NEW — employer read on submissions, scoped to only the submission
 -- behind a public verification (nothing else on this table is ever
 -- employer-readable: no drafts, no organisation-only work).
+DROP POLICY IF EXISTS "submissions: employer read via public verification" ON public.submissions;
 CREATE POLICY "submissions: employer read via public verification" ON public.submissions FOR SELECT
   USING (
     public.current_user_role() = 'employer'
-    AND EXISTS (SELECT 1 FROM public.verifications v WHERE v.submission_id = id AND v.visibility = 'public')
+    AND EXISTS (SELECT 1 FROM public.verifications v WHERE v.submission_id = submissions.id AND v.visibility = 'public')
   );
 
 -- NEW — employer read on work_items, scoped the same way (the brief/
@@ -67,12 +68,13 @@ CREATE POLICY "submissions: employer read via public verification" ON public.sub
 -- top of the existing visibility = 'public' branch which covers a
 -- different, org-controlled flag (whether staff listed the work item
 -- itself publicly) — this is deliberately additive, not a replacement.
+DROP POLICY IF EXISTS "work_items: employer read via public verification" ON public.work_items;
 CREATE POLICY "work_items: employer read via public verification" ON public.work_items FOR SELECT
   USING (
     public.current_user_role() = 'employer'
     AND EXISTS (
       SELECT 1 FROM public.submissions s
       JOIN public.verifications v ON v.submission_id = s.id
-      WHERE s.work_item_id = id AND v.visibility = 'public'
+      WHERE s.work_item_id = work_items.id AND v.visibility = 'public'
     )
   );

@@ -2,6 +2,13 @@
 -- Type 1 employer: guest invite (build order item 1 of the
 -- "Employer side (two types) + connections" spec).
 --
+-- Rewritten to be safe to run more than once (the first attempt hit
+-- an ambiguous-column error partway through — see the fixed `id`
+-- references below — so tables/columns/functions from that attempt
+-- may already exist). Every statement here is now idempotent:
+-- CREATE TABLE/INDEX IF NOT EXISTS, ADD COLUMN IF NOT EXISTS, and
+-- DROP POLICY IF EXISTS before every CREATE POLICY.
+--
 -- A guest employer is invited by ONE organisation to see ONE
 -- specific student, or ONE specific piece of verified work — never
 -- the wider platform. They still get a real auth.users/public.users
@@ -25,7 +32,7 @@
 -- ============================================================
 
 -- ── Guest invite + what's shared on it ──────────────────────
-CREATE TABLE public.guest_invites (
+CREATE TABLE IF NOT EXISTS public.guest_invites (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organisation_id  UUID NOT NULL REFERENCES public.organisations(id) ON DELETE CASCADE,
   token            TEXT NOT NULL UNIQUE,
@@ -35,14 +42,14 @@ CREATE TABLE public.guest_invites (
   revoked_at       TIMESTAMPTZ,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_guest_invites_token ON public.guest_invites(token);
-CREATE INDEX idx_guest_invites_org ON public.guest_invites(organisation_id);
+CREATE INDEX IF NOT EXISTS idx_guest_invites_token ON public.guest_invites(token);
+CREATE INDEX IF NOT EXISTS idx_guest_invites_org ON public.guest_invites(organisation_id);
 
 -- One row per shared thing. Sharing a student (student_id set) means
 -- "everything this student has verified, dynamically" — new work they
 -- verify later is visible too. Sharing a single verification_id means
 -- just that one piece of work, nothing else about the student.
-CREATE TABLE public.guest_invite_shares (
+CREATE TABLE IF NOT EXISTS public.guest_invite_shares (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   invite_id        UUID NOT NULL REFERENCES public.guest_invites(id) ON DELETE CASCADE,
   student_id       UUID REFERENCES public.users(id) ON DELETE CASCADE,
@@ -50,10 +57,10 @@ CREATE TABLE public.guest_invite_shares (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK ((student_id IS NOT NULL) <> (verification_id IS NOT NULL))
 );
-CREATE INDEX idx_guest_shares_invite ON public.guest_invite_shares(invite_id);
+CREATE INDEX IF NOT EXISTS idx_guest_shares_invite ON public.guest_invite_shares(invite_id);
 
-ALTER TABLE public.users ADD COLUMN is_guest BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE public.users ADD COLUMN guest_invite_id UUID REFERENCES public.guest_invites(id);
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_guest BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS guest_invite_id UUID REFERENCES public.guest_invites(id);
 
 -- ── Helper functions ─────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.current_user_is_guest()
@@ -146,28 +153,33 @@ ALTER TABLE public.guest_invite_shares ENABLE ROW LEVEL SECURITY;
 
 -- Org staff manage their own org's invites. A claiming guest reads
 -- their OWN invite row too (so the app can show "invited by X").
+DROP POLICY IF EXISTS "guest_invites: org staff read" ON public.guest_invites;
 CREATE POLICY "guest_invites: org staff read" ON public.guest_invites FOR SELECT
   USING (
     (public.current_user_role() IN ('institution_staff','provider_staff') AND organisation_id = public.current_user_org())
     OR claimed_by = auth.uid()
   );
+DROP POLICY IF EXISTS "guest_invites: org staff insert" ON public.guest_invites;
 CREATE POLICY "guest_invites: org staff insert" ON public.guest_invites FOR INSERT
   WITH CHECK (
     public.current_user_role() IN ('institution_staff','provider_staff')
     AND organisation_id = public.current_user_org()
     AND created_by = auth.uid()
   );
+DROP POLICY IF EXISTS "guest_invites: org staff revoke" ON public.guest_invites;
 CREATE POLICY "guest_invites: org staff revoke" ON public.guest_invites FOR UPDATE
   USING (
     public.current_user_role() IN ('institution_staff','provider_staff')
     AND organisation_id = public.current_user_org()
   );
 
+DROP POLICY IF EXISTS "guest_invite_shares: org staff read" ON public.guest_invite_shares;
 CREATE POLICY "guest_invite_shares: org staff read" ON public.guest_invite_shares FOR SELECT
   USING (
     EXISTS (SELECT 1 FROM public.guest_invites gi WHERE gi.id = invite_id AND gi.organisation_id = public.current_user_org())
     AND public.current_user_role() IN ('institution_staff','provider_staff')
   );
+DROP POLICY IF EXISTS "guest_invite_shares: org staff insert" ON public.guest_invite_shares;
 CREATE POLICY "guest_invite_shares: org staff insert" ON public.guest_invite_shares FOR INSERT
   WITH CHECK (
     EXISTS (SELECT 1 FROM public.guest_invites gi WHERE gi.id = invite_id AND gi.organisation_id = public.current_user_org() AND gi.created_by = auth.uid())
@@ -187,19 +199,20 @@ CREATE POLICY "verifications: student or org staff read" ON public.verifications
       AND public.current_user_role() IN ('institution_staff','provider_staff')
     )
     OR (public.current_user_role() = 'employer' AND NOT public.current_user_is_guest() AND visibility = 'public')
-    OR (public.current_user_is_guest() AND public.guest_can_see_verification(id))
+    OR (public.current_user_is_guest() AND public.guest_can_see_verification(verifications.id))
   );
 
 DROP POLICY IF EXISTS "submissions: employer read via public verification" ON public.submissions;
 CREATE POLICY "submissions: employer read via public verification" ON public.submissions FOR SELECT
   USING (
     public.current_user_role() = 'employer' AND NOT public.current_user_is_guest()
-    AND EXISTS (SELECT 1 FROM public.verifications v WHERE v.submission_id = id AND v.visibility = 'public')
+    AND EXISTS (SELECT 1 FROM public.verifications v WHERE v.submission_id = submissions.id AND v.visibility = 'public')
   );
+DROP POLICY IF EXISTS "submissions: guest read via share" ON public.submissions;
 CREATE POLICY "submissions: guest read via share" ON public.submissions FOR SELECT
   USING (
     public.current_user_is_guest()
-    AND EXISTS (SELECT 1 FROM public.verifications v WHERE v.submission_id = id AND public.guest_can_see_verification(v.id))
+    AND EXISTS (SELECT 1 FROM public.verifications v WHERE v.submission_id = submissions.id AND public.guest_can_see_verification(v.id))
   );
 
 DROP POLICY IF EXISTS "work_items: employer read via public verification" ON public.work_items;
@@ -209,24 +222,26 @@ CREATE POLICY "work_items: employer read via public verification" ON public.work
     AND EXISTS (
       SELECT 1 FROM public.submissions s
       JOIN public.verifications v ON v.submission_id = s.id
-      WHERE s.work_item_id = id AND v.visibility = 'public'
+      WHERE s.work_item_id = work_items.id AND v.visibility = 'public'
     )
   );
+DROP POLICY IF EXISTS "work_items: guest read via share" ON public.work_items;
 CREATE POLICY "work_items: guest read via share" ON public.work_items FOR SELECT
   USING (
     public.current_user_is_guest()
     AND EXISTS (
       SELECT 1 FROM public.submissions s
       JOIN public.verifications v ON v.submission_id = s.id
-      WHERE s.work_item_id = id AND public.guest_can_see_verification(v.id)
+      WHERE s.work_item_id = work_items.id AND public.guest_can_see_verification(v.id)
     )
   );
 
 -- A guest can see the student's row on exactly the same "shared with
 -- them" basis -- separate from has_verification() (public-only),
 -- since shared work is often organisation-only visibility, not public.
+DROP POLICY IF EXISTS "users: guest read shared student" ON public.users;
 CREATE POLICY "users: guest read shared student" ON public.users FOR SELECT
-  USING (public.current_user_is_guest() AND public.guest_can_see_student(id));
+  USING (public.current_user_is_guest() AND public.guest_can_see_student(users.id));
 
 -- ── Guests never post: tighten opportunities insert ──────────
 DROP POLICY IF EXISTS "opportunities: employer self insert" ON public.opportunities;
