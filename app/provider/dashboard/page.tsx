@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
+import PreviousSessionsCard from '@/components/v2/PreviousSessionsCard'
 import {
   BookOpen, ClipboardCheck, CheckCircle2, Users, AlertTriangle, Flag, Clock,
   KeyRound, TrendingUp, TrendingDown, ClipboardList, PlusCircle, Ticket,
@@ -196,6 +197,8 @@ export default function ProviderDashboardPage() {
           </div>
         </div>
       </div>
+
+      <PreviousSessionsCard />
 
       <div id="join-codes" className="bg-surface border border-edge rounded-2xl p-6">
         <JoinCodesPanel />

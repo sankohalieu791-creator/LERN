@@ -40,7 +40,10 @@ export default function WorkItemsPanel({ type }: { type: ItemType }) {
   const load = () => {
     if (!user?.organisation_id) return
     getWorkItems(user.organisation_id).then(({ data }) => {
-      setItems((data || []).filter((i: any) => i.type === type))
+      // An ended workshop/course moves to the Dashboard's "Previous"
+      // list instead of cluttering the live one — it's done, there's
+      // nothing left to do with it here.
+      setItems((data || []).filter((i: any) => i.type === type && !i.ended_at))
       setLoading(false)
     })
   }

@@ -117,6 +117,20 @@ export const getWorkItems = async (organisationId: string) => {
   return { data, error }
 }
 
+// Dashboard's "Previous courses/workshops" — an ended session moves
+// here instead of staying in the live Workshops/Courses list.
+export const getEndedWorkItems = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('work_items')
+    .select('id, type, title, ended_at')
+    .eq('organisation_id', organisationId)
+    .in('type', ['workshop', 'course'])
+    .not('ended_at', 'is', null)
+    .order('ended_at', { ascending: false })
+    .limit(20)
+  return { data, error }
+}
+
 export const createWorkItem = async (
   organisationId: string, createdBy: string,
   fields: {
@@ -195,7 +209,7 @@ export const getWorkItemAttachments = async (workItemId: string) => {
 
 // Both submission-files and work-item-attachments are private buckets --
 // a signed URL is the only way to actually view/download an object.
-export const getSignedFileUrl = async (bucket: 'submission-files' | 'work-item-attachments' | 'post-images' | 'session-recordings', path: string) => {
+export const getSignedFileUrl = async (bucket: 'submission-files' | 'work-item-attachments' | 'post-images' | 'post-videos' | 'session-recordings' | 'self-qualifications', path: string) => {
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600)
   return { url: data?.signedUrl ?? null, error }
 }
@@ -520,9 +534,15 @@ export const uploadPostImage = async (userId: string, file: File) => {
   return { path: error ? null : path, error }
 }
 
+export const uploadPostVideo = async (userId: string, file: File | Blob, ext: string = 'webm') => {
+  const path = `${userId}/${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('post-videos').upload(path, file, { contentType: file.type || 'video/webm' })
+  return { path: error ? null : path, error }
+}
+
 export const createPost = async (
   organisationId: string, authorId: string,
-  fields: { content?: string; image_path?: string; visibility?: 'organisation' | 'public' }
+  fields: { content?: string; image_path?: string; video_path?: string; visibility?: 'organisation' | 'public' }
 ) => {
   const { data, error } = await supabase
     .from('posts')
@@ -798,6 +818,17 @@ export const deleteOpportunity = async (id: string) => {
   return { error }
 }
 
+// Student-facing browse (all employers' postings — the table is
+// public-read by design already).
+export const getAllOpportunities = async () => {
+  const { data, error } = await supabase
+    .from('opportunities')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(50)
+  return { data, error }
+}
+
 // ── Guest employer invite (Type 1 — org-invited, scoped to one
 // student, no browsing beyond what's explicitly shared) ──────────
 
@@ -893,4 +924,81 @@ export const devLogin = async (email: string, secret: string) => {
   if (!res.ok) return { error: body }
   const { error } = await supabase.auth.verifyOtp({ email, token_hash: body.tokenHash, type: 'magiclink' })
   return { error }
+}
+
+// ── Profile ────────────────────────────────────────────────────
+export const getFollowCounts = async (userId: string) => {
+  const [{ count: followers }, { count: following }] = await Promise.all([
+    supabase.from('followers').select('id', { count: 'exact', head: true }).eq('followed_id', userId),
+    supabase.from('followers').select('id', { count: 'exact', head: true }).eq('follower_id', userId),
+  ])
+  return { followers: followers || 0, following: following || 0 }
+}
+
+export const amIFollowing = async (viewerId: string, profileId: string) => {
+  const { data } = await supabase.from('followers').select('id').eq('follower_id', viewerId).eq('followed_id', profileId).maybeSingle()
+  return !!data
+}
+
+export const followUser = async (followerId: string, followedId: string) => {
+  const { error } = await supabase.from('followers').insert([{ follower_id: followerId, followed_id: followedId }])
+  return { error }
+}
+
+export const unfollowUser = async (followerId: string, followedId: string) => {
+  const { error } = await supabase.from('followers').delete().eq('follower_id', followerId).eq('followed_id', followedId)
+  return { error }
+}
+
+// The trusted core of a profile — every non-revoked verification for
+// this student, most recent first.
+export const getVerifiedWorkForProfile = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('verifications')
+    .select('id, verified_at, visibility, verifier:users!verifications_verified_by_fkey(full_name), submissions!inner(student_id, content, work_items(title, type))')
+    .eq('submissions.student_id', studentId)
+    .is('revoked_at', null)
+    .order('verified_at', { ascending: false })
+  return { data, error }
+}
+
+export const getMyPosts = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('posts_feed')
+    .select('*')
+    .eq('author_id', studentId)
+    .eq('hidden', false)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// Self-declared, never verified — kept in a table that's never joined
+// with verifications anywhere, so the two can't be blended by accident.
+export const getSelfQualifications = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('self_qualifications')
+    .select('*')
+    .eq('student_id', studentId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const addSelfQualification = async (studentId: string, fields: { title: string; issuer?: string; file_path?: string }) => {
+  const { data, error } = await supabase
+    .from('self_qualifications')
+    .insert([{ student_id: studentId, ...fields }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const deleteSelfQualification = async (id: string) => {
+  const { error } = await supabase.from('self_qualifications').delete().eq('id', id)
+  return { error }
+}
+
+export const uploadSelfQualificationFile = async (studentId: string, file: File) => {
+  const path = `${studentId}/${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from('self-qualifications').upload(path, file)
+  return { path: error ? null : path, error }
 }

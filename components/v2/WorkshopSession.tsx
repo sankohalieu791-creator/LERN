@@ -341,7 +341,8 @@ export default function WorkshopSession({
 
   const endForEveryone = async () => {
     if (recording) stopRecording() // keeps whatever was captured so far, ready to save from the end screen
-    await endWorkshop(workItemId)
+    const { error: endError } = await endWorkshop(workItemId)
+    if (endError) { setActionError("Couldn't end the session: " + endError.message); return }
     await leave()
     onEnded?.()
   }

@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getFeed, getPublicFeed, createPost, deletePost, uploadPostImage, setPostReaction, getSignedFileUrl } from '@/lib/supabase'
+import { getFeed, getPublicFeed, deletePost, setPostReaction, getSignedFileUrl } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
-import { ImagePlus, X, Globe, Users, Trash2, PartyPopper } from 'lucide-react'
+import { Globe, Users, Trash2 } from 'lucide-react'
 
 // Fixed positive set only — no open free-text comments anywhere. One
 // custom LERN-branded reaction (celebrate_lern) alongside plain ones.
@@ -46,7 +46,7 @@ export default function FeedPanel() {
 
   return (
     <div className="max-w-xl mx-auto space-y-4">
-      {exploring ? (
+      {exploring && (
         <div className="bg-surface-subtle border border-edge rounded-2xl px-5 py-4">
           <p className="text-[13px] text-ink-secondary">
             {user?.role === 'employer'
@@ -54,8 +54,6 @@ export default function FeedPanel() {
               : "You're not linked to an organisation yet, so you're only seeing public educational content — you can look around, but you can't post or be seen by anyone. Enter your join code in My Work to unlock everything."}
           </p>
         </div>
-      ) : (
-        <Composer onPosted={load} />
       )}
 
       {loading ? (
@@ -74,97 +72,18 @@ export default function FeedPanel() {
   )
 }
 
-function Composer({ onPosted }: { onPosted: () => void }) {
-  const { user } = useAuth()
-  const [content, setContent] = useState('')
-  const [file, setFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
-  const [visibility, setVisibility] = useState<'organisation' | 'public'>('organisation')
-  const [posting, setPosting] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const isAdult = user?.date_of_birth ? (Date.now() - new Date(user.date_of_birth).getTime()) / (1000 * 60 * 60 * 24 * 365.25) >= 18 : false
-
-  const pickFile = (f: File | null) => {
-    setFile(f)
-    setPreview(f ? URL.createObjectURL(f) : null)
-  }
-
-  const handlePost = async () => {
-    if (!content.trim() && !file) return
-    if (!user?.organisation_id) return
-    setPosting(true)
-    let image_path: string | undefined
-    if (file) {
-      const { path, error } = await uploadPostImage(user.id, file)
-      if (error || !path) { setPosting(false); return }
-      image_path = path
-    }
-    await createPost(user.organisation_id, user.id, { content: content.trim() || undefined, image_path, visibility })
-    setPosting(false)
-    setContent(''); pickFile(null); setVisibility('organisation')
-    onPosted()
-  }
-
-  return (
-    // Posting is a phone action, per spec -- the composer only appears at
-    // phone widths. On laptop the feed is browse-only.
-    <div className="lg:hidden bg-surface border border-edge rounded-2xl p-4">
-      <div className="flex items-start gap-2.5">
-        <div className="w-9 h-9 rounded-full bg-surface-muted flex items-center justify-center text-[12px] font-bold text-ink-secondary flex-shrink-0">
-          {initials(user?.full_name)}
-        </div>
-        <textarea
-          value={content} onChange={e => setContent(e.target.value)}
-          placeholder="Share something educational…"
-          rows={2}
-          className="flex-1 text-[14px] text-ink placeholder-ink-quaternary outline-none resize-none"
-        />
-      </div>
-      {preview && (
-        <div className="relative mt-2 ml-11">
-          <img src={preview} alt="" className="max-h-48 rounded-xl border border-edge" />
-          <button onClick={() => pickFile(null)} className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-      <div className="flex items-center justify-between mt-3 ml-11">
-        <div className="flex items-center gap-1">
-          <button onClick={() => fileRef.current?.click()} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-secondary hover:bg-surface-muted transition">
-            <ImagePlus className="w-4 h-4" />
-          </button>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => pickFile(e.target.files?.[0] || null)} />
-          {isAdult && (
-            <button
-              onClick={() => setVisibility(v => v === 'organisation' ? 'public' : 'organisation')}
-              className="flex items-center gap-1 text-[11px] font-semibold text-ink-secondary px-2 py-1 rounded-lg hover:bg-surface-muted transition"
-            >
-              {visibility === 'public' ? <Globe className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
-              {visibility === 'public' ? 'Public' : 'Organisation only'}
-            </button>
-          )}
-        </div>
-        <button
-          onClick={handlePost} disabled={posting || (!content.trim() && !file)}
-          className="bg-brand text-white font-semibold text-[13px] px-4 py-1.5 rounded-lg disabled:opacity-40 transition"
-        >
-          {posting ? 'Posting…' : 'Post'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
 function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
   const { user } = useAuth()
   const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const reactions: any[] = post.post_reactions || []
   const myReaction = reactions.find(r => r.user_id === user?.id)?.reaction as ReactionType | undefined
   const canDelete = post.author_id === user?.id || (user && ['institution_staff', 'provider_staff'].includes((user as any).role))
 
   useEffect(() => {
     if (post.image_path) getSignedFileUrl('post-images', post.image_path).then(({ url }) => setImageUrl(url))
-  }, [post.image_path])
+    if (post.video_path) getSignedFileUrl('post-videos', post.video_path).then(({ url }) => setVideoUrl(url))
+  }, [post.image_path, post.video_path])
 
   const react = async (key: ReactionType) => {
     if (!user) return
@@ -201,7 +120,11 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
       </div>
 
       {post.content && <p className="text-[14px] text-ink-body whitespace-pre-wrap mb-2.5 leading-relaxed">{post.content}</p>}
-      {imageUrl && <img src={imageUrl} alt="" className="w-full rounded-xl border border-edge-subtle mb-2.5" />}
+      {videoUrl ? (
+        <video src={videoUrl} controls playsInline className="w-full rounded-xl border border-edge-subtle mb-2.5 bg-black max-h-[70vh]" />
+      ) : imageUrl && (
+        <img src={imageUrl} alt="" className="w-full rounded-xl border border-edge-subtle mb-2.5" />
+      )}
 
       {counts.length > 0 && (
         <div className="flex items-center gap-1 mb-2 text-[12px] text-ink-tertiary">

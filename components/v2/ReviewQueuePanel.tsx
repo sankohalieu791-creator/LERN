@@ -43,7 +43,7 @@ export default function ReviewQueuePanel() {
   const decided = items.filter(i => i.status !== 'submitted')
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-5">
         <p className="font-bold text-ink text-[15px]">Review queue</p>
         {!loading && (
