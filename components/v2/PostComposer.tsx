@@ -43,13 +43,18 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
     ? (Date.now() - new Date(user.date_of_birth).getTime()) / (1000 * 60 * 60 * 24 * 365.25) >= 18
     : false
 
-  // ── Camera stream ──
+  // ── Camera stream — one persistent stream per facing direction,
+  // not per photo/video mode. Requesting audio once alongside video
+  // and just not using the mic track in photo mode means toggling
+  // Photo/Video doesn't tear down and re-request the whole camera
+  // (which flickered and could re-trigger a permission prompt on some
+  // browsers every single toggle). ──
   const startStream = async (facing: 'environment' | 'user') => {
     stopStream()
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: facing },
-        audio: mode === 'video',
+        audio: true,
       })
       streamRef.current = stream
       if (videoRef.current) videoRef.current.srcObject = stream
@@ -66,7 +71,7 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
     if (step === 'camera') startStream(facingMode)
     return () => { if (step !== 'camera') stopStream() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, facingMode, mode])
+  }, [step, facingMode])
 
   useEffect(() => () => { stopStream(); if (recordTimerRef.current) clearInterval(recordTimerRef.current) }, [])
 

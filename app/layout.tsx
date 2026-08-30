@@ -4,6 +4,7 @@ import { AuthProvider } from '@/context/AuthContext'
 import ThemeProvider from '@/context/ThemeProvider'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import ServiceWorkerRegistration from '@/components/v2/ServiceWorkerRegistration'
 
 // v2 rebuild: desktop/laptop-first, paper/ink/orange. Dark mode exists
 // today only inside the institution/provider shell (see
@@ -17,6 +18,9 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 export const metadata: Metadata = {
   title: 'LERN',
   description: 'Verified work, safely.',
+  manifest: '/manifest.json',
+  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'LERN' },
+  icons: { icon: '/icon-192.png', apple: '/icon-192.png' },
 }
 
 export const viewport: Viewport = {
@@ -34,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </ThemeProvider>
         </AuthProvider>
+        <ServiceWorkerRegistration />
         <Analytics />
         <SpeedInsights />
       </body>

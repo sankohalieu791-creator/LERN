@@ -12,14 +12,14 @@ self.addEventListener('push', event => {
       badge: '/icon-192.png',
       tag:   data.tag   ?? 'lern-notif',
       renotify: true,
-      data:  { url: data.url ?? '/feed' },
+      data:  { url: data.url ?? '/' },
     })
   )
 })
 
 self.addEventListener('notificationclick', event => {
   event.notification.close()
-  const target = event.notification.data?.url ?? '/feed'
+  const target = event.notification.data?.url ?? '/'
   event.waitUntil(
     clients
       .matchAll({ type: 'window', includeUncontrolled: true })
