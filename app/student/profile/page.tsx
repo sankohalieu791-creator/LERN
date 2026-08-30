@@ -1,7 +1,11 @@
 'use client'
 
-import ProfilePanel from '@/components/v2/ProfilePanel'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
+// Temporarily pulled from the nav — see app/student/work/page.tsx.
 export default function StudentProfilePage() {
-  return <ProfilePanel />
+  const router = useRouter()
+  useEffect(() => { router.replace('/student/feed') }, [router])
+  return null
 }

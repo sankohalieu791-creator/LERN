@@ -1,7 +1,13 @@
 'use client'
 
-import MyWorkPanel from '@/components/v2/MyWorkPanel'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
+// Temporarily pulled from the nav — being rebuilt to spec, one screen
+// at a time, starting with Feed. Redirects rather than 404s in case
+// this URL is bookmarked/still linked anywhere.
 export default function StudentWorkPage() {
-  return <MyWorkPanel />
+  const router = useRouter()
+  useEffect(() => { router.replace('/student/feed') }, [router])
+  return null
 }

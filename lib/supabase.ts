@@ -570,6 +570,14 @@ export const setPostReaction = async (postId: string, userId: string, reaction: 
   return { error }
 }
 
+// Fire-and-forget, once per post per page-load (deduped client-side) —
+// a real counter, not a fabricated one, just a simple v1 of "shown in
+// your feed" rather than "watched to completion."
+export const incrementPostViews = async (postId: string) => {
+  const { error } = await supabase.rpc('increment_post_views', { p_post_id: postId })
+  return { error }
+}
+
 // ── Settings: account ────────────────────────────────────────────
 export const changePassword = async (newPassword: string) => {
   const { error } = await supabase.auth.updateUser({ password: newPassword })

@@ -1,7 +1,11 @@
 'use client'
 
-import DiscoverPanel from '@/components/v2/DiscoverPanel'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
+// Temporarily pulled from the nav — see app/student/work/page.tsx.
 export default function StudentDiscoverPage() {
-  return <DiscoverPanel />
+  const router = useRouter()
+  useEffect(() => { router.replace('/student/feed') }, [router])
+  return null
 }
