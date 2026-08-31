@@ -19,7 +19,14 @@ export const metadata: Metadata = {
   title: 'LERN',
   description: 'Verified work, safely.',
   manifest: '/manifest.json',
-  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'LERN' },
+  // 'default' is a WHITE status bar on an installed iOS PWA -- that's
+  // the actual, static cause of the white strip at the top over
+  // My Work/Discover (where clock/wifi/battery sit), not something a
+  // runtime theme-color change can override. black-translucent makes
+  // the status bar transparent instead, so whatever's actually
+  // painted behind it (dark on the student shell, light elsewhere)
+  // shows through correctly on every page, not just one hardcoded colour.
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'LERN' },
   icons: { icon: '/icon-192.png', apple: '/icon-192.png' },
 }
 

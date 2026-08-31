@@ -162,12 +162,15 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
           {!mediaUrl && <div className="absolute inset-0 bg-[#1a1a1a] animate-pulse" />}
           {mediaUrl && post.video_path ? (
             <>
-              <video src={mediaUrl} muted playsInline preload="metadata" className="w-full h-full object-cover pointer-events-none" />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+              <video src={mediaUrl} muted playsInline preload="metadata" className="w-full h-full object-cover" onClick={() => setPlayerOpen(true)} />
+              <button
+                onClick={() => setPlayerOpen(true)} aria-label="Play video"
+                className="absolute inset-0 flex items-center justify-center bg-black/10"
+              >
                 <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center">
                   <Play className="w-6 h-6 text-white fill-white ml-0.5" />
                 </div>
-              </div>
+              </button>
             </>
           ) : mediaUrl ? (
             <img src={mediaUrl} alt="" className="w-full h-full object-cover" />
@@ -219,18 +222,21 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
         </div>
 
         {/* ── ACTIONS ── */}
-        <div className="flex items-center gap-5 pb-4 relative">
-          {/* Shows the actual emoji you reacted with, not always a
-              generic thumbs-up -- picking 🎉 should look like you
-              picked 🎉. */}
+        <div className="flex items-center gap-4 pb-4 relative">
+          {/* Pure like/unlike -- always the same ThumbsUp glyph, just
+              filled red when you've reacted at all. Doesn't change
+              shape based on which emoji you picked; that's shown
+              separately, next to it, not fused into this button. */}
           <button onClick={quickLike} className="flex items-center gap-1.5 active:scale-90 transition-transform">
-            {myReactionMeta ? (
-              <span className="text-[18px] leading-none">{myReactionMeta.emoji}</span>
-            ) : (
-              <ThumbsUp className="w-5 h-5" fill={myReaction ? '#ef4444' : 'none'} color={myReaction ? '#ef4444' : '#555'} strokeWidth={1.5} />
-            )}
+            <ThumbsUp className="w-5 h-5" fill={myReaction ? '#ef4444' : 'none'} color={myReaction ? '#ef4444' : '#555'} strokeWidth={1.5} />
             <span className={`text-sm font-semibold ${myReaction ? 'text-red-500' : 'text-[#555]'}`}>{totalReactions}</span>
           </button>
+          {/* The picked reaction, shown as its own small badge next to
+              Like -- like LinkedIn's reaction indicator -- rather than
+              replacing the Like button's own icon. */}
+          {myReactionMeta && (
+            <span className="text-[16px] leading-none" title={myReactionMeta.label}>{myReactionMeta.emoji}</span>
+          )}
           {/* Sits in the "comment" slot visually but opens the reaction
               picker, not a comment box -- there is no free-text
               commenting. */}

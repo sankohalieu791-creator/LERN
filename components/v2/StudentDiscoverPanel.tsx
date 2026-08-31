@@ -205,7 +205,10 @@ export default function StudentDiscoverPanel() {
                     {o.employer?.full_name && <p className="text-[#888] text-sm">{o.employer.full_name}</p>}
                   </div>
                 </div>
-                {o.salary && <p className="text-[#4ade80] font-bold text-sm mb-2">{o.salary}</p>}
+                {/* Brand orange, not green -- matches the real old
+                    JobCard exactly (git show a07a8c2~1), not a generic
+                    "money = green" default. */}
+                {o.salary && <p className="text-[#FF6B2B] font-bold text-sm mb-2">{o.salary}</p>}
                 {o.description && <p className="text-[#666] text-sm leading-relaxed line-clamp-2 mb-3">{o.description}</p>}
                 <div className="flex items-center gap-1 text-[#555] text-xs mb-3">
                   <Clock className="w-3 h-3" /> Posted {new Date(o.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
