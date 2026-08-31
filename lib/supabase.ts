@@ -866,6 +866,27 @@ export const getOpportunities = async (type?: 'job' | 'apprenticeship' | 'intern
   return { data, error }
 }
 
+// "Apply" on a Jobs/Apprenticeships/Internships card — the reverse
+// direction from expressInterest: a student applying to a posting,
+// not an employer expressing interest in a student. Same org-routing
+// shape either way, RLS decides who reads it next.
+export const applyToOpportunity = async (opportunityId: string, studentId: string) => {
+  const { data, error } = await supabase
+    .from('opportunity_interest')
+    .insert([{ opportunity_id: opportunityId, student_id: studentId }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const getMyOpportunityApplications = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('opportunity_interest')
+    .select('*')
+    .eq('student_id', studentId)
+  return { data, error }
+}
+
 // 18+ only (enforced by RLS, not this function) — the student-facing
 // end of the employer "express interest" flow. Under-18s have no read
 // path to this table at all; their organisation sees it instead.

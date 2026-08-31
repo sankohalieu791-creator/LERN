@@ -70,7 +70,15 @@ export default function StudentMyWorkPanel() {
       getMySubmissions(user.id),
     ]).then(([ot, wi, subs]) => {
       setOrgType(ot)
-      setWorkItems((wi.data || []).filter((w: any) => !w.closed_at))
+      // A workshop is one live session -- once it's ended there's
+      // nothing left to join, so (matching the staff side's own
+      // WorkItemsPanel) it drops out of the active list the instant
+      // ended_at is set, not just once the badge says "Ended". It's
+      // still visible from the Dashboard's "Previous workshops" card.
+      // Courses aren't dropped the same way -- a course can genuinely
+      // run for months, so ended_at isn't "nothing left here" the same
+      // way it is for a single workshop session.
+      setWorkItems((wi.data || []).filter((w: any) => !w.closed_at && !(w.type === 'workshop' && w.ended_at)))
       setSubmissions(subs.data || [])
       setLoading(false)
     })

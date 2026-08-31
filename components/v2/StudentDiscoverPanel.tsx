@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getDiscoverWork, getOpportunities, getMyReceivedInterest, respondToInterest,
+  applyToOpportunity, getMyOpportunityApplications,
 } from '@/lib/supabase'
 import {
-  Search, X, BadgeCheck, MapPin, Briefcase, Clock, Check, Ban,
+  Search, X, BadgeCheck, MapPin, Briefcase, Clock, Check, Ban, Send,
 } from 'lucide-react'
 
 // Sizes/structure pulled from the real deleted v1 app/discovery/page.tsx
@@ -42,6 +43,8 @@ export default function StudentDiscoverPanel() {
   const [search, setSearch] = useState('')
   const [work, setWork] = useState<any[]>([])
   const [opportunities, setOpportunities] = useState<any[]>([])
+  const [applicationByOpp, setApplicationByOpp] = useState<Record<string, string>>({})
+  const [applying, setApplying] = useState<string | null>(null)
   const [interest, setInterest] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -58,6 +61,11 @@ export default function StudentDiscoverPanel() {
         setOpportunities(q ? (data || []).filter((o: any) => o.title?.toLowerCase().includes(q) || o.description?.toLowerCase().includes(q)) : (data || []))
         setLoading(false)
       })
+      if (user) getMyOpportunityApplications(user.id).then(({ data }) => {
+        const map: Record<string, string> = {}
+        for (const a of data || []) map[a.opportunity_id] = a.status
+        setApplicationByOpp(map)
+      })
     }
   }
   useEffect(load, [tab, user?.id])
@@ -66,6 +74,14 @@ export default function StudentDiscoverPanel() {
   const respond = async (id: string, status: 'accepted' | 'declined') => {
     await respondToInterest(id, status)
     setInterest(prev => prev.map(i => i.id === id ? { ...i, status } : i))
+  }
+
+  const apply = async (opportunityId: string) => {
+    if (!user) return
+    setApplying(opportunityId)
+    const { error } = await applyToOpportunity(opportunityId, user.id)
+    setApplying(null)
+    if (!error) setApplicationByOpp(prev => ({ ...prev, [opportunityId]: 'pending' }))
   }
 
   const tabs: { id: Tab; label: string }[] = [
@@ -172,23 +188,49 @@ export default function StudentDiscoverPanel() {
             </div>
           ))
         ) : (
-          opportunities.length === 0 ? <EmptyState label={`No ${tab === 'job' ? 'jobs' : tab === 'apprenticeship' ? 'apprenticeships' : 'internships'} posted yet.`} icon={<Briefcase className="w-8 h-8 text-[#333] mb-2" />} /> : opportunities.map(o => (
-            <div key={o.id} className="bg-[#1a1a1a] border border-white/[0.07] rounded-2xl p-4">
-              <div className="flex items-start gap-3 mb-3">
-                <div className="w-12 h-12 rounded-2xl bg-[#252525] flex items-center justify-center text-white font-bold text-[13px] flex-shrink-0">
-                  {initials(o.employer?.full_name)}
+          opportunities.length === 0 ? <EmptyState label={`No ${tab === 'job' ? 'jobs' : tab === 'apprenticeship' ? 'apprenticeships' : 'internships'} posted yet.`} icon={<Briefcase className="w-8 h-8 text-[#333] mb-2" />} /> : opportunities.map(o => {
+            const status = applicationByOpp[o.id]
+            return (
+              <div key={o.id} className="bg-[#1a1a1a] border border-white/[0.07] rounded-2xl p-4">
+                <div className="flex items-start gap-3 mb-3">
+                  {/* Employer "logo" -- there's no real company-logo upload
+                      yet, this is the same gradient-initials treatment
+                      used for every avatar elsewhere in the app, just
+                      bigger here to read as a company mark. */}
+                  <div className="w-14 h-14 rounded-2xl bg-[#252525] flex items-center justify-center text-white font-bold text-[16px] flex-shrink-0">
+                    {initials(o.employer?.full_name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-[17px] leading-tight">{o.title}</p>
+                    {o.employer?.full_name && <p className="text-[#888] text-sm">{o.employer.full_name}</p>}
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-bold text-base leading-tight">{o.title}</p>
-                  {o.employer?.full_name && <p className="text-[#888] text-sm">{o.employer.full_name}</p>}
+                {o.salary && <p className="text-[#4ade80] font-bold text-sm mb-2">{o.salary}</p>}
+                {o.description && <p className="text-[#666] text-sm leading-relaxed line-clamp-2 mb-3">{o.description}</p>}
+                <div className="flex items-center gap-1 text-[#555] text-xs mb-3">
+                  <Clock className="w-3 h-3" /> Posted {new Date(o.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                 </div>
+                {status === 'pending' ? (
+                  <div className="w-full text-center py-2.5 rounded-full text-sm font-semibold bg-white/5 text-[#888]">
+                    {adult ? 'Applied — pending' : 'Applied — sent to your organisation'}
+                  </div>
+                ) : status === 'accepted' ? (
+                  <div className="flex items-center justify-center gap-1.5 w-full text-center py-2.5 rounded-full text-sm font-semibold bg-[#123a24] text-[#4ade80]">
+                    <Check className="w-4 h-4" /> Accepted
+                  </div>
+                ) : status === 'declined' ? (
+                  <div className="w-full text-center py-2.5 rounded-full text-sm font-semibold bg-white/5 text-[#666]">Declined</div>
+                ) : (
+                  <button
+                    onClick={() => apply(o.id)} disabled={applying === o.id}
+                    className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white disabled:opacity-50"
+                  >
+                    <Send className="w-3.5 h-3.5" /> {applying === o.id ? 'Applying…' : 'Apply'}
+                  </button>
+                )}
               </div>
-              {o.description && <p className="text-[#666] text-sm leading-relaxed line-clamp-2 mb-3">{o.description}</p>}
-              <div className="flex items-center gap-1 text-[#555] text-xs">
-                <Clock className="w-3 h-3" /> Posted {new Date(o.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-              </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
     </div>

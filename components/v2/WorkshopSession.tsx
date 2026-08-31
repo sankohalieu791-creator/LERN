@@ -332,20 +332,33 @@ export default function WorkshopSession({
     trackPresence({ handRaised: next })
   }
 
+  // The host has two exits -- this plain one and the explicit "End for
+  // everyone" button below -- but only one of them used to actually
+  // mark the session ended_at. A host who just hit this one (which is
+  // most of the time; it's the only leave button a non-host ever sees,
+  // so it's the natural one to reach for) left the workshop stuck
+  // "LIVE NOW" indefinitely, since nothing else ever sets ended_at.
+  // Once the host is gone there's no one left to run it, so a host
+  // leaving by ANY path now ends it for real, not just the one
+  // deliberately-labelled button.
   const leave = async () => {
+    if (canEnd) {
+      if (recording) stopRecording() // keeps whatever was captured so far, ready to save from the end screen
+      const { error: endError } = await endWorkshop(workItemId)
+      if (endError) setActionError("Couldn't mark the session ended: " + endError.message) // non-fatal -- still lets the host actually leave
+      else onEnded?.()
+    }
     cameraRef.current?.close(); micRef.current?.close(); screenRef.current?.close()
     await clientRef.current?.leave().catch(() => {})
     clientRef.current = null
     onClose()
   }
 
-  const endForEveryone = async () => {
-    if (recording) stopRecording() // keeps whatever was captured so far, ready to save from the end screen
-    const { error: endError } = await endWorkshop(workItemId)
-    if (endError) { setActionError("Couldn't end the session: " + endError.message); return }
-    await leave()
-    onEnded?.()
-  }
+  // Kept as its own button (rather than folding into "leave" entirely
+  // invisibly) so a host has an explicit, deliberate way to end things
+  // -- functionally identical to leave() for a host now, just named for
+  // what it's doing.
+  const endForEveryone = leave
 
   const startRecording = async () => {
     try {

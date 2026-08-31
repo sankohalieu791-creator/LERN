@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import NotificationsBell from '@/components/v2/NotificationsBell'
@@ -28,6 +29,23 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   // tab bar sits right under the safe area. Same split here.
   const showHeader = isActive('/student/feed')
 
+  // Two real causes of "a white flash/strip at the top" on a hardcoded-
+  // dark shell living inside a globally light-themed app:
+  // 1. The root <meta name="theme-color"> is the light paper colour --
+  //    that's what an iOS/Android PWA paints the system status bar
+  //    with, regardless of what this component renders underneath it.
+  // 2. <main> is the actual scroll container here (html/body don't
+  //    scroll in this fixed-shell layout), but only html/body had
+  //    overscroll-behavior set globally -- so pulling past the top of
+  //    <main> could still trigger the browser's own native
+  //    pull-to-refresh/overscroll chrome, which is never themed dark.
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]')
+    const prev = meta?.getAttribute('content') ?? null
+    meta?.setAttribute('content', '#0f0f0f')
+    return () => { if (prev !== null) meta?.setAttribute('content', prev) }
+  }, [])
+
   return (
     <div data-theme="dark" className="min-h-screen bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {showHeader && (
@@ -44,7 +62,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
         </header>
       )}
 
-      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(60px + env(safe-area-inset-bottom))' }}>{children}</main>
+      <main className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(60px + env(safe-area-inset-bottom))' }}>{children}</main>
 
       <nav
         className="fixed bottom-0 left-0 right-0 bg-[#0f0f0f] border-t border-white/10 z-30"

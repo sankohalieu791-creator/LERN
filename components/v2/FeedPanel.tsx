@@ -7,7 +7,7 @@ import {
   incrementPostViews, amIFollowing, followUser, unfollowUser,
 } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
-import { Eye, ThumbsUp, MessageCircle, Share2 } from 'lucide-react'
+import { Eye, ThumbsUp, MessageCircle, Share2, Play, X } from 'lucide-react'
 
 // Sizes/structure here are pulled directly from the actual deleted v1
 // app/feed/page.tsx (git show a07a8c2~1), not eyeballed off a
@@ -90,6 +90,7 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
   const [following, setFollowing] = useState<boolean | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [playerOpen, setPlayerOpen] = useState(false)
   const viewedRef = useRef(false)
   const reactions: any[] = post.post_reactions || []
   const myReaction = reactions.find(r => r.user_id === user?.id)?.reaction as ReactionType | undefined
@@ -148,11 +149,26 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
   return (
     <div className="border-b border-white/5">
       {/* ── MEDIA: fixed 230px, not an aspect box ── */}
+      {/* A video is a thumbnail here, not an inline player -- tapping it
+          opens a proper full-screen player (like tapping a YouTube
+          thumbnail), instead of playing small and muted-by-default
+          right in the feed. */}
       {(post.image_path || post.video_path) && (
-        <div className="relative w-full bg-[#1a1a1a] overflow-hidden" style={{ height: 230 }}>
+        <div
+          className="relative w-full bg-[#1a1a1a] overflow-hidden"
+          style={{ height: 230 }}
+          onClick={() => post.video_path && mediaUrl && setPlayerOpen(true)}
+        >
           {!mediaUrl && <div className="absolute inset-0 bg-[#1a1a1a] animate-pulse" />}
           {mediaUrl && post.video_path ? (
-            <video src={mediaUrl} controls playsInline className="w-full h-full object-cover" />
+            <>
+              <video src={mediaUrl} muted playsInline preload="metadata" className="w-full h-full object-cover pointer-events-none" />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center">
+                  <Play className="w-6 h-6 text-white fill-white ml-0.5" />
+                </div>
+              </div>
+            </>
           ) : mediaUrl ? (
             <img src={mediaUrl} alt="" className="w-full h-full object-cover" />
           ) : null}
@@ -239,6 +255,17 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
           )}
         </div>
       </div>
+
+      {playerOpen && mediaUrl && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <button onClick={() => setPlayerOpen(false)} className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-black/50 flex items-center justify-center" style={{ marginTop: 'env(safe-area-inset-top)' }}>
+            <X className="w-5 h-5 text-white" />
+          </button>
+          <div className="flex-1 flex items-center justify-center">
+            <video src={mediaUrl} controls autoPlay playsInline className="max-h-full max-w-full" />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
