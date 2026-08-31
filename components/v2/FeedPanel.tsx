@@ -3,12 +3,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import {
-  getFeed, getPublicFeed, deletePost, setPostReaction, getSignedFileUrl,
+  getFeed, getPublicFeed, setPostReaction, getSignedFileUrl,
   incrementPostViews, amIFollowing, followUser, unfollowUser,
 } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
-import { Eye, ThumbsUp, MessageCircle, Share2, Trash2, Play } from 'lucide-react'
+import { Eye, ThumbsUp, MessageCircle, Share2 } from 'lucide-react'
 
+// Sizes/structure here are pulled directly from the actual deleted v1
+// app/feed/page.tsx (git show a07a8c2~1), not eyeballed off a
+// screenshot: a fixed 230px media block (not an aspect-ratio box --
+// that's what kept overshooting), text-xs/text-sm throughout, 36px
+// avatar, 20px action icons. Guessed pixel bumps kept swinging both
+// directions -- this is ground truth.
+//
 // Fixed positive set only — no open free-text comments anywhere. The
 // second action slot (where a comment button would be on most feeds)
 // opens this same picker instead of a comment box.
@@ -34,10 +41,6 @@ function initials(name?: string) {
   return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
 }
 
-// Rebuilt to match the actual old-app feed exactly: one full-bleed
-// post after another (like a YouTube home feed), not padded cards in
-// a column. Posting itself is out of scope for this pass — Feed is
-// the only student screen being rebuilt right now, one at a time.
 export default function FeedPanel() {
   const { user } = useAuth()
   const [posts, setPosts] = useState<any[]>([])
@@ -52,7 +55,7 @@ export default function FeedPanel() {
   if (loading) {
     return (
       <div className="space-y-1">
-        {[0, 1].map(i => <div key={i} className="h-80 bg-[#1a1a1a] animate-pulse" />)}
+        {[0, 1].map(i => <div key={i} className="h-[230px] bg-[#1a1a1a] animate-pulse" />)}
       </div>
     )
   }
@@ -92,7 +95,6 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
   const myReaction = reactions.find(r => r.user_id === user?.id)?.reaction as ReactionType | undefined
   const myReactionMeta = REACTIONS.find(r => r.key === myReaction && r.key !== 'thumbs_up')
   const isOwn = post.author_id === user?.id
-  const canDelete = isOwn || (user && ['institution_staff', 'provider_staff'].includes((user as any).role))
 
   useEffect(() => {
     if (post.image_path) getSignedFileUrl('post-images', post.image_path).then(({ url }) => setMediaUrl(url))
@@ -141,22 +143,13 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
     } catch {}
   }
 
-  const remove = async () => { await deletePost(post.id); onChanged() }
-
   const totalReactions = reactions.length
 
   return (
-    <div className="border-b border-white/10">
-      {/* ── MEDIA ── */}
-      {/* Space is reserved up front (same aspect box whether or not the
-          signed URL has resolved yet) so the media popping in doesn't
-          shove everything below it down mid-scroll. */}
+    <div className="border-b border-white/5">
+      {/* ── MEDIA: fixed 230px, not an aspect box ── */}
       {(post.image_path || post.video_path) && (
-        // Tall, near-square crop -- matches the reference exactly. The
-        // previous wide 16:10 landscape box was the real reason
-        // everything read as "small": a squat, low image makes the
-        // whole post feel thin regardless of icon/text sizing.
-        <div className="relative w-full aspect-[4/5] bg-black">
+        <div className="relative w-full bg-[#1a1a1a] overflow-hidden" style={{ height: 230 }}>
           {!mediaUrl && <div className="absolute inset-0 bg-[#1a1a1a] animate-pulse" />}
           {mediaUrl && post.video_path ? (
             <video src={mediaUrl} controls playsInline className="w-full h-full object-cover" />
@@ -164,38 +157,35 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
             <img src={mediaUrl} alt="" className="w-full h-full object-cover" />
           ) : null}
           {post.category && (
-            <span className="absolute top-3 left-3 bg-[#1a1a1a]/90 text-white text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full">
+            <span className="absolute top-2.5 left-2.5 text-[10px] font-bold bg-black/70 text-white px-2.5 py-1 rounded-full uppercase tracking-wide">
               {post.category}
             </span>
           )}
           {post.title && (
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-10 pb-3 px-4">
-              <p className="text-white font-bold text-[17px]">{post.title}</p>
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent px-3 pt-8 pb-3">
+              <h3 className="text-white font-bold text-[15px] leading-snug line-clamp-2">{post.title}</h3>
             </div>
-          )}
-          {canDelete && (
-            <button
-              onClick={remove}
-              className="absolute top-3 right-3 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-white" />
-            </button>
           )}
         </div>
       )}
 
-      <div className="px-4 pt-3 pb-4">
+      <div className="px-4 pt-3 pb-1">
         {/* ── AUTHOR ROW ── */}
-        <div className="flex items-center gap-2.5 mb-2">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[12px] flex-shrink-0">
-            {initials(post.author_name)}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[11px] flex-shrink-0">
+              {initials(post.author_name)}
+            </div>
+            <div className="min-w-0">
+              <p className="text-white text-sm font-bold truncate leading-none mb-0.5">{post.author_name}</p>
+              {post.author_role && <p className="text-[#555] text-xs truncate">{post.author_role === 'institution_staff' || post.author_role === 'provider_staff' ? 'Instructor' : 'Student'}</p>}
+            </div>
           </div>
-          <p className="font-bold text-white text-[14.5px] truncate flex-1">{post.author_name}</p>
           {!isOwn && following !== null && (
             <button
               onClick={toggleFollow}
-              className={`text-[12.5px] font-semibold px-3.5 py-1.5 rounded-full flex-shrink-0 transition ${
-                following ? 'bg-white/10 text-white' : 'bg-white text-black'
+              className={`flex-shrink-0 text-[12px] font-bold px-4 py-1.5 rounded-full border transition ${
+                following ? 'border-white/10 text-[#444]' : 'border-white text-white'
               }`}
             >
               {following ? 'Following' : 'Follow'}
@@ -204,47 +194,43 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
         </div>
 
         {/* ── CAPTION (only when there's no title overlay, so text isn't shown twice) ── */}
-        {post.content && !post.title && <p className="text-[#ccc] text-[14px] whitespace-pre-wrap leading-relaxed mb-2">{post.content}</p>}
-        {post.content && post.title && <p className="text-[#999] text-[13.5px] whitespace-pre-wrap leading-relaxed mb-2">{post.content}</p>}
+        {post.content && !post.title && <p className="text-[#999] text-sm line-clamp-2 mb-2 leading-snug">{post.content}</p>}
 
         {/* ── VIEWS + TIME ── */}
-        <div className="flex items-center gap-1.5 text-[#777] text-[13.5px] mb-3">
-          <Eye className="w-4 h-4" />
-          <span>{(post.views_count || 0).toLocaleString()} views</span>
-          <span>·</span>
+        <div className="flex items-center gap-3 text-[#555] text-xs mb-3">
+          <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{(post.views_count || 0).toLocaleString()} views</span>
           <span>{timeAgo(post.created_at)}</span>
         </div>
 
         {/* ── ACTIONS ── */}
-        <div className="flex items-center gap-5 relative">
+        <div className="flex items-center gap-5 pb-4 relative">
           {/* Shows the actual emoji you reacted with, not always a
               generic thumbs-up -- picking 🎉 should look like you
-              picked 🎉, the same way a comment would carry your own
-              words rather than everyone's comment looking identical. */}
-          <button onClick={quickLike} className={`flex items-center gap-2 text-[14.5px] font-semibold ${myReaction ? 'text-brand' : 'text-white'}`}>
+              picked 🎉. */}
+          <button onClick={quickLike} className="flex items-center gap-1.5 active:scale-90 transition-transform">
             {myReactionMeta ? (
-              <span className="text-[22px] leading-none">{myReactionMeta.emoji}</span>
+              <span className="text-[18px] leading-none">{myReactionMeta.emoji}</span>
             ) : (
-              <ThumbsUp className="w-6 h-6" />
+              <ThumbsUp className="w-5 h-5" fill={myReaction ? '#ef4444' : 'none'} color={myReaction ? '#ef4444' : '#555'} strokeWidth={1.5} />
             )}
-            {totalReactions}
+            <span className={`text-sm font-semibold ${myReaction ? 'text-red-500' : 'text-[#555]'}`}>{totalReactions}</span>
           </button>
-          {/* Sits in the "comment" slot visually (matches the reference's
-              speech-bubble glyph exactly) but opens the reaction picker,
-              not a comment box -- there is no free-text commenting. */}
-          <button onClick={() => setPickerOpen(v => !v)} className="text-white">
-            <MessageCircle className="w-6 h-6" />
+          {/* Sits in the "comment" slot visually but opens the reaction
+              picker, not a comment box -- there is no free-text
+              commenting. */}
+          <button onClick={() => setPickerOpen(v => !v)} className="flex items-center gap-1.5 text-[#555] active:scale-90 transition-transform">
+            <MessageCircle className="w-5 h-5" />
           </button>
-          <button onClick={share} className="ml-auto text-white">
-            <Share2 className="w-6 h-6" />
+          <button onClick={share} className="text-[#555] active:scale-90 transition-transform ml-auto">
+            <Share2 className="w-5 h-5" />
           </button>
 
           {pickerOpen && (
-            <div className="absolute bottom-9 left-0 flex items-center gap-1 bg-[#1e1e1e] border border-white/10 rounded-full px-2 py-1.5 shadow-lg z-10">
+            <div className="absolute bottom-12 left-0 flex items-center gap-1 bg-[#1e1e1e] border border-white/10 rounded-full px-2 py-1.5 shadow-lg z-10">
               {REACTIONS.map(r => (
                 <button
                   key={r.key} onClick={() => react(r.key)} title={r.label}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center text-[19px] transition ${myReaction === r.key ? 'bg-white/15' : 'hover:bg-white/10'}`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-[17px] transition ${myReaction === r.key ? 'bg-white/15' : 'hover:bg-white/10'}`}
                 >
                   {r.emoji}
                 </button>
