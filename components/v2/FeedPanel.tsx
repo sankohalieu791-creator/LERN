@@ -90,6 +90,7 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
   const viewedRef = useRef(false)
   const reactions: any[] = post.post_reactions || []
   const myReaction = reactions.find(r => r.user_id === user?.id)?.reaction as ReactionType | undefined
+  const myReactionMeta = REACTIONS.find(r => r.key === myReaction && r.key !== 'thumbs_up')
   const isOwn = post.author_id === user?.id
   const canDelete = isOwn || (user && ['institution_staff', 'provider_staff'].includes((user as any).role))
 
@@ -115,9 +116,12 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
     else { await followUser(user.id, post.author_id); setFollowing(true) }
   }
 
+  // Tapping the main button reacts thumbs-up by default; tapping it
+  // again while ANY reaction is set (thumbs-up or a picked emoji)
+  // clears it, rather than always forcing it specifically to thumbs-up.
   const quickLike = async () => {
     if (!user) return
-    await setPostReaction(post.id, user.id, myReaction === 'thumbs_up' ? null : 'thumbs_up')
+    await setPostReaction(post.id, user.id, myReaction ? null : 'thumbs_up')
     onChanged()
   }
 
@@ -200,32 +204,40 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
         {post.content && post.title && <p className="text-[#999] text-[13.5px] whitespace-pre-wrap leading-relaxed mb-2">{post.content}</p>}
 
         {/* ── VIEWS + TIME ── */}
-        <div className="flex items-center gap-1.5 text-[#666] text-[12.5px] mb-3">
-          <Eye className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-1.5 text-[#777] text-[13.5px] mb-3">
+          <Eye className="w-4 h-4" />
           <span>{(post.views_count || 0).toLocaleString()} views</span>
           <span>·</span>
           <span>{timeAgo(post.created_at)}</span>
         </div>
 
         {/* ── ACTIONS ── */}
-        <div className="flex items-center gap-4 relative">
-          <button onClick={quickLike} className={`flex items-center gap-1.5 text-[13px] font-semibold ${myReaction ? 'text-brand' : 'text-white'}`}>
-            <ThumbsUp className={`w-[18px] h-[18px] ${myReaction ? 'fill-current' : ''}`} />
+        <div className="flex items-center gap-5 relative">
+          {/* Shows the actual emoji you reacted with, not always a
+              generic thumbs-up -- picking 🎉 should look like you
+              picked 🎉, the same way a comment would carry your own
+              words rather than everyone's comment looking identical. */}
+          <button onClick={quickLike} className={`flex items-center gap-2 text-[14.5px] font-semibold ${myReaction ? 'text-brand' : 'text-white'}`}>
+            {myReactionMeta ? (
+              <span className="text-[22px] leading-none">{myReactionMeta.emoji}</span>
+            ) : (
+              <ThumbsUp className="w-6 h-6" />
+            )}
             {totalReactions}
           </button>
           <button onClick={() => setPickerOpen(v => !v)} className="text-white">
-            <Smile className="w-[18px] h-[18px]" />
+            <Smile className="w-6 h-6" />
           </button>
           <button onClick={share} className="ml-auto text-white">
-            <Share2 className="w-[18px] h-[18px]" />
+            <Share2 className="w-6 h-6" />
           </button>
 
           {pickerOpen && (
-            <div className="absolute bottom-8 left-0 flex items-center gap-1 bg-[#1e1e1e] border border-white/10 rounded-full px-2 py-1.5 shadow-lg z-10">
+            <div className="absolute bottom-9 left-0 flex items-center gap-1 bg-[#1e1e1e] border border-white/10 rounded-full px-2 py-1.5 shadow-lg z-10">
               {REACTIONS.map(r => (
                 <button
                   key={r.key} onClick={() => react(r.key)} title={r.label}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-[17px] transition ${myReaction === r.key ? 'bg-white/15' : 'hover:bg-white/10'}`}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-[19px] transition ${myReaction === r.key ? 'bg-white/15' : 'hover:bg-white/10'}`}
                 >
                   {r.emoji}
                 </button>

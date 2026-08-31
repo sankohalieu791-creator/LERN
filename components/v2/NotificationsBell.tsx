@@ -22,7 +22,7 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(diff / 86400)}d`
 }
 
-export default function NotificationsBell() {
+export default function NotificationsBell({ size = 'md' }: { size?: 'md' | 'lg' }) {
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<any[]>([])
@@ -72,11 +72,13 @@ export default function NotificationsBell() {
     <div className="relative" ref={ref}>
       <button
         aria-label="Notifications" onClick={() => setOpen(v => !v)}
-        className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition"
+        className={`relative flex items-center justify-center text-ink-secondary transition hover:bg-surface-muted ${
+          size === 'lg' ? 'w-11 h-11 rounded-full' : 'w-9 h-9 rounded-lg'
+        }`}
       >
-        <Bell className="w-[18px] h-[18px]" />
+        <Bell className={size === 'lg' ? 'w-6 h-6' : 'w-[18px] h-[18px]'} />
         {unread > 0 && (
-          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-danger-solid" />
+          <span className={`absolute rounded-full bg-danger-solid ${size === 'lg' ? 'top-2 right-2 w-2.5 h-2.5' : 'top-1 right-1 w-2 h-2'}`} />
         )}
       </button>
 
