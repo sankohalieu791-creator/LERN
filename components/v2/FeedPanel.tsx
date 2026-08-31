@@ -7,7 +7,7 @@ import {
   incrementPostViews, amIFollowing, followUser, unfollowUser,
 } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
-import { Eye, ThumbsUp, Smile, Share2, Trash2, Play } from 'lucide-react'
+import { Eye, ThumbsUp, MessageCircle, Share2, Trash2, Play } from 'lucide-react'
 
 // Fixed positive set only — no open free-text comments anywhere. The
 // second action slot (where a comment button would be on most feeds)
@@ -152,7 +152,11 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
           signed URL has resolved yet) so the media popping in doesn't
           shove everything below it down mid-scroll. */}
       {(post.image_path || post.video_path) && (
-        <div className="relative w-full aspect-[16/10] bg-black">
+        // Tall, near-square crop -- matches the reference exactly. The
+        // previous wide 16:10 landscape box was the real reason
+        // everything read as "small": a squat, low image makes the
+        // whole post feel thin regardless of icon/text sizing.
+        <div className="relative w-full aspect-[4/5] bg-black">
           {!mediaUrl && <div className="absolute inset-0 bg-[#1a1a1a] animate-pulse" />}
           {mediaUrl && post.video_path ? (
             <video src={mediaUrl} controls playsInline className="w-full h-full object-cover" />
@@ -225,8 +229,11 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
             )}
             {totalReactions}
           </button>
+          {/* Sits in the "comment" slot visually (matches the reference's
+              speech-bubble glyph exactly) but opens the reaction picker,
+              not a comment box -- there is no free-text commenting. */}
           <button onClick={() => setPickerOpen(v => !v)} className="text-white">
-            <Smile className="w-6 h-6" />
+            <MessageCircle className="w-6 h-6" />
           </button>
           <button onClick={share} className="ml-auto text-white">
             <Share2 className="w-6 h-6" />
