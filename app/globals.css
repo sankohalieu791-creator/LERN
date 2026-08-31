@@ -122,12 +122,19 @@ body {
 
 /* overflow-x clip on the scroll wrapper only — NOT body/html/any element
    with transform, as those break position:fixed on iOS Safari.
-   min-height ensures the document always fills the viewport so that
-   position:fixed bottom:0 anchors to the viewport on short-content pages. */
+   No min-height here on purpose (removed a stray 100vh/100dvh floor) --
+   every real shell (StudentShell, OrgShell, ...) already makes <main>
+   a flex-1 child of a min-h-screen flex column, so it sizes to exactly
+   its allotted space and scrolls internally via overflow-y-auto. Forcing
+   min-height:100vh on top of that fights the flex layout: main gets
+   pushed taller than its slot (header + nav eat into the viewport too),
+   which makes the outer document ALSO become scrollable alongside
+   main's own internal scroll -- two overlapping scroll containers
+   moving together is exactly the "everything goes up and down" jitter.
+   position:fixed elements anchor to the real viewport regardless of
+   document height, so nothing needs this floor to render correctly. */
 main {
   overflow-x: clip;
-  min-height: 100vh;
-  min-height: 100dvh;
 }
 
 ::-webkit-scrollbar {
