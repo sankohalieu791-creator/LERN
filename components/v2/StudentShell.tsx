@@ -16,11 +16,11 @@ import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search } from 'lu
 // raised -mt-4 above the row. Guessed pixel bumps kept overshooting in
 // both directions — this is ground truth, not a guess.
 //
-// Feed and My Work are reachable now — Plus/Discover/Profile stay
+// Feed, My Work and Plus are reachable now — Discover/Profile stay
 // visible (this is the real, final 5-button structure) but disabled,
 // rather than linking to pages that don't match spec yet. Each one
 // goes live as it's rebuilt, one at a time.
-export default function StudentShell({ children }: { children: React.ReactNode }) {
+export default function StudentShell({ children, onPlus }: { children: React.ReactNode; onPlus?: () => void }) {
   const pathname = usePathname()
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
   // The real v1 Feed page has its own header (LERN + search + bell);
@@ -53,7 +53,7 @@ export default function StudentShell({ children }: { children: React.ReactNode }
         <div className="flex items-center h-[60px]">
           <NavItem href="/student/feed" icon={Home} label="Feed" active={isActive('/student/feed')} />
           <NavItem href="/student/work" icon={ClipboardList} label="My Work" active={isActive('/student/work')} />
-          <PlusButton />
+          <PlusButton onClick={onPlus} />
           <DisabledNavItem icon={Compass} label="Discover" />
           <DisabledNavItem icon={UserIcon} label="Profile" />
         </div>
@@ -73,13 +73,12 @@ function NavItem({ href, icon: Icon, label, active }: { href: string; icon: any;
 
 // Plain "+", no box behind it, raised slightly above the row -- a
 // quick press twists it into a cross (matches the old app exactly).
-// Still inert until Plus itself is built, one screen at a time.
-function PlusButton() {
+function PlusButton({ onClick }: { onClick?: () => void }) {
   return (
     <div className="flex-shrink-0 flex items-center justify-center w-[72px]">
-      <div aria-disabled className="flex items-center justify-center w-[46px] h-[46px] -mt-4 text-[#555] cursor-not-allowed">
+      <button onClick={onClick} aria-label="New post" className="flex items-center justify-center w-[46px] h-[46px] -mt-4 text-white">
         <Plus className="w-7 h-7 transition-transform duration-200 active:rotate-45" />
-      </div>
+      </button>
     </div>
   )
 }
