@@ -43,8 +43,13 @@ body {
   --border-subtle: #EDE9E1;
   --border-input: #C9C2B2;
   --text-secondary: #6B6558;
-  --text-tertiary: #8A8373;
-  --text-quaternary: #A39C8A;
+  /* Measured against --paper (#FFFDF9): the old values were #8A8373
+     (3.71:1) and #A39C8A (2.69:1) -- both fail WCAG AA's 4.5:1 for
+     normal text, and quaternary was close to unreadable. These pass
+     (4.63:1) / come close (4.02:1) while keeping the same
+     secondary > tertiary > quaternary de-emphasis order. */
+  --text-tertiary: #7A7364;
+  --text-quaternary: #857D6C;
   --text-body: #4A453B;
   --brand: #F26B21;
   --brand-hover: #D95E17;
