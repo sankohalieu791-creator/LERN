@@ -36,8 +36,21 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   // don't scroll), and without it, pulling past the top could still
   // trigger the browser's own native pull-to-refresh chrome, which is
   // never themed dark.
+  //
+  // h-screen + overflow-hidden here (not min-h-screen) is load-bearing,
+  // not decorative -- min-h-screen is only a FLOOR, so if main's content
+  // ever wants to be taller, the whole column (header included) grows
+  // past one viewport and the real browser/PWA document takes over
+  // scrolling instead of main's own overflow-y-auto. That's exactly
+  // what "the header pulls down when I scroll" was: the header isn't
+  // inside main at all, so it should be structurally unable to move --
+  // it was only moving because this wrapper wasn't actually capped to
+  // the viewport. h-screen + overflow-hidden caps it for real; main's
+  // own min-h-0 (below) is the other half -- a flex child defaults to
+  // min-height:auto, which lets it refuse to shrink below its content's
+  // natural height even with flex-1, silently defeating overflow-y-auto.
   return (
-    <div data-theme="dark" className="min-h-screen bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div data-theme="dark" className="h-screen overflow-hidden bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {showHeader && (
         <header className="flex-shrink-0 bg-[#0f0f0f] border-b border-white/10 sticky top-0 z-20">
           <div className="px-4 py-3 flex items-center justify-between">
@@ -58,7 +71,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
           WHOLE app (body, which has no dark background of its own) rather
           than just its immediate parent. Painting main itself removes any
           chance of that white flash showing mid-scroll. */}
-      <main className="flex-1 overflow-y-auto overscroll-contain bg-[#0f0f0f]" style={{ paddingBottom: 'calc(60px + env(safe-area-inset-bottom))' }}>{children}</main>
+      <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[#0f0f0f]" style={{ paddingBottom: 'calc(60px + env(safe-area-inset-bottom))' }}>{children}</main>
 
       <nav
         className="fixed bottom-0 left-0 right-0 bg-[#0f0f0f] border-t border-white/10 z-30"
