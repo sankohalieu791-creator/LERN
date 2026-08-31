@@ -23,20 +23,26 @@ import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search } from 'lu
 export default function StudentShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
+  // The real v1 Feed page has its own header (LERN + search + bell);
+  // Courses/Workshops (app/courses/page.tsx) has none at all -- its
+  // tab bar sits right under the safe area. Same split here.
+  const showHeader = isActive('/student/feed')
 
   return (
     <div data-theme="dark" className="min-h-screen bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <header className="flex-shrink-0 bg-[#0f0f0f] border-b border-white/10 sticky top-0 z-20">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <span className="text-white font-bold text-xl tracking-tight">LERN</span>
-          <div className="flex items-center gap-1">
-            <button aria-label="Search" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 text-[#888] transition">
-              <Search className="w-5 h-5" />
-            </button>
-            <NotificationsBell />
+      {showHeader && (
+        <header className="flex-shrink-0 bg-[#0f0f0f] border-b border-white/10 sticky top-0 z-20">
+          <div className="px-4 py-3 flex items-center justify-between">
+            <span className="text-white font-bold text-xl tracking-tight">LERN</span>
+            <div className="flex items-center gap-1">
+              <button aria-label="Search" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 text-[#888] transition">
+                <Search className="w-5 h-5" />
+              </button>
+              <NotificationsBell />
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(60px + env(safe-area-inset-bottom))' }}>{children}</main>
 
