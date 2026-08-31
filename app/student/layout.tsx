@@ -1,41 +1,30 @@
-'use client'
-
-import { useState } from 'react'
+import type { Viewport } from 'next'
 import RoleGate from '@/components/v2/RoleGate'
-import StudentShell from '@/components/v2/StudentShell'
-import PostComposer from '@/components/v2/PostComposer'
-import { useRouter, usePathname } from 'next/navigation'
+import StudentLayoutClient from '@/components/v2/StudentLayoutClient'
 
-function StudentLayoutInner({ children }: { children: React.ReactNode }) {
-  const [composerOpen, setComposerOpen] = useState(false)
-  const router = useRouter()
-  const pathname = usePathname()
-
-  return (
-    <StudentShell onPlus={() => setComposerOpen(true)}>
-      {children}
-      {composerOpen && (
-        <PostComposer
-          onClose={() => setComposerOpen(false)}
-          onPosted={() => {
-            setComposerOpen(false)
-            // Already on Feed -> nothing to navigate to, so force a real
-            // reload to pick up the new post (FeedPanel fetches once on
-            // mount, a same-route push won't remount it). Anywhere else,
-            // a normal navigation to Feed mounts it fresh.
-            if (pathname === '/student/feed') window.location.reload()
-            else router.push('/student/feed')
-          }}
-        />
-      )}
-    </StudentShell>
-  )
+// A real per-segment override, not a runtime meta-tag hack -- the root
+// layout's viewport.themeColor is the light paper colour, and Next.js
+// re-asserts that on every navigation (App Router segments each carry
+// their own metadata/viewport, resolved fresh per route). A JS
+// useEffect trying to override it after the fact gets stomped again
+// on the very next navigation -- that's exactly the "flashes light
+// then goes dark" behaviour. This file being a real server component
+// (not 'use client') is what makes a segment-level viewport export
+// possible at all; the interactive bits (Plus/composer state) live in
+// StudentLayoutClient instead.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: '#0f0f0f',
 }
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   return (
     <RoleGate allow="student">
-      <StudentLayoutInner>{children}</StudentLayoutInner>
+      <StudentLayoutClient>{children}</StudentLayoutClient>
     </RoleGate>
   )
 }

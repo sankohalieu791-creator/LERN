@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import NotificationsBell from '@/components/v2/NotificationsBell'
@@ -29,23 +28,14 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   // tab bar sits right under the safe area. Same split here.
   const showHeader = isActive('/student/feed')
 
-  // Two real causes of "a white flash/strip at the top" on a hardcoded-
-  // dark shell living inside a globally light-themed app:
-  // 1. The root <meta name="theme-color"> is the light paper colour --
-  //    that's what an iOS/Android PWA paints the system status bar
-  //    with, regardless of what this component renders underneath it.
-  // 2. <main> is the actual scroll container here (html/body don't
-  //    scroll in this fixed-shell layout), but only html/body had
-  //    overscroll-behavior set globally -- so pulling past the top of
-  //    <main> could still trigger the browser's own native
-  //    pull-to-refresh/overscroll chrome, which is never themed dark.
-  useEffect(() => {
-    const meta = document.querySelector('meta[name="theme-color"]')
-    const prev = meta?.getAttribute('content') ?? null
-    meta?.setAttribute('content', '#0f0f0f')
-    return () => { if (prev !== null) meta?.setAttribute('content', prev) }
-  }, [])
-
+  // theme-color itself is now a real per-segment export
+  // (app/student/layout.tsx's viewport), not a runtime hack here --
+  // that's what actually stops the light-then-dark flash on
+  // navigation. overscroll-contain below is a separate fix: <main> is
+  // the actual scroll container in this fixed-shell layout (html/body
+  // don't scroll), and without it, pulling past the top could still
+  // trigger the browser's own native pull-to-refresh chrome, which is
+  // never themed dark.
   return (
     <div data-theme="dark" className="min-h-screen bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {showHeader && (
