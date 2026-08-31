@@ -121,14 +121,15 @@ function BriefsPanel() {
           <div className="flex items-center justify-between mb-5">
             <p className="font-bold text-ink text-[15px]">Briefs</p>
             <button
-              onClick={() => setShowCreate(v => !v)}
+              onClick={() => setShowCreate(true)}
               className="flex items-center gap-1.5 bg-brand text-white font-semibold text-[13px] px-4 py-2 rounded-lg hover:bg-brand-hover transition"
             >
-              {showCreate ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-              {showCreate ? 'Cancel' : 'New brief'}
+              <Plus className="w-3.5 h-3.5" /> New brief
             </button>
           </div>
-          {showCreate && <NewBriefForm onCreated={() => { setShowCreate(false); load() }} />}
+          {showCreate && (
+            <NewBriefForm onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />
+          )}
           {loading ? (
             <p className="text-ink-tertiary text-[14px]">Loading…</p>
           ) : items.length === 0 ? (
@@ -565,13 +566,16 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
 // Briefs' "two ways": set a new brief, or upload coursework/exam work a
 // group already produced elsewhere and mark it for verification directly
 // — no new marking, straight into the review queue.
-// Borrows Classroom's Create-form shape (title, instructions, topic,
-// attachments, criteria in place of a rubric, deadline, assign to a
-// class, post now/draft/schedule) without any of its grading machinery
-// — verify, not grade, throughout.
+// A real modal dialog now, not an inline card in the page flow -- the
+// Classroom create dialog it's borrowing the shape from is a focused
+// document/sidebar split (big title + instructions on the left, the
+// metadata that governs it — topic, criteria, deadline, class, publish
+// state — grouped in a panel on the right), not one long stacked form.
+// Same fields as before, same "verify, not grade" content, just laid
+// out like the thing it's meant to feel as considered as.
 type PublishChoice = 'posted' | 'draft' | 'scheduled'
 
-function NewBriefForm({ onCreated }: { onCreated: () => void }) {
+function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: () => void }) {
   const { user } = useAuth()
   const [title, setTitle] = useState('')
   const [topic, setTopic] = useState('')
@@ -609,86 +613,114 @@ function NewBriefForm({ onCreated }: { onCreated: () => void }) {
       if (attachError) { setLoading(false); return setError(`Brief created, but "${file.name}" failed to attach: ${attachError.message}`) }
     }
     setLoading(false)
-    setTitle(''); setTopic(''); setAssignment(''); setCriteria(''); setDeadline(''); setGroupId(''); setFiles([]); setPublishChoice('posted'); setScheduledFor('')
     onCreated()
   }
 
   return (
-    <div className="bg-surface-subtle border border-edge-subtle rounded-xl p-5">
-      <ErrorBanner message={error} />
-      <TextField label="Title" value={title} onChange={setTitle} placeholder="Design a mobile app icon" autoFocus />
-      <TextField label="Topic (groups briefs together, like a Classroom topic)" value={topic} onChange={setTopic} placeholder="e.g. Graphic Design" />
-      <label className="block mb-4">
-        <span className="block text-[13px] font-semibold text-ink mb-1.5">Instructions — what the student has to do</span>
-        <textarea
-          value={assignment} onChange={e => setAssignment(e.target.value)}
-          placeholder="Write the full instructions here — as much room as you need."
-          rows={6}
-          className="w-full bg-surface border border-edge rounded-xl px-4 py-3 text-[14px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none leading-relaxed"
-        />
-      </label>
-      <label className="block mb-1.5">
-        <span className="block text-[13px] font-semibold text-ink mb-1.5">Attachments (optional)</span>
-      </label>
-      <FileDropzone files={files} onChange={setFiles} multiple />
-      <TextField
-        label="Criteria — what the work must show to be verified" value={criteria} onChange={setCriteria}
-        placeholder="e.g. Original, scalable to 16px, with a one-paragraph rationale"
-        hint="Visible to the student too. LERN's replacement for a rubric — this is what a tutor checks the work against, not a mark out of ten."
-      />
-      <label className="block mb-5">
-        <span className="block text-[13px] font-semibold text-ink mb-1.5">Deadline (optional)</span>
-        <input
-          type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
-          className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
-        />
-      </label>
-      <GroupPicker organisationId={user?.organisation_id} value={groupId} onChange={setGroupId} />
-      <label className="block mb-5">
-        <span className="block text-[13px] font-semibold text-ink mb-1.5">Visibility</span>
-        <div className="flex gap-2">
-          {(['private', 'public'] as const).map(v => (
-            <button
-              key={v} type="button" onClick={() => setVisibility(v)}
-              className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold capitalize transition ${
-                visibility === v ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
-              }`}
-            >
-              {v === 'private' ? 'Private — join code only' : 'Public'}
-            </button>
-          ))}
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 sm:p-8">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-edge-subtle flex-shrink-0">
+          <p className="font-bold text-ink text-[16px]">New brief</p>
+          <button onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-tertiary transition">
+            <X className="w-4 h-4" />
+          </button>
         </div>
-      </label>
-      <label className="block mb-2">
-        <span className="block text-[13px] font-semibold text-ink mb-1.5">When</span>
-        <div className="flex gap-2">
-          {([['posted', 'Post now'], ['draft', 'Save as draft'], ['scheduled', 'Schedule']] as [PublishChoice, string][]).map(([choice, label]) => (
-            <button
-              key={choice} type="button" onClick={() => setPublishChoice(choice)}
-              className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${
-                publishChoice === choice ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+
+        <div className="flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-[1fr_300px] divide-y lg:divide-y-0 lg:divide-x divide-edge-subtle">
+          {/* ── Main: title + instructions + attachments ── */}
+          <div className="px-6 py-5">
+            <input
+              value={title} onChange={e => setTitle(e.target.value)} autoFocus
+              placeholder="Untitled brief"
+              className="w-full text-2xl font-bold text-ink placeholder-ink-quaternary outline-none bg-transparent border-b border-transparent focus:border-edge pb-2 mb-5 transition"
+            />
+            <label className="block mb-4">
+              <span className="block text-[13px] font-semibold text-ink mb-1.5">Instructions — what the student has to do</span>
+              <textarea
+                value={assignment} onChange={e => setAssignment(e.target.value)}
+                placeholder="Write the full instructions here — as much room as you need."
+                rows={10}
+                className="w-full bg-surface-subtle border border-edge rounded-xl px-4 py-3 text-[14px] text-ink placeholder-ink-quaternary outline-none focus:border-brand focus:bg-surface transition resize-none leading-relaxed"
+              />
+            </label>
+            <label className="block mb-1.5">
+              <span className="block text-[13px] font-semibold text-ink mb-1.5">Attachments (optional)</span>
+            </label>
+            <FileDropzone files={files} onChange={setFiles} multiple />
+          </div>
+
+          {/* ── Sidebar: everything that governs the brief ── */}
+          <div className="px-5 py-5 bg-surface-subtle/60 space-y-5">
+            <TextField label="Topic" value={topic} onChange={setTopic} placeholder="e.g. Graphic Design" hint="Groups briefs together, like a Classroom topic." />
+            <TextField
+              label="Criteria — what makes it a verify" value={criteria} onChange={setCriteria}
+              placeholder="e.g. Original, scalable to 16px, with a one-paragraph rationale"
+              hint="Visible to the student too. LERN's replacement for a rubric — not a mark out of ten."
+            />
+            <label className="block">
+              <span className="block text-[13px] font-semibold text-ink mb-1.5">Deadline (optional)</span>
+              <input
+                type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
+                className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+              />
+            </label>
+            <GroupPicker organisationId={user?.organisation_id} value={groupId} onChange={setGroupId} />
+            <label className="block">
+              <span className="block text-[13px] font-semibold text-ink mb-1.5">Visibility</span>
+              <div className="flex gap-2">
+                {(['private', 'public'] as const).map(v => (
+                  <button
+                    key={v} type="button" onClick={() => setVisibility(v)}
+                    className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold capitalize transition ${
+                      visibility === v ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
+                    }`}
+                  >
+                    {v === 'private' ? 'Private' : 'Public'}
+                  </button>
+                ))}
+              </div>
+            </label>
+            <label className="block">
+              <span className="block text-[13px] font-semibold text-ink mb-1.5">When</span>
+              <div className="flex flex-col gap-1.5">
+                {([['posted', 'Post now'], ['draft', 'Save as draft'], ['scheduled', 'Schedule']] as [PublishChoice, string][]).map(([choice, label]) => (
+                  <button
+                    key={choice} type="button" onClick={() => setPublishChoice(choice)}
+                    className={`w-full text-left py-2.5 px-3 rounded-lg text-[13px] font-semibold transition ${
+                      publishChoice === choice ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {publishChoice === 'draft' && (
+                <p className="text-[12px] text-ink-tertiary mt-2">Only staff can see a draft. Come back and post it whenever it's ready.</p>
+              )}
+              {publishChoice === 'scheduled' && (
+                <input
+                  type="datetime-local" value={scheduledFor} onChange={e => setScheduledFor(e.target.value)}
+                  className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition mt-2"
+                />
+              )}
+            </label>
+          </div>
         </div>
-      </label>
-      {publishChoice === 'draft' && (
-        <p className="text-[12px] text-ink-tertiary mb-5">Only staff can see a draft. Come back and post it whenever it's ready.</p>
-      )}
-      {publishChoice === 'scheduled' && (
-        <label className="block mb-5">
-          <span className="block text-[12px] font-semibold text-ink-secondary mb-1">Posts automatically at</span>
-          <input
-            type="datetime-local" value={scheduledFor} onChange={e => setScheduledFor(e.target.value)}
-            className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
-          />
-        </label>
-      )}
-      <PrimaryButton onClick={handleSubmit} loading={loading}>
-        {publishChoice === 'draft' ? 'Save draft' : publishChoice === 'scheduled' ? 'Schedule' : 'Create'}
-      </PrimaryButton>
+
+        <div className="flex items-center justify-between gap-4 px-6 py-4 border-t border-edge-subtle flex-shrink-0">
+          <div className="flex-1 min-w-0">
+            {error && <p className="text-[13px] font-semibold text-danger-text">{error}</p>}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={onClose} className="px-4 py-2.5 rounded-lg text-[13px] font-semibold text-ink-secondary hover:bg-surface-muted transition">
+              Cancel
+            </button>
+            <PrimaryButton onClick={handleSubmit} loading={loading}>
+              {publishChoice === 'draft' ? 'Save draft' : publishChoice === 'scheduled' ? 'Schedule' : 'Create'}
+            </PrimaryButton>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

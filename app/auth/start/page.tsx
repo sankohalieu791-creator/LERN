@@ -2,25 +2,64 @@
 
 import { useRouter } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
-import { Hammer } from 'lucide-react'
+import { GraduationCap, School, Building2, Briefcase } from 'lucide-react'
 
-// Public signup is still closed while LERN is founder-tested (the real
-// gate is the allowlist in handle_new_user()) — this stays a simple
-// placeholder rather than a form nobody outside the allowlist can submit.
-// Reviewers/testers use the single demo credential on the login page
-// instead (Lern12@gmail.com), not a route from here.
+// Real role chooser -- restored to what it was before the "Being built"
+// placeholder covered it. Account creation is still gated by the
+// founder allowlist in handle_new_user() during the testing phase, but
+// that's a backend rule, not a reason to hide the navigation itself.
+const CHOICES = [
+  {
+    key: 'student',
+    icon: GraduationCap,
+    label: "I'm a young person",
+    hint: 'Join with a code from your school, college or training provider.',
+    href: '/auth/signup/student',
+  },
+  {
+    key: 'institution',
+    icon: School,
+    label: "I'm a school or college",
+    hint: 'Set up your organisation and invite your students.',
+    href: '/auth/signup/organisation?type=institution',
+  },
+  {
+    key: 'provider',
+    icon: Building2,
+    label: "I'm a training provider",
+    hint: 'Set up your organisation and invite your learners.',
+    href: '/auth/signup/organisation?type=provider',
+  },
+  {
+    key: 'employer',
+    icon: Briefcase,
+    label: "I'm an employer",
+    hint: 'Discover verified young talent and post opportunities.',
+    href: '/auth/signup/employer',
+  },
+] as const
+
 export default function ChooseRolePage() {
   const router = useRouter()
 
   return (
-    <AuthShell title="Being built" subtitle="LERN isn't open yet — check back soon.">
-      <div className="flex flex-col items-center text-center py-10">
-        <div className="w-14 h-14 rounded-2xl bg-[#FCEEE4] flex items-center justify-center mb-5">
-          <Hammer className="w-6 h-6 text-brand" />
-        </div>
-        <p className="text-[14px] text-[#6B6558] max-w-xs leading-relaxed">
-          We're still putting LERN together. There's nothing to sign up for yet — come back once it's live.
-        </p>
+    <AuthShell title="Who's signing up?" subtitle="Pick the option that describes you — each one leads somewhere different.">
+      <div className="space-y-3">
+        {CHOICES.map(c => (
+          <button
+            key={c.key}
+            onClick={() => router.push(c.href)}
+            className="w-full flex items-center gap-4 bg-white border border-[#E2DDD1] rounded-2xl px-5 py-4 text-left hover:border-brand hover:shadow-[0_2px_12px_rgba(242,107,33,0.08)] transition group"
+          >
+            <div className="w-11 h-11 rounded-xl bg-[#FCEEE4] flex items-center justify-center flex-shrink-0 group-hover:bg-brand transition-colors">
+              <c.icon className="w-5 h-5 text-brand group-hover:text-white transition-colors" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-ink text-[15px]">{c.label}</p>
+              <p className="text-[13px] text-[#8A8373] mt-0.5">{c.hint}</p>
+            </div>
+          </button>
+        ))}
       </div>
 
       <p className="text-center text-[13px] text-[#8A8373] mt-8">
