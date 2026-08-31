@@ -137,6 +137,12 @@ export const createWorkItem = async (
     type: 'brief' | 'course' | 'workshop'; title: string; description?: string; criteria: string
     visibility?: 'public' | 'private'; topic?: string; assignment?: string; deadline?: string | null; group_id?: string | null
     mode?: 'online' | 'in_person'; location?: string; starts_at?: string | null
+    // Briefs only, Classroom-shaped: post immediately, hold as a draft
+    // only staff can see, or publish automatically once scheduled_for
+    // arrives (RLS reads scheduled_for at query time -- no cron job).
+    // Courses/Workshops never pass these, so they stay the default
+    // 'posted', unaffected.
+    publish_state?: 'draft' | 'scheduled' | 'posted'; scheduled_for?: string | null
   }
 ) => {
   const { data, error } = await supabase
@@ -145,6 +151,37 @@ export const createWorkItem = async (
     .select()
     .single()
   return { data, error }
+}
+
+// Brief status roll-up (Classroom-style): "New / Submitted / Verified /
+// Returned / Overdue", rolled up per brief across everyone it's assigned
+// to. "In progress" (opened but not submitted) isn't tracked anywhere in
+// this schema -- a submission row only exists once work is actually
+// turned in -- so that state is deliberately not claimed here rather
+// than faked from data that doesn't exist yet.
+export const getBriefStatusSummaries = async (
+  workItems: { id: string; group_id?: string | null; deadline?: string | null }[],
+  organisationId: string,
+): Promise<Record<string, { assigned: number; submitted: number; verified: number; returned: number; overdue: boolean }>> => {
+  const ids = workItems.map(w => w.id)
+  if (ids.length === 0) return {}
+
+  const [{ data: subs }, { data: students }] = await Promise.all([
+    supabase.from('submissions').select('work_item_id, student_id, status').in('work_item_id', ids),
+    supabase.from('users').select('id, group_id').eq('organisation_id', organisationId).eq('role', 'student'),
+  ])
+
+  const out: Record<string, { assigned: number; submitted: number; verified: number; returned: number; overdue: boolean }> = {}
+  for (const w of workItems) {
+    const assignedStudents = (students || []).filter(s => !w.group_id || s.group_id === w.group_id)
+    const itemSubs = (subs || []).filter(s => s.work_item_id === w.id)
+    const submittedIds = new Set(itemSubs.map(s => s.student_id))
+    const verified = itemSubs.filter(s => s.status === 'verified').length
+    const returned = itemSubs.filter(s => s.status === 'returned').length
+    const isOverdue = !!w.deadline && new Date(w.deadline) < new Date() && submittedIds.size < assignedStudents.length
+    out[w.id] = { assigned: assignedStudents.length, submitted: submittedIds.size, verified, returned, overdue: isOverdue }
+  }
+  return out
 }
 
 // Attachments a tutor adds to a brief when creating it (slides, docs,

@@ -5,12 +5,12 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getWorkItems, createWorkItem, getGroups, createGroup, getGroupMembers,
   uploadWorkItemAttachment, uploadSubmissionFileFor, submitWorkForStudents, getSignedFileUrl, startWorkItemSession,
-  closeWorkItem, reopenWorkItem, getWorkItemRecordings,
+  closeWorkItem, reopenWorkItem, getWorkItemRecordings, getBriefStatusSummaries,
 } from '@/lib/supabase'
 import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
 import WorkshopSession from '@/components/v2/WorkshopSession'
 import type { WorkItem, Group } from '@/lib/types'
-import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw, Film, Download } from 'lucide-react'
+import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw, Film, Download, Clock, PenLine } from 'lucide-react'
 
 type ItemType = 'brief' | 'course' | 'workshop'
 
@@ -86,14 +86,17 @@ function BriefsPanel() {
   const { user } = useAuth()
   const [tab, setTab] = useState<BriefTab>('briefs')
   const [items, setItems] = useState<any[]>([])
+  const [summaries, setSummaries] = useState<Awaited<ReturnType<typeof getBriefStatusSummaries>>>({})
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
 
   const load = () => {
     if (!user?.organisation_id) return
     getWorkItems(user.organisation_id).then(({ data }) => {
-      setItems((data || []).filter((i: any) => i.type === 'brief'))
+      const briefs = (data || []).filter((i: any) => i.type === 'brief')
+      setItems(briefs)
       setLoading(false)
+      getBriefStatusSummaries(briefs, user.organisation_id!).then(setSummaries)
     })
   }
   useEffect(load, [user?.organisation_id])
@@ -132,7 +135,7 @@ function BriefsPanel() {
             <p className="text-ink-tertiary text-[14px]">No briefs yet.</p>
           ) : (
             <div className="space-y-3">
-              {items.map(item => <WorkItemCard key={item.id} item={item} onChanged={load} />)}
+              {items.map(item => <WorkItemCard key={item.id} item={item} summary={summaries[item.id]} onChanged={load} />)}
             </div>
           )}
         </div>
@@ -146,7 +149,7 @@ function BriefsPanel() {
   )
 }
 
-function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void }) {
+function WorkItemCard({ item, onChanged, summary }: { item: any; onChanged: () => void; summary?: { assigned: number; submitted: number; verified: number; returned: number; overdue: boolean } }) {
   const attachments = item.work_item_attachments || []
   const [inSession, setInSession] = useState(false)
   const [confirmingRevoke, setConfirmingRevoke] = useState(false)
@@ -191,6 +194,17 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
       <div className="flex items-center justify-between mb-1 gap-2">
         <p className="font-bold text-ink text-[14px] min-w-0 truncate">{item.title}</p>
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          {item.publish_state === 'draft' && (
+            <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary bg-surface-muted px-2 py-0.5 rounded-full">
+              <PenLine className="w-3 h-3" /> Draft
+            </span>
+          )}
+          {item.publish_state === 'scheduled' && (
+            <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-brand bg-accent-bg px-2 py-0.5 rounded-full">
+              <Clock className="w-3 h-3" />
+              Scheduled {item.scheduled_for && new Date(item.scheduled_for).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
           {item.closed_at ? (
             <span className="text-[11px] font-semibold uppercase tracking-wide text-danger-text bg-danger-bg px-2 py-0.5 rounded-full">
               Revoked
@@ -225,6 +239,9 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
           <span className="flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Due {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
         )}
         <span className="flex items-center gap-1"><Users2 className="w-3.5 h-3.5" /> {item.groups?.name || 'Whole organisation'}</span>
+        {summary && summary.overdue && (
+          <span className="font-semibold text-danger-text">Overdue</span>
+        )}
         {(item.type === 'workshop' || item.type === 'course') && item.mode === 'online' && (
           <span className="flex items-center gap-1 text-success-text font-semibold"><Video className="w-3.5 h-3.5" /> Online</span>
         )}
@@ -235,6 +252,9 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
           <span className="flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Starts {new Date(item.starts_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
         )}
       </div>
+      {summary && item.type === 'brief' && item.publish_state === 'posted' && (
+        <StatusRollup summary={summary} />
+      )}
       {(item.type === 'workshop' || item.type === 'course') && item.mode === 'online' && !item.closed_at && (
         item.ended_at ? (
           <span className="inline-flex items-center gap-1.5 bg-danger-bg text-danger-text font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3">
@@ -272,6 +292,23 @@ function WorkItemCard({ item, onChanged }: { item: any; onChanged: () => void })
           onEnded={onChanged}
         />
       )}
+    </div>
+  )
+}
+
+// Classroom's "x of y turned in" roll-up, in LERN's own verify-not-grade
+// language: submitted / verified / returned, against how many the brief
+// is actually assigned to. Nothing to show for a brand-new brief nobody
+// has touched yet — that's just "New", the implicit zero state.
+function StatusRollup({ summary }: { summary: { assigned: number; submitted: number; verified: number; returned: number; overdue: boolean } }) {
+  if (summary.assigned === 0) return null
+  const notStarted = summary.assigned - summary.submitted
+  return (
+    <div className="flex items-center gap-3 flex-wrap text-[11px] font-semibold mt-2.5 pt-2.5 border-t border-edge-subtle">
+      <span className="text-ink-secondary">{summary.submitted} of {summary.assigned} turned in</span>
+      {summary.verified > 0 && <span className="text-success-text">{summary.verified} verified</span>}
+      {summary.returned > 0 && <span className="text-danger-text">{summary.returned} returned</span>}
+      {notStarted > 0 && <span className="text-ink-quaternary font-normal">{notStarted} new</span>}
     </div>
   )
 }
@@ -528,6 +565,12 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
 // Briefs' "two ways": set a new brief, or upload coursework/exam work a
 // group already produced elsewhere and mark it for verification directly
 // — no new marking, straight into the review queue.
+// Borrows Classroom's Create-form shape (title, instructions, topic,
+// attachments, criteria in place of a rubric, deadline, assign to a
+// class, post now/draft/schedule) without any of its grading machinery
+// — verify, not grade, throughout.
+type PublishChoice = 'posted' | 'draft' | 'scheduled'
+
 function NewBriefForm({ onCreated }: { onCreated: () => void }) {
   const { user } = useAuth()
   const [title, setTitle] = useState('')
@@ -538,6 +581,8 @@ function NewBriefForm({ onCreated }: { onCreated: () => void }) {
   const [groupId, setGroupId] = useState('')
   const [visibility, setVisibility] = useState<'public' | 'private'>('private')
   const [files, setFiles] = useState<File[]>([])
+  const [publishChoice, setPublishChoice] = useState<PublishChoice>('posted')
+  const [scheduledFor, setScheduledFor] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -546,12 +591,16 @@ function NewBriefForm({ onCreated }: { onCreated: () => void }) {
     if (!title.trim()) return setError('Give it a title.')
     if (!assignment.trim()) return setError('Write what the student has to do.')
     if (!criteria.trim()) return setError('Success criteria is required — this is what makes the tick mean something.')
+    if (publishChoice === 'scheduled' && !scheduledFor) return setError('Pick a date and time to schedule it for.')
+    if (publishChoice === 'scheduled' && new Date(scheduledFor) <= new Date()) return setError('Scheduled time has to be in the future — otherwise just post it now.')
     if (!user?.organisation_id) return setError("Your account isn't linked to an organisation yet — try refreshing the page.")
 
     setLoading(true)
     const { data: workItem, error: createError } = await createWorkItem(user.organisation_id, user.id, {
       type: 'brief', title: title.trim(), topic: topic.trim() || undefined, assignment: assignment.trim(),
       criteria: criteria.trim(), deadline: deadline || null, group_id: groupId || null, visibility,
+      publish_state: publishChoice,
+      scheduled_for: publishChoice === 'scheduled' ? new Date(scheduledFor).toISOString() : null,
     })
     if (createError || !workItem) { setLoading(false); return setError(createError?.message || 'Could not create the brief.') }
 
@@ -560,7 +609,7 @@ function NewBriefForm({ onCreated }: { onCreated: () => void }) {
       if (attachError) { setLoading(false); return setError(`Brief created, but "${file.name}" failed to attach: ${attachError.message}`) }
     }
     setLoading(false)
-    setTitle(''); setTopic(''); setAssignment(''); setCriteria(''); setDeadline(''); setGroupId(''); setFiles([])
+    setTitle(''); setTopic(''); setAssignment(''); setCriteria(''); setDeadline(''); setGroupId(''); setFiles([]); setPublishChoice('posted'); setScheduledFor('')
     onCreated()
   }
 
@@ -568,9 +617,9 @@ function NewBriefForm({ onCreated }: { onCreated: () => void }) {
     <div className="bg-surface-subtle border border-edge-subtle rounded-xl p-5">
       <ErrorBanner message={error} />
       <TextField label="Title" value={title} onChange={setTitle} placeholder="Design a mobile app icon" autoFocus />
-      <TextField label="Topic / subject" value={topic} onChange={setTopic} placeholder="e.g. Graphic Design" />
+      <TextField label="Topic (groups briefs together, like a Classroom topic)" value={topic} onChange={setTopic} placeholder="e.g. Graphic Design" />
       <label className="block mb-4">
-        <span className="block text-[13px] font-semibold text-ink mb-1.5">Assignment — what the student has to do</span>
+        <span className="block text-[13px] font-semibold text-ink mb-1.5">Instructions — what the student has to do</span>
         <textarea
           value={assignment} onChange={e => setAssignment(e.target.value)}
           placeholder="Write the full instructions here — as much room as you need."
@@ -583,9 +632,9 @@ function NewBriefForm({ onCreated }: { onCreated: () => void }) {
       </label>
       <FileDropzone files={files} onChange={setFiles} multiple />
       <TextField
-        label="Success criteria" value={criteria} onChange={setCriteria}
+        label="Criteria — what the work must show to be verified" value={criteria} onChange={setCriteria}
         placeholder="e.g. Original, scalable to 16px, with a one-paragraph rationale"
-        hint="Visible to the student too. What a tutor checks the work against when they verify it."
+        hint="Visible to the student too. LERN's replacement for a rubric — this is what a tutor checks the work against, not a mark out of ten."
       />
       <label className="block mb-5">
         <span className="block text-[13px] font-semibold text-ink mb-1.5">Deadline (optional)</span>
@@ -610,7 +659,36 @@ function NewBriefForm({ onCreated }: { onCreated: () => void }) {
           ))}
         </div>
       </label>
-      <PrimaryButton onClick={handleSubmit} loading={loading}>Create</PrimaryButton>
+      <label className="block mb-2">
+        <span className="block text-[13px] font-semibold text-ink mb-1.5">When</span>
+        <div className="flex gap-2">
+          {([['posted', 'Post now'], ['draft', 'Save as draft'], ['scheduled', 'Schedule']] as [PublishChoice, string][]).map(([choice, label]) => (
+            <button
+              key={choice} type="button" onClick={() => setPublishChoice(choice)}
+              className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${
+                publishChoice === choice ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </label>
+      {publishChoice === 'draft' && (
+        <p className="text-[12px] text-ink-tertiary mb-5">Only staff can see a draft. Come back and post it whenever it's ready.</p>
+      )}
+      {publishChoice === 'scheduled' && (
+        <label className="block mb-5">
+          <span className="block text-[12px] font-semibold text-ink-secondary mb-1">Posts automatically at</span>
+          <input
+            type="datetime-local" value={scheduledFor} onChange={e => setScheduledFor(e.target.value)}
+            className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+          />
+        </label>
+      )}
+      <PrimaryButton onClick={handleSubmit} loading={loading}>
+        {publishChoice === 'draft' ? 'Save draft' : publishChoice === 'scheduled' ? 'Schedule' : 'Create'}
+      </PrimaryButton>
     </div>
   )
 }

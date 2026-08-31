@@ -103,6 +103,8 @@ export interface WorkItem {
   visibility: 'public' | 'private'
   level?: 'beginner' | 'intermediate' | 'advanced'
   duration_label?: string
+  publish_state?: 'draft' | 'scheduled' | 'posted'
+  scheduled_for?: string
   created_by?: string
   created_at: string
 }
