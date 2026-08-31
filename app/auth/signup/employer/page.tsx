@@ -11,10 +11,9 @@ import { ShieldCheck } from 'lucide-react'
 
 type Step = 1 | 2
 
-// Employers are invite-only — reached via the hidden "Founder access"
-// link on /auth/start, not a public CTA. The access-lock allowlist
-// enforced in handle_new_user() is the real gate; this form existing
-// doesn't make signup open to anyone who finds the URL.
+// Employers are invite-only during the founder-testing phase — the
+// access-lock allowlist enforced in handle_new_user() is the real gate;
+// this form existing doesn't make signup open to anyone who finds the URL.
 export default function EmployerSignupPage() {
   const router = useRouter()
   const { refreshUser } = useAuth()

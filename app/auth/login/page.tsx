@@ -4,10 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
+import DemoRolePicker from '@/components/v2/DemoRolePicker'
 import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
 import { signIn, getUserProfile } from '@/lib/supabase'
 import { routeForRole } from '@/lib/roleRouting'
 import { useAuth } from '@/context/AuthContext'
+import type { Role } from '@/lib/types'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -15,6 +17,10 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [greeting, setGreeting] = useState<{ name: string; dest: string } | null>(null)
+  // The one public demo credential (Lern12@gmail.com) doesn't route
+  // straight into a dashboard — it lands here instead, so a visitor
+  // picks which of the 4 real roles to look around as.
+  const [showRolePicker, setShowRolePicker] = useState(false)
   const router = useRouter()
   const { refreshUser } = useAuth()
 
@@ -34,10 +40,24 @@ export default function LoginPage() {
     const { data: profile } = await getUserProfile(data.user.id)
     await refreshUser()
     setLoading(false)
+    if (profile?.is_demo_gateway) { setShowRolePicker(true); return }
     setGreeting({ name: profile?.full_name || '', dest: routeForRole(profile?.role) })
   }
 
+  const handleDemoSwitched = async (role: Role) => {
+    await refreshUser()
+    setGreeting({ name: '', dest: routeForRole(role) })
+  }
+
   if (greeting) return <LoginGreeting name={greeting.name} onDone={() => router.replace(greeting.dest)} />
+
+  if (showRolePicker) {
+    return (
+      <AuthShell title="Try LERN" subtitle="Pick a role to look around as — switch any time by logging back in.">
+        <DemoRolePicker onSwitched={handleDemoSwitched} />
+      </AuthShell>
+    )
+  }
 
   return (
     <AuthShell title="Welcome back" subtitle="Log in to your LERN account.">
@@ -53,9 +73,6 @@ export default function LoginPage() {
           Sign up
         </button>
       </p>
-      <button onClick={() => router.push('/auth/dev-login')} className="block mx-auto text-[11px] text-[#C9C2B2] hover:text-[#8A8373] transition mt-4">
-        Dev login
-      </button>
     </AuthShell>
   )
 }

@@ -32,6 +32,7 @@ export interface User {
   notification_prefs?: Record<string, boolean>
   is_guest?: boolean
   guest_invite_id?: string
+  is_demo_gateway?: boolean
   created_at: string
 }
 

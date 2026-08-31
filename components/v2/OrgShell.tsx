@@ -63,7 +63,9 @@ export default function OrgShell({
       {/* ── Laptop sidebar ── */}
       <aside className={`hidden lg:flex flex-col border-r border-edge-subtle bg-surface transition-[width] duration-150 flex-shrink-0 ${collapsed ? 'w-[72px]' : 'w-60'}`}>
         <div className={`flex items-center h-16 px-4 flex-shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>
-          {!collapsed && <Logo />}
+          {/* Plain wordmark, not the chip — matches the student feed's
+              top-left header treatment exactly, per explicit request. */}
+          {!collapsed && <span className="text-ink font-bold text-xl tracking-tight">LERN</span>}
           <button
             onClick={toggleCollapsed}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}

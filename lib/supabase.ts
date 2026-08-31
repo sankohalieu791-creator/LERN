@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import type { ReactionType } from '@/lib/types'
+import type { ReactionType, Role } from '@/lib/types'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -1014,19 +1014,22 @@ export const getGuestSharedWork = async () => {
   return { data, error }
 }
 
-// ── Dev login (testing stage only — see app/api/dev-login) ───────
-// No password: a shared secret (set once, kept in this browser) plus
-// the DB's own allowlist check stand in for one. token_hash comes
-// back from an admin-generated magic link that's exchanged for a real
-// session here, without ever sending an actual email.
-export const devLogin = async (email: string, secret: string) => {
-  const res = await fetch('/api/dev-login', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, secret }),
+// ── Demo gateway (public "try LERN" login — see app/api/demo-switch) ──
+// One real email+password (Lern12@gmail.com / Lerntesterapp) anyone can
+// sign in with; this then swaps the session into whichever of the 4
+// seeded test accounts the visitor picks. Only works while the current
+// session belongs to a user flagged is_demo_gateway — enforced server-side.
+export const demoSwitchRole = async (role: Role) => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) return { error: { message: 'Not signed in.' } }
+  const res = await fetch('/api/demo-switch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ role }),
   })
   const body = await res.json()
   if (!res.ok) return { error: body }
-  const { error } = await supabase.auth.verifyOtp({ email, token_hash: body.tokenHash, type: 'magiclink' })
+  const { error } = await supabase.auth.verifyOtp({ email: body.email, token_hash: body.tokenHash, type: 'magiclink' })
   return { error }
 }
 
