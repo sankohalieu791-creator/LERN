@@ -16,9 +16,9 @@ import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search } from 'lu
 // raised -mt-4 above the row. Guessed pixel bumps kept overshooting in
 // both directions — this is ground truth, not a guess.
 //
-// Feed, My Work and Plus are reachable now — Discover/Profile stay
+// Feed, My Work, Plus and Discover are reachable now — Profile stays
 // visible (this is the real, final 5-button structure) but disabled,
-// rather than linking to pages that don't match spec yet. Each one
+// rather than linking to a page that doesn't match spec yet. Each one
 // goes live as it's rebuilt, one at a time.
 export default function StudentShell({ children, onPlus }: { children: React.ReactNode; onPlus?: () => void }) {
   const pathname = usePathname()
@@ -54,7 +54,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
           <NavItem href="/student/feed" icon={Home} label="Feed" active={isActive('/student/feed')} />
           <NavItem href="/student/work" icon={ClipboardList} label="My Work" active={isActive('/student/work')} />
           <PlusButton onClick={onPlus} />
-          <DisabledNavItem icon={Compass} label="Discover" />
+          <NavItem href="/student/discover" icon={Compass} label="Discover" active={isActive('/student/discover')} />
           <DisabledNavItem icon={UserIcon} label="Profile" />
         </div>
       </nav>

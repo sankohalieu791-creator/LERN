@@ -125,7 +125,7 @@ export default function EmployerDiscoverPanel() {
                         onClick={() => handleExpress(student.id)} disabled={sending === student.id}
                         className="flex items-center gap-1.5 bg-brand text-white text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 transition disabled:opacity-50 flex-shrink-0"
                       >
-                        <Send className="w-3.5 h-3.5" /> {sending === student.id ? 'Sending…' : 'Express interest'}
+                        <Send className="w-3.5 h-3.5" /> {sending === student.id ? 'Sending…' : 'Place your offer'}
                       </button>
                     )
                   )}

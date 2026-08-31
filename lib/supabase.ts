@@ -853,6 +853,65 @@ export const getAllOpportunities = async () => {
   return { data, error }
 }
 
+// Discover's Jobs/Apprenticeships/Internships tabs — same table,
+// filtered by type.
+export const getOpportunities = async (type?: 'job' | 'apprenticeship' | 'internship') => {
+  let query = supabase
+    .from('opportunities')
+    .select('*, employer:users!opportunities_employer_id_fkey(full_name)')
+    .order('created_at', { ascending: false })
+    .limit(50)
+  if (type) query = query.eq('type', type)
+  const { data, error } = await query
+  return { data, error }
+}
+
+// 18+ only (enforced by RLS, not this function) — the student-facing
+// end of the employer "express interest" flow. Under-18s have no read
+// path to this table at all; their organisation sees it instead.
+export const getMyReceivedInterest = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('interest')
+    .select('*, employer:users!interest_employer_id_fkey(full_name)')
+    .eq('student_id', studentId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// Shared by both an 18+ student acting on their own interest and org
+// staff acting on behalf of an under-18 student -- RLS decides which
+// of those two the caller actually is, this is just the one update.
+export const respondToInterest = async (interestId: string, status: 'accepted' | 'declined') => {
+  const { data, error } = await supabase
+    .from('interest')
+    .update({ status })
+    .eq('id', interestId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+// Org staff: every interest row raised against their org's students —
+// RLS already narrows this to their own org, this is the same shape
+// for institution and provider staff alike.
+export const getOrgInterest = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('interest')
+    .select('*, employer:users!interest_employer_id_fkey(full_name), student:users!interest_student_id_fkey(id, full_name, date_of_birth)')
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// Never exposes raw date_of_birth to an employer -- just the computed
+// boolean, same pattern as posts_feed's author_anonymised.
+export const getStudentsAdultStatus = async (studentIds: string[]): Promise<Record<string, boolean>> => {
+  if (studentIds.length === 0) return {}
+  const { data } = await supabase.rpc('students_adult_status', { p_student_ids: studentIds })
+  const map: Record<string, boolean> = {}
+  for (const row of (data as any[]) || []) map[row.student_id] = row.is_adult
+  return map
+}
+
 // ── Guest employer invite (Type 1 — org-invited, scoped to one
 // student, no browsing beyond what's explicitly shared) ──────────
 

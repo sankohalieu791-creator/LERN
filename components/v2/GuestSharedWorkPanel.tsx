@@ -2,23 +2,36 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getGuestSharedWork, getMyInterest, expressInterest } from '@/lib/supabase'
-import { BadgeCheck, Send, Check, Clock, ShieldCheck } from 'lucide-react'
+import { getGuestSharedWork, getMyInterest, expressInterest, getStudentsAdultStatus } from '@/lib/supabase'
+import { BadgeCheck, Send, Check, Clock, ShieldCheck, Building2 } from 'lucide-react'
 
 const TYPE_LABEL: Record<string, string> = { brief: 'Brief', course: 'Course', workshop: 'Workshop' }
 
 // A guest sees exactly what the organisation shared — RLS enforces
 // this, not this component; there's no filter/search here on purpose,
-// because there's nothing to filter down from.
+// because there's nothing to filter down from. Unlike the public
+// Discover feed (where a minor's work can never appear at all — DB
+// enforced), a guest CAN be shown an under-18 student's work here,
+// since the organisation explicitly chose to share it. That's exactly
+// why this is the one employer-facing screen that needs the age-aware
+// CTA: same underlying expressInterest() call either way (it always
+// routes through the organisation first, never straight to the
+// student), just labelled honestly for what actually happens next.
 export default function GuestSharedWorkPanel() {
   const { user } = useAuth()
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [interestByStudent, setInterestByStudent] = useState<Record<string, string>>({})
+  const [adultByStudent, setAdultByStudent] = useState<Record<string, boolean>>({})
   const [sending, setSending] = useState<string | null>(null)
 
   useEffect(() => {
-    getGuestSharedWork().then(({ data }) => { setItems(data || []); setLoading(false) })
+    getGuestSharedWork().then(({ data }) => {
+      setItems(data || [])
+      setLoading(false)
+      const ids = Array.from(new Set((data || []).map((v: any) => v.submissions?.student?.id).filter(Boolean)))
+      if (ids.length) getStudentsAdultStatus(ids).then(setAdultByStudent)
+    })
   }, [])
 
   useEffect(() => {
@@ -81,22 +94,35 @@ export default function GuestSharedWorkPanel() {
                       Verified by {v.verifier?.full_name || 'a reviewer'} · {new Date(v.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </p>
                   </div>
-                  {student && (
-                    status === 'pending' ? (
-                      <span className="flex items-center gap-1 text-[12px] font-semibold text-warning-text flex-shrink-0"><Clock className="w-3.5 h-3.5" /> Pending</span>
+                  {student && (() => {
+                    // Unknown age defaults to treated-as-under-18, same
+                    // safety-first convention used everywhere else in
+                    // this app that gates on age.
+                    const adult = adultByStudent[student.id] === true
+                    return status === 'pending' ? (
+                      <span className="flex items-center gap-1 text-[12px] font-semibold text-warning-text flex-shrink-0">
+                        <Clock className="w-3.5 h-3.5" /> {adult ? 'Pending' : 'Routed to their organisation'}
+                      </span>
                     ) : status === 'accepted' ? (
                       <span className="flex items-center gap-1 text-[12px] font-semibold text-success-text flex-shrink-0"><Check className="w-3.5 h-3.5" /> Accepted</span>
                     ) : status === 'declined' ? (
                       <span className="text-[12px] font-semibold text-ink-tertiary flex-shrink-0">Declined</span>
-                    ) : (
+                    ) : adult ? (
                       <button
                         onClick={() => handleExpress(student.id)} disabled={sending === student.id}
                         className="flex items-center gap-1.5 bg-brand text-white text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 transition disabled:opacity-50 flex-shrink-0"
                       >
-                        <Send className="w-3.5 h-3.5" /> {sending === student.id ? 'Sending…' : 'Express interest'}
+                        <Send className="w-3.5 h-3.5" /> {sending === student.id ? 'Sending…' : 'Place your offer'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleExpress(student.id)} disabled={sending === student.id}
+                        className="flex items-center gap-1.5 bg-surface border border-edge text-ink-secondary text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:border-brand hover:text-brand transition disabled:opacity-50 flex-shrink-0"
+                      >
+                        <Building2 className="w-3.5 h-3.5" /> {sending === student.id ? 'Sending…' : 'Contact their institution/provider'}
                       </button>
                     )
-                  )}
+                  })()}
                 </div>
               </div>
             )

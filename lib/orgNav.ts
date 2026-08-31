@@ -1,15 +1,20 @@
-import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase, Search, Megaphone } from 'lucide-react'
+import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase, Search, Megaphone, HeartHandshake } from 'lucide-react'
 import type { NavItem } from '@/components/v2/OrgShell'
 
 // Review is its own section for both roles now — Job tracking too (not
 // live yet, but reachable as its own place rather than buried as a card
-// inside Dashboard).
+// inside Dashboard). Interest received: employers expressing interest
+// in a student — the only place an under-18's interest is ever visible
+// at all (RLS gives the student themselves no read path to it), staff
+// accept/decline on their behalf; for 18+ students it's also visible
+// to them directly in their own Discover.
 export const institutionSections: NavItem[] = [
   { key: 'feed',      label: 'Feed',      icon: Home,            href: '/institution/feed' },
   { key: 'review',    label: 'Review',    icon: ClipboardCheck,  href: '/institution/review' },
   { key: 'students',  label: 'Students',  icon: Users,           href: '/institution/students' },
   { key: 'briefs',    label: 'Briefs',    icon: FileText,        href: '/institution/briefs' },
   { key: 'workshops', label: 'Workshops', icon: Presentation,    href: '/institution/workshops' },
+  { key: 'interest',  label: 'Interest received', icon: HeartHandshake, href: '/institution/interest' },
   { key: 'jobs',      label: 'Job tracking', icon: Briefcase,    href: '/institution/jobs' },
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/institution/dashboard' },
 ]
@@ -17,7 +22,7 @@ export const institutionSections: NavItem[] = [
 export const institutionPhoneItems: [NavItem, NavItem, NavItem] = [
   institutionSections[0], // Feed
   institutionSections[3], // Briefs
-  institutionSections[6], // Dashboard
+  institutionSections[7], // Dashboard
 ]
 
 export const providerSections: NavItem[] = [
@@ -25,6 +30,7 @@ export const providerSections: NavItem[] = [
   { key: 'review',    label: 'Review',    icon: ClipboardCheck,  href: '/provider/review' },
   { key: 'courses',   label: 'Courses',   icon: BookOpen,        href: '/provider/courses' },
   { key: 'workshops', label: 'Workshops', icon: Presentation,    href: '/provider/workshops' },
+  { key: 'interest',  label: 'Interest received', icon: HeartHandshake, href: '/provider/interest' },
   { key: 'jobs',      label: 'Job tracking', icon: Briefcase,    href: '/provider/jobs' },
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/provider/dashboard' },
 ]
@@ -32,7 +38,7 @@ export const providerSections: NavItem[] = [
 export const providerPhoneItems: [NavItem, NavItem, NavItem] = [
   providerSections[0], // Feed
   providerSections[2], // Courses
-  providerSections[5], // Dashboard
+  providerSections[6], // Dashboard
 ]
 
 // Independent employer sidebar — Feed, Discover, Briefs, Opportunities,
