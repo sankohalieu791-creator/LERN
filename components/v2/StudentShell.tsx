@@ -10,7 +10,7 @@ import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search } from 'lu
 // thing being built. Light/dark as an actual toggle is real, separate,
 // later work, not something to half-wire in here today.
 //
-// Only Feed is reachable right now — the other four nav slots stay
+// Feed and My Work are reachable now — Plus/Discover/Profile stay
 // visible (this is the real, final 5-button structure) but disabled,
 // rather than linking to pages that don't match spec yet. Each one
 // goes live as it's rebuilt, one at a time.
@@ -37,7 +37,7 @@ export default function StudentShell({ children }: { children: React.ReactNode }
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <NavItem href="/student/feed" icon={Home} label="Feed" active={isActive('/student/feed')} />
-        <DisabledNavItem icon={ClipboardList} label="My Work" />
+        <NavItem href="/student/work" icon={ClipboardList} label="My Work" active={isActive('/student/work')} />
         <DisabledNavItem icon={Plus} label="" isPlus />
         <DisabledNavItem icon={Compass} label="Discover" />
         <DisabledNavItem icon={UserIcon} label="Profile" />

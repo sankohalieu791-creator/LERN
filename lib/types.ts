@@ -85,7 +85,7 @@ export interface JoinCode {
 export interface WorkItem {
   id: string
   organisation_id: string
-  type: 'brief' | 'course' | 'workshop'
+  type: 'brief' | 'course' | 'workshop' | 'assignment'
   title: string
   description?: string
   topic?: string
@@ -100,6 +100,8 @@ export interface WorkItem {
   closed_at?: string
   criteria: string
   visibility: 'public' | 'private'
+  level?: 'beginner' | 'intermediate' | 'advanced'
+  duration_label?: string
   created_by?: string
   created_at: string
 }

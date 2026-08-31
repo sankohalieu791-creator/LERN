@@ -219,10 +219,26 @@ export const getSignedFileUrl = async (bucket: 'submission-files' | 'work-item-a
 export const getVisibleWorkItems = async (organisationId: string) => {
   const { data, error } = await supabase
     .from('work_items')
-    .select('*, work_item_attachments(id, file_name, file_path, file_size_bytes)')
+    .select('*, work_item_attachments(id, file_name, file_path, file_size_bytes), users!work_items_created_by_fkey(full_name)')
     .eq('organisation_id', organisationId)
     .order('created_at', { ascending: false })
   return { data, error }
+}
+
+// A student can't read `organisations.type` directly (RLS deliberately
+// keeps it staff-only), but My Work's tab set depends on it — this is
+// the one narrow read path in for the caller's own org.
+export const getMyOrgType = async (): Promise<'institution' | 'provider' | null> => {
+  const { data } = await supabase.rpc('my_org_type')
+  return (data as any) ?? null
+}
+
+// Headcount only (no names/rows) — same audience the work item is
+// already visible to. See work_item_member_count() for why this has
+// to be an RPC rather than a direct users query.
+export const getWorkItemMemberCount = async (workItemId: string): Promise<number> => {
+  const { data } = await supabase.rpc('work_item_member_count', { p_work_item_id: workItemId })
+  return (data as any) ?? 0
 }
 
 // Student: every submission they've made, most recent first, with the
