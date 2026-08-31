@@ -146,7 +146,7 @@ export default function OrgShell({
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-5 lg:px-10 py-7 pb-24 lg:pb-8">
+        <main className="flex-1 overflow-y-auto bg-paper px-5 lg:px-10 py-7 pb-24 lg:pb-8">
           {children}
         </main>
       </div>

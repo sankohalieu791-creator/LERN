@@ -52,7 +52,13 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
         </header>
       )}
 
-      <main className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(60px + env(safe-area-inset-bottom))' }}>{children}</main>
+      {/* bg-[#0f0f0f] here too, not just on the outer wrapper -- during
+          iOS momentum/rubber-band scrolling a transparent overflow-y-auto
+          element can composite straight through to whatever's behind the
+          WHOLE app (body, which has no dark background of its own) rather
+          than just its immediate parent. Painting main itself removes any
+          chance of that white flash showing mid-scroll. */}
+      <main className="flex-1 overflow-y-auto overscroll-contain bg-[#0f0f0f]" style={{ paddingBottom: 'calc(60px + env(safe-area-inset-bottom))' }}>{children}</main>
 
       <nav
         className="fixed bottom-0 left-0 right-0 bg-[#0f0f0f] border-t border-white/10 z-30"
