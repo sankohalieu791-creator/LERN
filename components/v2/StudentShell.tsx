@@ -52,7 +52,13 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   return (
     <div data-theme="dark" className="h-screen overflow-hidden bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {showHeader && (
-        <header className="flex-shrink-0 bg-[#0f0f0f] border-b border-white/10 sticky top-0 z-20">
+        // Plain static position, not sticky -- header is already a
+        // non-scrolling flex sibling of main (never inside the scroll
+        // container it would need to "stick" within), so sticky here
+        // was vestigial at best and one more thing that could misbehave
+        // during scroll. Now h-screen/overflow-hidden actually caps the
+        // shell, it has nothing to do.
+        <header className="flex-shrink-0 bg-[#0f0f0f] border-b border-white/10 z-20">
           <div className="px-4 py-3 flex items-center justify-between">
             <span className="text-white font-bold text-xl tracking-tight">LERN</span>
             <div className="flex items-center gap-1">
