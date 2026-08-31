@@ -144,13 +144,17 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
   return (
     <div className="border-b border-white/10">
       {/* ── MEDIA ── */}
-      {mediaUrl && (
+      {/* Space is reserved up front (same aspect box whether or not the
+          signed URL has resolved yet) so the media popping in doesn't
+          shove everything below it down mid-scroll. */}
+      {(post.image_path || post.video_path) && (
         <div className="relative w-full aspect-[16/10] bg-black">
-          {post.video_path ? (
+          {!mediaUrl && <div className="absolute inset-0 bg-[#1a1a1a] animate-pulse" />}
+          {mediaUrl && post.video_path ? (
             <video src={mediaUrl} controls playsInline className="w-full h-full object-cover" />
-          ) : (
+          ) : mediaUrl ? (
             <img src={mediaUrl} alt="" className="w-full h-full object-cover" />
-          )}
+          ) : null}
           {post.category && (
             <span className="absolute top-3 left-3 bg-[#1a1a1a]/90 text-white text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full">
               {post.category}

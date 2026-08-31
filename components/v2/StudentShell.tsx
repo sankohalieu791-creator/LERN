@@ -30,15 +30,15 @@ export default function StudentShell({ children }: { children: React.ReactNode }
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom))' }}>{children}</main>
+      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(60px + env(safe-area-inset-bottom))' }}>{children}</main>
 
       <nav
-        className="fixed bottom-0 left-0 right-0 bg-[#0f0f0f] border-t border-white/10 flex items-center justify-around h-16 z-30"
+        className="fixed bottom-0 left-0 right-0 bg-[#0f0f0f] border-t border-white/10 flex items-center justify-around h-[60px] z-30"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <NavItem href="/student/feed" icon={Home} label="Feed" active={isActive('/student/feed')} />
         <NavItem href="/student/work" icon={ClipboardList} label="My Work" active={isActive('/student/work')} />
-        <DisabledNavItem icon={Plus} label="" isPlus />
+        <PlusButton />
         <DisabledNavItem icon={Compass} label="Discover" />
         <DisabledNavItem icon={UserIcon} label="Profile" />
       </nav>
@@ -48,25 +48,30 @@ export default function StudentShell({ children }: { children: React.ReactNode }
 
 function NavItem({ href, icon: Icon, label, active }: { href: string; icon: any; label: string; active: boolean }) {
   return (
-    <Link href={href} className={`flex flex-col items-center gap-0.5 ${active ? 'text-white' : 'text-[#666]'}`}>
-      <Icon className="w-5 h-5" />
-      <span className="text-[10px] font-semibold">{label}</span>
+    <Link href={href} className={`flex flex-col items-center justify-center gap-1 w-16 h-full ${active ? 'text-white' : 'text-[#666]'}`}>
+      <Icon className="w-6 h-6" strokeWidth={active ? 2.4 : 2} />
+      <span className="text-[11px] font-bold">{label}</span>
     </Link>
   )
 }
 
-function DisabledNavItem({ icon: Icon, label, isPlus }: { icon: any; label: string; isPlus?: boolean }) {
-  if (isPlus) {
-    return (
-      <div aria-disabled className="w-12 h-12 rounded-2xl bg-white/10 text-[#555] flex items-center justify-center -mt-1 cursor-not-allowed">
-        <Icon className="w-6 h-6" />
-      </div>
-    )
-  }
+// Plain "+", no box behind it — a quick press gives it the
+// familiar plus-twists-into-a-cross feedback (like IG/TikTok's
+// composer button), even though tapping it doesn't open anything
+// yet — Plus itself is still to come, one screen at a time.
+function PlusButton() {
   return (
-    <div aria-disabled className="flex flex-col items-center gap-0.5 text-[#3a3a3a] cursor-not-allowed">
-      <Icon className="w-5 h-5" />
-      <span className="text-[10px] font-semibold">{label}</span>
+    <div aria-disabled className="flex items-center justify-center w-16 h-full text-[#555] cursor-not-allowed">
+      <Plus className="w-8 h-8 transition-transform duration-150 active:rotate-45" strokeWidth={2.4} />
+    </div>
+  )
+}
+
+function DisabledNavItem({ icon: Icon, label }: { icon: any; label: string }) {
+  return (
+    <div aria-disabled className="flex flex-col items-center justify-center gap-1 w-16 h-full text-[#3a3a3a] cursor-not-allowed">
+      <Icon className="w-6 h-6" strokeWidth={2} />
+      <span className="text-[11px] font-bold">{label}</span>
     </div>
   )
 }
