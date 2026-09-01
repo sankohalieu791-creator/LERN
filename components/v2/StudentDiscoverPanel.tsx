@@ -94,12 +94,16 @@ export default function StudentDiscoverPanel() {
 
   return (
     <div className="min-h-full">
+      {/* Fixed height regardless of tab -- a conditional second line here
+          used to only show for under-18s on the opportunity tabs, which
+          pushed the search bar/tab row/content down a few px on Jobs
+          versus Explore. The safeguarding note is already carried by
+          each opportunity card's own status text ("sent to your
+          organisation"), so it isn't lost, just not duplicated up here
+          at the cost of a layout shift between tabs. */}
       <div className="px-4 pt-4 pb-3">
         <h1 className="text-white text-2xl font-bold">Discover</h1>
         {tab === 'received' && <p className="text-[#666] text-sm mt-0.5">Employers who've expressed interest in you</p>}
-        {!adult && tab !== 'explore' && tab !== 'received' && (
-          <p className="text-[#666] text-sm mt-0.5">Interest goes to your organisation first — no employer contacts you directly.</p>
-        )}
       </div>
 
       {tab !== 'received' && (
