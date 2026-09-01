@@ -846,10 +846,13 @@ export const getMyInterest = async (employerId: string) => {
   return { data, error }
 }
 
-export const expressInterest = async (employerId: string, studentId: string) => {
+export const expressInterest = async (
+  employerId: string, studentId: string,
+  fields?: { message?: string; opportunity_label?: string },
+) => {
   const { data, error } = await supabase
     .from('interest')
-    .insert([{ employer_id: employerId, student_id: studentId }])
+    .insert([{ employer_id: employerId, student_id: studentId, ...fields }])
     .select()
     .single()
   return { data, error }
@@ -957,6 +960,42 @@ export const getOrgInterest = async (organisationId: string) => {
     .from('interest')
     .select('*, employer:users!interest_employer_id_fkey(full_name), student:users!interest_student_id_fkey(id, full_name, date_of_birth)')
     .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// ── Interest received: the controlled thread ──────────────────────
+// The young person is never a party -- no student read path exists on
+// interest_messages at all (see the migration's RLS). Only the
+// employer and the student's own org staff can ever read or write here.
+export const getInterestMessages = async (interestId: string) => {
+  const { data, error } = await supabase
+    .from('interest_messages')
+    .select('*')
+    .eq('interest_id', interestId)
+    .order('created_at', { ascending: true })
+  return { data, error }
+}
+
+export const sendInterestMessage = async (
+  interestId: string, senderId: string, senderRole: 'employer' | 'org', body: string,
+) => {
+  const { data, error } = await supabase
+    .from('interest_messages')
+    .insert([{ interest_id: interestId, sender_id: senderId, sender_role: senderRole, body }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+// Org can close the thread at any time, independent of accept/decline
+// -- "closed" just means no further exchange, not a verdict.
+export const closeInterestThread = async (interestId: string) => {
+  const { data, error } = await supabase
+    .from('interest')
+    .update({ closed_at: new Date().toISOString() })
+    .eq('id', interestId)
+    .select()
+    .single()
   return { data, error }
 }
 

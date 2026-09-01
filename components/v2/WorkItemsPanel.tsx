@@ -11,7 +11,7 @@ import {
 import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
 import WorkshopSession from '@/components/v2/WorkshopSession'
 import type { WorkItem, Group } from '@/lib/types'
-import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw, Film, Download, Clock, PenLine, CheckCircle2, ChevronRight } from 'lucide-react'
+import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw, Film, Download, Clock, PenLine, CheckCircle2 } from 'lucide-react'
 
 type ItemType = 'brief' | 'course' | 'workshop'
 
@@ -121,11 +121,17 @@ function BriefsPanel() {
         <div>
           <div className="flex items-center justify-between mb-5">
             <p className="font-bold text-ink text-[15px]">Briefs</p>
+            {/* Outline, not filled -- matches the reference exactly.
+                "+ Create" is a plain outline button here since the
+                brand-orange fill is reserved for the one true primary
+                action on a screen, which per the house style is the
+                Create button INSIDE the create form, not this entry
+                point to it. */}
             <button
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 bg-brand text-white font-semibold text-[13px] px-4 py-2 rounded-lg hover:bg-brand-hover transition"
+              className="flex items-center gap-1.5 border border-edge text-ink font-semibold text-[13px] px-4 py-2 rounded-lg hover:border-edge-input transition"
             >
-              <Plus className="w-3.5 h-3.5" /> New brief
+              <Plus className="w-3.5 h-3.5" /> Create
             </button>
           </div>
           {showCreate && (
@@ -208,9 +214,12 @@ function BriefCard({ item, onChanged, summary }: { item: any; onChanged: () => v
     : 'no deadline set'
 
   return (
-    <div className="bg-white border border-edge rounded-xl px-5 py-4">
+    // bg-surface, not bg-white -- has to adapt to the org's own theme
+    // (this screen has a real dark mode, per the reference screenshot),
+    // not stay flat white regardless.
+    <div className="bg-surface border border-edge rounded-xl px-5 py-4">
       <div className="flex items-start gap-3">
-        <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${allVerified ? 'bg-[#E1F5EE] text-[#0F6E56]' : 'bg-accent-bg text-brand'}`}>
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-white ${allVerified ? 'bg-[#0F6E56]' : 'bg-[#185FA5]'}`}>
           {allVerified ? <CheckCircle2 className="w-[18px] h-[18px]" /> : <FileText className="w-[18px] h-[18px]" />}
         </div>
         <div className="flex-1 min-w-0">
@@ -233,42 +242,46 @@ function BriefCard({ item, onChanged, summary }: { item: any; onChanged: () => v
           {!isDraftOrScheduled && assigned > 0 && (
             <>
               <div className="border-t border-edge-subtle my-3" />
-              <div className="flex items-center justify-between">
-                <p className="text-[12px] text-ink-secondary">
-                  {allVerified
-                    ? <>{summary?.verified} verified{(summary?.returned ?? 0) > 0 && <>, {summary?.returned} returned</>}</>
-                    : <>{summary?.submitted ?? 0} submitted, {notStarted} in progress or not started</>}
-                </p>
-                <button onClick={() => setConfirmingRevoke(v => !v)} title="More" className="text-ink-quaternary hover:text-ink-tertiary transition">
-                  <ChevronRight className="w-3.5 h-3.5" />
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-5 text-[12px] text-ink-secondary">
+                  {allVerified ? (
+                    <>
+                      <span>{summary?.verified} verified</span>
+                      {(summary?.returned ?? 0) > 0 && <span>{summary?.returned} returned</span>}
+                    </>
+                  ) : (
+                    <>
+                      <span>{summary?.submitted ?? 0} submitted</span>
+                      <span>{notStarted} in progress</span>
+                    </>
+                  )}
+                </div>
+                {/* Review submitted work's own real queue exists
+                    (/review); a dedicated "preview as a student would
+                    see it" and a filtered "verified work for this
+                    brief" view don't yet -- the review queue is the
+                    closest real destination for all three until those
+                    exist, rather than a dead button. */}
+                <button
+                  onClick={() => router.push(pathname.split('/').slice(0, 2).join('/') + '/review')}
+                  className="flex items-center gap-1 text-[13px] font-semibold hover:underline flex-shrink-0" style={{ color: '#185FA5' }}
+                >
+                  {actionLabel} <ExternalLink className="w-3 h-3" />
                 </button>
               </div>
             </>
           )}
 
-          <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center justify-end mt-2">
             {confirmingRevoke ? (
               <span className="flex items-center gap-2 text-[12px]">
                 <span className="text-ink-tertiary">{item.closed_at ? 'Reopen this brief?' : 'Revoke this brief?'}</span>
-                <button onClick={item.closed_at ? reopen : revoke} disabled={busy} className="font-semibold text-brand hover:underline">Yes</button>
+                <button onClick={item.closed_at ? reopen : revoke} disabled={busy} className="font-semibold text-danger-text hover:underline">Yes</button>
                 <button onClick={() => setConfirmingRevoke(false)} className="font-semibold text-ink-tertiary hover:underline">Cancel</button>
               </span>
             ) : (
-              <button onClick={() => setConfirmingRevoke(true)} className="text-[12px] font-semibold text-ink-quaternary hover:text-ink-tertiary transition">
+              <button onClick={() => setConfirmingRevoke(true)} className="text-[11px] font-medium text-ink-quaternary hover:text-ink-tertiary transition">
                 {item.closed_at ? 'Reopen' : 'Revoke'}
-              </button>
-            )}
-            {!isDraftOrScheduled && (
-              // Review submitted work's own real queue exists (/review);
-              // a dedicated "preview as a student would see it" and a
-              // filtered "verified work for this brief" view don't yet
-              // -- the review queue is the closest real destination for
-              // all three until those exist, rather than a dead button.
-              <button
-                onClick={() => router.push(pathname.split('/').slice(0, 2).join('/') + '/review')}
-                className="text-[13px] font-semibold hover:underline" style={{ color: '#D4551A' }}
-              >
-                {actionLabel}
               </button>
             )}
           </div>

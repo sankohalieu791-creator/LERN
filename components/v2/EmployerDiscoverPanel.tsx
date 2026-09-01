@@ -23,6 +23,7 @@ export default function EmployerDiscoverPanel() {
   const [q, setQ] = useState('')
   const [interestByStudent, setInterestByStudent] = useState<Record<string, string>>({})
   const [sending, setSending] = useState<string | null>(null)
+  const [composer, setComposer] = useState<{ studentId: string; studentName: string; label?: string } | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -42,12 +43,12 @@ export default function EmployerDiscoverPanel() {
     })
   }, [user])
 
-  const handleExpress = async (studentId: string) => {
-    if (!user) return
-    setSending(studentId)
-    const { error } = await expressInterest(user.id, studentId)
+  const handleExpress = async (message: string) => {
+    if (!user || !composer) return
+    setSending(composer.studentId)
+    const { error } = await expressInterest(user.id, composer.studentId, { message, opportunity_label: composer.label })
     setSending(null)
-    if (!error) setInterestByStudent(prev => ({ ...prev, [studentId]: 'pending' }))
+    if (!error) { setInterestByStudent(prev => ({ ...prev, [composer.studentId]: 'pending' })); setComposer(null) }
   }
 
   return (
@@ -122,7 +123,8 @@ export default function EmployerDiscoverPanel() {
                       <span className="text-[12px] font-semibold text-ink-tertiary flex-shrink-0">Declined</span>
                     ) : (
                       <button
-                        onClick={() => handleExpress(student.id)} disabled={sending === student.id}
+                        onClick={() => setComposer({ studentId: student.id, studentName: student.full_name || 'this student', label: wi?.title })}
+                        disabled={sending === student.id}
                         className="flex items-center gap-1.5 bg-brand text-white text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 transition disabled:opacity-50 flex-shrink-0"
                       >
                         <Send className="w-3.5 h-3.5" /> {sending === student.id ? 'Sending…' : 'Place your offer'}
@@ -135,6 +137,47 @@ export default function EmployerDiscoverPanel() {
           })}
         </div>
       )}
+
+      {composer && (
+        <OfferComposer
+          studentName={composer.studentName}
+          sending={sending === composer.studentId}
+          onClose={() => setComposer(null)}
+          onSend={handleExpress}
+        />
+      )}
+    </div>
+  )
+}
+
+// The org sees this message verbatim on their side (Interest received)
+// -- a few sentences saying what the employer's actually after, not
+// just a bare "interested" flag with nothing to respond to.
+function OfferComposer({ studentName, sending, onClose, onSend }: { studentName: string; sending: boolean; onClose: () => void; onSend: (message: string) => void }) {
+  const [message, setMessage] = useState('')
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md p-5">
+        <p className="font-bold text-ink text-[15px] mb-1">Place your offer</p>
+        <p className="text-[13px] text-ink-tertiary mb-4">
+          A few sentences to {studentName}'s organisation about what you're after — they'll see this on their side.
+        </p>
+        <textarea
+          value={message} onChange={e => setMessage(e.target.value)} autoFocus
+          placeholder="e.g. We saw their verified poster work and we'd love to offer a week's work experience this term."
+          rows={4}
+          className="w-full bg-surface-subtle border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none mb-4"
+        />
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2.5 rounded-lg text-[13px] font-semibold text-ink-secondary hover:bg-surface-muted transition">Cancel</button>
+          <button
+            onClick={() => onSend(message.trim())} disabled={sending || !message.trim()}
+            className="bg-brand text-white text-[13px] font-semibold px-4 py-2.5 rounded-lg hover:bg-brand-hover transition disabled:opacity-40"
+          >
+            {sending ? 'Sending…' : 'Send'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
