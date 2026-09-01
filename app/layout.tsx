@@ -42,7 +42,19 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-paper text-ink">
+      {/* No bg-paper here on purpose -- it was the actual root cause of
+          the white status-bar strip and the white flash during scroll,
+          on EVERY page, this whole time. bg-paper is a Tailwind CLASS
+          (specificity 0,1,0), which beats globals.css's plain `body {
+          background-color: #0f0f0f }` element rule (specificity 0,0,1)
+          outright, regardless of which file loads first or in what
+          order -- so body's real, rendered background was always the
+          light paper colour, dark-mode fallback or not. Every real
+          shell (StudentShell, OrgShell, AuthShell, ...) already paints
+          its own full-bleed background over this, so body's own colour
+          only ever shows through a gap -- that's exactly the bug this
+          was. text-ink is harmless to keep; it's not a background. */}
+      <body className="text-ink">
         <AuthProvider>
           <ThemeProvider>
             {children}
