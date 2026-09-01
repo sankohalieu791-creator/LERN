@@ -93,7 +93,15 @@ export default function StudentDiscoverPanel() {
   ]
 
   return (
-    <div className="min-h-full">
+    // No min-h-full here -- it forced this div to be at least as tall as
+    // main's own visible box regardless of how little content a tab
+    // actually has (e.g. Explore's empty state, or a short Jobs list),
+    // which is exactly what "scrolling goes all the way down" into
+    // blank space was: an extra almost-full-screen of empty scrollable
+    // area below the real content. main already paints its own full-
+    // bleed dark background, so nothing here needs to force full height
+    // to "fill the screen" -- it can just size to its actual content.
+    <div>
       {/* Fixed height regardless of tab -- a conditional second line here
           used to only show for under-18s on the opportunity tabs, which
           pushed the search bar/tab row/content down a few px on Jobs

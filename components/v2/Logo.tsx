@@ -1,15 +1,16 @@
-// The LERN wordmark: dark chip, white letters, the R in brand orange —
-// matches public/icon-512.png. One shared component so every header
-// (auth pages, org sidebar, mobile top bar) renders the same mark
-// instead of plain dark-on-paper text.
+// The LERN wordmark: plain letters, no chip/box -- matches the real
+// logo (white LE/N, the R in brand orange) sitting directly on the
+// page background, not boxed. NOTE: the real mark has a custom-drawn
+// diagonal R glyph that plain text genuinely can't replicate -- this
+// approximates it with a coloured letter until a real SVG/image asset
+// is provided to use instead.
 export default function Logo({ size = 'md' }: { size?: 'sm' | 'md' }) {
-  const box = size === 'sm' ? 'px-2.5 py-1' : 'px-3 py-1.5'
-  const text = size === 'sm' ? 'text-[13px]' : 'text-[15px]'
+  const text = size === 'sm' ? 'text-[15px]' : 'text-xl'
   return (
-    <span className={`inline-flex items-center rounded-md bg-[#141110] ${box} font-bold tracking-wide ${text}`}>
-      <span className="text-white">LE</span>
+    <span className={`inline-flex items-center font-bold tracking-tight ${text}`}>
+      <span className="text-ink">LE</span>
       <span className="text-brand">R</span>
-      <span className="text-white">N</span>
+      <span className="text-ink">N</span>
     </span>
   )
 }

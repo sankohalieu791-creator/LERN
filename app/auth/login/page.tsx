@@ -53,7 +53,7 @@ export default function LoginPage() {
 
   if (showRolePicker) {
     return (
-      <AuthShell title="Try LERN" subtitle="Pick a role to look around as — switch any time by logging back in.">
+      <AuthShell title="Choose a view" subtitle="Pick a role to look around as — switch any time by logging back in.">
         <DemoRolePicker onSwitched={handleDemoSwitched} />
       </AuthShell>
     )

@@ -1066,7 +1066,12 @@ export const demoSwitchRole = async (role: Role) => {
   })
   const body = await res.json()
   if (!res.ok) return { error: body }
-  const { error } = await supabase.auth.verifyOtp({ email: body.email, token_hash: body.tokenHash, type: 'magiclink' })
+  // token_hash-based verification takes ONLY { token_hash, type } -- passing
+  // email alongside it (even though the API response includes it) mixes
+  // it with the separate OTP-code shape ({ email, token, type }) and is
+  // exactly what Supabase's "Only the token_hash and type should be
+  // provided" error is guarding against.
+  const { error } = await supabase.auth.verifyOtp({ token_hash: body.tokenHash, type: 'magiclink' })
   return { error }
 }
 
