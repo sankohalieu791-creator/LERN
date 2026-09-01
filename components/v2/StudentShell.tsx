@@ -69,7 +69,20 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
         // was vestigial at best and one more thing that could misbehave
         // during scroll. Now h-screen/overflow-hidden actually caps the
         // shell, it has nothing to do.
-        <header className="flex-shrink-0 bg-[#0f0f0f] border-b border-white/10 z-20">
+        //
+        // transform: translateZ(0) + will-change: transform force this
+        // onto its own GPU compositing layer. Untouched, a plain static
+        // element sitting next to a fast-scrolling sibling can get
+        // recomposited a frame late during momentum scroll on iOS --
+        // visually reading as "it moved" even though nothing in the DOM
+        // actually repositioned it. The bottom nav is position:fixed,
+        // which browsers already layer-promote automatically -- this
+        // gives the header the same real isolation explicitly, since
+        // static elements don't get it for free.
+        <header
+          className="flex-shrink-0 bg-[#0f0f0f] border-b border-white/10 z-20 will-change-transform"
+          style={{ transform: 'translateZ(0)' }}
+        >
           <div className="px-4 py-3 flex items-center justify-between">
             <span className="text-white font-bold text-xl tracking-tight">LERN</span>
             <div className="flex items-center gap-1">
