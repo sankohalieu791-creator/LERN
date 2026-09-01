@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
   getWorkItems, createWorkItem, getGroups, createGroup, getGroupMembers,
@@ -10,7 +11,7 @@ import {
 import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
 import WorkshopSession from '@/components/v2/WorkshopSession'
 import type { WorkItem, Group } from '@/lib/types'
-import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw, Film, Download, Clock, PenLine } from 'lucide-react'
+import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw, Film, Download, Clock, PenLine, CheckCircle2, ChevronRight } from 'lucide-react'
 
 type ItemType = 'brief' | 'course' | 'workshop'
 
@@ -136,7 +137,7 @@ function BriefsPanel() {
             <p className="text-ink-tertiary text-[14px]">No briefs yet.</p>
           ) : (
             <div className="space-y-3">
-              {items.map(item => <WorkItemCard key={item.id} item={item} summary={summaries[item.id]} onChanged={load} />)}
+              {items.map(item => <BriefCard key={item.id} item={item} summary={summaries[item.id]} onChanged={load} />)}
             </div>
           )}
         </div>
@@ -146,6 +147,134 @@ function BriefsPanel() {
           <UploadExistingWorkForm onCreated={() => { setTab('briefs'); load() }} />
         </div>
       )}
+    </div>
+  )
+}
+
+// House style (LERN Build Spec: Briefs and Interest Received, v1.0):
+// clean white card, one hairline border, 12px radius, one status pill
+// per card (blue/amber/green, the ONLY three states a card shows, even
+// though the underlying per-student truth has more granularity), a
+// divider, at-a-glance counts on the surface, and exactly one quiet
+// brand-coloured action whose label depends on state. Draft/Scheduled
+// keep their own separate badge (a fourth, staff-only state the spec
+// doesn't cover, since a draft isn't visible to anyone to have a real
+// status yet).
+const STATUS_PILL = {
+  new:      { label: 'New',         bg: '#E6F1FB', text: '#185FA5' },
+  progress: { label: 'In progress', bg: '#FAEEDA', text: '#854F0B' },
+  verified: { label: 'Verified',    bg: '#E1F5EE', text: '#0F6E56' },
+}
+
+function BriefCard({ item, onChanged, summary }: { item: any; onChanged: () => void; summary?: { assigned: number; submitted: number; verified: number; returned: number; overdue: boolean } }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState('')
+
+  const revoke = async () => {
+    setBusy(true); setActionError('')
+    const { error } = await closeWorkItem(item.id)
+    setBusy(false); setConfirmingRevoke(false)
+    if (error) { setActionError(error.message); return }
+    onChanged()
+  }
+  const reopen = async () => {
+    setBusy(true); setActionError('')
+    const { error } = await reopenWorkItem(item.id)
+    setBusy(false)
+    if (error) { setActionError(error.message); return }
+    onChanged()
+  }
+
+  const isDraftOrScheduled = item.publish_state === 'draft' || item.publish_state === 'scheduled'
+  const assigned = summary?.assigned ?? 0
+  const notStarted = Math.max(0, assigned - (summary?.submitted ?? 0))
+  const pendingReview = Math.max(0, (summary?.submitted ?? 0) - (summary?.verified ?? 0) - (summary?.returned ?? 0))
+  const allVerified = assigned > 0 && (summary?.verified ?? 0) === assigned
+
+  // One of exactly three pills, per house style -- collapsing the
+  // richer per-student truth (submitted/overdue/returned) into New /
+  // In progress / Verified for the card surface.
+  const status = allVerified ? STATUS_PILL.verified
+    : (summary?.submitted ?? 0) > 0 || summary?.overdue ? STATUS_PILL.progress
+    : STATUS_PILL.new
+
+  const actionLabel = allVerified ? 'See verified work' : pendingReview > 0 ? 'Review submitted' : 'Preview for students'
+
+  const deadlineLabel = item.deadline
+    ? `due ${new Date(item.deadline).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`
+    : 'no deadline set'
+
+  return (
+    <div className="bg-white border border-edge rounded-xl px-5 py-4">
+      <div className="flex items-start gap-3">
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${allVerified ? 'bg-[#E1F5EE] text-[#0F6E56]' : 'bg-accent-bg text-brand'}`}>
+          {allVerified ? <CheckCircle2 className="w-[18px] h-[18px]" /> : <FileText className="w-[18px] h-[18px]" />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className="font-medium text-ink text-[15px] leading-snug truncate">{item.title}</p>
+            {isDraftOrScheduled ? (
+              <span className="flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-surface-muted text-ink-tertiary">
+                {item.publish_state === 'draft' ? 'Draft' : 'Scheduled'}
+              </span>
+            ) : (
+              <span className="flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: status.bg, color: status.text }}>
+                {status.label}
+              </span>
+            )}
+          </div>
+          <p className="text-[13px] text-ink-tertiary mt-0.5">
+            {item.topic ? `${item.topic}, ` : ''}{deadlineLabel} · {item.groups?.name || 'Whole organisation'}
+          </p>
+
+          {!isDraftOrScheduled && assigned > 0 && (
+            <>
+              <div className="border-t border-edge-subtle my-3" />
+              <div className="flex items-center justify-between">
+                <p className="text-[12px] text-ink-secondary">
+                  {allVerified
+                    ? <>{summary?.verified} verified{(summary?.returned ?? 0) > 0 && <>, {summary?.returned} returned</>}</>
+                    : <>{summary?.submitted ?? 0} submitted, {notStarted} in progress or not started</>}
+                </p>
+                <button onClick={() => setConfirmingRevoke(v => !v)} title="More" className="text-ink-quaternary hover:text-ink-tertiary transition">
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </>
+          )}
+
+          <div className="flex items-center justify-between mt-3">
+            {confirmingRevoke ? (
+              <span className="flex items-center gap-2 text-[12px]">
+                <span className="text-ink-tertiary">{item.closed_at ? 'Reopen this brief?' : 'Revoke this brief?'}</span>
+                <button onClick={item.closed_at ? reopen : revoke} disabled={busy} className="font-semibold text-brand hover:underline">Yes</button>
+                <button onClick={() => setConfirmingRevoke(false)} className="font-semibold text-ink-tertiary hover:underline">Cancel</button>
+              </span>
+            ) : (
+              <button onClick={() => setConfirmingRevoke(true)} className="text-[12px] font-semibold text-ink-quaternary hover:text-ink-tertiary transition">
+                {item.closed_at ? 'Reopen' : 'Revoke'}
+              </button>
+            )}
+            {!isDraftOrScheduled && (
+              // Review submitted work's own real queue exists (/review);
+              // a dedicated "preview as a student would see it" and a
+              // filtered "verified work for this brief" view don't yet
+              // -- the review queue is the closest real destination for
+              // all three until those exist, rather than a dead button.
+              <button
+                onClick={() => router.push(pathname.split('/').slice(0, 2).join('/') + '/review')}
+                className="text-[13px] font-semibold hover:underline" style={{ color: '#D4551A' }}
+              >
+                {actionLabel}
+              </button>
+            )}
+          </div>
+          {actionError && <p className="text-[12px] text-danger-text mt-2">{actionError}</p>}
+        </div>
+      </div>
     </div>
   )
 }

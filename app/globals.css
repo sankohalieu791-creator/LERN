@@ -121,9 +121,12 @@ body {
   box-sizing: border-box;
 }
 
-html {
-  scroll-behavior: smooth;
-}
+/* scroll-behavior: smooth removed -- nothing in the app actually uses
+   programmatic scrolling (no scrollIntoView/scrollTo calls anywhere)
+   for it to smooth, and it's a known WebKit interaction problem: it can
+   stop native touch-driven rubber-band overscroll from springing back
+   properly after you release the drag, which is exactly "drag it down
+   and it just stays down instead of bouncing back". */
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
