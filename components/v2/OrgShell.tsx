@@ -58,14 +58,18 @@ export default function OrgShell({
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
 
-  // h-screen + overflow-hidden (not min-h-screen) — same fix as
+  // h-[100dvh] + overflow-hidden (not min-h-screen) — same fix as
   // StudentShell: a flex container that's only min-height means content
   // taller than the viewport grows the whole shell instead of scrolling
   // inside main, and every flex child down the chain needs min-h-0 to
   // actually respect that bound rather than refusing to shrink below
   // its own content's natural height (flexbox's default min-height:auto).
+  // dvh not vh -- 100vh is fixed to mobile Safari's LARGEST viewport
+  // (toolbar hidden), taller than what's visible while the address bar
+  // is still showing, so h-screen looked right on desktop but caused
+  // exactly the same "pulls down as you scroll" mismatch on phone.
   return (
-    <div data-theme={theme} className="h-screen overflow-hidden bg-paper flex">
+    <div data-theme={theme} className="h-[100dvh] overflow-hidden bg-paper flex">
       {/* ── Laptop sidebar ── */}
       <aside className={`hidden lg:flex flex-col border-r border-edge-subtle bg-surface transition-[width] duration-150 flex-shrink-0 ${collapsed ? 'w-[72px]' : 'w-60'}`}>
         <div className={`flex items-center h-16 px-4 flex-shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>

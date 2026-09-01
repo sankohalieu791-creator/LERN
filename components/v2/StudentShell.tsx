@@ -37,7 +37,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   // trigger the browser's own native pull-to-refresh chrome, which is
   // never themed dark.
   //
-  // h-screen + overflow-hidden here (not min-h-screen) is load-bearing,
+  // h-[100dvh] + overflow-hidden here (not min-h-screen) is load-bearing,
   // not decorative -- min-h-screen is only a FLOOR, so if main's content
   // ever wants to be taller, the whole column (header included) grows
   // past one viewport and the real browser/PWA document takes over
@@ -45,12 +45,23 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   // what "the header pulls down when I scroll" was: the header isn't
   // inside main at all, so it should be structurally unable to move --
   // it was only moving because this wrapper wasn't actually capped to
-  // the viewport. h-screen + overflow-hidden caps it for real; main's
-  // own min-h-0 (below) is the other half -- a flex child defaults to
-  // min-height:auto, which lets it refuse to shrink below its content's
-  // natural height even with flex-1, silently defeating overflow-y-auto.
+  // the viewport.
+  //
+  // dvh, not vh/h-screen: mobile Safari's 100vh is fixed to the
+  // viewport's LARGEST possible size (toolbar chrome hidden), which is
+  // taller than what's actually on screen while the address bar is
+  // still showing. h-screen sized the shell for a viewport that isn't
+  // there yet -- as you scroll and the toolbar animates away, the gap
+  // between "sized for" and "actually visible" resolves itself, which
+  // looks exactly like the shell pulling/settling and briefly exposing
+  // whatever's behind it. 100dvh tracks the real, current viewport
+  // continuously instead of the largest hypothetical one, so there's
+  // no mismatch to resolve. main's own min-h-0 (below) is the other
+  // half of the original fix -- a flex child defaults to min-height:
+  // auto, which lets it refuse to shrink below its content's natural
+  // height even with flex-1, silently defeating overflow-y-auto.
   return (
-    <div data-theme="dark" className="h-screen overflow-hidden bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div data-theme="dark" className="h-[100dvh] overflow-hidden bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {showHeader && (
         // Plain static position, not sticky -- header is already a
         // non-scrolling flex sibling of main (never inside the scroll
