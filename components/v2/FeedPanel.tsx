@@ -3,29 +3,25 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import {
-  getFeed, getPublicFeed, setPostReaction, getSignedFileUrl, incrementPostViews,
+  getFeed, getPublicFeed, setPostReaction, toggleLike, getSignedFileUrl, incrementPostViews,
 } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
-import { Play, X, CheckCircle2 } from 'lucide-react'
+import { Heart } from 'lucide-react'
 
-// Build Spec: Feed and My Work (student) v1.0, Part 1. Structural
-// colours (card bg, hairlines) stay this app's own dark palette, same
-// call as every other rebuild this session -- every PINNED accent hex
-// (avatar, verified tick, reaction pills) is used exactly as given.
-//
-// "Reactions are the only interaction" is literal here: no comments
-// (never existed), no DMs (never existed), and as of this rebuild no
-// Follow/Share/view-count on the card either -- the previous version
-// had all three, none of which the spec mentions, and it explicitly
-// scopes interaction down to reactions alone. Views are still counted
-// server-side (incrementPostViews) since that's just a read metric an
-// org can see, never shown back to a student reading their own feed.
-const REACTIONS: { key: ReactionType; label: string; emoji: string }[] = [
+// Feed, revised: edge-to-edge like Instagram actually is on a phone
+// (no card border/radius, no outer side margin -- those made it read
+// as a floating box rather than a real full-width feed), a real Like
+// on the left plus exactly 2 sticker reactions on the right (chosen by
+// the POST'S AUTHOR at posting time via PostComposer's own sticker
+// picker, not fixed globally), and inline autoplay video instead of a
+// tap-to-open full-screen player.
+const ALL_REACTIONS: { key: ReactionType; label: string; emoji: string }[] = [
   { key: 'congratulations', label: 'Celebrate', emoji: '🎉' },
   { key: 'well_done', label: 'Well done', emoji: '👏' },
   { key: 'keep_going', label: 'Keep going', emoji: '🔥' },
   { key: 'proud', label: 'Proud', emoji: '⭐' },
 ]
+const REACTION_BY_KEY = Object.fromEntries(ALL_REACTIONS.map(r => [r.key, r]))
 
 function timeAgo(dateStr: string) {
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
@@ -34,11 +30,6 @@ function timeAgo(dateStr: string) {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h`
   if (diff < 604800) return `${Math.floor(diff / 86400)}d`
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-}
-function fmtDuration(secs: number) {
-  const m = Math.floor(secs / 60)
-  const s = Math.floor(secs % 60)
-  return `${m}:${s.toString().padStart(2, '0')}`
 }
 function initials(name?: string) {
   if (!name) return '?'
@@ -58,8 +49,8 @@ export default function FeedPanel() {
 
   if (loading) {
     return (
-      <div className="max-w-[420px] mx-auto px-4 py-4 space-y-[18px]">
-        {[0, 1].map(i => <div key={i} className="h-[340px] rounded-[14px] bg-[#1a1a1a] animate-pulse" />)}
+      <div className="px-4 py-4 space-y-4">
+        {[0, 1].map(i => <div key={i} className="h-[340px] rounded-xl bg-[#1a1a1a] animate-pulse" />)}
       </div>
     )
   }
@@ -76,7 +67,7 @@ export default function FeedPanel() {
   }
 
   return (
-    <div className="max-w-[420px] mx-auto">
+    <div>
       {exploring && (
         <div className="bg-[#1a1a1a] border-b border-white/10 px-4 py-3">
           <p className="text-[12.5px] text-[#999]">
@@ -84,9 +75,7 @@ export default function FeedPanel() {
           </p>
         </div>
       )}
-      <div className="px-4 py-4 space-y-[18px]">
-        {posts.map(p => <PostCard key={p.id} post={p} onChanged={load} />)}
-      </div>
+      {posts.map(p => <PostCard key={p.id} post={p} onChanged={load} />)}
     </div>
   )
 }
@@ -94,12 +83,18 @@ export default function FeedPanel() {
 function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
   const { user } = useAuth()
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
-  const [duration, setDuration] = useState<number | null>(null)
-  const [playerOpen, setPlayerOpen] = useState(false)
   const viewedRef = useRef(false)
   const reactions: any[] = post.post_reactions || []
+  const likes: any[] = post.post_likes || []
   const myReaction = reactions.find(r => r.user_id === user?.id)?.reaction as ReactionType | undefined
-  const totalReactions = reactions.length
+  const liked = likes.some(l => l.user_id === user?.id)
+
+  // Falls back to the first 2 of the full set for any post created
+  // before this -- sticker_choices is null on those, never an empty
+  // pick, so there's always something to react with.
+  const stickers = (post.sticker_choices && post.sticker_choices.length > 0
+    ? post.sticker_choices.map((k: string) => REACTION_BY_KEY[k]).filter(Boolean)
+    : ALL_REACTIONS.slice(0, 2)) as typeof ALL_REACTIONS
 
   useEffect(() => {
     if (post.image_path) getSignedFileUrl('post-images', post.image_path).then(({ url }) => setMediaUrl(url))
@@ -118,55 +113,35 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
     onChanged()
   }
 
+  const like = async () => {
+    if (!user) return
+    await toggleLike(post.id, user.id, !liked)
+    onChanged()
+  }
+
   return (
-    <div className="bg-[#1a1a1a] border border-white/10 rounded-[14px] overflow-hidden">
+    <div className="border-b border-white/10">
       {/* ── AUTHOR ROW ── */}
-      <div className="flex items-center gap-2.5 px-4 pt-3.5 pb-3">
-        <span className="w-[34px] h-[34px] rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+      <div className="flex items-center gap-2.5 px-4 pt-3.5 pb-2.5">
+        <span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
           {initials(post.author_name)}
         </span>
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold text-white flex items-center gap-1 truncate">
-            {post.author_name}
-            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#0F6E56' }} />
-          </p>
+          <p className="text-[13px] font-semibold text-white truncate">{post.author_name}</p>
           <p className="text-[11px]" style={{ color: '#999' }}>
             {[post.category, timeAgo(post.created_at)].filter(Boolean).join(' · ')}
           </p>
         </div>
       </div>
 
-      {/* ── MEDIA: full-width, ~240px ── */}
+      {/* ── MEDIA: full-bleed, edge to edge ── */}
       {(post.image_path || post.video_path) && (
-        <div
-          className="relative w-full bg-[#141414] overflow-hidden"
-          style={{ height: 240 }}
-          onClick={() => post.video_path && mediaUrl && setPlayerOpen(true)}
-        >
-          {!mediaUrl && <div className="absolute inset-0 bg-[#141414] animate-pulse" />}
+        <div className="relative w-full bg-[#141414]" style={{ minHeight: 240 }}>
+          {!mediaUrl && <div className="absolute inset-0 bg-[#141414] animate-pulse" style={{ height: 240 }} />}
           {mediaUrl && post.video_path ? (
-            <>
-              <video
-                src={mediaUrl} muted playsInline preload="metadata" className="w-full h-full object-cover"
-                onClick={() => setPlayerOpen(true)}
-                onLoadedMetadata={e => setDuration(e.currentTarget.duration)}
-              />
-              <button
-                onClick={() => setPlayerOpen(true)} aria-label="Play video"
-                className="absolute inset-0 flex items-center justify-center bg-black/10"
-              >
-                <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center">
-                  <Play className="w-6 h-6 text-white fill-white ml-0.5" />
-                </div>
-              </button>
-              {duration !== null && (
-                <span className="absolute bottom-2.5 right-2.5 text-[11px] font-semibold bg-black/70 text-white px-2 py-0.5 rounded">
-                  {fmtDuration(duration)}
-                </span>
-              )}
-            </>
+            <video src={mediaUrl} autoPlay loop muted playsInline controls className="w-full max-h-[520px] object-contain bg-black" />
           ) : mediaUrl ? (
-            <img src={mediaUrl} alt="" className="w-full h-full object-cover" />
+            <img src={mediaUrl} alt="" className="w-full max-h-[520px] object-cover" />
           ) : null}
         </div>
       )}
@@ -179,35 +154,29 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
         </div>
       )}
 
-      {/* ── REACTIONS ── */}
-      <div className="flex items-center gap-1.5 px-4 py-3.5 flex-wrap">
-        {REACTIONS.map(r => (
-          <button
-            key={r.key} onClick={() => react(r.key)}
-            className="flex items-center gap-1.5 rounded-full border transition"
-            style={{
-              borderColor: myReaction === r.key ? '#F26B21' : 'rgba(255,255,255,0.1)',
-              backgroundColor: myReaction === r.key ? 'rgba(242,107,33,0.12)' : '#141414',
-              padding: '6px 12px',
-            }}
-          >
-            <span className="text-[13px] leading-none">{r.emoji}</span>
-            <span className="text-[11.5px] font-medium" style={{ color: myReaction === r.key ? '#F26B21' : '#999' }}>{r.label}</span>
-          </button>
-        ))}
-        {totalReactions > 0 && <span className="text-[12px] ml-auto flex-shrink-0" style={{ color: '#999' }}>{totalReactions}</span>}
-      </div>
-
-      {playerOpen && mediaUrl && (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-          <button onClick={() => setPlayerOpen(false)} className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-black/50 flex items-center justify-center" style={{ marginTop: 'env(safe-area-inset-top)' }}>
-            <X className="w-5 h-5 text-white" />
-          </button>
-          <div className="flex-1 flex items-center justify-center">
-            <video src={mediaUrl} controls autoPlay playsInline className="max-h-full max-w-full" />
-          </div>
+      {/* ── LIKE (left) + up to 2 chosen stickers (right) ── */}
+      <div className="flex items-center justify-between px-4 py-3.5">
+        <button onClick={like} className="flex items-center gap-1.5 active:scale-90 transition-transform">
+          <Heart className="w-5 h-5" fill={liked ? '#F26B21' : 'none'} color={liked ? '#F26B21' : '#999'} strokeWidth={1.75} />
+          {likes.length > 0 && <span className="text-[13px] font-semibold" style={{ color: liked ? '#F26B21' : '#999' }}>{likes.length}</span>}
+        </button>
+        <div className="flex items-center gap-1.5">
+          {stickers.map(r => (
+            <button
+              key={r.key} onClick={() => react(r.key)} title={r.label}
+              className="flex items-center gap-1 rounded-full border transition"
+              style={{
+                borderColor: myReaction === r.key ? '#F26B21' : 'rgba(255,255,255,0.1)',
+                backgroundColor: myReaction === r.key ? 'rgba(242,107,33,0.12)' : '#141414',
+                padding: '5px 10px',
+              }}
+            >
+              <span className="text-[14px] leading-none">{r.emoji}</span>
+            </button>
+          ))}
+          {reactions.length > 0 && <span className="text-[12px] ml-1" style={{ color: '#999' }}>{reactions.length}</span>}
         </div>
-      )}
+      </div>
     </div>
   )
 }

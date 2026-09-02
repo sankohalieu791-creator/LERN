@@ -554,13 +554,28 @@ export const updateUserProfile = async (userId: string, updates: any) => {
 // merged in here instead.
 const attachReactions = async (posts: any[]) => {
   if (posts.length === 0) return posts
-  const { data: reactions } = await supabase
-    .from('post_reactions')
-    .select('id, post_id, user_id, reaction')
-    .in('post_id', posts.map(p => p.id))
-  const byPost = new Map<string, any[]>()
-  for (const r of reactions || []) byPost.set(r.post_id, [...(byPost.get(r.post_id) || []), r])
-  return posts.map(p => ({ ...p, post_reactions: byPost.get(p.id) || [] }))
+  const ids = posts.map(p => p.id)
+  const [{ data: reactions }, { data: likes }] = await Promise.all([
+    supabase.from('post_reactions').select('id, post_id, user_id, reaction').in('post_id', ids),
+    supabase.from('post_likes').select('id, post_id, user_id').in('post_id', ids),
+  ])
+  const reactionsByPost = new Map<string, any[]>()
+  for (const r of reactions || []) reactionsByPost.set(r.post_id, [...(reactionsByPost.get(r.post_id) || []), r])
+  const likesByPost = new Map<string, any[]>()
+  for (const l of likes || []) likesByPost.set(l.post_id, [...(likesByPost.get(l.post_id) || []), l])
+  return posts.map(p => ({ ...p, post_reactions: reactionsByPost.get(p.id) || [], post_likes: likesByPost.get(p.id) || [] }))
+}
+
+// A real Like, separate from the 4-sticker reaction set -- a user can
+// hold both at once (one like, one reaction), unlike reactions which
+// are one-per-user-per-post by design.
+export const toggleLike = async (postId: string, userId: string, liked: boolean) => {
+  if (liked) {
+    const { error } = await supabase.from('post_likes').insert([{ post_id: postId, user_id: userId }])
+    return { error }
+  }
+  const { error } = await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', userId)
+  return { error }
 }
 
 // posts_feed pre-computes author_name/author_anonymised server-side
@@ -608,7 +623,7 @@ export const uploadPostVideo = async (userId: string, file: File | Blob, ext: st
 
 export const createPost = async (
   organisationId: string, authorId: string,
-  fields: { content?: string; image_path?: string; video_path?: string; visibility?: 'organisation' | 'public' }
+  fields: { content?: string; image_path?: string; video_path?: string; visibility?: 'organisation' | 'public'; sticker_choices?: string[] }
 ) => {
   const { data, error } = await supabase
     .from('posts')
@@ -1507,7 +1522,7 @@ export const getVerifiedWorkForProfile = async (studentId: string) => {
     .select(`
       id, verified_at, visibility,
       verifier:users!verifications_verified_by_fkey(full_name),
-      submissions!inner(student_id, content, work_items(title, type, organisation_id, organisations(name)))
+      submissions!inner(student_id, content, file_path, file_type, work_items(title, type, criteria, organisation_id, organisations(name)))
     `)
     .eq('submissions.student_id', studentId)
     .is('revoked_at', null)

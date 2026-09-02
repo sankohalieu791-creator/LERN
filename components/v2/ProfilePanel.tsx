@@ -94,7 +94,21 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
     // one move -- there's no card left that needs to be tricked into
     // filling a guessed-at height, content just flows like every other
     // screen here does.
-    <div className="bg-[#0f0f0f] min-h-[calc(100vh-56px)] px-4 pt-4 pb-8 text-white">
+    <div className="relative bg-[#0f0f0f] min-h-[calc(100vh-56px)] px-4 pt-4 pb-8 text-white">
+        {/* Settings moved here, TikTok-style -- a quiet icon in the
+            corner rather than its own full row further down competing
+            with Saved jobs for attention. Only on the top view (not
+            inside an open folder), own view only. */}
+        {isOwn && !folder && (
+          <button
+            onClick={() => router.push('/student/settings')}
+            aria-label="Settings"
+            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/5 transition text-[#999]"
+          >
+            <SettingsIcon className="w-5 h-5" />
+          </button>
+        )}
+
         {editingBio && (
           <EditProfileScreen
             profile={profile}
@@ -115,25 +129,30 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
           />
         ) : (
           <>
-            {/* ── 1. Top block: centred, breathing ── */}
-            <div className="flex flex-col items-center text-center">
-              <Avatar path={profile.avatar_path} name={profile.full_name} size={84} textSize={29} variant="solid" />
-              <p className="text-[17px] font-semibold mt-[13px]">{profile.full_name}</p>
-              {profile.username && <p className="text-[13px] text-[#999]">@{profile.username}</p>}
+            {/* ── 1. Top block: centred, breathing -- typography
+                strengthened (bolder name/stats, tighter line-heights,
+                a touch more room around the avatar) without touching
+                the actual layout, closer to how TikTok's own profile
+                actually reads: confident weight on the identity,
+                everything else quietly secondary. ── */}
+            <div className="flex flex-col items-center text-center pt-1">
+              <Avatar path={profile.avatar_path} name={profile.full_name} size={88} textSize={30} variant="solid" />
+              <p className="text-[19px] font-bold mt-3.5 tracking-tight">{profile.full_name}</p>
+              {profile.username && <p className="text-[13px] text-[#888] mt-0.5">@{profile.username}</p>}
               {profile.bio && (
-                <p className="text-[13px] text-[#ccc] leading-[1.55] mt-3" style={{ maxWidth: 300 }}>{profile.bio}</p>
+                <p className="text-[13.5px] text-[#ccc] leading-[1.5] mt-2.5" style={{ maxWidth: 300 }}>{profile.bio}</p>
               )}
               {(profile.interest_tags || []).length > 0 && (
-                <div className="flex flex-wrap justify-center gap-2 mt-3">
+                <div className="flex flex-wrap justify-center gap-1.5 mt-3">
                   {profile.interest_tags.slice(0, 3).map((t: string) => (
-                    <span key={t} className="text-[12px] px-3 py-1 rounded-full" style={{ backgroundColor: '#E6F1FB', color: '#0C447C' }}>{t}</span>
+                    <span key={t} className="text-[11.5px] font-medium px-3 py-[5px] rounded-full" style={{ backgroundColor: '#E6F1FB', color: '#0C447C' }}>{t}</span>
                   ))}
                 </div>
               )}
               {isOwn && (
                 <button
                   onClick={() => setEditingBio(true)}
-                  className="mt-4 px-5 py-1.5 rounded-full border border-white/20 text-[13px] font-semibold hover:bg-white/5 transition"
+                  className="mt-4 px-6 py-2 rounded-full border border-white/15 text-[13px] font-semibold hover:bg-white/[0.06] active:scale-[0.98] transition"
                 >
                   Edit profile
                 </button>
@@ -141,7 +160,7 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
             </div>
 
             {/* ── 2. Stats band ── */}
-            <div className="grid grid-cols-3 divide-x divide-white/10 border-y border-white/10 mt-[22px] py-4">
+            <div className="grid grid-cols-3 divide-x divide-white/10 border-y border-white/10 mt-6 py-4">
               <Stat n={folderCount.verified} label="work" />
               <Stat n={counts.followers} label="followers" />
               <Stat n={counts.following} label="following" />
@@ -154,11 +173,11 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
               <CompactFolderTile onClick={() => setFolder('posts')} icon={Grid3x3} badgeBg="#EFEDE7" iconColor="#5A5A5A" label="Posts" count={folderCount.posts} />
             </div>
 
-            {/* ── 4. Saved jobs and Settings rows: own view only ── */}
+            {/* ── 4. Saved jobs row: own view only. Settings lives as
+                the icon top-right now, not a second row here. ── */}
             {isOwn && (
-              <div className="space-y-[10px] mt-4">
+              <div className="mt-4">
                 <ProfileRow icon={Bookmark} iconColor="#D4551A" title="Saved jobs" sub={`${folderCount.saved} saved · private to you`} onClick={() => setFolder('saved')} />
-                <ProfileRow icon={SettingsIcon} iconColor="#999999" title="Settings" sub="Account, privacy, safety" onClick={() => router.push('/student/settings')} />
               </div>
             )}
           </>
@@ -206,8 +225,8 @@ export function Avatar({ path, name, size, textSize, variant = 'light' }: { path
 function Stat({ n, label }: { n: number; label: string }) {
   return (
     <div className="text-center">
-      <p className="text-[20px] font-semibold leading-none">{n}</p>
-      <p className="text-[12px] text-[#999] mt-1.5">{label}</p>
+      <p className="text-[20px] font-bold leading-none tracking-tight">{n}</p>
+      <p className="text-[11.5px] text-[#999] mt-[7px]">{label}</p>
     </div>
   )
 }
@@ -284,6 +303,7 @@ function FolderDetail({
 }) {
   const meta = FOLDER_META[folder]
   const count = folder === 'verified' ? verified.length : folder === 'experience' ? experience.length : folder === 'posts' ? posts.length : saved.length
+  const [openWork, setOpenWork] = useState<any | null>(null)
 
   return (
     <div>
@@ -308,7 +328,7 @@ function FolderDetail({
           <>
             <div className="grid grid-cols-2 gap-[10px]">
               {verified.map(v => (
-                <div key={v.id} className="bg-[#141414] border border-white/10 rounded-xl p-[14px]">
+                <button key={v.id} onClick={() => setOpenWork(v)} className="text-left bg-[#141414] border border-white/10 rounded-xl p-[14px] hover:border-white/20 transition">
                   <span className="w-8 h-8 rounded-lg flex items-center justify-center mb-2.5" style={{ backgroundColor: '#E1F5EE' }}>
                     <CheckCircle2 className="w-4 h-4" style={{ color: '#0F6E56' }} />
                   </span>
@@ -316,7 +336,7 @@ function FolderDetail({
                   <p className="text-[12px] mt-1" style={{ color: '#4ade80' }}>
                     Verified · {new Date(v.verified_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
                   </p>
-                </div>
+                </button>
               ))}
               {quals.map(q => (
                 <div key={q.id} className="rounded-xl p-[14px] border border-dashed relative" style={{ borderColor: '#8A8A8A' }}>
@@ -418,6 +438,74 @@ function FolderDetail({
           </div>
         </>
       )}
+
+      {openWork && <VerifiedWorkDetail work={openWork} onClose={() => setOpenWork(null)} />}
+    </div>
+  )
+}
+
+// "When I click the work it should open so I can see it" -- tapping a
+// verified piece used to do nothing at all. This shows the actual
+// submitted content: the written answer/link, and the attached file
+// (an image previews inline, anything else is a real download link),
+// plus who verified it and against what criteria.
+function VerifiedWorkDetail({ work, onClose }: { work: any; onClose: () => void }) {
+  const [fileUrl, setFileUrl] = useState<string | null>(null)
+  const sub = work.submissions
+  const wi = sub?.work_items
+  const isImage = sub?.file_type && ['image/png', 'image/jpeg', 'image/webp'].includes(sub.file_type)
+
+  useEffect(() => {
+    if (sub?.file_path) getSignedFileUrl('submission-files', sub.file_path).then(({ url }) => setFileUrl(url))
+  }, [sub?.file_path])
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#0f0f0f] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-[#0f0f0f]/95 backdrop-blur border-b border-white/10">
+        <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="p-4">
+        <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-5">
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1 rounded-full mb-3" style={{ backgroundColor: '#E1F5EE', color: '#0F6E56' }}>
+            <CheckCircle2 className="w-3.5 h-3.5" /> Verified
+          </span>
+          <h1 className="text-[20px] font-bold leading-snug mb-2">{wi?.title}</h1>
+          <p className="text-[12.5px] text-[#999] mb-4">
+            Verified by {wi?.organisations?.name || work.verifier?.full_name || 'a reviewer'} · {new Date(work.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </p>
+
+          {wi?.criteria && (
+            <div className="bg-[#141414] border border-white/10 rounded-xl px-4 py-3 mb-4">
+              <p className="text-[11px] font-semibold text-[#999] uppercase tracking-wide mb-1">Criteria</p>
+              <p className="text-[13px] text-[#ccc] leading-relaxed">{wi.criteria}</p>
+            </div>
+          )}
+
+          {sub?.content && (
+            <div className="mb-4">
+              <p className="text-[11px] font-semibold text-[#999] uppercase tracking-wide mb-1.5">The work</p>
+              <p className="text-[14px] text-white whitespace-pre-wrap leading-relaxed">{sub.content}</p>
+            </div>
+          )}
+
+          {sub?.file_path && (
+            isImage && fileUrl ? (
+              <img src={fileUrl} alt="" className="w-full rounded-lg border border-white/10" />
+            ) : (
+              <a
+                href={fileUrl || '#'} target="_blank" rel="noreferrer"
+                className="flex items-center gap-2 bg-[#141414] border border-white/10 rounded-xl px-4 py-3 text-[13px] font-semibold text-white hover:border-white/20 transition"
+              >
+                <FilePlus className="w-4 h-4 text-[#999] flex-shrink-0" />
+                <span className="truncate">{sub.file_path.split('/').pop()}</span>
+              </a>
+            )
+          )}
+        </div>
+      </div>
     </div>
   )
 }

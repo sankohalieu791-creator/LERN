@@ -9,6 +9,15 @@ type Step = 'camera' | 'preview' | 'trim' | 'write' | 'details'
 type CaptureMode = 'photo' | 'video'
 const MAX_RECORD_SECS = 60
 
+// The author picks exactly 2 of these -- what shows on their post in
+// Feed, not a fixed global set every viewer sees on every post.
+const STICKER_OPTIONS = [
+  { key: 'congratulations', label: 'Celebrate', emoji: '🎉' },
+  { key: 'well_done', label: 'Well done', emoji: '👏' },
+  { key: 'keep_going', label: 'Keep going', emoji: '🔥' },
+  { key: 'proud', label: 'Proud', emoji: '⭐' },
+]
+
 // Re-encodes [start, end] of a video into a new, genuinely shorter
 // file -- not just in/out metadata, since that wouldn't actually cut
 // down what gets uploaded. No video library in this project (adding
@@ -85,6 +94,7 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
   const [capturedKind, setCapturedKind] = useState<CaptureMode>('photo')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [caption, setCaption] = useState('')
+  const [stickers, setStickers] = useState<string[]>(['congratulations', 'well_done'])
   const [visibility, setVisibility] = useState<'organisation' | 'public'>('organisation')
   const [videoDuration, setVideoDuration] = useState(0)
   const [trimStart, setTrimStart] = useState(0)
@@ -241,7 +251,7 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
         video_path = path
       }
     }
-    const { error: postErr } = await createPost(user.organisation_id, user.id, { content: caption.trim() || undefined, image_path, video_path, visibility })
+    const { error: postErr } = await createPost(user.organisation_id, user.id, { content: caption.trim() || undefined, image_path, video_path, visibility, sticker_choices: stickers })
     setPosting(false)
     if (postErr) { setError(postErr.message); return }
     onPosted()
@@ -418,6 +428,30 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
               rows={3}
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white placeholder-white/40 outline-none resize-none"
             />
+
+            <div>
+              <p className="text-[12.5px] font-semibold text-white/70 mb-2">Pick 2 stickers for this post</p>
+              <div className="flex flex-wrap gap-2">
+                {STICKER_OPTIONS.map(s => {
+                  const active = stickers.includes(s.key)
+                  return (
+                    <button
+                      key={s.key}
+                      onClick={() => setStickers(prev =>
+                        active ? prev.filter(k => k !== s.key)
+                          : prev.length >= 2 ? [prev[1], s.key] : [...prev, s.key]
+                      )}
+                      className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-medium transition ${
+                        active ? 'border-brand bg-brand/15 text-white' : 'border-white/10 bg-white/5 text-white/60'
+                      }`}
+                    >
+                      <span>{s.emoji}</span> {s.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             {isAdult && (
               <button
                 onClick={() => setVisibility(v => v === 'organisation' ? 'public' : 'organisation')}
