@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
   getFeed, getPublicFeed, setPostReaction, toggleLike, getSignedFileUrl, incrementPostViews,
 } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
-import { Heart } from 'lucide-react'
+import { Heart, Play, X } from 'lucide-react'
 
 // Feed, revised: edge-to-edge like Instagram actually is on a phone
 // (no card border/radius, no outer side margin -- those made it read
@@ -82,7 +83,9 @@ export default function FeedPanel() {
 
 function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
   const { user } = useAuth()
+  const router = useRouter()
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
+  const [playerOpen, setPlayerOpen] = useState(false)
   const viewedRef = useRef(false)
   const reactions: any[] = post.post_reactions || []
   const likes: any[] = post.post_likes || []
@@ -121,8 +124,12 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
 
   return (
     <div className="border-b border-white/10">
-      {/* ── AUTHOR ROW ── */}
-      <div className="flex items-center gap-2.5 px-4 pt-3.5 pb-2.5">
+      {/* ── AUTHOR ROW -- tapping opens their profile, own view if it's
+          you, public view otherwise ── */}
+      <button
+        onClick={() => router.push(post.author_id === user?.id ? '/student/profile' : `/student/profile/${post.author_id}`)}
+        className="w-full flex items-center gap-2.5 px-4 pt-3.5 pb-2.5 text-left"
+      >
         <span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
           {initials(post.author_name)}
         </span>
@@ -132,14 +139,26 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
             {[post.category, timeAgo(post.created_at)].filter(Boolean).join(' · ')}
           </p>
         </div>
-      </div>
+      </button>
 
-      {/* ── MEDIA: full-bleed, edge to edge ── */}
+      {/* ── MEDIA: full-bleed, edge to edge. A video is a thumbnail
+          here (like tapping a YouTube thumbnail), not autoplaying
+          inline -- tapping opens the real full-screen player below. ── */}
       {(post.image_path || post.video_path) && (
-        <div className="relative w-full bg-[#141414]" style={{ minHeight: 240 }}>
+        <div
+          className="relative w-full bg-[#141414]" style={{ minHeight: 240 }}
+          onClick={() => post.video_path && mediaUrl && setPlayerOpen(true)}
+        >
           {!mediaUrl && <div className="absolute inset-0 bg-[#141414] animate-pulse" style={{ height: 240 }} />}
           {mediaUrl && post.video_path ? (
-            <video src={mediaUrl} autoPlay loop muted playsInline controls className="w-full max-h-[520px] object-contain bg-black" />
+            <>
+              <video src={mediaUrl} muted playsInline preload="metadata" className="w-full max-h-[520px] object-cover" />
+              <button aria-label="Play video" className="absolute inset-0 flex items-center justify-center bg-black/10">
+                <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center">
+                  <Play className="w-6 h-6 text-white fill-white ml-0.5" />
+                </div>
+              </button>
+            </>
           ) : mediaUrl ? (
             <img src={mediaUrl} alt="" className="w-full max-h-[520px] object-cover" />
           ) : null}
@@ -177,6 +196,17 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
           {reactions.length > 0 && <span className="text-[12px] ml-1" style={{ color: '#999' }}>{reactions.length}</span>}
         </div>
       </div>
+
+      {playerOpen && mediaUrl && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <button onClick={() => setPlayerOpen(false)} className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-black/50 flex items-center justify-center" style={{ marginTop: 'env(safe-area-inset-top)' }}>
+            <X className="w-5 h-5 text-white" />
+          </button>
+          <div className="flex-1 flex items-center justify-center">
+            <video src={mediaUrl} controls autoPlay playsInline className="max-h-full max-w-full" />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

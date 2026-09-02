@@ -129,12 +129,10 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
           />
         ) : (
           <>
-            {/* ── 1. Top block: centred, breathing -- typography
-                strengthened (bolder name/stats, tighter line-heights,
-                a touch more room around the avatar) without touching
-                the actual layout, closer to how TikTok's own profile
-                actually reads: confident weight on the identity,
-                everything else quietly secondary. ── */}
+            {/* ── 1. Top block, reordered per direct feedback:
+                avatar/name/username/bio, then the stat numbers (TikTok
+                size, no divider lines/border-y -- that band read as
+                too heavy), then interest tags, then Edit profile. ── */}
             <div className="flex flex-col items-center text-center pt-1">
               <Avatar path={profile.avatar_path} name={profile.full_name} size={88} textSize={30} variant="solid" />
               <p className="text-[19px] font-bold mt-3.5 tracking-tight">{profile.full_name}</p>
@@ -142,8 +140,15 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
               {profile.bio && (
                 <p className="text-[13.5px] text-[#ccc] leading-[1.5] mt-2.5" style={{ maxWidth: 300 }}>{profile.bio}</p>
               )}
+
+              <div className="flex items-center gap-6 mt-4">
+                <Stat n={folderCount.verified} label="work" />
+                <Stat n={counts.followers} label="followers" />
+                <Stat n={counts.following} label="following" />
+              </div>
+
               {(profile.interest_tags || []).length > 0 && (
-                <div className="flex flex-wrap justify-center gap-1.5 mt-3">
+                <div className="flex flex-wrap justify-center gap-1.5 mt-3.5">
                   {profile.interest_tags.slice(0, 3).map((t: string) => (
                     <span key={t} className="text-[11.5px] font-medium px-3 py-[5px] rounded-full" style={{ backgroundColor: '#E6F1FB', color: '#0C447C' }}>{t}</span>
                   ))}
@@ -159,27 +164,18 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
               )}
             </div>
 
-            {/* ── 2. Stats band ── */}
-            <div className="grid grid-cols-3 divide-x divide-white/10 border-y border-white/10 mt-6 py-4">
-              <Stat n={folderCount.verified} label="work" />
-              <Stat n={counts.followers} label="followers" />
-              <Stat n={counts.following} label="following" />
-            </div>
-
-            {/* ── 3. Folder tiles: compact row of three ── */}
-            <div className="grid grid-cols-3 gap-[10px] mt-5">
+            {/* ── 2. Folders: Verified, Experience, Posts, and (own
+                view only) Saved jobs -- four in a row now, smaller,
+                and no card box around each -- just the icon badge,
+                label and count, no bg/border, per direct feedback. ── */}
+            <div className={`grid ${isOwn ? 'grid-cols-4' : 'grid-cols-3'} gap-2 mt-6`}>
               <CompactFolderTile onClick={() => setFolder('verified')} icon={FolderCheck} badgeBg="#E1F5EE" iconColor="#0F6E56" label="Verified" count={folderCount.verified} />
               <CompactFolderTile onClick={() => setFolder('experience')} icon={Briefcase} badgeBg="#E6F1FB" iconColor="#D4551A" label="Experience" count={folderCount.experience} />
               <CompactFolderTile onClick={() => setFolder('posts')} icon={Grid3x3} badgeBg="#EFEDE7" iconColor="#5A5A5A" label="Posts" count={folderCount.posts} />
+              {isOwn && (
+                <CompactFolderTile onClick={() => setFolder('saved')} icon={Bookmark} badgeBg="#FBEAE0" iconColor="#D4551A" label="Saved" count={folderCount.saved} />
+              )}
             </div>
-
-            {/* ── 4. Saved jobs row: own view only. Settings lives as
-                the icon top-right now, not a second row here. ── */}
-            {isOwn && (
-              <div className="mt-4">
-                <ProfileRow icon={Bookmark} iconColor="#D4551A" title="Saved jobs" sub={`${folderCount.saved} saved · private to you`} onClick={() => setFolder('saved')} />
-              </div>
-            )}
           </>
         )}
     </div>
@@ -222,51 +218,29 @@ export function Avatar({ path, name, size, textSize, variant = 'light' }: { path
   )
 }
 
+// TikTok-sized, not the earlier bolder/bigger treatment -- a compact
+// "n label" pair read horizontally, no divider lines around the row.
 function Stat({ n, label }: { n: number; label: string }) {
   return (
-    <div className="text-center">
-      <p className="text-[20px] font-bold leading-none tracking-tight">{n}</p>
-      <p className="text-[11.5px] text-[#999] mt-[7px]">{label}</p>
-    </div>
+    <p className="text-[13.5px] leading-none">
+      <span className="font-bold">{n}</span> <span className="text-[#999]">{label}</span>
+    </p>
   )
 }
 
-// Compact tile, not a tall stacked bar -- a 44px rounded-square icon
-// badge, label, count. Three of these plus the stats band above still
-// needs to leave room for the Saved jobs/Settings rows below without
-// the whole screen running long, which is exactly why the spec calls
-// these out as compact.
+// No card box around each tile any more -- just the icon badge, label
+// and count on the bare page, per direct feedback ("remove the box
+// around them just the thing remains"). Slightly smaller badge too.
 function CompactFolderTile({ onClick, icon: Icon, badgeBg, iconColor, label, count }: {
   onClick: () => void; icon: any; badgeBg: string; iconColor: string; label: string; count: number
 }) {
   return (
-    <button
-      onClick={onClick}
-      className="flex flex-col items-center bg-[#141414] border border-white/10 rounded-[14px] px-4 py-2 transition hover:bg-[#1a1a1a]"
-    >
-      <span className="w-11 h-11 rounded-[12px] flex items-center justify-center" style={{ backgroundColor: badgeBg }}>
-        <Icon className="w-5 h-5" style={{ color: iconColor }} />
+    <button onClick={onClick} className="flex flex-col items-center py-1 transition active:opacity-70">
+      <span className="w-9 h-9 rounded-[11px] flex items-center justify-center" style={{ backgroundColor: badgeBg }}>
+        <Icon className="w-4 h-4" style={{ color: iconColor }} />
       </span>
-      <p className="text-[13px] font-semibold mt-1.5">{label}</p>
-      <p className="text-[11px] text-[#999] mt-0.5">{count}</p>
-    </button>
-  )
-}
-
-// Saved jobs / Settings row -- icon left, two lines of text, chevron
-// right, full width.
-function ProfileRow({ icon: Icon, iconColor, title, sub, onClick }: { icon: any; iconColor: string; title: string; sub: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-3 bg-[#141414] border border-white/10 rounded-xl py-[14px] px-4 text-left hover:bg-[#1a1a1a] transition"
-    >
-      <Icon className="w-[18px] h-[18px] flex-shrink-0" style={{ color: iconColor }} />
-      <div className="flex-1 min-w-0">
-        <p className="text-[14px] font-semibold">{title}</p>
-        <p className="text-[12px] text-[#999]">{sub}</p>
-      </div>
-      <ChevronRight className="w-4 h-4 text-[#666] flex-shrink-0" />
+      <p className="text-[12px] font-semibold mt-1.5">{label}</p>
+      <p className="text-[10.5px] text-[#999] mt-0.5">{count}</p>
     </button>
   )
 }
