@@ -80,18 +80,21 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
   const folderCount = { verified: verified.length, experience: experience.length, posts: posts.length, saved: saved.length }
 
   return (
-    <div className="bg-[#0f0f0f] min-h-[calc(100vh-56px)] px-4 pt-3 pb-8 flex flex-col">
-      {/* The one rounded card everything sits on -- #1a1a1a on the
-          #0f0f0f page, this app's own established elevated-surface
-          pair (Briefs cards, Settings groups, the folder tiles below
-          all use it), not the spec text's literal white card.
-          flex-1 here is load-bearing, not decorative -- without it the
-          card only sizes to its own content, so a sparser profile
-          (short bio, few folders) left it as a small box floating
-          above a dead stretch of plain page background -- exactly
-          "why is there a square" instead of a surface that actually
-          fills the screen. */}
-      <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl pt-[26px] pb-[26px] px-5 text-white flex-1 flex flex-col">
+    // Flat, edge-to-edge, no enclosing card -- exactly how Feed, My
+    // Work, Discover and Settings already work. The previous version
+    // wrapped the whole screen in a separate #1a1a1a card floating on
+    // the #0f0f0f page, which is not a pattern anything else in this
+    // app uses -- every other screen just IS the dark surface, cards
+    // are for individual rows/tiles inside it, never the whole page.
+    // That boxed-card structure is what actually made the profile
+    // look like "a square" instead of a real screen: a self-contained
+    // box with its own visible corners sitting in the middle of a
+    // taller page, not a surface that fills it. Removing the box
+    // outright fixes both the look and the leftover-height problem in
+    // one move -- there's no card left that needs to be tricked into
+    // filling a guessed-at height, content just flows like every other
+    // screen here does.
+    <div className="bg-[#0f0f0f] min-h-[calc(100vh-56px)] px-4 pt-4 pb-8 text-white">
         {editingBio && (
           <EditProfileScreen
             profile={profile}
@@ -160,7 +163,6 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
             )}
           </>
         )}
-      </div>
     </div>
   )
 }
