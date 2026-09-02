@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getDiscoverWork, getMyInterest, expressInterest } from '@/lib/supabase'
-import { BadgeCheck, Search, Send, Check, Clock } from 'lucide-react'
+import { getDiscoverWork, getMyInterest, expressInterest, getTalentPools, createTalentPool, addToTalentPool } from '@/lib/supabase'
+import { BadgeCheck, Search, Send, Check, Clock, Bookmark, Shield } from 'lucide-react'
 
 type WorkType = 'all' | 'brief' | 'course' | 'workshop'
 
@@ -24,6 +24,7 @@ export default function EmployerDiscoverPanel() {
   const [interestByStudent, setInterestByStudent] = useState<Record<string, string>>({})
   const [sending, setSending] = useState<string | null>(null)
   const [composer, setComposer] = useState<{ studentId: string; studentName: string; label?: string } | null>(null)
+  const [poolPickerFor, setPoolPickerFor] = useState<string | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -122,19 +123,42 @@ export default function EmployerDiscoverPanel() {
                     ) : status === 'declined' ? (
                       <span className="text-[12px] font-semibold text-ink-tertiary flex-shrink-0">Declined</span>
                     ) : (
-                      <button
-                        onClick={() => setComposer({ studentId: student.id, studentName: student.full_name || 'this student', label: wi?.title })}
-                        disabled={sending === student.id}
-                        className="flex items-center gap-1.5 bg-brand text-white text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 transition disabled:opacity-50 flex-shrink-0"
-                      >
-                        <Send className="w-3.5 h-3.5" /> {sending === student.id ? 'Sending…' : 'Place your offer'}
-                      </button>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <div className="relative">
+                          <button
+                            onClick={() => setPoolPickerFor(v => v === student.id ? null : student.id)}
+                            aria-label="Save to a talent pool"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg border border-edge text-ink-tertiary hover:border-edge-input transition"
+                          >
+                            <Bookmark className="w-3.5 h-3.5" />
+                          </button>
+                          {poolPickerFor === student.id && (
+                            <PoolPicker studentId={student.id} onClose={() => setPoolPickerFor(null)} />
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setComposer({ studentId: student.id, studentName: student.full_name || 'this student', label: wi?.title })}
+                          disabled={sending === student.id}
+                          className="flex items-center gap-1.5 bg-brand text-white text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 transition disabled:opacity-50"
+                        >
+                          <Send className="w-3.5 h-3.5" /> {sending === student.id ? 'Sending…' : 'Express interest'}
+                        </button>
+                      </div>
                     )
                   )}
                 </div>
               </div>
             )
           })}
+        </div>
+      )}
+
+      {items.length > 0 && (
+        <div className="rounded-lg px-[13px] py-[10px] flex items-start gap-2" style={{ backgroundColor: '#E1F5EE' }}>
+          <Shield className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#0F6E56' }} />
+          <p className="text-[12px]" style={{ color: '#0F6E56' }}>
+            Under-18s are not publicly searchable as people. You express interest, and it routes through their school.
+          </p>
         </div>
       )}
 
@@ -145,6 +169,61 @@ export default function EmployerDiscoverPanel() {
           onClose={() => setComposer(null)}
           onSend={handleExpress}
         />
+      )}
+    </div>
+  )
+}
+
+// Small anchored dropdown -- pick an existing pool or make a new one
+// on the spot, per spec: "Candidates are added from Discover via the
+// bookmark button."
+function PoolPicker({ studentId, onClose }: { studentId: string; onClose: () => void }) {
+  const { user } = useAuth()
+  const [pools, setPools] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [name, setName] = useState('')
+  const [saved, setSaved] = useState<string | null>(null)
+
+  useEffect(() => { if (user) getTalentPools(user.id).then(({ data }) => { setPools(data || []); setLoading(false) }) }, [user?.id])
+
+  const save = async (poolId: string) => {
+    await addToTalentPool(poolId, studentId)
+    setSaved(poolId)
+    setTimeout(onClose, 700)
+  }
+  const makeAndSave = async () => {
+    if (!name.trim() || !user) return
+    const { data } = await createTalentPool(user.id, name.trim())
+    if (data) save(data.id)
+  }
+
+  return (
+    <div className="absolute right-0 top-9 z-20 w-52 bg-surface border border-edge rounded-xl shadow-lg p-2" onMouseLeave={onClose}>
+      {loading ? (
+        <p className="text-[12px] text-ink-tertiary px-2 py-1.5">Loading…</p>
+      ) : (
+        <>
+          {pools.map(p => (
+            <button key={p.id} onClick={() => save(p.id)} className="w-full text-left px-2 py-1.5 rounded-lg text-[12.5px] text-ink hover:bg-surface-muted transition flex items-center justify-between">
+              {p.name} {saved === p.id && <Check className="w-3.5 h-3.5 text-success-text" />}
+            </button>
+          ))}
+          {creating ? (
+            <div className="flex items-center gap-1 px-1 pt-1">
+              <input
+                value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="Pool name"
+                onKeyDown={e => e.key === 'Enter' && makeAndSave()}
+                className="flex-1 bg-surface-subtle border border-edge rounded-md px-2 py-1 text-[12px] text-ink outline-none focus:border-brand"
+              />
+              <button onClick={makeAndSave} className="text-[11px] font-semibold text-brand px-1.5">Add</button>
+            </div>
+          ) : (
+            <button onClick={() => setCreating(true)} className="w-full text-left px-2 py-1.5 rounded-lg text-[12.5px] font-semibold text-brand hover:bg-surface-muted transition">
+              + New pool
+            </button>
+          )}
+        </>
       )}
     </div>
   )

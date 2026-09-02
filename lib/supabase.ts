@@ -1014,6 +1014,11 @@ export const applyToOpportunity = async (opportunityId: string, studentId: strin
     .insert([{ opportunity_id: opportunityId, student_id: studentId }])
     .select()
     .single()
+  // Feeds the job tracker (Complete Build Spec v1.0, Part 2) --
+  // "Applied" is the pipeline's literal first stage. Best-effort: a
+  // failure here shouldn't undo the application itself, which already
+  // succeeded above.
+  if (data) createApplicationFromOpportunity(data.id, opportunityId, studentId).catch(() => {})
   return { data, error }
 }
 
@@ -1047,6 +1052,10 @@ export const respondToInterest = async (interestId: string, status: 'accepted' |
     .eq('id', interestId)
     .select()
     .single()
+  // "Accepted requests can feed a young person into the job tracker"
+  // (Complete Build Spec v1.0, Part 2) -- only on acceptance, never on
+  // decline. Best-effort, same reasoning as applyToOpportunity above.
+  if (data && status === 'accepted') createApplicationFromAcceptedInterest(interestId, data.employer_id, data.student_id).catch(() => {})
   return { data, error }
 }
 
@@ -1095,6 +1104,214 @@ export const closeInterestThread = async (interestId: string) => {
     .select()
     .single()
   return { data, error }
+}
+
+// ── Job tracker (Complete Build Spec v1.0, Part 2) + Employer side
+// Candidates (Part 3) -- the same board, viewed from the organisation
+// (watches only) or the employer (moves cards) side. `applications` is
+// its own table on purpose, kept separate from `interest` and
+// `opportunity_interest` so neither of those already-shipped,
+// safeguarding-sensitive flows is touched -- an application is CREATED
+// by hooking the exact moments the spec names as the pipeline's start,
+// not by repurposing their own status columns. ────────────────────
+
+export type ApplicationStage = 'applied' | 'reviewing' | 'shortlisted' | 'interview' | 'offer' | 'hired' | 'not_progressing'
+export const APPLICATION_STAGES: ApplicationStage[] = ['applied', 'reviewing', 'shortlisted', 'interview', 'offer', 'hired', 'not_progressing']
+
+const logApplicationActivity = async (applicationId: string, actorId: string | null, action: string, detail?: string) => {
+  await supabase.from('application_activity').insert([{ application_id: applicationId, actor_id: actorId, action, detail }])
+}
+
+// A student applying to a posted opportunity -- "Applied" is the
+// literal first pipeline stage, so this is the entry point for that path.
+export const createApplicationFromOpportunity = async (opportunityInterestId: string, opportunityId: string, studentId: string) => {
+  const [{ data: opp }, { data: student }] = await Promise.all([
+    supabase.from('opportunities').select('employer_id').eq('id', opportunityId).single(),
+    supabase.from('users').select('organisation_id').eq('id', studentId).single(),
+  ])
+  if (!opp) return { data: null, error: { message: 'Opportunity not found.' } as any }
+  const { data, error } = await supabase
+    .from('applications')
+    .insert([{
+      student_id: studentId, employer_id: opp.employer_id, opportunity_id: opportunityId,
+      organisation_id: student?.organisation_id || null, source_opportunity_interest_id: opportunityInterestId, stage: 'applied',
+    }])
+    .select().single()
+  if (data) await logApplicationActivity(data.id, studentId, 'applied')
+  return { data, error }
+}
+
+// An employer's direct interest in a student being ACCEPTED -- "Accepted
+// requests can feed a young person into the job tracker."
+export const createApplicationFromAcceptedInterest = async (interestId: string, employerId: string, studentId: string) => {
+  const { data: student } = await supabase.from('users').select('organisation_id').eq('id', studentId).single()
+  const { data, error } = await supabase
+    .from('applications')
+    .insert([{ student_id: studentId, employer_id: employerId, organisation_id: student?.organisation_id || null, source_interest_id: interestId, stage: 'applied' }])
+    .select().single()
+  if (data) await logApplicationActivity(data.id, employerId, 'applied')
+  return { data, error }
+}
+
+export const getApplicationsForEmployer = async (employerId: string) => {
+  const { data, error } = await supabase
+    .from('applications')
+    .select('*, student:users!applications_student_id_fkey(id, full_name, date_of_birth), opportunity:opportunities(title)')
+    .eq('employer_id', employerId)
+    .order('stage_updated_at', { ascending: false })
+  return { data, error }
+}
+
+export const getApplicationsForOrganisation = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('applications')
+    .select('*, student:users!applications_student_id_fkey(id, full_name, date_of_birth), employer:users!applications_employer_id_fkey(full_name), opportunity:opportunities(title)')
+    .eq('organisation_id', organisationId)
+    .order('stage_updated_at', { ascending: false })
+  return { data, error }
+}
+
+const STAGE_LABEL: Record<ApplicationStage, string> = {
+  applied: 'Applied', reviewing: 'Reviewing', shortlisted: 'Shortlisted', interview: 'Interview',
+  offer: 'Offer', hired: 'Hired', not_progressing: 'Not progressing',
+}
+
+// Only the employer moves cards ("The EMPLOYER moves cards between
+// stages; they own stage changes... The ORGANISATION does not move
+// cards"), enforced by RLS (applications: employer manage own is the
+// only UPDATE-of-stage-shaped policy an employer's own auth.uid() can hit).
+export const moveApplicationStage = async (applicationId: string, stage: ApplicationStage, actorId: string) => {
+  const { data, error } = await supabase
+    .from('applications')
+    .update({ stage, stage_updated_at: new Date().toISOString() })
+    .eq('id', applicationId)
+    .select().single()
+  if (data) await logApplicationActivity(applicationId, actorId, `moved_to_${stage}`, `Moved to ${STAGE_LABEL[stage]}`)
+  return { data, error }
+}
+
+export const setApplicationPrivateNote = async (applicationId: string, note: string) => {
+  const { error } = await supabase.from('applications').update({ private_note: note }).eq('id', applicationId)
+  return { error }
+}
+
+export const getApplicationActivity = async (applicationId: string) => {
+  const { data, error } = await supabase
+    .from('application_activity')
+    .select('*, actor:users(full_name)')
+    .eq('application_id', applicationId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// ── Employer side (Part 3): Talent pools ───────────────────────────
+export const getTalentPools = async (employerId: string) => {
+  const { data, error } = await supabase
+    .from('talent_pools')
+    .select('*, talent_pool_members(count)')
+    .eq('employer_id', employerId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const createTalentPool = async (employerId: string, name: string) => {
+  const { data, error } = await supabase.from('talent_pools').insert([{ employer_id: employerId, name }]).select().single()
+  return { data, error }
+}
+
+export const deleteTalentPool = async (id: string) => {
+  const { error } = await supabase.from('talent_pools').delete().eq('id', id)
+  return { error }
+}
+
+export const getTalentPoolMembers = async (poolId: string) => {
+  const { data, error } = await supabase
+    .from('talent_pool_members')
+    .select('id, created_at, student:users(id, full_name)')
+    .eq('pool_id', poolId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const addToTalentPool = async (poolId: string, studentId: string) => {
+  const { error } = await supabase.from('talent_pool_members').insert([{ pool_id: poolId, student_id: studentId }])
+  return { error }
+}
+
+export const removeFromTalentPool = async (memberRowId: string) => {
+  const { error } = await supabase.from('talent_pool_members').delete().eq('id', memberRowId)
+  return { error }
+}
+
+// ── Employer side (Part 3): Partners -- derived, not a separate
+// relationship table. A "partner" is any organisation that has
+// actually shown up through real interaction (an application), so
+// there's nothing to fake-connect -- reached/hired counts come
+// straight from applications grouped by organisation.
+export const getEmployerPartners = async (employerId: string) => {
+  const { data, error } = await supabase
+    .from('applications')
+    .select('organisation_id, stage, organisation:organisations(id, name, type)')
+    .eq('employer_id', employerId)
+    .not('organisation_id', 'is', null)
+  if (error || !data) return { data: null, error }
+  const byOrg = new Map<string, { id: string; name: string; type: string; reached: number; hired: number }>()
+  for (const row of data as any[]) {
+    const org = row.organisation
+    if (!org) continue
+    if (!byOrg.has(org.id)) byOrg.set(org.id, { id: org.id, name: org.name, type: org.type, reached: 0, hired: 0 })
+    const entry = byOrg.get(org.id)!
+    entry.reached++
+    if (row.stage === 'hired') entry.hired++
+  }
+  return { data: Array.from(byOrg.values()).sort((a, b) => b.reached - a.reached), error: null }
+}
+
+// ── Employer side (Part 3): Inbox ──────────────────────────────────
+// "A list of activity items: new applications, organisation responses
+// to interest requests, and status updates." No unread-dot here --
+// there's no real read-tracking behind it yet, and a fake blue dot
+// that never actually reflects anything read/unread would be worse
+// than not having one.
+export const getEmployerInboxItems = async (employerId: string) => {
+  const [{ data: apps }, { data: interest }] = await Promise.all([
+    supabase.from('applications').select('id, stage, created_at, student:users!applications_student_id_fkey(full_name), opportunity:opportunities(title)').eq('employer_id', employerId),
+    supabase.from('interest').select('id, status, created_at, student:users!interest_student_id_fkey(full_name)').eq('employer_id', employerId),
+  ])
+  const items: { id: string; icon: 'application' | 'interest'; text: string; created_at: string }[] = []
+  for (const a of apps || []) {
+    items.push({ id: `app-${a.id}`, icon: 'application', text: `${(a as any).student?.full_name} applied to ${(a as any).opportunity?.title || 'a role'}`, created_at: a.created_at })
+  }
+  for (const i of interest || []) {
+    if (i.status === 'accepted') items.push({ id: `int-${i.id}`, icon: 'interest', text: `${(i as any).student?.full_name}'s organisation accepted your request`, created_at: i.created_at })
+    else if (i.status === 'declined') items.push({ id: `int-${i.id}`, icon: 'interest', text: `${(i as any).student?.full_name}'s organisation declined your request`, created_at: i.created_at })
+  }
+  items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  return { data: items, error: null }
+}
+
+// ── Employer side (Part 3): Dashboard ──────────────────────────────
+export const getEmployerDashboardStats = async (employerId: string) => {
+  const { data, error } = await supabase
+    .from('applications')
+    .select('stage, student_id, organisation:organisations(name)')
+    .eq('employer_id', employerId)
+  if (error || !data) return { data: null, error }
+  const rows = data as any[]
+  const hired = rows.filter(r => r.stage === 'hired').length
+  const inPipeline = rows.filter(r => !['hired', 'not_progressing'].includes(r.stage)).length
+  const youngPeopleReached = new Set(rows.map(r => r.student_id)).size
+  const hiresByPartner = new Map<string, number>()
+  for (const r of rows) {
+    if (r.stage === 'hired' && r.organisation?.name) hiresByPartner.set(r.organisation.name, (hiresByPartner.get(r.organisation.name) || 0) + 1)
+  }
+  return {
+    data: {
+      hired, inPipeline, youngPeopleReached,
+      hiresByPartner: Array.from(hiresByPartner.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+    },
+    error: null,
+  }
 }
 
 // Never exposes raw date_of_birth to an employer -- just the computed

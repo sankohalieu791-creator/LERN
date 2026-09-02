@@ -299,105 +299,105 @@ function WorkItemDetail({
   }
 
   return (
-    // bg-paper/text-ink etc. throughout this screen now, not literal
-    // #0f0f0f/#1a1a1a/white hex -- the same theme-token vocabulary the
-    // org "Create brief" screen (NewBriefForm, WorkItemsPanel.tsx) is
-    // built on. StudentShell still pins data-theme="dark" on itself
-    // deliberately (the phone app is dark-only for now), so this
-    // renders identically to before today -- but it's genuinely
-    // theme-capable now rather than hardcoded, and reads with the same
-    // considered, labelled-section feel as Create brief instead of the
-    // ad-hoc hex it had before.
+    // Rebuilt as an actual BOX, not just recoloured -- a slim bar
+    // (back arrow only) above one rounded card that holds everything,
+    // with the title big and bold right at the top of that card, in
+    // the same position/weight NewBriefForm's own "Untitled brief"
+    // input sits in. The previous version kept the old full-bleed page
+    // shape (small header bar + a gradient banner + loose flat
+    // sections) and only swapped its colours for theme tokens -- that
+    // matched the PALETTE, not the actual layout being asked for.
     <div className="fixed inset-0 z-50 bg-paper overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <div className="sticky top-0 z-10 flex items-center gap-3 h-14 px-3 bg-paper/95 backdrop-blur border-b border-edge-subtle">
+      <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-paper/95 backdrop-blur border-b border-edge-subtle">
         <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-muted text-ink">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <span className="font-bold text-ink text-[15px] truncate">{item.title}</span>
-      </div>
-
-      {/* Banner gradient + brand-gradient CTAs stay exactly as they
-          are -- a deliberate brand treatment, not a theme inconsistency. */}
-      <div className={`h-[200px] bg-gradient-to-br ${bannerGradient(item.id)} flex items-center justify-center`}>
-        <span className="text-white/10 font-black text-5xl tracking-tight select-none">LERN</span>
       </div>
 
       <div className="p-4">
-        <h1 className="font-bold text-ink text-xl leading-snug mb-2">{item.title}</h1>
+        <div className="bg-surface border border-edge rounded-2xl p-5">
+          <h1 className="text-2xl font-bold text-ink leading-snug mb-3">{item.title}</h1>
 
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
-            {initials(hostName)}
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
+              {initials(hostName)}
+            </div>
+            <span className="text-ink text-sm font-semibold flex items-center gap-1">
+              {hostName || 'Your organisation'}
+              <BadgeCheck className="w-3.5 h-3.5 text-[#4a9de0]" />
+            </span>
           </div>
-          <span className="text-ink text-sm font-semibold flex items-center gap-1">
-            {hostName || 'Your organisation'}
-            <BadgeCheck className="w-3.5 h-3.5 text-[#4a9de0]" />
-          </span>
-        </div>
 
-        {item.description && <p className="text-ink-secondary text-sm leading-snug mb-4">{item.description}</p>}
+          {item.description && <p className="text-ink-secondary text-sm leading-snug mb-4">{item.description}</p>}
 
-        <div className="flex items-center gap-4 text-ink-tertiary text-xs mb-4">
-          {item.type === 'brief' || item.type === 'assignment' ? (
-            item.deadline && <span className="flex items-center gap-1"><CalendarClock className="w-3 h-3" /> Due {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-          ) : (
-            <>
-              {item.starts_at && <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Starts {new Date(item.starts_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{item.duration_label ? ` · ${item.duration_label}` : ''}</span>}
-              {memberCount !== null && <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {memberCount} joined</span>}
-            </>
-          )}
-        </div>
-
-        <p className="text-[11px] font-bold text-ink-tertiary uppercase tracking-wide mb-1.5">
-          {item.type === 'assignment' ? 'Assignment' : 'Criteria'}
-        </p>
-        <p className="text-sm text-ink-body mb-4 leading-snug">{item.assignment || item.criteria}</p>
-
-        {(item.type === 'workshop' || item.type === 'course') && (
-          <div className="mb-4">
-            {item.ended_at ? (
-              <span className="inline-flex items-center gap-1.5 bg-white/10 text-[#999] font-semibold text-sm px-4 py-2.5 rounded-lg"><Video className="w-4 h-4" /> Ended</span>
-            ) : item.mode === 'online' && !item.started_at && item.starts_at && new Date(item.starts_at) > new Date() ? (
-              <p className="flex items-center gap-1.5 text-sm text-[#aaa]">
-                <CalendarClock className="w-4 h-4" /> Starts {new Date(item.starts_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} — join opens once it's started.
-              </p>
-            ) : item.mode === 'online' ? (
-              <button onClick={() => setInSession(true)} className="flex items-center gap-2 bg-red-500 text-white font-bold text-sm px-5 py-3 rounded-2xl">
-                <Video className="w-4 h-4" /> Join session
-              </button>
-            ) : item.location && (
-              <p className="flex items-center gap-1.5 text-sm text-[#aaa]"><MapPin className="w-4 h-4" /> {item.location}</p>
+          <div className="flex items-center gap-4 text-ink-tertiary text-xs mb-4">
+            {item.type === 'brief' || item.type === 'assignment' ? (
+              item.deadline && <span className="flex items-center gap-1"><CalendarClock className="w-3 h-3" /> Due {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+            ) : (
+              <>
+                {item.starts_at && <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Starts {new Date(item.starts_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{item.duration_label ? ` · ${item.duration_label}` : ''}</span>}
+                {memberCount !== null && <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {memberCount} joined</span>}
+              </>
             )}
           </div>
-        )}
-        {inSession && <WorkshopSession workItemId={item.id} title={item.title} onClose={() => setInSession(false)} />}
 
-        {allSubs.length > 0 && (
-          <div className="space-y-2 mb-4">
-            {allSubs.map((s: any) => <SubmissionRow key={s.id} submission={s} />)}
+          <label className="block mb-1.5">
+            <span className="block text-[13px] font-semibold text-ink">
+              {item.type === 'assignment' ? 'Assignment' : 'Criteria'}
+            </span>
+          </label>
+          <div className="bg-surface-subtle border border-edge rounded-xl px-4 py-3 mb-4">
+            <p className="text-sm text-ink-body leading-relaxed">{item.assignment || item.criteria}</p>
           </div>
-        )}
 
-        {canSubmit && (
-          <div className="border-t border-edge-subtle pt-4">
-            <p className="text-[13px] font-semibold text-ink mb-2.5">Your submission</p>
-            {error && <p className="text-xs text-danger-text mb-2">{error}</p>}
-            <textarea
-              value={content} onChange={e => setContent(e.target.value)}
-              placeholder="Paste a link, or write your work here."
-              rows={5}
-              className="w-full bg-surface-subtle border border-edge rounded-xl px-4 py-3 text-sm text-ink placeholder-ink-quaternary outline-none focus:border-brand focus:bg-surface transition mb-3 resize-none"
-            />
-            <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 text-xs font-semibold text-ink-secondary mb-4">
-              <Paperclip className="w-3.5 h-3.5" /> {file ? file.name : 'Attach a file (optional)'}
-              {file && <span onClick={e => { e.stopPropagation(); setFile(null) }} className="hover:text-danger-text"><X className="w-3.5 h-3.5" /></span>}
-            </button>
-            <input ref={fileRef} type="file" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
-            <button onClick={handleSubmit} disabled={loading} className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold text-sm py-3 rounded-2xl disabled:opacity-60">
-              {loading ? 'Submitting…' : latest?.status === 'returned' ? 'Resubmit' : 'Submit work'}
-            </button>
-          </div>
-        )}
+          {(item.type === 'workshop' || item.type === 'course') && (
+            <div className="mb-4">
+              {item.ended_at ? (
+                <span className="inline-flex items-center gap-1.5 bg-surface-muted text-ink-tertiary font-semibold text-sm px-4 py-2.5 rounded-lg"><Video className="w-4 h-4" /> Ended</span>
+              ) : item.mode === 'online' && !item.started_at && item.starts_at && new Date(item.starts_at) > new Date() ? (
+                <p className="flex items-center gap-1.5 text-sm text-ink-secondary">
+                  <CalendarClock className="w-4 h-4" /> Starts {new Date(item.starts_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} — join opens once it's started.
+                </p>
+              ) : item.mode === 'online' ? (
+                <button onClick={() => setInSession(true)} className="flex items-center gap-2 bg-red-500 text-white font-bold text-sm px-5 py-3 rounded-2xl">
+                  <Video className="w-4 h-4" /> Join session
+                </button>
+              ) : item.location && (
+                <p className="flex items-center gap-1.5 text-sm text-ink-secondary"><MapPin className="w-4 h-4" /> {item.location}</p>
+              )}
+            </div>
+          )}
+          {inSession && <WorkshopSession workItemId={item.id} title={item.title} onClose={() => setInSession(false)} />}
+
+          {allSubs.length > 0 && (
+            <div className="space-y-2 mb-4">
+              {allSubs.map((s: any) => <SubmissionRow key={s.id} submission={s} />)}
+            </div>
+          )}
+
+          {canSubmit && (
+            <div className="border-t border-edge-subtle pt-4">
+              <label className="block mb-1.5">
+                <span className="block text-[13px] font-semibold text-ink">Your submission</span>
+              </label>
+              {error && <p className="text-xs text-danger-text mb-2">{error}</p>}
+              <textarea
+                value={content} onChange={e => setContent(e.target.value)}
+                placeholder="Paste a link, or write your work here."
+                rows={5}
+                className="w-full bg-surface-subtle border border-edge rounded-xl px-4 py-3 text-sm text-ink placeholder-ink-quaternary outline-none focus:border-brand focus:bg-surface transition mb-3 resize-none"
+              />
+              <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 text-xs font-semibold text-ink-secondary mb-4">
+                <Paperclip className="w-3.5 h-3.5" /> {file ? file.name : 'Attach a file (optional)'}
+                {file && <span onClick={e => { e.stopPropagation(); setFile(null) }} className="hover:text-danger-text"><X className="w-3.5 h-3.5" /></span>}
+              </button>
+              <input ref={fileRef} type="file" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
+              <button onClick={handleSubmit} disabled={loading} className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold text-sm py-3 rounded-2xl disabled:opacity-60">
+                {loading ? 'Submitting…' : latest?.status === 'returned' ? 'Resubmit' : 'Submit work'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

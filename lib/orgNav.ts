@@ -1,4 +1,4 @@
-import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase, Search, Megaphone, HeartHandshake } from 'lucide-react'
+import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase, Search, Megaphone, HeartHandshake, Inbox, Bookmark, Building2 } from 'lucide-react'
 import type { NavItem } from '@/components/v2/OrgShell'
 
 // Review is its own section for both roles now — Job tracking too (not
@@ -41,23 +41,31 @@ export const providerPhoneItems: [NavItem, NavItem, NavItem] = [
   providerSections[6], // Dashboard
 ]
 
-// Independent employer sidebar — Feed, Discover, Briefs, Opportunities,
-// Candidates, Dashboard, per the "Employer side (two types) +
-// connections" spec. ("Job Tracker" from the earlier draft is the same
-// place as "Candidates" here — renamed to match, not a new page.)
+// Independent employer sidebar — Complete Build Spec v1.0, Part 3's
+// exact eight items and order (Feed, Discover, Jobs, Candidates,
+// Inbox, Talent pools, Partners, Dashboard), with Briefs kept right
+// after Feed -- real, already-shipped functionality the spec's list
+// just doesn't re-mention, not something to delete because a newer,
+// narrower-scoped spec didn't name it. "Opportunities" renamed to
+// "Jobs" to match the spec's exact label ("The posting button is
+// called Jobs, not Discover... keep these two separate and named
+// exactly this way") -- same page underneath, label only.
 // This nav is never shown to a guest employer (Type 1) — see
 // GuestEmployerShell, which replaces OrgShell entirely for them.
 export const employerSections: NavItem[] = [
-  { key: 'feed',           label: 'Feed',          icon: Home,            href: '/employer/feed' },
-  { key: 'discover',       label: 'Discover',      icon: Search,          href: '/employer/discover' },
-  { key: 'briefs',         label: 'Briefs',        icon: FileText,        href: '/employer/briefs' },
-  { key: 'opportunities',  label: 'Opportunities', icon: Megaphone,       href: '/employer/opportunities' },
-  { key: 'candidates',     label: 'Candidates',    icon: Briefcase,       href: '/employer/candidates' },
-  { key: 'dashboard',      label: 'Dashboard',     icon: LayoutDashboard, href: '/employer/dashboard' },
+  { key: 'feed',          label: 'Feed',         icon: Home,            href: '/employer/feed' },
+  { key: 'briefs',        label: 'Briefs',       icon: FileText,        href: '/employer/briefs' },
+  { key: 'discover',      label: 'Discover',     icon: Search,          href: '/employer/discover' },
+  { key: 'jobs',          label: 'Jobs',         icon: Megaphone,       href: '/employer/opportunities' },
+  { key: 'candidates',    label: 'Candidates',   icon: Briefcase,       href: '/employer/candidates' },
+  { key: 'inbox',         label: 'Inbox',        icon: Inbox,           href: '/employer/inbox' },
+  { key: 'talent-pools',  label: 'Talent pools', icon: Bookmark,        href: '/employer/talent-pools' },
+  { key: 'partners',      label: 'Partners',     icon: Building2,       href: '/employer/partners' },
+  { key: 'dashboard',     label: 'Dashboard',    icon: LayoutDashboard, href: '/employer/dashboard' },
 ]
 
 export const employerPhoneItems: [NavItem, NavItem, NavItem] = [
-  employerSections[1], // Discover
-  employerSections[3], // Opportunities
-  employerSections[5], // Dashboard
+  employerSections[2], // Discover
+  employerSections[4], // Candidates
+  employerSections[8], // Dashboard
 ]

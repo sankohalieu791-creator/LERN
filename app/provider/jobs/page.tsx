@@ -1,7 +1,10 @@
 'use client'
 
-import ComingSoon from '@/components/v2/ComingSoon'
+import { useAuth } from '@/context/AuthContext'
+import JobTrackerBoard from '@/components/v2/JobTrackerBoard'
 
 export default function ProviderJobsPage() {
-  return <ComingSoon title="Job tracking" note="Job-application tracking through LERN is being built — not live yet." />
+  const { user } = useAuth()
+  if (!user?.organisation_id) return null
+  return <JobTrackerBoard viewer="org" organisationId={user.organisation_id} />
 }
