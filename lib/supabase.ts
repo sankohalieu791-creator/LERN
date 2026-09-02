@@ -966,13 +966,24 @@ export const getMyOpportunities = async (employerId: string) => {
   return { data, error }
 }
 
-export const createOpportunity = async (employerId: string, fields: { title: string; description?: string }) => {
+export const createOpportunity = async (employerId: string, fields: {
+  title: string; description?: string; type?: 'job' | 'apprenticeship' | 'internship'
+  salary?: string; requirements?: string; location?: string; logo_path?: string
+}) => {
   const { data, error } = await supabase
     .from('opportunities')
     .insert([{ employer_id: employerId, ...fields }])
     .select()
     .single()
   return { data, error }
+}
+
+// Reuses the avatars bucket's own storage (public read, owner-folder
+// write) -- same RLS shape it already has, no new bucket needed.
+export const uploadOpportunityLogo = async (employerId: string, file: File) => {
+  const path = `${employerId}/${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from('avatars').upload(path, file)
+  return { path: error ? null : path, error }
 }
 
 export const deleteOpportunity = async (id: string) => {
@@ -1294,7 +1305,7 @@ export const getEmployerInboxItems = async (employerId: string) => {
 export const getEmployerDashboardStats = async (employerId: string) => {
   const { data, error } = await supabase
     .from('applications')
-    .select('stage, student_id, organisation:organisations(name)')
+    .select('stage, student_id, created_at, organisation:organisations(name)')
     .eq('employer_id', employerId)
   if (error || !data) return { data: null, error }
   const rows = data as any[]
@@ -1305,10 +1316,30 @@ export const getEmployerDashboardStats = async (employerId: string) => {
   for (const r of rows) {
     if (r.stage === 'hired' && r.organisation?.name) hiresByPartner.set(r.organisation.name, (hiresByPartner.get(r.organisation.name) || 0) + 1)
   }
+
+  // Real activity trend, last 6 months -- how many applications actually
+  // landed each month, so "up or down" is a fact, not a guess.
+  const now = new Date()
+  const months: { key: string; label: string; count: number }[] = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString('en-GB', { month: 'short' }), count: 0 })
+  }
+  for (const r of rows) {
+    const d = new Date(r.created_at)
+    const key = `${d.getFullYear()}-${d.getMonth()}`
+    const m = months.find(m => m.key === key)
+    if (m) m.count++
+  }
+  const thisMonth = months[months.length - 1].count
+  const lastMonth = months[months.length - 2].count
+  const trend: 'up' | 'down' | 'flat' = thisMonth > lastMonth ? 'up' : thisMonth < lastMonth ? 'down' : 'flat'
+
   return {
     data: {
       hired, inPipeline, youngPeopleReached,
       hiresByPartner: Array.from(hiresByPartner.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+      monthlyActivity: months, trend,
     },
     error: null,
   }

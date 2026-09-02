@@ -80,12 +80,18 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
   const folderCount = { verified: verified.length, experience: experience.length, posts: posts.length, saved: saved.length }
 
   return (
-    <div className="bg-[#0f0f0f] min-h-[calc(100vh-56px)] px-4 pt-3 pb-8">
+    <div className="bg-[#0f0f0f] min-h-[calc(100vh-56px)] px-4 pt-3 pb-8 flex flex-col">
       {/* The one rounded card everything sits on -- #1a1a1a on the
           #0f0f0f page, this app's own established elevated-surface
           pair (Briefs cards, Settings groups, the folder tiles below
-          all use it), not the spec text's literal white card. */}
-      <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl pt-[26px] pb-[26px] px-5 text-white">
+          all use it), not the spec text's literal white card.
+          flex-1 here is load-bearing, not decorative -- without it the
+          card only sizes to its own content, so a sparser profile
+          (short bio, few folders) left it as a small box floating
+          above a dead stretch of plain page background -- exactly
+          "why is there a square" instead of a surface that actually
+          fills the screen. */}
+      <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl pt-[26px] pb-[26px] px-5 text-white flex-1 flex flex-col">
         {editingBio && (
           <EditProfileScreen
             profile={profile}

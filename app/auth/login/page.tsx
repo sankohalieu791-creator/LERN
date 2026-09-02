@@ -49,11 +49,25 @@ export default function LoginPage() {
     setGreeting({ name: '', dest: routeForRole(role) })
   }
 
+  // "Choose school and press log in" as one actual tap, not type the
+  // demo credential first and only THEN get offered the role picker.
+  // Signs in with the one public demo credential and switches straight
+  // to the picked role in a single action — no separate typing step.
+  const [demoBusy, setDemoBusy] = useState<Role | null>(null)
+  const quickPreview = async (role: Role) => {
+    setError(''); setDemoBusy(role)
+    const { data, error: signInError } = await signIn('Lern12@gmail.com', 'Lerntesterapp')
+    if (signInError || !data.user) { setDemoBusy(null); setError('Could not reach the demo account — try again.'); return }
+    await refreshUser()
+    await handleDemoSwitched(role)
+    setDemoBusy(null)
+  }
+
   if (greeting) return <LoginGreeting name={greeting.name} onDone={() => router.replace(greeting.dest)} />
 
   if (showRolePicker) {
     return (
-      <AuthShell title="Choose a view" subtitle="Pick a role to look around as — switch any time by logging back in.">
+      <AuthShell title="Choose a view" subtitle="Pick a role to look around as — switch any time from here.">
         <DemoRolePicker onSwitched={handleDemoSwitched} />
       </AuthShell>
     )
@@ -73,6 +87,38 @@ export default function LoginPage() {
           Sign up
         </button>
       </p>
+
+      <div className="mt-8 pt-6 border-t border-[#E2DDD1]">
+        <p className="text-center text-[12.5px] font-semibold text-[#8A8373] mb-3">Testing? Preview a role directly</p>
+        <QuickPreviewRow busy={demoBusy} onPick={quickPreview} />
+      </div>
     </AuthShell>
+  )
+}
+
+// Not DemoRolePicker reused here -- that component calls
+// demoSwitchRole() straight away, which needs an already-authenticated
+// gateway/persona session token to even have something to switch FROM.
+// Here nobody's signed in yet at all -- quickPreview does the real
+// sequence (sign in with the demo credential, then switch), this is
+// just the row of buttons that triggers it in one tap.
+function QuickPreviewRow({ busy, onPick }: { busy: Role | null; onPick: (role: Role) => void }) {
+  const roles: { role: Role; label: string }[] = [
+    { role: 'student', label: 'Student' },
+    { role: 'institution_staff', label: 'School / college' },
+    { role: 'provider_staff', label: 'Training provider' },
+    { role: 'employer', label: 'Employer' },
+  ]
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {roles.map(r => (
+        <button
+          key={r.role} onClick={() => onPick(r.role)} disabled={busy !== null}
+          className="text-[13px] font-semibold text-ink bg-white border border-[#E2DDD1] rounded-xl py-2.5 hover:border-brand transition disabled:opacity-50"
+        >
+          {busy === r.role ? 'Opening…' : r.label}
+        </button>
+      ))}
+    </div>
   )
 }

@@ -38,9 +38,21 @@ export async function POST(req: NextRequest) {
   const { data: callerData, error: callerError } = await supabaseAdmin.auth.getUser(accessToken)
   if (callerError || !callerData?.user) return NextResponse.json({ error: 'Session expired — sign in again.' }, { status: 401 })
 
+  // Gate accepts the raw gateway account OR any of the 4 persona
+  // accounts themselves -- previously this only accepted
+  // is_demo_gateway, which is true for the raw Lern12@gmail.com login
+  // but false for every persona it switches you INTO. That meant the
+  // very first switch worked, but switching again afterwards (e.g.
+  // student -> employer without going back to log out and back in as
+  // the gateway account first) was silently rejected with a 403 here,
+  // while the client had already navigated to the destination route --
+  // RoleGate there then saw the still-unchanged real session and sent
+  // it back to wherever THAT role actually belongs. That's "I press
+  // Employer and the student layout opens."
   const { data: profile, error: profileError } = await supabaseAdmin
-    .from('users').select('is_demo_gateway').eq('id', callerData.user.id).single()
-  if (profileError || !profile?.is_demo_gateway) {
+    .from('users').select('is_demo_gateway, email').eq('id', callerData.user.id).single()
+  const callerIsPersona = profile?.email && Object.values(PERSONA_EMAIL).includes(profile.email)
+  if (profileError || !(profile?.is_demo_gateway || callerIsPersona)) {
     return NextResponse.json({ error: 'This account can’t switch roles.' }, { status: 403 })
   }
 

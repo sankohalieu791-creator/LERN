@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getDiscoverWork, getOpportunities, getMyReceivedInterest, respondToInterest,
-  applyToOpportunity, getMyOpportunityApplications,
+  applyToOpportunity, getMyOpportunityApplications, getAvatarUrl,
 } from '@/lib/supabase'
 import {
   Search, X, BadgeCheck, MapPin, Briefcase, Clock, Check, Ban, Send,
@@ -215,23 +215,30 @@ export default function StudentDiscoverPanel() {
             return (
               <div key={o.id} className="bg-[#1a1a1a] border border-white/[0.07] rounded-2xl p-4">
                 <div className="flex items-start gap-3 mb-3">
-                  {/* Employer "logo" -- there's no real company-logo upload
-                      yet, this is the same gradient-initials treatment
-                      used for every avatar elsewhere in the app, just
-                      bigger here to read as a company mark. */}
-                  <div className="w-14 h-14 rounded-2xl bg-[#252525] flex items-center justify-center text-white font-bold text-[16px] flex-shrink-0">
-                    {initials(o.employer?.full_name)}
-                  </div>
+                  {/* Real company logo when the employer's added one --
+                      gradient-initials fallback otherwise, same as
+                      every other avatar in the app. */}
+                  {o.logo_path ? (
+                    <img src={getAvatarUrl(o.logo_path) || ''} alt="" className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-[#252525] flex items-center justify-center text-white font-bold text-[16px] flex-shrink-0">
+                      {initials(o.employer?.full_name)}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-white font-bold text-[17px] leading-tight">{o.title}</p>
                     {o.employer?.full_name && <p className="text-[#888] text-sm">{o.employer.full_name}</p>}
                   </div>
                 </div>
-                {/* Brand orange, not green -- matches the real old
-                    JobCard exactly (git show a07a8c2~1), not a generic
-                    "money = green" default. */}
-                {o.salary && <p className="text-[#FF6B2B] font-bold text-sm mb-2">{o.salary}</p>}
-                {o.description && <p className="text-[#666] text-sm leading-relaxed line-clamp-2 mb-3">{o.description}</p>}
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  {/* Brand orange, not green -- matches the real old
+                      JobCard exactly (git show a07a8c2~1), not a generic
+                      "money = green" default. */}
+                  {o.salary && <p className="text-[#FF6B2B] font-bold text-sm">{o.salary}</p>}
+                  {o.location && <p className="text-[#888] text-sm">{o.salary ? '· ' : ''}{o.location}</p>}
+                </div>
+                {o.description && <p className="text-[#666] text-sm leading-relaxed line-clamp-2 mb-2">{o.description}</p>}
+                {o.requirements && <p className="text-[#666] text-sm leading-relaxed line-clamp-2 mb-3"><span className="font-semibold text-[#888]">Looking for: </span>{o.requirements}</p>}
                 <div className="flex items-center gap-1 text-[#555] text-xs mb-3">
                   <Clock className="w-3 h-3" /> Posted {new Date(o.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                 </div>
