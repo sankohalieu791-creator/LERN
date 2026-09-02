@@ -1143,11 +1143,74 @@ export const unfollowUser = async (followerId: string, followedId: string) => {
 export const getVerifiedWorkForProfile = async (studentId: string) => {
   const { data, error } = await supabase
     .from('verifications')
-    .select('id, verified_at, visibility, verifier:users!verifications_verified_by_fkey(full_name), submissions!inner(student_id, content, work_items(title, type))')
+    .select(`
+      id, verified_at, visibility,
+      verifier:users!verifications_verified_by_fkey(full_name),
+      submissions!inner(student_id, content, work_items(title, type, organisation_id, organisations(name)))
+    `)
     .eq('submissions.student_id', studentId)
     .is('revoked_at', null)
     .order('verified_at', { ascending: false })
   return { data, error }
+}
+
+// ── Profile v2 (LERN Complete Build Spec: Student Profile, Job
+// Tracker, Employer Side v1.0) ──────────────────────────────────────
+export const updateProfileBioTags = async (userId: string, bio: string, interestTags: string[]) => {
+  const { data, error } = await supabase
+    .from('users')
+    .update({ bio, interest_tags: interestTags.slice(0, 3) })
+    .eq('id', userId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+// "Experience" -- a student's own real-world entries (work placements,
+// volunteering), distinct from both verified work (tutor green tick)
+// and self-added qualifications (a certificate claim).
+export const getExperienceEntries = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('experience_entries')
+    .select('*')
+    .eq('student_id', studentId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+export const addExperienceEntry = async (studentId: string, fields: { title: string; organisation?: string; description?: string }) => {
+  const { data, error } = await supabase
+    .from('experience_entries')
+    .insert([{ student_id: studentId, ...fields }])
+    .select()
+    .single()
+  return { data, error }
+}
+export const deleteExperienceEntry = async (id: string) => {
+  const { error } = await supabase.from('experience_entries').delete().eq('id', id)
+  return { error }
+}
+
+// Saved jobs -- private, own-view only. RLS already restricts read/
+// write to the owner; there's no "public" variant of this query.
+export const getSavedOpportunities = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('saved_opportunities')
+    .select('*, opportunity:opportunities(*, employer:users!opportunities_employer_id_fkey(full_name))')
+    .eq('student_id', studentId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+export const saveOpportunity = async (studentId: string, opportunityId: string) => {
+  const { data, error } = await supabase
+    .from('saved_opportunities')
+    .insert([{ student_id: studentId, opportunity_id: opportunityId }])
+    .select()
+    .single()
+  return { data, error }
+}
+export const unsaveOpportunity = async (studentId: string, opportunityId: string) => {
+  const { error } = await supabase.from('saved_opportunities').delete().eq('student_id', studentId).eq('opportunity_id', opportunityId)
+  return { error }
 }
 
 export const getMyPosts = async (studentId: string) => {

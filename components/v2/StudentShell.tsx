@@ -112,7 +112,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
           <NavItem href="/student/work" icon={ClipboardList} label="My Work" active={isActive('/student/work')} />
           <PlusButton onClick={onPlus} />
           <NavItem href="/student/discover" icon={Compass} label="Discover" active={isActive('/student/discover')} />
-          <DisabledNavItem icon={UserIcon} label="Profile" />
+          <NavItem href="/student/profile" icon={UserIcon} label="Profile" active={isActive('/student/profile')} />
         </div>
       </nav>
     </div>

@@ -6,189 +6,377 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getFollowCounts, getVerifiedWorkForProfile, getMyPosts, getSelfQualifications,
   addSelfQualification, deleteSelfQualification, uploadSelfQualificationFile, getSignedFileUrl, deletePost,
+  updateProfileBioTags, getExperienceEntries, addExperienceEntry, deleteExperienceEntry,
+  getSavedOpportunities, unsaveOpportunity,
 } from '@/lib/supabase'
-import { Grid3x3, BadgeCheck, Award, Settings, Plus, X, Trash2, Play } from 'lucide-react'
+import {
+  FolderCheck, Briefcase, Grid3x3, Settings, Plus, X, Trash2, Play,
+  Eye, Bookmark, Lock, FilePlus, CheckCircle2,
+} from 'lucide-react'
 
 function initials(name?: string) {
   if (!name) return '?'
   return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
 }
+function daysAgo(dateStr: string) {
+  return Math.max(0, Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)))
+}
 
-type Tab = 'posts' | 'verified' | 'quals'
-const TABS: { id: Tab; icon: any }[] = [
-  { id: 'posts', icon: Grid3x3 },
-  { id: 'verified', icon: BadgeCheck },
-  { id: 'quals', icon: Award },
-]
+type Folder = 'verified' | 'experience' | 'posts'
 
-// Deliberately rebuilt to match the old app's profile screen exactly —
-// dark, avatar+stats row, role pill, edit/settings row, icon-only
-// tabs, 3-column grid with a delete overlay — not a light-themed
-// reinterpretation of it. The only real content changes from the old
-// app: no comments/messaging/connections tabs (this app has none of
-// those, per the safeguarding red lines), and "Certs" is now genuinely
-// two separate things — verified work (green tick, from a tutor) and
-// self-added qualifications (unverified, your own upload) — instead
-// of one blended tab.
-export default function ProfilePanel() {
-  const { user } = useAuth()
+// LERN Complete Build Spec: Student Profile, Job Tracker, Employer
+// Side v1.0, Part 1. Colours/sizes here are the spec's pinned values
+// EXCEPT page/card background and body text, which stay this app's
+// existing dark palette (#0f0f0f/#1a1a1a/white) rather than the spec's
+// literal #FFFDF9 light claim -- same call as Briefs: the user's own
+// reference screenshot for this exact screen is dark, not light, and
+// that's what's authoritative. The pinned accent hex values (avatar,
+// tag pills, folder icons, the blue safeguarding note) are used
+// exactly as given regardless -- those read fine as colour accents on
+// a dark page and the spec is explicit that hex codes aren't to be
+// substituted.
+//
+// ownView === true adds the private Saved jobs section; nothing else
+// changes between public and own view. A userId prop will be how a
+// future "view someone else's profile" screen reuses this same
+// component -- not wired to any other surface yet, only this student's
+// own /student/profile route.
+export default function ProfilePanel({ userId, ownView = true }: { userId?: string; ownView?: boolean }) {
+  const { user: authUser } = useAuth()
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>('posts')
+  const profileId = userId || authUser?.id
+  const isOwn = ownView && profileId === authUser?.id
+
+  const [profile, setProfile] = useState<any>(authUser)
   const [counts, setCounts] = useState({ followers: 0, following: 0 })
   const [verified, setVerified] = useState<any[]>([])
-  const [posts, setPosts] = useState<any[]>([])
   const [quals, setQuals] = useState<any[]>([])
+  const [experience, setExperience] = useState<any[]>([])
+  const [posts, setPosts] = useState<any[]>([])
+  const [saved, setSaved] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [folder, setFolder] = useState<Folder>('verified')
+  const [editingBio, setEditingBio] = useState(false)
+  const [addingExperience, setAddingExperience] = useState(false)
   const [addingQual, setAddingQual] = useState(false)
 
   const load = () => {
-    if (!user) return
-    getFollowCounts(user.id).then(setCounts)
-    getVerifiedWorkForProfile(user.id).then(({ data }) => setVerified(data || []))
-    getMyPosts(user.id).then(({ data }) => { setPosts(data || []); setLoading(false) })
-    getSelfQualifications(user.id).then(({ data }) => setQuals(data || []))
+    if (!profileId) return
+    if (isOwn) setProfile(authUser)
+    getFollowCounts(profileId).then(setCounts)
+    getVerifiedWorkForProfile(profileId).then(({ data }) => { setVerified(data || []); setLoading(false) })
+    getSelfQualifications(profileId).then(({ data }) => setQuals(data || []))
+    getExperienceEntries(profileId).then(({ data }) => setExperience(data || []))
+    getMyPosts(profileId).then(({ data }) => setPosts(data || []))
+    if (isOwn) getSavedOpportunities(profileId).then(({ data }) => setSaved(data || []))
   }
-  useEffect(load, [user?.id])
+  useEffect(load, [profileId, isOwn])
+
+  if (!profile) return null
+
+  const folderCount = { verified: verified.length, experience: experience.length, posts: posts.length }
 
   return (
-    <div className="-mx-4 -mt-5 bg-[#0f0f0f] min-h-[calc(100vh-56px)] text-white">
-      {/* ── HEADER ROW: avatar left · stats right ── */}
-      <div className="px-4 pt-5 flex items-center gap-4 mb-4">
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">
-          {initials(user?.full_name)}
+    <div className="-mx-4 -mt-5 bg-[#0f0f0f] min-h-[calc(100vh-56px)] text-white px-4 pt-5 pb-6">
+      {/* ── HEADER: avatar left, 3 counts, name, bio, tags ── */}
+      <div className="flex items-center gap-4 mb-4">
+        <div className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 font-medium text-[22px]" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+          {initials(profile.full_name)}
         </div>
         <div className="flex flex-1 justify-around">
-          <div className="text-center">
-            <p className="font-bold text-lg leading-none">{posts.length}</p>
-            <p className="text-[#666] text-xs mt-1">Posts</p>
-          </div>
-          <div className="text-center">
-            <p className="font-bold text-lg leading-none">{counts.followers}</p>
-            <p className="text-[#666] text-xs mt-1">Followers</p>
-          </div>
-          <div className="text-center">
-            <p className="font-bold text-lg leading-none">{counts.following}</p>
-            <p className="text-[#666] text-xs mt-1">Following</p>
-          </div>
+          <Stat n={folderCount.verified} label="work" />
+          <Stat n={counts.followers} label="followers" />
+          <Stat n={counts.following} label="following" />
         </div>
       </div>
 
-      {/* ── NAME + ROLE ── */}
-      <div className="px-4 mb-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-xl font-bold">{user?.full_name ?? 'Your name'}</h1>
-          <span className="text-[10px] font-bold bg-[#1e1e1e] text-[#888] border border-white/10 px-2 py-0.5 rounded-full uppercase">
-            {user?.role === 'student' ? 'Student' : user?.role}
-          </span>
+      <p className="text-[15px] font-medium mb-1">{profile.full_name}</p>
+      {profile.bio && <p className="text-[13px] text-[#999] leading-[1.5] mb-2">{profile.bio}</p>}
+      {(profile.interest_tags || []).length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {profile.interest_tags.slice(0, 3).map((t: string) => (
+            <span key={t} className="text-[12px] px-2.5 py-[3px] rounded-full" style={{ backgroundColor: '#E6F1FB', color: '#0C447C' }}>{t}</span>
+          ))}
         </div>
-      </div>
+      )}
 
-      {/* ── VERIFIED STRIP ── */}
-      <div className="px-4 mb-3 flex items-center gap-2">
-        <div className="flex-1 bg-[#1a1a1a] border border-white/10 rounded-xl py-2.5 text-center">
-          <p className="font-bold text-base leading-none text-success-text">{verified.length}</p>
-          <p className="text-[#666] text-[11px] mt-1">Verified</p>
+      {isOwn && (
+        <div className="flex gap-2 mb-4">
+          <button onClick={() => setEditingBio(true)} className="flex-1 bg-[#1a1a1a] border border-white/10 py-2.5 rounded-xl text-sm font-semibold text-center hover:bg-[#222] transition">
+            Edit profile
+          </button>
+          <button onClick={() => router.push('/student/settings')} className="bg-[#1a1a1a] border border-white/10 p-2.5 rounded-xl hover:bg-[#222] transition">
+            <Settings className="w-4 h-4" />
+          </button>
         </div>
-        <div className="flex-1 bg-[#1a1a1a] border border-white/10 rounded-xl py-2.5 text-center">
-          <p className="font-bold text-base leading-none">{quals.length}</p>
-          <p className="text-[#666] text-[11px] mt-1">Qualifications</p>
+      )}
+      {editingBio && <EditBioForm profile={profile} onDone={() => { setEditingBio(false); load() }} />}
+
+      {/* ── THREE FOLDERS (public shopfront, exact order) ── */}
+      <div className="grid grid-cols-3 gap-2.5 mb-5">
+        <FolderTile active={folder === 'verified'} onClick={() => setFolder('verified')} icon={FolderCheck} iconColor="#0F6E56" label="Verified work" count={`${folderCount.verified} pieces`} />
+        <FolderTile active={folder === 'experience'} onClick={() => setFolder('experience')} icon={Briefcase} iconColor="#D4551A" label="Experience" count={`${folderCount.experience} entries`} />
+        <FolderTile active={folder === 'posts'} onClick={() => setFolder('posts')} icon={Grid3x3} iconColor="#888888" label="Posts" count={`${folderCount.posts} posts`} />
+      </div>
+
+      {/* ── OWN VIEW ONLY: Your view + Saved jobs button ── */}
+      {isOwn && (
+        <div className="flex items-center justify-between mb-3">
+          <span className="flex items-center gap-1.5 text-[12px] text-[#999]"><Eye className="w-3.5 h-3.5" /> Your view</span>
+          <button onClick={() => setFolder('saved' as any)} className="flex items-center gap-1.5 bg-[#141414] border border-white/10 px-3 py-1.5 rounded-lg text-[12px] font-semibold">
+            <Bookmark className="w-3.5 h-3.5" /> Saved jobs · {saved.length}
+          </button>
         </div>
-      </div>
+      )}
 
-      {/* ── ACTION BUTTONS ── */}
-      <div className="px-4 flex gap-2 mb-3">
-        <button className="flex-1 bg-[#1a1a1a] border border-white/10 py-2.5 rounded-xl text-sm font-semibold text-center hover:bg-[#222] transition">
-          Edit profile
-        </button>
-        <button onClick={() => router.push('/student/settings')} className="bg-[#1a1a1a] border border-white/10 p-2.5 rounded-xl hover:bg-[#222] transition">
-          <Settings className="w-4 h-4" />
-        </button>
-      </div>
+      {folder === 'saved' as any ? (
+        <SavedJobsSection profileId={profileId!} saved={saved} onChanged={load} />
+      ) : (
+        <>
+          <p className="text-[13px] font-medium text-[#999] mb-2.5">Inside {folder === 'verified' ? 'verified work' : folder === 'experience' ? 'experience' : 'posts'}</p>
 
-      {/* ── TABS ── */}
-      <div className="flex border-b border-white/10 sticky top-0 bg-[#0f0f0f] z-10">
-        {TABS.map(t => {
-          const Icon = t.icon
-          const active = tab === t.id
-          return (
-            <button
-              key={t.id} onClick={() => setTab(t.id)}
-              className={`flex-1 flex justify-center py-3 border-b-2 transition-colors ${active ? 'border-white text-white' : 'border-transparent text-[#444] hover:text-[#777]'}`}
-            >
-              <Icon className="w-5 h-5" />
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ── TAB CONTENT ── */}
-      <div className="p-4">
-        {tab === 'posts' && (
-          loading ? (
-            <p className="text-[13px] text-[#666]">Loading…</p>
-          ) : posts.length === 0 ? (
-            <EmptyState icon={Grid3x3} title="No posts yet" hint="Tap + to share something" />
-          ) : (
-            <div className="grid grid-cols-3 gap-1">
-              {posts.map(p => <PostThumb key={p.id} post={p} onDeleted={load} />)}
-            </div>
-          )
-        )}
-
-        {tab === 'verified' && (
-          verified.length === 0 ? (
-            <EmptyState icon={BadgeCheck} title="Nothing verified yet" hint="It'll show up here the moment a tutor verifies your first piece of work" />
-          ) : (
-            <div className="space-y-2">
-              {verified.map(v => (
-                <div key={v.id} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3.5">
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <p className="font-semibold text-[13.5px]">{v.submissions?.work_items?.title}</p>
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-success-text flex-shrink-0"><BadgeCheck className="w-3.5 h-3.5" /> Verified</span>
-                  </div>
-                  <p className="text-[11.5px] text-[#777]">
-                    By {v.verifier?.full_name || 'a reviewer'} · {new Date(v.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )
-        )}
-
-        {tab === 'quals' && (
-          <div>
-            <div className="flex items-center justify-between mb-2.5">
-              <p className="text-[11.5px] text-[#888] leading-relaxed pr-3">Self-added — not checked or verified by anyone. Only the Verified tab has been checked by a tutor.</p>
-              <button onClick={() => setAddingQual(v => !v)} className="text-[12px] font-semibold text-brand flex items-center gap-1 flex-shrink-0">
-                {addingQual ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />} Add
-              </button>
-            </div>
-            {addingQual && <AddQualificationForm onAdded={() => { setAddingQual(false); load() }} />}
-            {quals.length === 0 ? (
-              <EmptyState icon={Award} title="Nothing added yet" hint="Certificates you've earned elsewhere can go here" />
+          {folder === 'verified' && (
+            loading ? <p className="text-[13px] text-[#666]">Loading…</p> : (verified.length === 0 && quals.length === 0) ? (
+              <EmptyState icon={FolderCheck} title="Nothing here yet" hint="It'll show up here the moment a tutor verifies your first piece of work" />
             ) : (
               <div className="space-y-2">
-                {quals.map(q => <QualificationRow key={q.id} qual={q} onChanged={load} />)}
+                {verified.map(v => (
+                  <div key={v.id} className="bg-[#141414] border border-white/10 rounded-lg px-[11px] py-[9px] flex items-start gap-2.5">
+                    <CheckCircle2 className="w-[18px] h-[18px] flex-shrink-0 mt-0.5" style={{ color: '#0F6E56' }} />
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-medium truncate">{v.submissions?.work_items?.title}</p>
+                      <p className="text-[12px] text-[#999]">
+                        Verified by {v.submissions?.work_items?.organisations?.name || v.verifier?.full_name || 'a reviewer'} · {new Date(v.verified_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {quals.map(q => (
+                  <div key={q.id} className="rounded-lg px-[11px] py-[9px] flex items-start gap-2.5 border border-dashed" style={{ borderColor: '#8A8A8A' }}>
+                    <FilePlus className="w-[18px] h-[18px] flex-shrink-0 mt-0.5" style={{ color: '#8A8A8A' }} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-medium truncate">{q.title}</p>
+                      <p className="text-[12px]"><span style={{ color: '#8A8A8A' }}>Self-added certificate · not verified by LERN</span></p>
+                    </div>
+                    {isOwn && (
+                      <button onClick={async () => { await deleteSelfQualification(q.id); load() }} className="text-[#666] hover:text-danger-text transition flex-shrink-0">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {isOwn && (
+                  <button onClick={() => setAddingQual(v => !v)} className="text-[12px] font-semibold text-brand flex items-center gap-1">
+                    {addingQual ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />} Add a self-added certificate
+                  </button>
+                )}
+                {addingQual && <AddQualForm profileId={profileId!} onAdded={() => { setAddingQual(false); load() }} />}
               </div>
-            )}
-          </div>
-        )}
-      </div>
+            )
+          )}
+
+          {folder === 'experience' && (
+            <div className="space-y-2">
+              {experience.length === 0 ? (
+                <EmptyState icon={Briefcase} title="Nothing added yet" hint="Work placements, volunteering, part-time work — anything real-world" />
+              ) : experience.map(e => (
+                <div key={e.id} className="bg-[#141414] border border-white/10 rounded-lg px-[11px] py-[9px] flex items-start gap-2.5">
+                  <Briefcase className="w-[18px] h-[18px] flex-shrink-0 mt-0.5" style={{ color: '#D4551A' }} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-medium truncate">{e.title}</p>
+                    {e.organisation && <p className="text-[12px] text-[#999] truncate">{e.organisation}</p>}
+                  </div>
+                  {isOwn && (
+                    <button onClick={async () => { await deleteExperienceEntry(e.id); load() }} className="text-[#666] hover:text-danger-text transition flex-shrink-0">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {isOwn && (
+                <button onClick={() => setAddingExperience(v => !v)} className="text-[12px] font-semibold text-brand flex items-center gap-1">
+                  {addingExperience ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />} Add experience
+                </button>
+              )}
+              {addingExperience && <AddExperienceForm profileId={profileId!} onAdded={() => { setAddingExperience(false); load() }} />}
+            </div>
+          )}
+
+          {folder === 'posts' && (
+            posts.length === 0 ? (
+              <EmptyState icon={Grid3x3} title="No posts yet" hint="Tap + to share something" />
+            ) : (
+              <div className="grid grid-cols-3 gap-1">
+                {posts.map(p => <PostThumb key={p.id} post={p} canDelete={isOwn} onDeleted={load} />)}
+              </div>
+            )
+          )}
+        </>
+      )}
     </div>
+  )
+}
+
+function Stat({ n, label }: { n: number; label: string }) {
+  return (
+    <div className="text-center">
+      <p className="text-[17px] font-medium leading-none">{n}</p>
+      <p className="text-[12px] text-[#999] mt-1">{label}</p>
+    </div>
+  )
+}
+
+function FolderTile({ active, onClick, icon: Icon, iconColor, label, count }: { active: boolean; onClick: () => void; icon: any; iconColor: string; label: string; count: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center text-center py-3.5 px-2 rounded-xl border transition ${active ? 'border-white/25 bg-[#1a1a1a]' : 'border-white/10 bg-[#141414]'}`}
+    >
+      <Icon className="w-[26px] h-[26px] mb-1.5" style={{ color: iconColor }} />
+      <p className="text-[13px] font-medium">{label}</p>
+      <p className="text-[12px] text-[#999] mt-0.5">{count}</p>
+    </button>
   )
 }
 
 function EmptyState({ icon: Icon, title, hint }: { icon: any; title: string; hint: string }) {
   return (
-    <div className="flex flex-col items-center text-center py-12">
-      <Icon className="w-8 h-8 text-[#333] mb-3" />
-      <p className="font-semibold text-[14px] mb-1">{title}</p>
-      <p className="text-[12.5px] text-[#666]">{hint}</p>
+    <div className="flex flex-col items-center text-center py-10">
+      <Icon className="w-7 h-7 text-[#333] mb-2.5" />
+      <p className="font-semibold text-[13px] mb-1">{title}</p>
+      <p className="text-[12px] text-[#666]">{hint}</p>
     </div>
   )
 }
 
-function PostThumb({ post, onDeleted }: { post: any; onDeleted: () => void }) {
+function SavedJobsSection({ profileId, saved, onChanged }: { profileId: string; saved: any[]; onChanged: () => void }) {
+  return (
+    <div>
+      <div className="rounded-lg px-[12px] py-[10px] mb-3 flex items-start gap-2" style={{ backgroundColor: '#E6F1FB' }}>
+        <Lock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#185FA5' }} />
+        <p className="text-[12px]" style={{ color: '#0C447C' }}>Saved jobs is private. Only you can see it. Employers see only your three folders above.</p>
+      </div>
+      <p className="text-[13px] font-medium text-[#999] mb-2.5">Saved jobs</p>
+      {saved.length === 0 ? (
+        <EmptyState icon={Bookmark} title="Nothing saved yet" hint="Bookmark a job from Discover to save it here" />
+      ) : (
+        <div className="space-y-2">
+          {saved.map(s => (
+            <div key={s.id} className="bg-[#141414] border border-white/10 rounded-lg px-[11px] py-[9px] flex items-center gap-2.5">
+              <Bookmark className="w-[18px] h-[18px] flex-shrink-0" style={{ color: '#D4551A' }} />
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-medium truncate">{s.opportunity?.title}</p>
+                <p className="text-[12px] text-[#999] truncate">{s.opportunity?.employer?.full_name || 'An employer'} · saved {daysAgo(s.created_at)} days ago</p>
+              </div>
+              <button
+                onClick={async () => { await unsaveOpportunity(profileId, s.opportunity_id); onChanged() }}
+                className="text-[13px] font-semibold flex-shrink-0" style={{ color: '#D4551A' }}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EditBioForm({ profile, onDone }: { profile: any; onDone: () => void }) {
+  const [bio, setBio] = useState(profile.bio || '')
+  const [tags, setTags] = useState((profile.interest_tags || []).join(', '))
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    setSaving(true)
+    await updateProfileBioTags(profile.id, bio.trim(), tags.split(',').map((t: string) => t.trim()).filter(Boolean))
+    setSaving(false)
+    onDone()
+  }
+
+  return (
+    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3.5 mb-4 space-y-2">
+      <textarea
+        value={bio} onChange={e => setBio(e.target.value)} placeholder="Aspiring graphic designer · Year 10 · loves branding and illustration"
+        rows={2} maxLength={120}
+        className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition resize-none"
+      />
+      <input
+        value={tags} onChange={e => setTags(e.target.value)} placeholder="Up to 3 interests, comma separated — e.g. Design, Illustration, Media"
+        className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition"
+      />
+      <div className="flex gap-2">
+        <button onClick={save} disabled={saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button onClick={onDone} className="px-3.5 py-2 rounded-lg text-[#999] text-[12px] font-semibold">Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+function AddExperienceForm({ profileId, onAdded }: { profileId: string; onAdded: () => void }) {
+  const [title, setTitle] = useState('')
+  const [organisation, setOrganisation] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const submit = async () => {
+    if (!title.trim()) return
+    setSaving(true)
+    await addExperienceEntry(profileId, { title: title.trim(), organisation: organisation.trim() || undefined })
+    setSaving(false)
+    onAdded()
+  }
+
+  return (
+    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3.5 space-y-2">
+      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Saturday job at a local print shop" className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition" />
+      <input value={organisation} onChange={e => setOrganisation(e.target.value)} placeholder="Where (optional)" className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition" />
+      <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+    </div>
+  )
+}
+
+function AddQualForm({ profileId, onAdded }: { profileId: string; onAdded: () => void }) {
+  const [title, setTitle] = useState('')
+  const [issuer, setIssuer] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [saving, setSaving] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const submit = async () => {
+    if (!title.trim()) return
+    setSaving(true)
+    let file_path: string | undefined
+    if (file) {
+      const { path } = await uploadSelfQualificationFile(profileId, file)
+      if (path) file_path = path
+    }
+    await addSelfQualification(profileId, { title: title.trim(), issuer: issuer.trim() || undefined, file_path })
+    setSaving(false)
+    onAdded()
+  }
+
+  return (
+    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3.5 space-y-2">
+      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Level 2 Food Hygiene Certificate" className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition" />
+      <input value={issuer} onChange={e => setIssuer(e.target.value)} placeholder="Issued by (optional)" className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition" />
+      <button onClick={() => fileRef.current?.click()} className="text-[12px] font-semibold text-[#999] hover:text-brand transition">
+        {file ? file.name : 'Attach a file (optional)'}
+      </button>
+      <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
+      <div>
+        <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function PostThumb({ post, canDelete, onDeleted }: { post: any; canDelete: boolean; onDeleted: () => void }) {
   const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
     if (post.image_path) getSignedFileUrl('post-images', post.image_path).then(({ url }) => setUrl(url))
@@ -210,69 +398,14 @@ function PostThumb({ post, onDeleted }: { post: any; onDeleted: () => void }) {
             : <p className="text-[11px] text-[#666] line-clamp-4">{post.content}</p>}
         </div>
       )}
-      <button
-        onClick={remove}
-        className="absolute top-1.5 right-1.5 w-7 h-7 bg-[#2a2a2a] rounded-full flex items-center justify-center z-10"
-      >
-        <Trash2 className="w-3.5 h-3.5 text-white" />
-      </button>
-    </div>
-  )
-}
-
-function AddQualificationForm({ onAdded }: { onAdded: () => void }) {
-  const { user } = useAuth()
-  const [title, setTitle] = useState('')
-  const [issuer, setIssuer] = useState('')
-  const [file, setFile] = useState<File | null>(null)
-  const [saving, setSaving] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  const submit = async () => {
-    if (!title.trim() || !user) return
-    setSaving(true)
-    let file_path: string | undefined
-    if (file) {
-      const { path } = await uploadSelfQualificationFile(user.id, file)
-      if (path) file_path = path
-    }
-    await addSelfQualification(user.id, { title: title.trim(), issuer: issuer.trim() || undefined, file_path })
-    setSaving(false)
-    onAdded()
-  }
-
-  return (
-    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3.5 mb-2.5 space-y-2">
-      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Level 2 Food Hygiene Certificate" className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition" />
-      <input value={issuer} onChange={e => setIssuer(e.target.value)} placeholder="Issued by (optional)" className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition" />
-      <button onClick={() => fileRef.current?.click()} className="text-[12px] font-semibold text-[#999] hover:text-brand transition">
-        {file ? file.name : 'Attach a file (optional)'}
-      </button>
-      <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
-      <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
-        {saving ? 'Saving…' : 'Save'}
-      </button>
-    </div>
-  )
-}
-
-function QualificationRow({ qual, onChanged }: { qual: any; onChanged: () => void }) {
-  const [url, setUrl] = useState<string | null>(null)
-  const open = async () => {
-    if (url) return window.open(url, '_blank')
-    if (!qual.file_path) return
-    const { url: signed } = await getSignedFileUrl('self-qualifications', qual.file_path)
-    if (signed) { setUrl(signed); window.open(signed, '_blank') }
-  }
-  const remove = async () => { await deleteSelfQualification(qual.id); onChanged() }
-
-  return (
-    <div className="flex items-center justify-between bg-[#1a1a1a] border border-white/10 rounded-xl px-3.5 py-2.5">
-      <button onClick={open} disabled={!qual.file_path} className="text-left min-w-0">
-        <p className="text-[13px] font-semibold truncate">{qual.title}</p>
-        {qual.issuer && <p className="text-[11.5px] text-[#777] truncate">{qual.issuer}</p>}
-      </button>
-      <button onClick={remove} className="text-[#666] hover:text-danger-text transition flex-shrink-0"><Trash2 className="w-3.5 h-3.5" /></button>
+      {canDelete && (
+        <button
+          onClick={remove}
+          className="absolute top-1.5 right-1.5 w-7 h-7 bg-[#2a2a2a] rounded-full flex items-center justify-center z-10"
+        >
+          <Trash2 className="w-3.5 h-3.5 text-white" />
+        </button>
+      )}
     </div>
   )
 }
