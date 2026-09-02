@@ -1312,6 +1312,8 @@ export const getEmployerDashboardStats = async (employerId: string) => {
   const hired = rows.filter(r => r.stage === 'hired').length
   const inPipeline = rows.filter(r => !['hired', 'not_progressing'].includes(r.stage)).length
   const youngPeopleReached = new Set(rows.map(r => r.student_id)).size
+  const byStage: Record<ApplicationStage, number> = { applied: 0, reviewing: 0, shortlisted: 0, interview: 0, offer: 0, hired: 0, not_progressing: 0 }
+  for (const r of rows) if (r.stage in byStage) byStage[r.stage as ApplicationStage]++
   const hiresByPartner = new Map<string, number>()
   for (const r of rows) {
     if (r.stage === 'hired' && r.organisation?.name) hiresByPartner.set(r.organisation.name, (hiresByPartner.get(r.organisation.name) || 0) + 1)
@@ -1337,7 +1339,7 @@ export const getEmployerDashboardStats = async (employerId: string) => {
 
   return {
     data: {
-      hired, inPipeline, youngPeopleReached,
+      hired, inPipeline, youngPeopleReached, byStage,
       hiresByPartner: Array.from(hiresByPartner.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
       monthlyActivity: months, trend,
     },

@@ -62,7 +62,12 @@ export default function ReviewQueuePanel() {
   const openItem = pending.find(i => i.id === openId) || null
 
   return (
-    <div className="max-w-3xl mx-auto">
+    // No max-w/mx-auto here -- main already has no width cap of its own
+    // (Dashboard etc. already fill it edge-to-edge), so capping this
+    // one screen just left dead margins either side of it, the
+    // opposite of what was wanted: fill the pane, like Gmail/Outlook's
+    // own web layouts do, not a narrow centred column floating in it.
+    <div>
       <div className="flex gap-2 mb-5">
         <button
           onClick={() => setOpenId(null)}

@@ -7,7 +7,7 @@ import {
   setApplicationPrivateNote, getApplicationActivity, APPLICATION_STAGES,
 } from '@/lib/supabase'
 import type { ApplicationStage } from '@/lib/supabase'
-import { Bell, Shield, CheckCircle2, X } from 'lucide-react'
+import { Bell, Shield, CheckCircle2, X, PenLine } from 'lucide-react'
 
 // Complete Build Spec v1.0, Part 2 (job tracker) + Part 3 (Candidates
 // -- "The same board as the job tracker in Part 2, from the employer's
@@ -116,14 +116,28 @@ export default function JobTrackerBoard({ viewer, employerId, organisationId }: 
           </p>
         </div>
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
+        // grid-auto-columns minmax(...,1fr), not a fixed 180px flex
+        // row -- fixed-width columns left a strip of dead space on a
+        // wide screen instead of actually filling it. Each column
+        // still never shrinks below 180px (still scrolls on a narrow
+        // window), but stretches evenly to fill whatever's there on a
+        // laptop, the same "fill the pane" fix as everywhere else
+        // this round.
+        <div
+          className="grid gap-3 overflow-x-auto pb-2"
+          style={{ gridTemplateColumns: `repeat(${APPLICATION_STAGES.length}, minmax(180px, 1fr))`, scrollbarWidth: 'thin' }}
+        >
           {APPLICATION_STAGES.map(stage => (
-            <div key={stage} className="flex-shrink-0" style={{ minWidth: 180, width: 180 }}>
-              <p className="text-[12px] font-semibold mb-2" style={{ color: STAGE_META[stage].headingColor }}>
-                {STAGE_META[stage].label} · {byStage(stage).length}
+            <div key={stage} className="min-w-0 bg-surface-subtle/60 rounded-xl p-2">
+              <p className="flex items-center gap-1.5 text-[12px] font-semibold mb-2.5 px-1">
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: STAGE_META[stage].headingColor }} />
+                <span style={{ color: STAGE_META[stage].headingColor }}>{STAGE_META[stage].label}</span>
+                <span className="text-ink-quaternary font-normal">· {byStage(stage).length}</span>
               </p>
-              <div className="space-y-2">
-                {byStage(stage).map(a => <AppCard key={a.id} app={a} onClick={() => setOpenApp(a)} />)}
+              <div className="space-y-2 min-h-[40px]">
+                {byStage(stage).length === 0 ? (
+                  <p className="text-[11px] text-ink-quaternary px-1">—</p>
+                ) : byStage(stage).map(a => <AppCard key={a.id} app={a} onClick={() => setOpenApp(a)} />)}
               </div>
             </div>
           ))}
@@ -146,7 +160,7 @@ function AppCard({ app, onClick }: { app: any; onClick: () => void }) {
   const isMinor = a !== null && a < 18
   const hired = app.stage === 'hired'
   return (
-    <button onClick={onClick} className="w-full text-left bg-surface border border-edge rounded-xl px-[12px] py-[11px] hover:border-brand transition">
+    <button onClick={onClick} className="w-full text-left bg-surface border border-edge rounded-xl px-[12px] py-[11px] hover:border-brand hover:shadow-sm transition">
       <div className="flex items-center gap-2 mb-1.5">
         {hired ? (
           <span className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#E1F5EE' }}>
@@ -157,7 +171,8 @@ function AppCard({ app, onClick }: { app: any; onClick: () => void }) {
             {initials(app.student?.full_name)}
           </span>
         )}
-        <p className="text-[13px] font-medium text-ink truncate">{app.student?.full_name}</p>
+        <p className="text-[13px] font-medium text-ink truncate flex-1">{app.student?.full_name}</p>
+        {app.private_note && <PenLine className="w-3 h-3 text-ink-quaternary flex-shrink-0" />}
       </div>
       <p className="text-[12px] text-ink-tertiary truncate">{app.opportunity?.title || 'Direct interest'}</p>
       <p className="text-[12px] truncate" style={{ color: '#8A8A8A' }}>{app.employer?.full_name || ''}{app.employer?.full_name && a !== null ? ' · ' : ''}{a !== null ? `${a} yrs` : ''}</p>
@@ -178,6 +193,8 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged }: {
   const [note, setNote] = useState(app.private_note || '')
   const [moving, setMoving] = useState(false)
   const [savingNote, setSavingNote] = useState(false)
+  const [noteSaved, setNoteSaved] = useState(false)
+  const [noteError, setNoteError] = useState('')
 
   useEffect(() => { getApplicationActivity(app.id).then(({ data }) => setActivity(data || [])) }, [app.id])
 
@@ -192,9 +209,16 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged }: {
     onChanged()
   }
   const saveNote = async () => {
-    setSavingNote(true)
-    await setApplicationPrivateNote(app.id, note.trim())
+    setSavingNote(true); setNoteError(''); setNoteSaved(false)
+    // Was never checking this before -- a failed save and a
+    // successful one looked identical (button just flips back to
+    // "Save note" either way), which is exactly "I save it, where does
+    // it go?" -- there was no way to tell it had actually happened.
+    const { error } = await setApplicationPrivateNote(app.id, note.trim())
     setSavingNote(false)
+    if (error) { setNoteError(error.message || "Couldn't save — try again."); return }
+    setNoteSaved(true)
+    setTimeout(() => setNoteSaved(false), 2500)
   }
 
   return (
@@ -258,13 +282,21 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged }: {
           {viewer === 'org' && (
             <div>
               <label className="block text-[12px] font-semibold text-ink-tertiary mb-1.5">Private note (only your staff see this)</label>
+              {/* Answers "where does it go" directly -- it's saved
+                  against this exact application, nowhere else, and
+                  will be here again next time this card is opened. */}
+              <p className="text-[11px] text-ink-quaternary mb-1.5">Stays attached to this candidate's card — visible to your own staff only, never the employer or student.</p>
               <textarea
                 value={note} onChange={e => setNote(e.target.value)} rows={3}
                 className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2 text-[13px] text-ink outline-none focus:border-brand transition resize-none"
               />
-              <button onClick={saveNote} disabled={savingNote} className="mt-2 text-[12px] font-semibold text-brand disabled:opacity-40">
-                {savingNote ? 'Saving…' : 'Save note'}
-              </button>
+              {noteError && <p className="text-[12px] text-danger-text mt-1.5">{noteError}</p>}
+              <div className="flex items-center gap-2 mt-2">
+                <button onClick={saveNote} disabled={savingNote} className="text-[12px] font-semibold text-brand disabled:opacity-40">
+                  {savingNote ? 'Saving…' : 'Save note'}
+                </button>
+                {noteSaved && <span className="text-[12px] font-semibold text-success-text">Saved ✓</span>}
+              </div>
             </div>
           )}
         </div>

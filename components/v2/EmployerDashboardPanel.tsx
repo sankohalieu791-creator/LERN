@@ -2,8 +2,19 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getEmployerDashboardStats } from '@/lib/supabase'
+import { getEmployerDashboardStats, APPLICATION_STAGES } from '@/lib/supabase'
+import type { ApplicationStage } from '@/lib/supabase'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+
+const STAGE_META: Record<ApplicationStage, { label: string; bg: string; text: string }> = {
+  applied: { label: 'Applied', bg: '#E6F1FB', text: '#185FA5' },
+  reviewing: { label: 'Reviewing', bg: '#FAEEDA', text: '#854F0B' },
+  shortlisted: { label: 'Shortlisted', bg: '#FAEEDA', text: '#854F0B' },
+  interview: { label: 'Interview', bg: '#FAEEDA', text: '#854F0B' },
+  offer: { label: 'Offer', bg: '#FAEEDA', text: '#854F0B' },
+  hired: { label: 'Hired', bg: '#E1F5EE', text: '#0F6E56' },
+  not_progressing: { label: 'Not progressing', bg: '#F1EFE8', text: '#5F5E5A' },
+}
 
 // Complete Build Spec v1.0, Part 3 -- "This month" header, three
 // metric tiles, a "Hires by partner" bar list. Plus a real activity
@@ -13,6 +24,7 @@ export default function EmployerDashboardPanel() {
   const { user } = useAuth()
   const [stats, setStats] = useState<{
     hired: number; inPipeline: number; youngPeopleReached: number
+    byStage: Record<ApplicationStage, number>
     hiresByPartner: { name: string; count: number }[]
     monthlyActivity: { key: string; label: string; count: number }[]
     trend: 'up' | 'down' | 'flat'
@@ -34,6 +46,24 @@ export default function EmployerDashboardPanel() {
         <MetricTile label="Hired" value={stats?.hired ?? 0} />
         <MetricTile label="In pipeline" value={stats?.inPipeline ?? 0} />
         <MetricTile label="Young people reached" value={stats?.youngPeopleReached ?? 0} />
+      </div>
+
+      <div className="bg-surface border border-edge rounded-2xl p-5 mb-4">
+        <p className="text-[14px] font-medium text-ink mb-4">Pipeline by status</p>
+        {!stats ? (
+          <p className="text-[13px] text-ink-tertiary">Loading…</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {APPLICATION_STAGES.map(s => (
+              <div key={s} className="flex items-center gap-1.5 rounded-full pl-1 pr-3 py-1" style={{ backgroundColor: STAGE_META[s].bg }}>
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold" style={{ backgroundColor: 'rgba(255,255,255,0.6)', color: STAGE_META[s].text }}>
+                  {stats.byStage[s]}
+                </span>
+                <span className="text-[12px] font-medium" style={{ color: STAGE_META[s].text }}>{STAGE_META[s].label}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-surface border border-edge rounded-2xl p-5 mb-4">
