@@ -695,6 +695,94 @@ export const getOrgStaff = async (organisationId: string) => {
   return { data, error }
 }
 
+// A student's own org name + who their safeguarding contact is --
+// read-only here on purpose (a student cannot move themselves to
+// another school, and the signpost in Safety needs a real name to
+// point at rather than a generic line).
+export const getMyOrganisationInfo = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('organisations')
+    .select('name, safeguarding_lead:users!organisations_safeguarding_lead_fk(full_name, email)')
+    .eq('id', organisationId)
+    .single()
+  return { data, error }
+}
+
+// ── Settings: profile photo, privacy, security, blocking ──────────
+// avatars is a public bucket -- reading it back is just the public
+// URL, no signed-URL round trip needed the way private buckets need.
+export const uploadAvatar = async (userId: string, file: File) => {
+  const path = `${userId}/${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from('avatars').upload(path, file)
+  if (error) return { path: null, error }
+  await supabase.from('users').update({ avatar_path: path }).eq('id', userId)
+  return { path, error: null }
+}
+export const removeAvatar = async (userId: string, currentPath?: string | null) => {
+  const { error } = await supabase.from('users').update({ avatar_path: null }).eq('id', userId)
+  if (!error && currentPath) await supabase.storage.from('avatars').remove([currentPath])
+  return { error }
+}
+export const getAvatarUrl = (path?: string | null) =>
+  path ? supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl : null
+
+// Changing email through Supabase auth sends a confirmation link to
+// the NEW address and only swaps it over once that's clicked --
+// exactly "changing it requires verifying the new address", not an
+// immediate overwrite.
+export const requestEmailChange = async (newEmail: string) => {
+  const { error } = await supabase.auth.updateUser({ email: newEmail })
+  return { error }
+}
+
+export const sendPasswordResetEmail = async (email: string) => {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/reset-password` : undefined,
+  })
+  return { error }
+}
+
+// scope: 'global' signs out every session on every device, not just
+// this one -- "sign out of all of them".
+export const signOutEverywhere = async () => {
+  const { error } = await supabase.auth.signOut({ scope: 'global' })
+  return { error }
+}
+
+export const getBlockedUsers = async (blockerId: string) => {
+  const { data, error } = await supabase
+    .from('blocked_users')
+    .select('id, blocked_id, created_at, blocked:users!blocked_users_blocked_id_fkey(full_name)')
+    .eq('blocker_id', blockerId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+export const blockUser = async (blockerId: string, blockedId: string) => {
+  const { error } = await supabase.from('blocked_users').insert([{ blocker_id: blockerId, blocked_id: blockedId }])
+  return { error }
+}
+export const unblockUser = async (rowId: string) => {
+  const { error } = await supabase.from('blocked_users').delete().eq('id', rowId)
+  return { error }
+}
+
+// Under-18 "delete my account" is deliberately not a bare self-serve
+// action -- it's raised as a report routed to the student's own
+// organisation, the same queue safeguarding staff already work from
+// (getOrgReports/resolveReport), so a responsible adult sees it and
+// helps rather than a child silently erasing everything alone.
+export const requestMinorAccountDeletion = async (userId: string, organisationId: string) => {
+  const { error } = await submitReport(userId, organisationId, 'user', 'ACCOUNT DELETION REQUESTED (under 18) — please route through your safeguarding process.', userId)
+  return { error }
+}
+
+export const setCookieConsent = async (userId: string, analytics: boolean) => {
+  const { error } = await supabase.from('users').update({
+    cookie_consent: { essential: true, analytics, consented_at: new Date().toISOString() },
+  }).eq('id', userId)
+  return { error }
+}
+
 // ── Reporting ───────────────────────────────────────────────────
 export const submitReport = async (
   reporterId: string, organisationId: string | null,

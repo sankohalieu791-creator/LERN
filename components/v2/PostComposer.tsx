@@ -248,7 +248,17 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+    // z-[60], above everything else in the app including the shell's
+    // own z-30 nav and z-20 header with room to spare -- and paddingTop
+    // safe-area-inset-top on the OUTER wrapper (every other full-screen
+    // modal here does this: EditProfileScreen, the My Work detail
+    // sheet) so nothing sits under the status bar. This one didn't have
+    // it at all, so its own X button -- absolute top-4, no offset of
+    // its own -- rendered just 16px below the true top edge of the
+    // viewport, which in a standalone home-screen app is UNDER the
+    // status bar overlay: present in the DOM, effectively invisible
+    // and untappable. That's "I can't even see the X to cancel."
+    <div className="fixed inset-0 z-[60] bg-black flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* ── CAMERA ── */}
       {step === 'camera' && (
         <div className="flex-1 flex flex-col relative">

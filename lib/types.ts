@@ -33,6 +33,18 @@ export interface User {
   is_guest?: boolean
   guest_invite_id?: string
   is_demo_gateway?: boolean
+  bio?: string
+  interest_tags?: string[]
+  avatar_path?: string
+  // Privacy — only ever meaningfully settable for an 18+ account; an
+  // under-18's row stays at these safe defaults (public_profile false)
+  // and Settings never renders a control to change them.
+  public_profile?: boolean
+  work_public_default?: boolean
+  followers_visible?: boolean
+  following_visible?: boolean
+  two_step_enabled?: boolean
+  cookie_consent?: { essential: true; analytics: boolean; consented_at: string }
   created_at: string
 }
 

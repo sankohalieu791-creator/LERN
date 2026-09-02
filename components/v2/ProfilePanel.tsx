@@ -7,11 +7,11 @@ import {
   getFollowCounts, getVerifiedWorkForProfile, getMyPosts, getSelfQualifications,
   addSelfQualification, deleteSelfQualification, uploadSelfQualificationFile, getSignedFileUrl, deletePost,
   updateProfileBioTags, getExperienceEntries, addExperienceEntry, deleteExperienceEntry,
-  getSavedOpportunities, unsaveOpportunity, updateUserProfile,
+  getSavedOpportunities, unsaveOpportunity, updateUserProfile, uploadAvatar, removeAvatar, getAvatarUrl,
 } from '@/lib/supabase'
 import {
   FolderCheck, Briefcase, Grid3x3, Settings, Plus, X, Trash2, Play,
-  Eye, Bookmark, Lock, FilePlus, CheckCircle2,
+  Eye, Bookmark, Lock, FilePlus, CheckCircle2, Camera,
 } from 'lucide-react'
 
 function initials(name?: string) {
@@ -92,9 +92,7 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
           TikTok actually give a profile room rather than packing it
           edge to edge. */}
       <div className="flex items-center gap-5 mb-5">
-        <div className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 font-medium text-[22px]" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
-          {initials(profile.full_name)}
-        </div>
+        <Avatar path={profile.avatar_path} name={profile.full_name} size={64} textSize={22} />
         <div className="flex flex-1 justify-around">
           <Stat n={folderCount.verified} label="work" />
           <Stat n={counts.followers} label="followers" />
@@ -235,6 +233,27 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
   )
 }
 
+// Shared everywhere a profile photo shows: real image if avatar_path
+// is set, initials on the same brand-blue circle otherwise -- so
+// there's never a broken/empty state, just a graceful fallback.
+export function Avatar({ path, name, size, textSize }: { path?: string | null; name?: string; size: number; textSize: number }) {
+  const url = getAvatarUrl(path)
+  return url ? (
+    <img
+      src={url} alt="" width={size} height={size}
+      className="rounded-full object-cover flex-shrink-0"
+      style={{ width: size, height: size }}
+    />
+  ) : (
+    <div
+      className="rounded-full flex items-center justify-center flex-shrink-0 font-medium"
+      style={{ width: size, height: size, fontSize: textSize, backgroundColor: '#E6F1FB', color: '#185FA5' }}
+    >
+      {initials(name)}
+    </div>
+  )
+}
+
 function Stat({ n, label }: { n: number; label: string }) {
   return (
     <div className="text-center">
@@ -305,11 +324,38 @@ function SavedJobsSection({ profileId, saved, onChanged }: { profileId: string; 
 // each field on its own labelled row with real room to breathe, a
 // Cancel/Save header instead of buttons buried at the bottom of a
 // cramped box.
-function EditProfileScreen({ profile, onDone, onClose }: { profile: any; onDone: () => void; onClose: () => void }) {
+// Exported -- Settings' Account section (Display name / Bio /
+// Interests / Profile photo rows) reuses this exact same screen
+// rather than rebuilding four near-identical forms.
+export function EditProfileScreen({ profile, onDone, onClose }: { profile: any; onDone: () => void; onClose: () => void }) {
   const [name, setName] = useState(profile.full_name || '')
   const [bio, setBio] = useState(profile.bio || '')
   const [tags, setTags] = useState((profile.interest_tags || []).join(', '))
+  const [avatarPath, setAvatarPath] = useState<string | null>(profile.avatar_path || null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [photoError, setPhotoError] = useState('')
+  const photoRef = useRef<HTMLInputElement>(null)
+
+  const pickPhoto = () => photoRef.current?.click()
+
+  const onPhotoChosen = async (file: File | null) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) return setPhotoError('Choose an image file.')
+    setUploadingPhoto(true); setPhotoError('')
+    const { path, error } = await uploadAvatar(profile.id, file)
+    setUploadingPhoto(false)
+    if (error) return setPhotoError(error.message || 'Upload failed — try again.')
+    setAvatarPath(path)
+  }
+
+  const removePhoto = async () => {
+    setUploadingPhoto(true); setPhotoError('')
+    const { error } = await removeAvatar(profile.id, avatarPath)
+    setUploadingPhoto(false)
+    if (error) return setPhotoError(error.message || "Couldn't remove that — try again.")
+    setAvatarPath(null)
+  }
 
   const save = async () => {
     setSaving(true)
@@ -332,10 +378,24 @@ function EditProfileScreen({ profile, onDone, onClose }: { profile: any; onDone:
       </div>
 
       <div className="flex flex-col items-center pt-8 pb-6">
-        <div className="w-24 h-24 rounded-full flex items-center justify-center font-medium text-[32px]" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
-          {initials(name || profile.full_name)}
+        <button onClick={pickPhoto} disabled={uploadingPhoto} className="relative disabled:opacity-60">
+          <Avatar path={avatarPath} name={name || profile.full_name} size={96} textSize={32} />
+          <span className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-brand flex items-center justify-center border-2 border-[#0f0f0f]">
+            <Camera className="w-3.5 h-3.5 text-white" />
+          </span>
+        </button>
+        <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={e => onPhotoChosen(e.target.files?.[0] || null)} />
+        {photoError && <p className="text-[12px] text-danger-text mt-2 text-center px-8">{photoError}</p>}
+        <div className="flex items-center gap-4 mt-3">
+          <button onClick={pickPhoto} disabled={uploadingPhoto} className="text-[13px] font-semibold text-brand disabled:opacity-40">
+            {uploadingPhoto ? 'Uploading…' : avatarPath ? 'Change photo' : 'Add photo'}
+          </button>
+          {avatarPath && (
+            <button onClick={removePhoto} disabled={uploadingPhoto} className="text-[13px] font-semibold text-[#999] disabled:opacity-40">
+              Remove
+            </button>
+          )}
         </div>
-        <p className="text-[13px] text-[#666] mt-3">Your initials, based on your name</p>
       </div>
 
       <div className="px-5 space-y-6 pb-10">

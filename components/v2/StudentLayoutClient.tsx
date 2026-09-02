@@ -11,8 +11,21 @@ export default function StudentLayoutClient({ children }: { children: React.Reac
   const pathname = usePathname()
 
   return (
-    <StudentShell onPlus={() => setComposerOpen(true)}>
-      {children}
+    <>
+      <StudentShell onPlus={() => setComposerOpen(true)}>
+        {children}
+      </StudentShell>
+      {/* A true top-level sibling of the shell now, not nested inside
+          it -- it used to render as part of StudentShell's `children`,
+          which places it inside <main>, the app's own scrollable
+          container. position:fixed is supposed to escape that
+          regardless per spec, but nesting a full-screen modal inside a
+          scrolling ancestor is exactly the kind of thing mobile
+          WebKit/webview builds are inconsistent about in practice --
+          "can't see the create or X" is consistent with the modal (or
+          parts of it) rendering clipped to main's box on some devices
+          rather than the true viewport. Rendering it here removes any
+          dependency on that at all. */}
       {composerOpen && (
         <PostComposer
           onClose={() => setComposerOpen(false)}
@@ -27,6 +40,6 @@ export default function StudentLayoutClient({ children }: { children: React.Reac
           }}
         />
       )}
-    </StudentShell>
+    </>
   )
 }
