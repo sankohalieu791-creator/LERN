@@ -24,10 +24,26 @@ html, body {
    parent. Defaulting body dark (not the light --paper) means that
    edge case shows a dark flash, not the stark white strip that was
    actually being reported -- the mobile dark shell is the primary
-   surface this app runs on right now.  */
+   surface this app runs on right now.
+
+   NOTE: no padding-top here. StudentShell's own root div already
+   applies `paddingTop: env(safe-area-inset-top)` to itself, on a box
+   that's pinned to exactly `h-[100dvh]`. body has no explicit height
+   (it sizes to its content, i.e. auto), so if body ALSO padded itself
+   by that same inset, the true rendered height became
+   safe-area-inset-top + 100dvh -- taller than the actual viewport by
+   the status-bar height, making the real HTML document scrollable by
+   that amount on top of main's own internal scroll. Two overlapping
+   scroll ranges is exactly "the top nav moves" / "drag it down and it
+   just stays down" -- and it's standalone-only because a normal
+   in-tab Safari page reports safe-area-inset-top as ~0 (the browser's
+   own chrome already occupies that space), while a standalone
+   home-screen app with statusBarStyle 'black-translucent' reports the
+   real status-bar height there, so the double-count was invisible in
+   a tab and very visible once installed. Found by walking the actual
+   box model, not by guessing at another CSS tweak. */
 body {
   background-color: #0f0f0f;
-  padding-top: env(safe-area-inset-top);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }

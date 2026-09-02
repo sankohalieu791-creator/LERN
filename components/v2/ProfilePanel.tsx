@@ -7,7 +7,7 @@ import {
   getFollowCounts, getVerifiedWorkForProfile, getMyPosts, getSelfQualifications,
   addSelfQualification, deleteSelfQualification, uploadSelfQualificationFile, getSignedFileUrl, deletePost,
   updateProfileBioTags, getExperienceEntries, addExperienceEntry, deleteExperienceEntry,
-  getSavedOpportunities, unsaveOpportunity,
+  getSavedOpportunities, unsaveOpportunity, updateUserProfile,
 } from '@/lib/supabase'
 import {
   FolderCheck, Briefcase, Grid3x3, Settings, Plus, X, Trash2, Play,
@@ -42,7 +42,7 @@ type Folder = 'verified' | 'experience' | 'posts'
 // component -- not wired to any other surface yet, only this student's
 // own /student/profile route.
 export default function ProfilePanel({ userId, ownView = true }: { userId?: string; ownView?: boolean }) {
-  const { user: authUser } = useAuth()
+  const { user: authUser, refreshUser } = useAuth()
   const router = useRouter()
   const profileId = userId || authUser?.id
   const isOwn = ownView && profileId === authUser?.id
@@ -77,9 +77,21 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
   const folderCount = { verified: verified.length, experience: experience.length, posts: posts.length }
 
   return (
-    <div className="-mx-4 -mt-5 bg-[#0f0f0f] min-h-[calc(100vh-56px)] text-white px-4 pt-5 pb-6">
-      {/* ── HEADER: avatar left, 3 counts, name, bio, tags ── */}
-      <div className="flex items-center gap-4 mb-4">
+    // px-4, matching every other panel (Feed/My Work/Discover) against
+    // main's own zero padding -- this used to be -mx-4 px-5, a leftover
+    // assumption that main already had 16px of its own padding to cancel
+    // out. It doesn't (checked directly against main's className), so
+    // that combo left only a ~4px gutter on each side: content read as
+    // "too wide" because it really was rendered almost edge-to-edge,
+    // not because of the internal spacing.
+    <div className="bg-[#0f0f0f] min-h-[calc(100vh-56px)] text-white px-4 pt-4 pb-8">
+      {/* ── HEADER: avatar left, 3 counts, name, bio, tags ──
+          More breathing room throughout this screen than the first
+          pass -- generous gaps and padding instead of the spec's
+          literal (very tight) pixel values, closer to how Instagram/
+          TikTok actually give a profile room rather than packing it
+          edge to edge. */}
+      <div className="flex items-center gap-5 mb-5">
         <div className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 font-medium text-[22px]" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
           {initials(profile.full_name)}
         </div>
@@ -90,30 +102,36 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
         </div>
       </div>
 
-      <p className="text-[15px] font-medium mb-1">{profile.full_name}</p>
-      {profile.bio && <p className="text-[13px] text-[#999] leading-[1.5] mb-2">{profile.bio}</p>}
+      <p className="text-[16px] font-medium mb-1.5">{profile.full_name}</p>
+      {profile.bio && <p className="text-[13px] text-[#999] leading-[1.6] mb-2.5">{profile.bio}</p>}
       {(profile.interest_tags || []).length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
+        <div className="flex flex-wrap gap-2 mb-4">
           {profile.interest_tags.slice(0, 3).map((t: string) => (
-            <span key={t} className="text-[12px] px-2.5 py-[3px] rounded-full" style={{ backgroundColor: '#E6F1FB', color: '#0C447C' }}>{t}</span>
+            <span key={t} className="text-[12px] px-3 py-1 rounded-full" style={{ backgroundColor: '#E6F1FB', color: '#0C447C' }}>{t}</span>
           ))}
         </div>
       )}
 
       {isOwn && (
-        <div className="flex gap-2 mb-4">
-          <button onClick={() => setEditingBio(true)} className="flex-1 bg-[#1a1a1a] border border-white/10 py-2.5 rounded-xl text-sm font-semibold text-center hover:bg-[#222] transition">
+        <div className="flex gap-2.5 mb-6">
+          <button onClick={() => setEditingBio(true)} className="flex-1 bg-[#1a1a1a] border border-white/10 py-3 rounded-xl text-sm font-semibold text-center hover:bg-[#222] transition">
             Edit profile
           </button>
-          <button onClick={() => router.push('/student/settings')} className="bg-[#1a1a1a] border border-white/10 p-2.5 rounded-xl hover:bg-[#222] transition">
+          <button onClick={() => router.push('/student/settings')} className="bg-[#1a1a1a] border border-white/10 p-3 rounded-xl hover:bg-[#222] transition">
             <Settings className="w-4 h-4" />
           </button>
         </div>
       )}
-      {editingBio && <EditBioForm profile={profile} onDone={() => { setEditingBio(false); load() }} />}
+      {editingBio && (
+        <EditProfileScreen
+          profile={profile}
+          onDone={async () => { await refreshUser(); setEditingBio(false); load() }}
+          onClose={() => setEditingBio(false)}
+        />
+      )}
 
       {/* ── THREE FOLDERS (public shopfront, exact order) ── */}
-      <div className="grid grid-cols-3 gap-2.5 mb-5">
+      <div className="grid grid-cols-3 gap-3 mb-6">
         <FolderTile active={folder === 'verified'} onClick={() => setFolder('verified')} icon={FolderCheck} iconColor="#0F6E56" label="Verified work" count={`${folderCount.verified} pieces`} />
         <FolderTile active={folder === 'experience'} onClick={() => setFolder('experience')} icon={Briefcase} iconColor="#D4551A" label="Experience" count={`${folderCount.experience} entries`} />
         <FolderTile active={folder === 'posts'} onClick={() => setFolder('posts')} icon={Grid3x3} iconColor="#888888" label="Posts" count={`${folderCount.posts} posts`} />
@@ -121,9 +139,9 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
 
       {/* ── OWN VIEW ONLY: Your view + Saved jobs button ── */}
       {isOwn && (
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-4">
           <span className="flex items-center gap-1.5 text-[12px] text-[#999]"><Eye className="w-3.5 h-3.5" /> Your view</span>
-          <button onClick={() => setFolder('saved' as any)} className="flex items-center gap-1.5 bg-[#141414] border border-white/10 px-3 py-1.5 rounded-lg text-[12px] font-semibold">
+          <button onClick={() => setFolder('saved' as any)} className="flex items-center gap-1.5 bg-[#141414] border border-white/10 px-3.5 py-2 rounded-lg text-[12px] font-semibold">
             <Bookmark className="w-3.5 h-3.5" /> Saved jobs · {saved.length}
           </button>
         </div>
@@ -282,36 +300,79 @@ function SavedJobsSection({ profileId, saved, onChanged }: { profileId: string; 
   )
 }
 
-function EditBioForm({ profile, onDone }: { profile: any; onDone: () => void }) {
+// Full-screen, not an inline card -- matches how Instagram/TikTok
+// actually do "Edit profile": its own screen, a centred avatar up top,
+// each field on its own labelled row with real room to breathe, a
+// Cancel/Save header instead of buttons buried at the bottom of a
+// cramped box.
+function EditProfileScreen({ profile, onDone, onClose }: { profile: any; onDone: () => void; onClose: () => void }) {
+  const [name, setName] = useState(profile.full_name || '')
   const [bio, setBio] = useState(profile.bio || '')
   const [tags, setTags] = useState((profile.interest_tags || []).join(', '))
   const [saving, setSaving] = useState(false)
 
   const save = async () => {
     setSaving(true)
-    await updateProfileBioTags(profile.id, bio.trim(), tags.split(',').map((t: string) => t.trim()).filter(Boolean))
+    await Promise.all([
+      updateUserProfile(profile.id, { full_name: name.trim() }),
+      updateProfileBioTags(profile.id, bio.trim(), tags.split(',').map((t: string) => t.trim()).filter(Boolean)),
+    ])
     setSaving(false)
     onDone()
   }
 
   return (
-    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3.5 mb-4 space-y-2">
-      <textarea
-        value={bio} onChange={e => setBio(e.target.value)} placeholder="Aspiring graphic designer · Year 10 · loves branding and illustration"
-        rows={2} maxLength={120}
-        className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition resize-none"
-      />
-      <input
-        value={tags} onChange={e => setTags(e.target.value)} placeholder="Up to 3 interests, comma separated — e.g. Design, Illustration, Media"
-        className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition"
-      />
-      <div className="flex gap-2">
-        <button onClick={save} disabled={saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
+    <div className="fixed inset-0 z-50 bg-[#0f0f0f] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div className="sticky top-0 z-10 flex items-center justify-between h-14 px-4 bg-[#0f0f0f]/95 backdrop-blur border-b border-white/10">
+        <button onClick={onClose} className="text-[15px] text-[#999]">Cancel</button>
+        <p className="text-[15px] font-semibold text-white">Edit profile</p>
+        <button onClick={save} disabled={saving || !name.trim()} className="text-[15px] font-semibold text-brand disabled:opacity-40">
           {saving ? 'Saving…' : 'Save'}
         </button>
-        <button onClick={onDone} className="px-3.5 py-2 rounded-lg text-[#999] text-[12px] font-semibold">Cancel</button>
+      </div>
+
+      <div className="flex flex-col items-center pt-8 pb-6">
+        <div className="w-24 h-24 rounded-full flex items-center justify-center font-medium text-[32px]" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+          {initials(name || profile.full_name)}
+        </div>
+        <p className="text-[13px] text-[#666] mt-3">Your initials, based on your name</p>
+      </div>
+
+      <div className="px-5 space-y-6 pb-10">
+        <EditField label="Name" value={name} onChange={setName} placeholder="Your name" />
+        <EditField
+          label="Bio" value={bio} onChange={setBio} multiline maxLength={120}
+          placeholder="Aspiring graphic designer · Year 10 · loves branding and illustration"
+        />
+        <EditField
+          label="Interests" value={tags} onChange={setTags}
+          placeholder="Up to 3, comma separated — e.g. Design, Illustration, Media"
+          hint="Shown as tags on your profile — separate with commas."
+        />
       </div>
     </div>
+  )
+}
+
+function EditField({ label, value, onChange, placeholder, hint, multiline, maxLength }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; hint?: string; multiline?: boolean; maxLength?: number
+}) {
+  return (
+    <label className="block">
+      <span className="block text-[13px] font-semibold text-[#999] mb-2">{label}</span>
+      {multiline ? (
+        <textarea
+          value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={3} maxLength={maxLength}
+          className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-[15px] text-white placeholder-[#555] outline-none focus:border-brand transition resize-none leading-relaxed"
+        />
+      ) : (
+        <input
+          value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+          className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-[15px] text-white placeholder-[#555] outline-none focus:border-brand transition"
+        />
+      )}
+      {hint && <span className="block text-[12px] text-[#666] mt-1.5">{hint}</span>}
+    </label>
   )
 }
 

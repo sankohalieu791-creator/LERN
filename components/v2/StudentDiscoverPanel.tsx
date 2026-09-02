@@ -114,19 +114,23 @@ export default function StudentDiscoverPanel() {
         {tab === 'received' && <p className="text-[#666] text-sm mt-0.5">Employers who've expressed interest in you</p>}
       </div>
 
-      {tab !== 'received' && (
-        <div className="px-4 mb-3">
-          <div className="flex items-center gap-2 bg-[#1a1a1a] border border-white/[0.08] rounded-2xl px-4 py-3">
-            <Search className="w-4 h-4 text-[#555] flex-shrink-0" />
-            <input
-              value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search…"
-              className="flex-1 bg-transparent text-white text-sm placeholder-[#444] outline-none"
-            />
-            {search && <button onClick={() => setSearch('')}><X className="w-4 h-4 text-[#555]" /></button>}
-          </div>
+      {/* Always rendered, every tab -- it used to only show for tabs
+          other than "received", and hiding it there removed a whole
+          row of height, which is exactly what made switching to
+          Interest received visibly jump the content up. Search still
+          does something real on every tab, including this one
+          (filters by employer name client-side, below). */}
+      <div className="px-4 mb-3">
+        <div className="flex items-center gap-2 bg-[#1a1a1a] border border-white/[0.08] rounded-2xl px-4 py-3">
+          <Search className="w-4 h-4 text-[#555] flex-shrink-0" />
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder={tab === 'received' ? 'Search by employer…' : 'Search…'}
+            className="flex-1 bg-transparent text-white text-sm placeholder-[#444] outline-none"
+          />
+          {search && <button onClick={() => setSearch('')}><X className="w-4 h-4 text-[#555]" /></button>}
         </div>
-      )}
+      </div>
 
       <div className="px-4 flex gap-2 pb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
         {tabs.map(t => (
@@ -170,7 +174,12 @@ export default function StudentDiscoverPanel() {
             )
           })
         ) : tab === 'received' ? (
-          interest.length === 0 ? <EmptyState label="Nothing yet — when an employer's interested in your verified work, it'll show up here." /> : interest.map(i => (
+          (() => {
+            const q = search.trim().toLowerCase()
+            const filtered = q ? interest.filter(i => i.employer?.full_name?.toLowerCase().includes(q)) : interest
+            if (interest.length === 0) return <EmptyState label="Nothing yet — when an employer's interested in your verified work, it'll show up here." />
+            if (filtered.length === 0) return <EmptyState label={`No requests from an employer matching "${search}".`} />
+            return filtered.map(i => (
             <div key={i.id} className="bg-[#1a1a1a] border border-white/[0.07] rounded-2xl p-4">
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="w-9 h-9 rounded-xl bg-[#252525] flex items-center justify-center text-white font-bold text-[11px] flex-shrink-0">
@@ -198,7 +207,8 @@ export default function StudentDiscoverPanel() {
                 </span>
               )}
             </div>
-          ))
+            ))
+          })()
         ) : (
           opportunities.length === 0 ? <EmptyState label={`No ${tab === 'job' ? 'jobs' : tab === 'apprenticeship' ? 'apprenticeships' : 'internships'} posted yet.`} icon={<Briefcase className="w-8 h-8 text-[#333] mb-2" />} /> : opportunities.map(o => {
             const status = applicationByOpp[o.id]
