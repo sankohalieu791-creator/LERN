@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getVisibleWorkItems, getMySubmissions, getMyOrgType, getWorkItemMemberCount,
   submitWork, uploadSubmissionFile, getSignedFileUrl, redeemJoinCode,
+  markWorkItemStarted, getMyStartedWorkItemIds,
 } from '@/lib/supabase'
 import type { WorkItem } from '@/lib/types'
 import {
@@ -53,11 +54,25 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   revoked: { label: 'Revoked', cls: 'bg-[#3a1414] text-[#e04a4a]' },
 }
 
+// Build Spec: Feed and My Work (student) v1.0, Part 2 -- pinned pill
+// colours used exactly, structural bg stays this app's own dark
+// palette (same call as every other rebuild this session).
+const SPEC_STATUS: Record<string, { label: string; bg: string; text: string }> = {
+  new: { label: 'New', bg: '#123049', text: '#6FB2E8' },
+  overdue: { label: 'Overdue', bg: '#3A2A10', text: '#E0A94B' },
+  in_progress: { label: 'In progress', bg: '#3A2A10', text: '#E0A94B' },
+  submitted: { label: 'In review', bg: '#3A2A10', text: '#E0A94B' },
+  returned: { label: 'Returned', bg: '#3A2A10', text: '#E0A94B' },
+  verified: { label: 'Verified', bg: '#12321F', text: '#4ade80' },
+}
+const TYPE_LABEL: Record<string, string> = { brief: 'Design brief', assignment: 'Assignment', course: 'Course' }
+
 export default function StudentMyWorkPanel() {
   const { user, refreshUser } = useAuth()
   const [orgType, setOrgType] = useState<'institution' | 'provider' | null>(null)
   const [workItems, setWorkItems] = useState<WorkItem[]>([])
   const [submissions, setSubmissions] = useState<any[]>([])
+  const [startedIds, setStartedIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('primary')
   const [selected, setSelected] = useState<WorkItem | null>(null)
@@ -68,7 +83,8 @@ export default function StudentMyWorkPanel() {
       getMyOrgType(),
       getVisibleWorkItems(user.organisation_id),
       getMySubmissions(user.id),
-    ]).then(([ot, wi, subs]) => {
+      getMyStartedWorkItemIds(user.id),
+    ]).then(([ot, wi, subs, started]) => {
       setOrgType(ot)
       // A workshop is one live session -- once it's ended there's
       // nothing left to join, so (matching the staff side's own
@@ -80,6 +96,7 @@ export default function StudentMyWorkPanel() {
       // way it is for a single workshop session.
       setWorkItems((wi.data || []).filter((w: any) => !w.closed_at && !(w.type === 'workshop' && w.ended_at)))
       setSubmissions(subs.data || [])
+      setStartedIds(started.data || [])
       setLoading(false)
     })
   }
@@ -124,7 +141,13 @@ export default function StudentMyWorkPanel() {
         <div className="px-4 py-3 space-y-3">
           {items.map(item => {
             const mySubs = submissions.filter((s: any) => s.work_item_id === item.id)
-            return <WorkCard key={item.id} item={item} latest={mySubs[0]} onOpen={() => setSelected(item)} />
+            return (
+              <WorkCard
+                key={item.id} item={item} latest={mySubs[0]} started={startedIds.includes(item.id)}
+                onOpen={() => setSelected(item)}
+                onStart={async () => { if (user) { await markWorkItemStarted(item.id, user.id); setStartedIds(prev => [...prev, item.id]) } setSelected(item) }}
+              />
+            )
           })}
         </div>
       )}
@@ -153,7 +176,101 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
   )
 }
 
-function WorkCard({ item, latest, onOpen }: { item: WorkItem; latest: any; onOpen: () => void }) {
+function WorkCard({ item, latest, started, onOpen, onStart }: {
+  item: WorkItem; latest: any; started: boolean; onOpen: () => void; onStart: () => void
+}) {
+  const isSubmittable = item.type === 'brief' || item.type === 'assignment'
+  if (isSubmittable) return <SubmittableCard item={item} latest={latest} started={started} onOpen={onOpen} onStart={onStart} />
+  return <SessionCard item={item} onOpen={onOpen} />
+}
+
+// Build Spec: Feed and My Work (student) v1.0, Part 2 -- the compact
+// card, statuses as the visible game-loop. "started" (work_item_starts,
+// see lib/supabase.ts) is the one genuinely new signal here: a
+// submission row only ever means "submitted" (submitted_at is NOT
+// NULL on it), so "begun but not yet submitted" had no real signal to
+// read before now.
+function SubmittableCard({ item, latest, started, onOpen, onStart }: {
+  item: WorkItem; latest: any; started: boolean; onOpen: () => void; onStart: () => void
+}) {
+  const overdue = !latest && item.deadline && new Date(item.deadline) < new Date()
+  const statusKey = latest ? latest.status : overdue ? 'overdue' : started ? 'in_progress' : 'new'
+  const spec = SPEC_STATUS[statusKey] || SPEC_STATUS.new
+  const dateLine = latest
+    ? statusKey === 'verified' && (latest as any).verified_at
+      ? `Verified ${new Date((latest as any).verified_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
+      : `Submitted ${new Date(latest.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+    : item.deadline
+      ? `${overdue ? 'Was due' : 'Due'} ${new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+      : null
+
+  return (
+    <button onClick={onOpen} className="block w-full text-left bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-[14px]">
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <p className="text-[14px] font-semibold text-white flex-1 min-w-0 leading-snug">{item.title}</p>
+        <span className="text-[11px] font-semibold px-[10px] py-[3px] rounded-full flex-shrink-0" style={{ backgroundColor: spec.bg, color: spec.text }}>
+          {spec.label}
+        </span>
+      </div>
+      <p className="text-[12px] text-[#999] mb-3">
+        {TYPE_LABEL[item.type] || item.type}{dateLine ? ` · ${dateLine}` : ''}
+      </p>
+
+      {statusKey === 'new' && (
+        <div className="flex items-center justify-between">
+          <span className="text-[12px] text-[#666]">Not started yet</span>
+          <span
+            onClick={e => { e.stopPropagation(); onStart() }}
+            className="text-[12px] font-semibold text-white border border-white/20 rounded-full px-4 py-1.5 hover:bg-white/5 transition"
+          >
+            Start
+          </span>
+        </div>
+      )}
+
+      {statusKey === 'in_progress' && (
+        <>
+          <div className="flex items-center gap-2.5 mb-2.5">
+            <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-full rounded-full" style={{ width: '40%', backgroundColor: '#E0A94B' }} />
+            </div>
+            <span className="text-[11px] text-[#999] flex-shrink-0">Started</span>
+          </div>
+          <span
+            onClick={e => { e.stopPropagation(); onOpen() }}
+            className="block w-full text-center text-[13px] font-semibold text-white bg-brand rounded-full py-2 hover:bg-brand-hover transition"
+          >
+            Continue
+          </span>
+        </>
+      )}
+
+      {statusKey === 'returned' && (
+        <span
+          onClick={e => { e.stopPropagation(); onOpen() }}
+          className="block w-full text-center text-[13px] font-semibold text-white bg-brand rounded-full py-2 hover:bg-brand-hover transition"
+        >
+          Resubmit
+        </span>
+      )}
+
+      {statusKey === 'verified' && (
+        <p className="text-[12px] flex items-center gap-1.5" style={{ color: '#4ade80' }}>
+          <CheckCircle2 className="w-3.5 h-3.5" /> Now on your profile as verified work
+        </p>
+      )}
+    </button>
+  )
+}
+
+// The pre-existing gradient-banner card, for course/workshop only --
+// these are joinable live sessions, not submit-and-verify work, so the
+// spec's own New/In progress/Verified vocabulary genuinely doesn't
+// apply to them (the spec's Workshops-tab description is separately
+// just "timing, and which the student has attended"). Untouched, since
+// it never renders alongside SubmittableCard -- Courses/Workshops and
+// Briefs/Assignments are always different tabs, never the same list.
+function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
   const [memberCount, setMemberCount] = useState<number | null>(null)
   const hostName = (item as any).users?.full_name
 
@@ -161,9 +278,6 @@ function WorkCard({ item, latest, onOpen }: { item: WorkItem; latest: any; onOpe
     if (item.type === 'course' || item.type === 'workshop') getWorkItemMemberCount(item.id).then(setMemberCount)
   }, [item.id, item.type])
 
-  const isSubmittable = item.type === 'brief' || item.type === 'assignment'
-  const statusKey = latest ? latest.status : 'new'
-  const status = STATUS[statusKey]
   const live = !!item.started_at && !item.ended_at
   const ended = !!item.ended_at
   const imgHeight = item.type === 'workshop' ? 190 : 200
@@ -173,36 +287,23 @@ function WorkCard({ item, latest, onOpen }: { item: WorkItem; latest: any; onOpe
       <div className={`relative bg-gradient-to-br ${bannerGradient(item.id)} flex items-center justify-center`} style={{ height: imgHeight }}>
         <span className="text-white/10 font-black text-4xl tracking-tight select-none">LERN</span>
 
-        {isSubmittable ? (
-          <>
-            <span className="absolute top-2.5 left-2.5 text-[10px] font-bold bg-black/80 text-white px-2.5 py-1 rounded-full uppercase tracking-wide">
-              {item.topic || item.type}
+        <span className="absolute top-2.5 left-2.5 text-[10px] font-bold bg-black/80 text-white px-2.5 py-1 rounded-full uppercase tracking-wide">
+          {[item.topic, item.level].filter(Boolean).join(' · ') || item.type}
+        </span>
+        {item.type === 'course' && (
+          <span className="absolute top-2.5 right-2.5 text-[10px] font-bold bg-[#FF6B2B] text-white px-2.5 py-1 rounded-full">YOUR COURSE</span>
+        )}
+        {item.type === 'workshop' && (
+          live ? (
+            <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 bg-red-500/90 rounded-full px-2.5 py-1">
+              <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+              <span className="text-white text-[10px] font-bold">LIVE NOW</span>
+            </div>
+          ) : (
+            <span className={`absolute top-2.5 right-2.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide ${ended ? 'bg-black/80 text-white/60' : 'bg-[#FF6B2B]/90 text-white'}`}>
+              {ended ? 'Ended' : (item.mode || 'online')}
             </span>
-            <span className={`absolute top-2.5 right-2.5 text-[10px] font-bold px-2.5 py-1 rounded-full ${status.cls}`}>
-              {status.label}
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="absolute top-2.5 left-2.5 text-[10px] font-bold bg-black/80 text-white px-2.5 py-1 rounded-full uppercase tracking-wide">
-              {[item.topic, item.level].filter(Boolean).join(' · ') || item.type}
-            </span>
-            {item.type === 'course' && (
-              <span className="absolute top-2.5 right-2.5 text-[10px] font-bold bg-[#FF6B2B] text-white px-2.5 py-1 rounded-full">YOUR COURSE</span>
-            )}
-            {item.type === 'workshop' && (
-              live ? (
-                <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 bg-red-500/90 rounded-full px-2.5 py-1">
-                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                  <span className="text-white text-[10px] font-bold">LIVE NOW</span>
-                </div>
-              ) : (
-                <span className={`absolute top-2.5 right-2.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide ${ended ? 'bg-black/80 text-white/60' : 'bg-[#FF6B2B]/90 text-white'}`}>
-                  {ended ? 'Ended' : (item.mode || 'online')}
-                </span>
-              )
-            )}
-          </>
+          )
         )}
       </div>
 
@@ -221,38 +322,19 @@ function WorkCard({ item, latest, onOpen }: { item: WorkItem; latest: any; onOpe
         </div>
 
         <div className="flex items-center gap-4 text-[#666] text-xs mb-4">
-          {isSubmittable ? (
-            item.deadline && (
-              <span className="flex items-center gap-1"><CalendarClock className="w-3 h-3" /> Due {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
-            )
-          ) : (
-            <>
-              {(item.duration_label || item.starts_at) && (
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {item.starts_at ? `Starts ${new Date(item.starts_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}
-                  {item.starts_at && item.duration_label ? ' · ' : ''}
-                  {item.duration_label || ''}
-                </span>
-              )}
-              {memberCount !== null && <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {memberCount} joined</span>}
-            </>
+          {(item.duration_label || item.starts_at) && (
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {item.starts_at ? `Starts ${new Date(item.starts_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}
+              {item.starts_at && item.duration_label ? ' · ' : ''}
+              {item.duration_label || ''}
+            </span>
           )}
+          {memberCount !== null && <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {memberCount} joined</span>}
         </div>
 
-        <div className={`w-full text-center rounded-2xl py-3 text-sm font-bold ${
-          item.type === 'workshop' || item.type === 'course'
-            ? live ? 'bg-red-500 text-white' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
-            : statusKey === 'verified' ? 'bg-[#123a24] text-[#4ade80]'
-            : statusKey === 'submitted' ? 'bg-white/10 text-white/70'
-            : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'
-        }`}>
-          {item.type === 'workshop' || item.type === 'course'
-            ? live ? '🔴 Join Now' : ended ? 'Ended' : 'Start Class →'
-            : statusKey === 'verified' ? 'Completed ✓'
-            : statusKey === 'submitted' ? 'Awaiting review'
-            : statusKey === 'returned' ? 'Resubmit →'
-            : 'Open →'}
+        <div className={`w-full text-center rounded-2xl py-3 text-sm font-bold ${live ? 'bg-red-500 text-white' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'}`}>
+          {live ? '🔴 Join Now' : ended ? 'Ended' : 'Start Class →'}
         </div>
       </div>
     </button>
@@ -279,6 +361,16 @@ function WorkItemDetail({
   useEffect(() => {
     if (item.type === 'course' || item.type === 'workshop') getWorkItemMemberCount(item.id).then(setMemberCount)
   }, [item.id, item.type])
+
+  // Fallback net -- SubmittableCard's own "Start" pill already marks
+  // this, but a student can just as easily open the detail view
+  // directly (tapping the card body, not that specific pill) without
+  // ever hitting it. Opening a not-yet-submitted item at all is a
+  // reasonable definition of "begun", so mark it here too.
+  useEffect(() => {
+    if (canSubmit && !latest && user) markWorkItemStarted(item.id, user.id).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id])
 
   const handleSubmit = async () => {
     setError('')

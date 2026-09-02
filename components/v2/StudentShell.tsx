@@ -83,10 +83,16 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
           className="flex-shrink-0 bg-[#0f0f0f] border-b border-white/10 z-20 will-change-transform"
           style={{ transform: 'translateZ(0)' }}
         >
+          {/* Build Spec: Feed and My Work (student) v1.0, Part 1 --
+              "LERN wordmark on the left at 20px weight 600 in #D4551A.
+              On the right: a search icon and a notifications (bell)
+              icon, both #5A5A5A." Only touches Feed -- this header is
+              gated to isActive('/student/feed') above, nothing else
+              renders it. */}
           <div className="px-4 py-3 flex items-center justify-between">
-            <span className="text-white font-bold text-xl tracking-tight">LERN</span>
+            <span className="font-semibold text-[20px] tracking-tight" style={{ color: '#D4551A' }}>LERN</span>
             <div className="flex items-center gap-1">
-              <button aria-label="Search" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 text-[#888] transition">
+              <button aria-label="Search" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition" style={{ color: '#5A5A5A' }}>
                 <Search className="w-5 h-5" />
               </button>
               <NotificationsBell />

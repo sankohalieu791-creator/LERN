@@ -5,7 +5,9 @@
 export type Role = 'student' | 'institution_staff' | 'provider_staff' | 'employer'
 export type OrgType = 'institution' | 'provider'
 
-export type ReactionType = 'congratulations' | 'well_done' | 'keep_going' | 'thumbs_up' | 'celebrate_lern'
+// Build Spec: Feed and My Work (student) v1.0 -- exactly these 4,
+// "no separate Like... a like and a reaction are the same gesture."
+export type ReactionType = 'congratulations' | 'well_done' | 'keep_going' | 'proud'
 
 export interface Post {
   id: string

@@ -289,6 +289,19 @@ export const getMySubmissions = async (studentId: string) => {
   return { data, error }
 }
 
+// My Work "In progress" state -- the only real signal that a piece
+// has been opened/begun but not yet submitted. Written once (upsert,
+// not insert -- opening the same item again shouldn't error), read as
+// a plain set of work_item_ids to check against.
+export const markWorkItemStarted = async (workItemId: string, studentId: string) => {
+  const { error } = await supabase.from('work_item_starts').upsert([{ work_item_id: workItemId, student_id: studentId }], { onConflict: 'work_item_id,student_id' })
+  return { error }
+}
+export const getMyStartedWorkItemIds = async (studentId: string) => {
+  const { data, error } = await supabase.from('work_item_starts').select('work_item_id').eq('student_id', studentId)
+  return { data: (data || []).map(r => r.work_item_id), error }
+}
+
 // Uploads to the student's own folder in the private submission-files
 // bucket — RLS only lets a student upload under their own auth.uid()
 // prefix (already enforced by the "owner upload" storage policy).
