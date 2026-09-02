@@ -8,7 +8,7 @@ import {
   uploadWorkItemAttachment, uploadSubmissionFileFor, submitWorkForStudents, getSignedFileUrl, startWorkItemSession,
   closeWorkItem, reopenWorkItem, getWorkItemRecordings, getBriefStatusSummaries,
 } from '@/lib/supabase'
-import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
+import { TextField, PrimaryButton, ErrorBanner, Spinner } from '@/components/v2/Field'
 import WorkshopSession from '@/components/v2/WorkshopSession'
 import type { WorkItem, Group } from '@/lib/types'
 import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw, Film, Download, Clock, PenLine, CheckCircle2 } from 'lucide-react'
@@ -857,9 +857,22 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
             <button onClick={onClose} className="px-4 py-2.5 rounded-lg text-[13px] font-semibold text-ink-secondary hover:bg-surface-muted transition">
               Cancel
             </button>
-            <PrimaryButton onClick={handleSubmit} loading={loading}>
+            {/* Not the shared PrimaryButton here -- it's w-full, built
+                for standing alone as a full-width submit button (as it
+                is everywhere else it's used). Reused inline next to
+                Cancel in this compact flex-shrink-0 row, that w-full
+                fights the row's own shrink-to-fit sizing -- the button
+                stretched to fill leftover flex space instead of sizing
+                to its own label, which read as "doesn't fit in the
+                box." A plain auto-width button, sized like Cancel next
+                to it, is what this spot actually needs. */}
+            <button
+              onClick={handleSubmit} disabled={loading}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-hover active:scale-[0.99] transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {loading && <Spinner />}
               {publishChoice === 'draft' ? 'Save draft' : publishChoice === 'scheduled' ? 'Schedule' : 'Create'}
-            </PrimaryButton>
+            </button>
           </div>
         </div>
       </div>

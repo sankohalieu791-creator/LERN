@@ -299,34 +299,45 @@ function WorkItemDetail({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0f0f0f] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <div className="sticky top-0 z-10 flex items-center gap-3 h-14 px-3 bg-[#0f0f0f]/95 backdrop-blur border-b border-white/10">
-        <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 text-white">
+    // bg-paper/text-ink etc. throughout this screen now, not literal
+    // #0f0f0f/#1a1a1a/white hex -- the same theme-token vocabulary the
+    // org "Create brief" screen (NewBriefForm, WorkItemsPanel.tsx) is
+    // built on. StudentShell still pins data-theme="dark" on itself
+    // deliberately (the phone app is dark-only for now), so this
+    // renders identically to before today -- but it's genuinely
+    // theme-capable now rather than hardcoded, and reads with the same
+    // considered, labelled-section feel as Create brief instead of the
+    // ad-hoc hex it had before.
+    <div className="fixed inset-0 z-50 bg-paper overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div className="sticky top-0 z-10 flex items-center gap-3 h-14 px-3 bg-paper/95 backdrop-blur border-b border-edge-subtle">
+        <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-muted text-ink">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <span className="font-bold text-white text-[15px] truncate">{item.title}</span>
+        <span className="font-bold text-ink text-[15px] truncate">{item.title}</span>
       </div>
 
+      {/* Banner gradient + brand-gradient CTAs stay exactly as they
+          are -- a deliberate brand treatment, not a theme inconsistency. */}
       <div className={`h-[200px] bg-gradient-to-br ${bannerGradient(item.id)} flex items-center justify-center`}>
         <span className="text-white/10 font-black text-5xl tracking-tight select-none">LERN</span>
       </div>
 
       <div className="p-4">
-        <h1 className="font-bold text-white text-xl leading-snug mb-2">{item.title}</h1>
+        <h1 className="font-bold text-ink text-xl leading-snug mb-2">{item.title}</h1>
 
         <div className="flex items-center gap-2 mb-3">
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
             {initials(hostName)}
           </div>
-          <span className="text-white text-sm font-semibold flex items-center gap-1">
+          <span className="text-ink text-sm font-semibold flex items-center gap-1">
             {hostName || 'Your organisation'}
             <BadgeCheck className="w-3.5 h-3.5 text-[#4a9de0]" />
           </span>
         </div>
 
-        {item.description && <p className="text-[#999] text-sm leading-snug mb-4">{item.description}</p>}
+        {item.description && <p className="text-ink-secondary text-sm leading-snug mb-4">{item.description}</p>}
 
-        <div className="flex items-center gap-4 text-[#666] text-xs mb-4">
+        <div className="flex items-center gap-4 text-ink-tertiary text-xs mb-4">
           {item.type === 'brief' || item.type === 'assignment' ? (
             item.deadline && <span className="flex items-center gap-1"><CalendarClock className="w-3 h-3" /> Due {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
           ) : (
@@ -337,10 +348,10 @@ function WorkItemDetail({
           )}
         </div>
 
-        <p className="text-[11px] font-bold text-[#666] uppercase tracking-wide mb-1.5">
+        <p className="text-[11px] font-bold text-ink-tertiary uppercase tracking-wide mb-1.5">
           {item.type === 'assignment' ? 'Assignment' : 'Criteria'}
         </p>
-        <p className="text-sm text-[#ccc] mb-4 leading-snug">{item.assignment || item.criteria}</p>
+        <p className="text-sm text-ink-body mb-4 leading-snug">{item.assignment || item.criteria}</p>
 
         {(item.type === 'workshop' || item.type === 'course') && (
           <div className="mb-4">
@@ -368,23 +379,24 @@ function WorkItemDetail({
         )}
 
         {canSubmit && (
-          <>
-            {error && <p className="text-xs text-[#e04a4a] mb-2">{error}</p>}
+          <div className="border-t border-edge-subtle pt-4">
+            <p className="text-[13px] font-semibold text-ink mb-2.5">Your submission</p>
+            {error && <p className="text-xs text-danger-text mb-2">{error}</p>}
             <textarea
               value={content} onChange={e => setContent(e.target.value)}
               placeholder="Paste a link, or write your work here."
               rows={5}
-              className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-[#666] outline-none focus:border-white/30 transition mb-3 resize-none"
+              className="w-full bg-surface-subtle border border-edge rounded-xl px-4 py-3 text-sm text-ink placeholder-ink-quaternary outline-none focus:border-brand focus:bg-surface transition mb-3 resize-none"
             />
-            <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 text-xs font-semibold text-[#aaa] mb-3">
+            <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 text-xs font-semibold text-ink-secondary mb-4">
               <Paperclip className="w-3.5 h-3.5" /> {file ? file.name : 'Attach a file (optional)'}
-              {file && <span onClick={e => { e.stopPropagation(); setFile(null) }} className="hover:text-[#e04a4a]"><X className="w-3.5 h-3.5" /></span>}
+              {file && <span onClick={e => { e.stopPropagation(); setFile(null) }} className="hover:text-danger-text"><X className="w-3.5 h-3.5" /></span>}
             </button>
             <input ref={fileRef} type="file" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
             <button onClick={handleSubmit} disabled={loading} className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold text-sm py-3 rounded-2xl disabled:opacity-60">
               {loading ? 'Submitting…' : latest?.status === 'returned' ? 'Resubmit' : 'Submit work'}
             </button>
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -400,12 +412,12 @@ function SubmissionRow({ submission }: { submission: any }) {
   }, [submission.file_path])
 
   return (
-    <div className="bg-[#1a1a1a] rounded-xl p-3.5">
+    <div className="bg-surface-subtle border border-edge-subtle rounded-xl p-3.5">
       <div className="flex items-center justify-between mb-1.5">
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${status.cls}`}>{status.label}</span>
-        <span className="text-[11px] text-[#666]">{new Date(submission.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+        <span className="text-[11px] text-ink-tertiary">{new Date(submission.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
       </div>
-      {submission.content && <p className="text-sm text-[#ccc] whitespace-pre-wrap mb-1 leading-snug">{submission.content}</p>}
+      {submission.content && <p className="text-sm text-ink-body whitespace-pre-wrap mb-1 leading-snug">{submission.content}</p>}
       {submission.file_path && (
         <a href={fileUrl || '#'} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs font-semibold text-[#4a9de0] hover:underline mb-1">
           <Paperclip className="w-3 h-3" /> {submission.file_path.split('/').pop()}

@@ -708,6 +708,16 @@ export const getMyOrganisationInfo = async (organisationId: string) => {
   return { data, error }
 }
 
+// Case-insensitively unique (see the migration's index) -- checked
+// before saving so a taken handle fails with a clear message instead
+// of a raw constraint-violation error.
+export const isUsernameAvailable = async (username: string, excludeUserId: string) => {
+  const { data, error } = await supabase
+    .from('users').select('id').ilike('username', username).neq('id', excludeUserId).maybeSingle()
+  if (error) return { available: false, error }
+  return { available: !data, error: null }
+}
+
 // ── Settings: profile photo, privacy, security, blocking ──────────
 // avatars is a public bucket -- reading it back is just the public
 // URL, no signed-URL round trip needed the way private buckets need.

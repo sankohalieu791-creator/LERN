@@ -36,6 +36,7 @@ export interface User {
   bio?: string
   interest_tags?: string[]
   avatar_path?: string
+  username?: string
   // Privacy — only ever meaningfully settable for an 18+ account; an
   // under-18's row stays at these safe defaults (public_profile false)
   // and Settings never renders a control to change them.
