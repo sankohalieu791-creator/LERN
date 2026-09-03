@@ -1,15 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
   getDiscoverWork, getOpportunities, getMyReceivedInterest, respondToInterest,
   applyToOpportunity, getMyOpportunityApplications, getAvatarUrl, getMyApplications,
+  incrementVerificationViews,
 } from '@/lib/supabase'
 import type { ApplicationStage } from '@/lib/supabase'
 import {
-  Search, X, BadgeCheck, MapPin, Briefcase, Clock, Check, Ban, Send, LineChart,
+  Search, X, BadgeCheck, MapPin, Briefcase, Clock, Check, Ban, Send, LineChart, Eye,
 } from 'lucide-react'
 
 const STAGE_META: Record<ApplicationStage, { label: string; bg: string; text: string }> = {
@@ -57,7 +58,6 @@ const TYPE_LABEL: Record<string, string> = { brief: 'Brief', course: 'Course', w
 
 export default function StudentDiscoverPanel() {
   const { user } = useAuth()
-  const router = useRouter()
   const adult = isAdult(user?.date_of_birth)
   const [tab, setTab] = useState<Tab>('explore')
   const [search, setSearch] = useState('')
@@ -193,32 +193,7 @@ export default function StudentDiscoverPanel() {
             ))}
           </div>
         ) : tab === 'explore' ? (
-          work.length === 0 ? <EmptyState label="No public verified work matches yet — check back soon." /> : work.map(v => {
-            const wi = v.submissions?.work_items
-            const student = v.submissions?.student
-            return (
-              // Was a plain div -- tapping did nothing at all. Opens
-              // the student's own profile (Verified is right there),
-              // the same destination tapping a Feed author now goes to.
-              <button
-                key={v.id} onClick={() => router.push(student?.id === user?.id ? '/student/profile' : `/student/profile/${student?.id}`)}
-                className="w-full text-left bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4"
-              >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className="text-[10px] font-bold text-[var(--app-text-secondary)] uppercase tracking-wide">{TYPE_LABEL[wi?.type] || wi?.type}</span>
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-[#4ade80] flex-shrink-0"><BadgeCheck className="w-3.5 h-3.5" /> Verified</span>
-                </div>
-                <p className="text-[var(--app-text)] font-bold text-[15px] leading-snug mb-1">{wi?.title}</p>
-                {wi?.description && <p className="text-[var(--app-text-secondary)] text-sm line-clamp-2 mb-3 leading-snug">{wi.description}</p>}
-                <div className="flex items-center gap-2 pt-2 border-t border-[var(--app-border-subtle)]">
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-[var(--app-text)] font-bold text-[9px] flex-shrink-0">
-                    {initials(student?.full_name)}
-                  </div>
-                  <p className="text-[var(--app-text-secondary)] text-xs">{student?.full_name} · verified {new Date(v.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
-                </div>
-              </button>
-            )
-          })
+          work.length === 0 ? <EmptyState label="No public verified work matches yet — check back soon." /> : work.map(v => <ExploreCard key={v.id} v={v} isOwn={v.submissions?.student?.id === user?.id} />)
         ) : tab === 'received' ? (
           (() => {
             const q = search.trim().toLowerCase()
@@ -380,6 +355,47 @@ function TrackingCard({ application: a }: { application: any }) {
 
       <p className="text-[var(--app-text-tertiary)] text-[11px] mt-2.5">Updated {new Date(a.stage_updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
     </div>
+  )
+}
+
+// Same "shown once per page-load" view count Feed already tracks --
+// requested here too ("add how many views on discover as well").
+function ExploreCard({ v, isOwn }: { v: any; isOwn: boolean }) {
+  const router = useRouter()
+  const wi = v.submissions?.work_items
+  const student = v.submissions?.student
+  const viewedRef = useRef(false)
+
+  useEffect(() => {
+    if (viewedRef.current) return
+    viewedRef.current = true
+    incrementVerificationViews(v.id)
+  }, [v.id])
+
+  return (
+    // Was a plain div -- tapping did nothing at all. Opens the
+    // student's own profile (Verified is right there), the same
+    // destination tapping a Feed author now goes to.
+    <button
+      onClick={() => router.push(isOwn ? '/student/profile' : `/student/profile/${student?.id}`)}
+      className="w-full text-left bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4"
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <span className="text-[10px] font-bold text-[var(--app-text-secondary)] uppercase tracking-wide">{TYPE_LABEL[wi?.type] || wi?.type}</span>
+        <span className="flex items-center gap-1 text-[11px] font-semibold text-[#4ade80] flex-shrink-0"><BadgeCheck className="w-3.5 h-3.5" /> Verified</span>
+      </div>
+      <p className="text-[var(--app-text)] font-bold text-[15px] leading-snug mb-1">{wi?.title}</p>
+      {wi?.description && <p className="text-[var(--app-text-secondary)] text-sm line-clamp-2 mb-3 leading-snug">{wi.description}</p>}
+      <div className="flex items-center gap-2 pt-2 border-t border-[var(--app-border-subtle)]">
+        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-[var(--app-text)] font-bold text-[9px] flex-shrink-0">
+          {initials(student?.full_name)}
+        </div>
+        <p className="text-[var(--app-text-secondary)] text-xs flex-1 min-w-0">{student?.full_name} · verified {new Date(v.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+        {typeof v.views_count === 'number' && (
+          <span className="flex items-center gap-1 text-[var(--app-text-tertiary)] text-xs flex-shrink-0"><Eye className="w-3 h-3" /> {v.views_count}</span>
+        )}
+      </div>
+    </button>
   )
 }
 

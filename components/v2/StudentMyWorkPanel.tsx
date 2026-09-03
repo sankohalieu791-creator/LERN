@@ -10,7 +10,7 @@ import {
 import type { WorkItem } from '@/lib/types'
 import {
   Clock, Users, BadgeCheck, Paperclip, X, Video, MapPin, CalendarClock,
-  CheckCircle2, RotateCcw, KeyRound, ArrowLeft,
+  CheckCircle2, RotateCcw, KeyRound, ArrowLeft, FileText,
 } from 'lucide-react'
 import WorkshopSession from '@/components/v2/WorkshopSession'
 
@@ -222,16 +222,31 @@ function SubmittableCard({ item, latest, started, onOpen, onStart }: {
       : null
 
   return (
-    <button onClick={onOpen} className="block w-full text-left bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-[14px]">
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <p className="text-[14px] font-semibold text-[var(--app-text)] flex-1 min-w-0 leading-snug">{item.title}</p>
-        <span className="text-[11px] font-semibold px-[10px] py-[3px] rounded-full flex-shrink-0" style={{ backgroundColor: spec.bg, color: spec.text }}>
-          {spec.label}
-        </span>
-      </div>
-      <p className="text-[12px] text-[var(--app-text-secondary)] mb-3">
-        {TYPE_LABEL[item.type] || item.type}{dateLine ? ` · ${dateLine}` : ''}
-      </p>
+    // Icon badge + a left colour bar keyed to the current status --
+    // was a flat box with just a title and a pill, which read thinner
+    // and less finished than the rest of the app (Verified cards on
+    // Profile, opportunity cards on Discover both use an icon badge).
+    // Same structure here now, keyed to spec.text instead of a fixed
+    // colour so the accent itself already signals status at a glance.
+    <button onClick={onOpen} className="block w-full text-left bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl overflow-hidden">
+      <div className="flex" style={{ borderLeft: `3px solid ${spec.text}` }}>
+        <div className="flex-1 min-w-0 px-4 py-[14px]">
+          <div className="flex items-start gap-2.5 mb-3">
+            <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: spec.bg }}>
+              <FileText className="w-4 h-4" style={{ color: spec.text }} />
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[14px] font-semibold text-[var(--app-text)] flex-1 min-w-0 leading-snug">{item.title}</p>
+                <span className="text-[11px] font-semibold px-[10px] py-[3px] rounded-full flex-shrink-0" style={{ backgroundColor: spec.bg, color: spec.text }}>
+                  {spec.label}
+                </span>
+              </div>
+              <p className="text-[12px] text-[var(--app-text-secondary)] mt-0.5">
+                {TYPE_LABEL[item.type] || item.type}{dateLine ? ` · ${dateLine}` : ''}
+              </p>
+            </div>
+          </div>
 
       {statusKey === 'new' && (
         <div className="flex items-center justify-between">
@@ -276,6 +291,8 @@ function SubmittableCard({ item, latest, started, onOpen, onStart }: {
           <CheckCircle2 className="w-3.5 h-3.5" /> Now on your profile as verified work
         </p>
       )}
+        </div>
+      </div>
     </button>
   )
 }
@@ -357,9 +374,14 @@ function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
 
         {/* In-person has nothing to "join" online -- there's no live
             video link, so "Start Class"/"Join Now" never made sense
-            for it. "Attend" instead, matching what it actually is. */}
-        <div className={`w-full text-center rounded-2xl py-3 text-sm font-bold ${live ? 'bg-red-500 text-[var(--app-text)]' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-[var(--app-text)]'}`}>
-          {ended ? 'Ended' : inPerson ? (live ? 'Attending now' : 'Attend →') : live ? '🔴 Join Now' : 'Start Class →'}
+            for it. "Attend" instead, matching what it actually is.
+            🔴 emoji replaced with a real pulsing dot + icon -- flagged
+            alongside Feed's reaction emoji as "confusing, needs to be
+            professional". */}
+        <div className={`w-full flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold ${live ? 'bg-red-500 text-[var(--app-text)]' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-[var(--app-text)]'}`}>
+          {ended ? 'Ended' : inPerson ? (live ? 'Attending now' : 'Attend →') : live ? (
+            <><span className="w-2 h-2 rounded-full bg-white animate-pulse" /> Join Now</>
+          ) : 'Start Class →'}
         </div>
       </div>
     </button>

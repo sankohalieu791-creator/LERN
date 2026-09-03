@@ -134,9 +134,16 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   )
 }
 
+// Inactive used var(--app-text-quaternary) -- #bbbbbb in light mode,
+// on an #fafafa bg that's ~1.6:1 contrast, functionally invisible
+// (the "bottom nav icon needs to be black" report). #5A5A5A is the
+// same pinned inactive-icon grey already used everywhere else in the
+// app (search icon, My Work's inactive tab label) -- it reads clearly
+// against both a black and a white bar, so it doesn't need a
+// theme-conditional value at all.
 function NavItem({ href, icon: Icon, label, active }: { href: string; icon: any; label: string; active: boolean }) {
   return (
-    <Link href={href} className="flex-1 flex flex-col items-center justify-center gap-0.5 h-full" style={{ color: active ? 'var(--app-text)' : 'var(--app-text-quaternary)' }}>
+    <Link href={href} className="flex-1 flex flex-col items-center justify-center gap-0.5 h-full" style={{ color: active ? 'var(--app-text)' : '#5A5A5A' }}>
       <Icon className="w-6 h-6" />
       <span className="text-[10px] font-medium">{label}</span>
     </Link>

@@ -7,7 +7,7 @@ import {
   getFeed, getPublicFeed, setPostReaction, toggleLike, getSignedFileUrl, incrementPostViews,
 } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
-import { ThumbsUp, Play, X } from 'lucide-react'
+import { ThumbsUp, Play, X, PartyPopper, Award, Flame, Star, Eye } from 'lucide-react'
 
 // Feed, LinkedIn-modelled per direct feedback: distinct post "cards"
 // separated by a real gap (page background showing through between
@@ -15,11 +15,14 @@ import { ThumbsUp, Play, X } from 'lucide-react'
 // only a hairline divider -- each card still spans the full screen
 // width itself (touches both side edges), media is full-width WITHIN
 // that card. ThumbsUp for the like (LinkedIn's own icon), not a heart.
-const ALL_REACTIONS: { key: ReactionType; label: string; emoji: string }[] = [
-  { key: 'congratulations', label: 'Celebrate', emoji: '🎉' },
-  { key: 'well_done', label: 'Well done', emoji: '👏' },
-  { key: 'keep_going', label: 'Keep going', emoji: '🔥' },
-  { key: 'proud', label: 'Proud', emoji: '⭐' },
+// Reactions were raw emoji (🎉👏🔥⭐) -- flagged as "confusing, needs
+// to be professional" for a platform employers and institutions also
+// use. Same four concepts, drawn as real icons instead.
+const ALL_REACTIONS: { key: ReactionType; label: string; icon: any }[] = [
+  { key: 'congratulations', label: 'Celebrate', icon: PartyPopper },
+  { key: 'well_done', label: 'Well done', icon: Award },
+  { key: 'keep_going', label: 'Keep going', icon: Flame },
+  { key: 'proud', label: 'Proud', icon: Star },
 ]
 const REACTION_BY_KEY = Object.fromEntries(ALL_REACTIONS.map(r => [r.key, r]))
 
@@ -134,8 +137,11 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
         </span>
         <div className="min-w-0">
           <p className="text-[13px] font-semibold text-[var(--app-text)] truncate">{post.author_name}</p>
-          <p className="text-[11px]" style={{ color: 'var(--app-text-secondary)' }}>
+          <p className="text-[11px] flex items-center gap-1" style={{ color: 'var(--app-text-secondary)' }}>
             {[post.category, timeAgo(post.created_at)].filter(Boolean).join(' · ')}
+            {typeof post.views_count === 'number' && (
+              <span className="flex items-center gap-0.5">· <Eye className="w-3 h-3" /> {post.views_count}</span>
+            )}
           </p>
         </div>
       </button>
@@ -175,8 +181,8 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
       {/* ── LIKE (left) + up to 2 chosen stickers (right) ── */}
       <div className="flex items-center justify-between px-4 py-3.5">
         <button onClick={like} className="flex items-center gap-1.5 active:scale-90 transition-transform">
-          <ThumbsUp className="w-5 h-5" fill={liked ? '#F26B21' : 'none'} color={liked ? '#F26B21' : '#999'} strokeWidth={1.75} />
-          {likes.length > 0 && <span className="text-[13px] font-semibold" style={{ color: liked ? '#F26B21' : '#999' }}>{likes.length}</span>}
+          <ThumbsUp className="w-5 h-5" fill={liked ? '#F26B21' : 'none'} color={liked ? '#F26B21' : 'var(--app-text-secondary)'} strokeWidth={1.75} />
+          {likes.length > 0 && <span className="text-[13px] font-semibold" style={{ color: liked ? '#F26B21' : 'var(--app-text-secondary)' }}>{likes.length}</span>}
         </button>
         <div className="flex items-center gap-1.5">
           {stickers.map(r => (
@@ -184,12 +190,12 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
               key={r.key} onClick={() => react(r.key)} title={r.label}
               className="flex items-center gap-1 rounded-full border transition"
               style={{
-                borderColor: myReaction === r.key ? '#F26B21' : 'rgba(255,255,255,0.1)',
-                backgroundColor: myReaction === r.key ? 'rgba(242,107,33,0.12)' : '#141414',
+                borderColor: myReaction === r.key ? '#F26B21' : 'var(--app-overlay-2)',
+                backgroundColor: myReaction === r.key ? 'rgba(242,107,33,0.12)' : 'var(--app-surface-2)',
                 padding: '5px 10px',
               }}
             >
-              <span className="text-[14px] leading-none">{r.emoji}</span>
+              <r.icon className="w-3.5 h-3.5" style={{ color: myReaction === r.key ? '#F26B21' : 'var(--app-text-secondary)' }} />
             </button>
           ))}
           {reactions.length > 0 && <span className="text-[12px] ml-1" style={{ color: 'var(--app-text-secondary)' }}>{reactions.length}</span>}

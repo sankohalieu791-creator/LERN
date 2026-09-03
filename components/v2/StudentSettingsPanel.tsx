@@ -281,11 +281,19 @@ export default function StudentSettingsPanel() {
 }
 
 // ── Shared row/group primitives ──────────────────────────────────
+// bg-[var(--app-surface)] (same lighter card tone as My Work/Discover
+// cards) made a stack of ~9 of these read noticeably greyer than the
+// rest of the app -- one card is fine, nine boxed cards in a row is a
+// different look. app-surface-2 is closer to app-bg itself (the same
+// "surface that sits directly on the black page" tone WorkCard's
+// pending-status pill uses), with a subtler border to match -- reads
+// as one dark screen with light dividers again, not a stack of grey
+// panels.
 function Group({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
     <div className="mb-3">
       {title && <p className="text-[13px] font-medium text-[var(--app-text-secondary)] mb-2 px-1">{title}</p>}
-      <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-2xl divide-y divide-white/[0.06] overflow-hidden">
+      <div className="bg-[var(--app-surface-2)] border border-[var(--app-border-subtle)] rounded-2xl divide-y divide-[var(--app-overlay-1)] overflow-hidden">
         {children}
       </div>
     </div>
@@ -464,7 +472,7 @@ function BlockedAccountsScreen({ userId, onBack }: { userId: string; onBack: () 
           <p className="text-[13px] text-[var(--app-text-tertiary)]">Nobody's blocked. Block someone from their profile and they'll show up here.</p>
         </div>
       ) : (
-        <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-2xl divide-y divide-white/[0.06] overflow-hidden">
+        <div className="bg-[var(--app-surface-2)] border border-[var(--app-border-subtle)] rounded-2xl divide-y divide-[var(--app-overlay-1)] overflow-hidden">
           {rows.map(r => (
             <div key={r.id} className="flex items-center justify-between px-4 py-3.5">
               <span className="text-[14px]">{r.blocked?.full_name || 'A user'}</span>

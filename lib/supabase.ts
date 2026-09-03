@@ -680,6 +680,15 @@ export const incrementPostViews = async (postId: string) => {
   return { error }
 }
 
+// Same "shown once per page-load" counter, for a verified work card on
+// Discover's Explore tab -- the request was "add how many views on
+// discover as well", i.e. the same real view count Feed already
+// tracks, just for verifications instead of posts.
+export const incrementVerificationViews = async (verificationId: string) => {
+  const { error } = await supabase.rpc('increment_verification_views', { p_verification_id: verificationId })
+  return { error }
+}
+
 // ── Settings: account ────────────────────────────────────────────
 export const changePassword = async (newPassword: string) => {
   const { error } = await supabase.auth.updateUser({ password: newPassword })
@@ -963,7 +972,7 @@ export const getDiscoverWork = async (filters?: { type?: string; q?: string }) =
   let query = supabase
     .from('verifications')
     .select(`
-      id, verified_at, submission_id,
+      id, verified_at, submission_id, views_count,
       verifier:users!verifications_verified_by_fkey(full_name),
       submissions!inner(
         id, content, student_id,

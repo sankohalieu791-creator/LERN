@@ -233,19 +233,23 @@ function Stat({ n, label }: { n: number; label: string }) {
 // TikTok-style tab, not a navigate-away tile -- icon, label, count,
 // and an underline that only appears on the active one. No card box
 // around it, per direct feedback.
+// Bumped up a size from the original compact treatment -- icon
+// 16px→20px, label 12px→13px, underline 2px→3px, more vertical
+// padding -- per direct feedback that the tab row read as too small
+// next to everything else on the page.
 function FolderTab({ active, onClick, icon: Icon, iconColor, label, count }: {
   active: boolean; onClick: () => void; icon: any; iconColor: string; label: string; count: number
 }) {
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-1.5 pb-2.5 border-b-2 transition"
+      className="flex flex-col items-center gap-2 pb-3 border-b-[3px] transition"
       style={{ borderColor: active ? '#D4551A' : 'transparent' }}
     >
-      <Icon className="w-4 h-4" style={{ color: active ? iconColor : '#666' }} />
+      <Icon className="w-5 h-5" style={{ color: active ? iconColor : '#666' }} />
       <span>
-        <span className={`text-[12px] font-semibold ${active ? 'text-[var(--app-text)]' : 'text-[var(--app-text-secondary)]'}`}>{label}</span>
-        <span className="text-[10.5px] text-[var(--app-text-secondary)]"> · {count}</span>
+        <span className={`text-[13px] font-semibold ${active ? 'text-[var(--app-text)]' : 'text-[var(--app-text-secondary)]'}`}>{label}</span>
+        <span className="text-[11px] text-[var(--app-text-secondary)]"> · {count}</span>
       </span>
     </button>
   )
@@ -545,7 +549,12 @@ export function EditProfileScreen({ profile, onDone, onClose }: { profile: any; 
       <div className="flex flex-col items-center pt-8 pb-6">
         <button onClick={pickPhoto} disabled={uploadingPhoto} className="relative disabled:opacity-60">
           <Avatar path={avatarPath} name={name || profile.full_name} size={96} textSize={32} variant="solid" />
-          <span className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-brand flex items-center justify-center border-2 border-[#0f0f0f]">
+          {/* border-[#0f0f0f] was hardcoded black regardless of theme --
+              on a light-mode surface that read as a solid black ring
+              punched into the profile photo itself ("the pfp is
+              black"). var(--app-bg) matches whatever's actually behind
+              it in either theme, so it reads as a clean cutout again. */}
+          <span className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-brand flex items-center justify-center border-2 border-[var(--app-bg)]">
             <Camera className="w-3.5 h-3.5 text-[var(--app-text)]" />
           </span>
         </button>
