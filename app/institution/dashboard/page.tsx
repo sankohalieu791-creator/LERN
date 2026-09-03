@@ -108,14 +108,14 @@ export default function InstitutionDashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
         <StatCard icon={Users} label="Students" value={stats.students} />
         <StatCard icon={FileText} label="Active briefs" value={stats.briefs} />
         <StatCard icon={ClipboardCheck} label="Awaiting review" value={stats.pending} accent={stats.pending > 0} />
         <StatCard icon={CheckCircle2} label="Verified" value={stats.verified} />
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <QuickAction href="/institution/review" icon={ClipboardList} label="Review queue" />
         <QuickAction href="/institution/dashboard#join-codes" icon={Ticket} label="Generate join code" />
       </div>
@@ -151,7 +151,7 @@ export default function InstitutionDashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-surface border border-edge rounded-2xl p-6">
           <p className="font-bold text-ink text-[15px] mb-4">Recent activity</p>
           {activity.length === 0 ? (
@@ -194,7 +194,13 @@ export default function InstitutionDashboardPage() {
             {myReviews === null ? (
               <p className="text-[13px] text-ink-tertiary">Loading…</p>
             ) : (
-              <div className="flex items-center gap-5">
+              // grid, not flex+gap -- three equal-width cells that can
+              // never push each other outside the card, on any screen
+              // width. flex+gap-5 didn't reserve any width for each
+              // number, so a narrower card (this sits in a 2-up grid
+              // that itself compresses further on phone) let the last
+              // one ("returned") spill past the card's own edge.
+              <div className="grid grid-cols-3 gap-2">
                 <div><p className="text-2xl font-bold text-ink">{myReviews.total}</p><p className="text-[12px] text-ink-tertiary">marked</p></div>
                 <div><p className="text-2xl font-bold text-success-text">{myReviews.verified}</p><p className="text-[12px] text-ink-tertiary">verified</p></div>
                 <div><p className="text-2xl font-bold text-warning-text">{myReviews.returned}</p><p className="text-[12px] text-ink-tertiary">returned</p></div>

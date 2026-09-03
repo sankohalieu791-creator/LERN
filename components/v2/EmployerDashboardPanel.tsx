@@ -86,7 +86,7 @@ export default function EmployerDashboardPanel() {
               <div key={m.key} className="flex-1 flex flex-col items-center justify-end h-full">
                 <div
                   className="w-full rounded-t-md transition-all"
-                  style={{ height: `${Math.max(4, (m.count / maxMonthly) * 100)}%`, backgroundColor: m.count > 0 ? '#1D9E75' : '#F7F5F0', minHeight: 4 }}
+                  style={{ height: `${Math.max(4, (m.count / maxMonthly) * 100)}%`, backgroundColor: m.count > 0 ? '#1D9E75' : 'var(--surface-muted)', minHeight: 4 }}
                 />
                 <p className="text-[11px] text-ink-tertiary mt-1.5">{m.label}</p>
               </div>
@@ -117,11 +117,15 @@ export default function EmployerDashboardPanel() {
   )
 }
 
+// Was hardcoded #F7F5F0/#1A1A1A -- a fixed light-cream tile regardless
+// of theme, which is what "leave that colour for the laptop" was: it
+// stayed a pale box sitting on an otherwise-dark phone dashboard.
+// Theme tokens now, same as every other card in this app.
 function MetricTile({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg p-[13px]" style={{ backgroundColor: '#F7F5F0' }}>
-      <p className="text-[12px]" style={{ color: '#5A5A5A' }}>{label}</p>
-      <p className="text-[24px] font-medium mt-1" style={{ color: '#1A1A1A' }}>{value}</p>
+    <div className="rounded-lg p-[13px] bg-surface-muted">
+      <p className="text-[12px] text-ink-tertiary">{label}</p>
+      <p className="text-[24px] font-medium mt-1 text-ink">{value}</p>
     </div>
   )
 }

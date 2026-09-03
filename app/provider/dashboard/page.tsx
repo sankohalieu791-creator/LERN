@@ -100,14 +100,14 @@ export default function ProviderDashboardPage() {
       <h1 className="text-2xl font-bold text-ink mb-1">{org?.name || 'Dashboard'}</h1>
       <p className="text-ink-secondary mb-6">Reviewing and verifying learner work happens here.</p>
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
         <StatCard icon={Users} label="Learners" value={stats.learners} />
         <StatCard icon={BookOpen} label="Courses" value={stats.courses} />
         <StatCard icon={ClipboardCheck} label="Awaiting review" value={stats.pending} accent={stats.pending > 0} />
         <StatCard icon={CheckCircle2} label="Verified" value={stats.verified} />
       </div>
 
-      <div className="flex gap-3 mb-6">
+      <div className="flex flex-wrap gap-3 mb-6">
         <QuickLink href="/provider/review" icon={ClipboardList} label="Review queue" />
         <QuickLink href="/provider/courses" icon={PlusCircle} label="Create a course" />
         <QuickLink href="#join-codes" icon={Ticket} label="Generate join code" />
@@ -144,7 +144,7 @@ export default function ProviderDashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <div className="bg-surface border border-edge rounded-2xl p-6">
           <p className="font-bold text-ink text-[15px] mb-4">Recent activity</p>
           {activity.length === 0 ? (
@@ -187,7 +187,10 @@ export default function ProviderDashboardPage() {
             {myReviews === null ? (
               <p className="text-[13px] text-ink-tertiary">Loading…</p>
             ) : (
-              <div className="flex items-center gap-5">
+              // grid, not flex+gap -- see the same fix on institution's
+              // dashboard for why (this was "the 1 returned is out of
+              // the box").
+              <div className="grid grid-cols-3 gap-2">
                 <div><p className="text-2xl font-bold text-ink">{myReviews.total}</p><p className="text-[12px] text-ink-tertiary">marked</p></div>
                 <div><p className="text-2xl font-bold text-success-text">{myReviews.verified}</p><p className="text-[12px] text-ink-tertiary">verified</p></div>
                 <div><p className="text-2xl font-bold text-warning-text">{myReviews.returned}</p><p className="text-[12px] text-ink-tertiary">returned</p></div>

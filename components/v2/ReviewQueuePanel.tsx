@@ -82,7 +82,7 @@ export default function ReviewQueuePanel() {
     // opposite of what was wanted: fill the pane, like Gmail/Outlook's
     // own web layouts do, not a narrow centred column floating in it.
     <div>
-      <div className="flex gap-2 mb-5">
+      <div className="flex flex-wrap gap-2 mb-5">
         <button
           onClick={() => setOuterTab('submissions')}
           className={`px-4 py-2 rounded-lg text-[13px] font-semibold border transition ${outerTab === 'submissions' ? 'border-ink bg-surface text-ink' : 'border-edge text-ink-tertiary hover:text-ink'}`}
@@ -106,7 +106,7 @@ export default function ReviewQueuePanel() {
         <ReportedContentQueue onChanged={refreshReportedCount} />
       ) : (
         <>
-          <div className="flex gap-2 mb-5">
+          <div className="flex flex-wrap gap-2 mb-5">
             <button
               onClick={() => setOpenId(null)}
               className={`px-4 py-2 rounded-lg text-[13px] font-semibold border transition ${!openItem ? 'border-ink bg-surface text-ink' : 'border-edge text-ink-tertiary hover:text-ink'}`}

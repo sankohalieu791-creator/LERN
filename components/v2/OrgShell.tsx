@@ -102,7 +102,14 @@ export default function OrgShell({
   // is still showing, so h-screen looked right on desktop but caused
   // exactly the same "pulls down as you scroll" mismatch on phone.
   return (
-    <div data-theme={theme} className="h-[100dvh] overflow-hidden bg-paper flex">
+    // paddingTop: env(safe-area-inset-top) -- missing entirely before,
+    // so on a standalone PWA the whole shell (top bar included) sat
+    // right at the true top edge, under the status bar/notch ("the top
+    // nav is so high, all the way where my wifi/data is"). Every other
+    // full-screen shell in the app already has this; this one never did.
+    // Harmless on desktop -- env() resolves to 0 with no notch/status
+    // bar to avoid.
+    <div data-theme={theme} className="h-[100dvh] overflow-hidden bg-paper flex" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {/* ── Laptop sidebar ── */}
       <aside className={`hidden lg:flex flex-col border-r border-edge-subtle bg-surface transition-[width] duration-150 flex-shrink-0 ${collapsed ? 'w-[72px]' : 'w-60'}`}>
         <div className={`flex items-center h-16 px-4 flex-shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>
@@ -239,7 +246,11 @@ export default function OrgShell({
             </div>
 
             <div className="flex items-center gap-3 px-5 py-4 flex-shrink-0">
-              <span className="w-12 h-12 rounded-2xl bg-accent-bg text-brand font-bold text-[15px] flex items-center justify-center flex-shrink-0">
+              {/* rounded-full, not rounded-2xl -- every other avatar in
+                  the app (profile, feed, students roster, review queue)
+                  is a circle; a squared badge here was the exact
+                  inconsistency flagged before on Profile. */}
+              <span className="w-12 h-12 rounded-full bg-accent-bg text-brand font-bold text-[15px] flex items-center justify-center flex-shrink-0">
                 {orgInitials(orgName)}
               </span>
               <div className="min-w-0">
@@ -261,7 +272,7 @@ export default function OrgShell({
                     }`}
                   >
                     <s.icon className="w-5 h-5 flex-shrink-0" />
-                    <span className="flex-1 truncate">{s.label}</span>
+                    <span className="flex-1 min-w-0 truncate">{s.label}</span>
                     {!!badge && (
                       <span className="flex-shrink-0 min-w-[22px] text-center text-[11px] font-bold text-white bg-brand rounded-full px-[7px] py-[2px]">
                         {badge}
