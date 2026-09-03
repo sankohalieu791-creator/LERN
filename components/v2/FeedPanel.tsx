@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
   getFeed, getPublicFeed, setPostReaction, toggleLike, getSignedFileUrl, incrementPostViews, getPostsByAuthor,
+  reportPost, REPORT_REASONS,
 } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
-import { ThumbsUp, Play, X, PartyPopper, Award, Flame, Star, Eye } from 'lucide-react'
+import { ThumbsUp, Play, X, PartyPopper, Award, Flame, Star, Eye, MoreHorizontal, EyeOff, Check } from 'lucide-react'
 
 // Feed, LinkedIn-modelled per direct feedback: distinct post "cards"
 // separated by a real gap (page background showing through between
@@ -88,7 +89,9 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
   const router = useRouter()
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
   const [playerOpen, setPlayerOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
   const viewedRef = useRef(false)
+
   const reactions: any[] = post.post_reactions || []
   const likes: any[] = post.post_likes || []
   const myReaction = reactions.find(r => r.user_id === user?.id)?.reaction as ReactionType | undefined
@@ -124,27 +127,57 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
     onChanged()
   }
 
+  // Auto-hide is instant and protective, but it is NEVER a decision
+  // against the person who posted -- the state is neutral, not an
+  // accusation, and worded that way for every viewer including the
+  // author themselves (the only person besides org staff who can even
+  // still see this row at all -- getFeed/getPublicFeed rely on RLS to
+  // keep it from reaching anyone else). Nothing else about the post
+  // renders while it's in this state. This has to come after every
+  // hook above, not as an early return before them -- the same
+  // PostCard instance (same key=post.id) can go from hidden back to
+  // not-hidden across a reload once staff restores it, and an early
+  // return before hooks would skip calling the effects below on some
+  // renders and not others, which breaks React's rules of hooks.
+  if (post.hidden) {
+    return (
+      <div className="bg-[var(--app-surface)] px-4 py-6 flex flex-col items-center text-center gap-2">
+        <EyeOff className="w-5 h-5" style={{ color: 'var(--app-text-tertiary)' }} />
+        <p className="text-[13px] font-semibold text-[var(--app-text)]">This post has been hidden while it is checked by a person.</p>
+        <p className="text-[12px]" style={{ color: 'var(--app-text-tertiary)' }}>Hidden automatically after being reported. Nothing has been decided yet.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-[var(--app-surface)]">
       {/* ── AUTHOR ROW -- tapping opens their profile, own view if it's
-          you, public view otherwise ── */}
-      <button
-        onClick={() => router.push(post.author_id === user?.id ? '/student/profile' : `/student/profile/${post.author_id}`)}
-        className="w-full flex items-center gap-2.5 px-4 pt-3.5 pb-2.5 text-left"
-      >
-        <span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
-          {initials(post.author_name)}
-        </span>
-        <div className="min-w-0">
-          <p className="text-[13px] font-semibold text-[var(--app-text)] truncate">{post.author_name}</p>
-          <p className="text-[11px] flex items-center gap-1" style={{ color: 'var(--app-text-secondary)' }}>
-            {[post.category, timeAgo(post.created_at)].filter(Boolean).join(' · ')}
-            {typeof post.views_count === 'number' && (
-              <span className="flex items-center gap-0.5">· <Eye className="w-3 h-3" /> {post.views_count}</span>
-            )}
-          </p>
-        </div>
-      </button>
+          you, public view otherwise. "···" opens the report sheet --
+          not shown on your own post, you can't report yourself. ── */}
+      <div className="flex items-center justify-between pl-4 pr-2.5 pt-3.5 pb-2.5">
+        <button
+          onClick={() => router.push(post.author_id === user?.id ? '/student/profile' : `/student/profile/${post.author_id}`)}
+          className="flex-1 min-w-0 flex items-center gap-2.5 text-left"
+        >
+          <span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+            {initials(post.author_name)}
+          </span>
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold text-[var(--app-text)] truncate">{post.author_name}</p>
+            <p className="text-[11px] flex items-center gap-1" style={{ color: 'var(--app-text-secondary)' }}>
+              {[post.category, timeAgo(post.created_at)].filter(Boolean).join(' · ')}
+              {typeof post.views_count === 'number' && (
+                <span className="flex items-center gap-0.5">· <Eye className="w-3 h-3" /> {post.views_count}</span>
+              )}
+            </p>
+          </div>
+        </button>
+        {post.author_id !== user?.id && (
+          <button onClick={() => setReportOpen(true)} aria-label="Report this post" className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition">
+            <MoreHorizontal className="w-[18px] h-[18px]" style={{ color: 'var(--app-text-tertiary)' }} />
+          </button>
+        )}
+      </div>
 
       {/* ── MEDIA: full-bleed, edge to edge. A video is a thumbnail
           here (like tapping a YouTube thumbnail), not autoplaying
@@ -208,6 +241,86 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
       {playerOpen && mediaUrl && (
         <VideoPlayerOverlay initialPost={post} initialUrl={mediaUrl} onClose={() => setPlayerOpen(false)} />
       )}
+
+      {reportOpen && (
+        <ReportSheet
+          onClose={() => setReportOpen(false)}
+          onSent={() => { setReportOpen(false); onChanged() }}
+          onSend={(reasonKey, note) => reportPost(post.id, post.organisation_id, user!.id, reasonKey, note)}
+        />
+      )}
+    </div>
+  )
+}
+
+// Stage 1 of report -> auto-hide -> human review. Plain, single-choice
+// reasons a young person can understand, an optional note, and a
+// quiet safety line -- reporting a post is not the place to handle an
+// actual emergency, so it says so directly rather than leaving that
+// unstated.
+function ReportSheet({ onClose, onSend, onSent }: {
+  onClose: () => void
+  onSend: (reasonKey: string, note: string) => Promise<{ error: any }>
+  onSent: () => void
+}) {
+  const [reasonKey, setReasonKey] = useState<string>(REPORT_REASONS[0].key)
+  const [note, setNote] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+
+  const send = async () => {
+    setSending(true); setError('')
+    const { error: err } = await onSend(reasonKey, note)
+    setSending(false)
+    if (err) return setError("Couldn't send that -- try again.")
+    onSent()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center bg-black/50" onClick={onClose}>
+      <div
+        className="w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl bg-[var(--app-surface)] px-5 pt-5 pb-6"
+        style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <p className="text-[16px] font-bold text-[var(--app-text)] mb-1">Report this post</p>
+        <p className="text-[13px] mb-4" style={{ color: 'var(--app-text-secondary)' }}>Tell us what is wrong. A person will look at it.</p>
+
+        <div className="space-y-2 mb-4">
+          {REPORT_REASONS.map(r => (
+            <button
+              key={r.key} onClick={() => setReasonKey(r.key)}
+              className="w-full flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-left transition"
+              style={{ borderColor: reasonKey === r.key ? '#F26B21' : 'var(--app-border)', backgroundColor: reasonKey === r.key ? 'rgba(242,107,33,0.08)' : 'transparent' }}
+            >
+              <span className="w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center" style={{ borderColor: reasonKey === r.key ? '#F26B21' : 'var(--app-border)' }}>
+                {reasonKey === r.key && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#F26B21' }} />}
+              </span>
+              <span className="text-[13.5px] text-[var(--app-text)]">{r.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <textarea
+          value={note} onChange={e => setNote(e.target.value)}
+          placeholder="Add anything that helps (optional)"
+          rows={2}
+          className="w-full bg-[var(--app-overlay-2)] border border-[var(--app-border)] rounded-xl px-3.5 py-2.5 text-[13px] text-[var(--app-text)] placeholder:text-[var(--app-text-tertiary)] outline-none resize-none mb-4"
+        />
+
+        {error && <p className="text-[12.5px] text-danger-text mb-3">{error}</p>}
+
+        <button
+          onClick={send} disabled={sending}
+          className="w-full flex items-center justify-center gap-1.5 bg-brand text-white font-semibold text-[14px] py-3 rounded-xl disabled:opacity-50 transition mb-3"
+        >
+          {sending ? 'Sending…' : <><Check className="w-4 h-4" /> Send report</>}
+        </button>
+
+        <p className="text-center text-[11.5px]" style={{ color: 'var(--app-text-tertiary)' }}>
+          If you are in danger, tell a trusted adult or call emergency services.
+        </p>
+      </div>
     </div>
   )
 }

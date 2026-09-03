@@ -620,12 +620,19 @@ export const getPostsByAuthor = async (authorId: string, excludePostId: string) 
   return { data, error }
 }
 
+// hidden posts are NOT filtered out here on purpose -- RLS on the
+// underlying posts table already decides who gets a hidden row back at
+// all (the post's own author, always; org staff, always; everyone
+// else, never -- a hidden post simply isn't in their results). That
+// lets the author still see their own post (rendered as the neutral
+// "hidden while checked" placeholder, see FeedPanel) instead of it
+// just vanishing on them with no explanation, while a hidden post
+// genuinely disappears for every other regular viewer.
 export const getFeed = async (organisationId: string) => {
   const { data, error } = await supabase
     .from('posts_feed')
     .select('*')
     .or(`organisation_id.eq.${organisationId},visibility.eq.public`)
-    .eq('hidden', false)
     .order('created_at', { ascending: false })
     .limit(50)
   if (error || !data) return { data, error }
@@ -641,7 +648,6 @@ export const getPublicFeed = async () => {
     .from('posts_feed')
     .select('*')
     .eq('visibility', 'public')
-    .eq('hidden', false)
     .order('created_at', { ascending: false })
     .limit(50)
   if (error || !data) return { data, error }
@@ -896,6 +902,84 @@ export const resolveReport = async (reportId: string, reviewerId: string, status
     .from('reports')
     .update({ status, reviewed_by: reviewerId, reviewed_at: new Date().toISOString() })
     .eq('id', reportId)
+  return { error }
+}
+
+// ── Feed post reporting: report -> instant, neutral auto-hide ->
+// human review (restore or remove). The moment-of-report and human-
+// decision plumbing already lives in the database as triggers on
+// `reports`, not written here on purpose -- they're the actual source
+// of truth so the behaviour can't drift from what the client thinks
+// happened:
+//   - auto_hide_reported_post: any report with target_type='post'
+//     immediately sets that post's hidden=true. Instant, before any
+//     human has looked at it -- exactly "auto-hide protects first."
+//   - notify_report: notifies every institution_staff/provider_staff
+//     in the report's organisation (the safeguarding lead is one of
+//     them) the moment a report is filed, not only once it's resolved.
+//   - resolve_report_unhide: flips a post back to hidden=false only
+//     when its report's status moves pending -> 'dismissed' -- which
+//     is why Restore below writes exactly that status, and Remove
+//     deliberately writes a different one ('actioned') that no trigger
+//     un-hides on, so the post stays down.
+export const REPORT_REASONS = [
+  { key: 'bullying', label: 'It is bullying or unkind' },
+  { key: 'inappropriate', label: 'It is inappropriate or upsetting' },
+  { key: 'not_real', label: 'It is not real, or not their work' },
+  { key: 'other', label: 'Something else' },
+] as const
+
+export const reportPost = async (postId: string, organisationId: string | null, reporterId: string, reasonKey: string, note: string) => {
+  const reasonLabel = REPORT_REASONS.find(r => r.key === reasonKey)?.label || 'Something else'
+  const reason = note.trim() ? `${reasonLabel} — ${note.trim()}` : reasonLabel
+  return submitReport(reporterId, organisationId, 'post', reason, postId)
+}
+
+// Reported posts still awaiting a human decision, for this
+// organisation's staff -- grouped by post (not one row per report) so
+// a post several people reported shows once, with its full count.
+// target_id has no FK (reports is polymorphic across post/user/
+// submission/general), so this is two queries merged client-side
+// rather than one embedded join.
+export const getReportedPosts = async (organisationId: string) => {
+  const { data: reports, error } = await supabase
+    .from('reports')
+    .select('*, users!reports_reporter_id_fkey(full_name)')
+    .eq('organisation_id', organisationId)
+    .eq('target_type', 'post')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+  if (error || !reports || reports.length === 0) return { data: [], error }
+
+  const postIds = Array.from(new Set(reports.map(r => r.target_id).filter(Boolean)))
+  const { data: posts } = await supabase.from('posts_feed').select('*').in('id', postIds as string[])
+
+  const grouped = postIds
+    .map(id => ({ post: posts?.find(p => p.id === id), reports: reports.filter(r => r.target_id === id) }))
+    .filter((g): g is { post: any; reports: any[] } => !!g.post)
+    .sort((a, b) => new Date(b.reports[0].created_at).getTime() - new Date(a.reports[0].created_at).getTime())
+
+  return { data: grouped, error: null }
+}
+
+// Restore: the post returns to the feed as if nothing happened.
+export const restorePost = async (postId: string, reviewerId: string) => {
+  const { error } = await supabase
+    .from('reports')
+    .update({ status: 'dismissed', reviewed_by: reviewerId, reviewed_at: new Date().toISOString() })
+    .eq('target_type', 'post').eq('target_id', postId).eq('status', 'pending')
+  return { error }
+}
+
+// Remove: the post stays down. Repeated/serious breaches reaching this
+// point is exactly what "escalated to the safeguarding lead" means in
+// practice here -- every staff member (lead included) was already
+// notified the moment it was first reported, per notify_report above.
+export const removePost = async (postId: string, reviewerId: string) => {
+  const { error } = await supabase
+    .from('reports')
+    .update({ status: 'actioned', reviewed_by: reviewerId, reviewed_at: new Date().toISOString() })
+    .eq('target_type', 'post').eq('target_id', postId).eq('status', 'pending')
   return { error }
 }
 

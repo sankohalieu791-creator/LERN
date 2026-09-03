@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getReviewQueue, submitReview, getStudentReviewHistory, getSignedFileUrl } from '@/lib/supabase'
+import {
+  getReviewQueue, submitReview, getStudentReviewHistory, getSignedFileUrl,
+  getReportedPosts, restorePost, removePost,
+} from '@/lib/supabase'
 import type { Submission } from '@/lib/types'
 import {
   CheckCircle2, History, FileText, ExternalLink, ChevronLeft, Sparkles,
+  Flag, EyeOff, ShieldAlert,
 } from 'lucide-react'
 
 // Build Spec: Review Surface (institutions and providers) v1.0. One
@@ -43,15 +47,25 @@ function isOverdue(s: any) {
 
 export default function ReviewQueuePanel() {
   const { user } = useAuth()
+  const [outerTab, setOuterTab] = useState<'submissions' | 'reported'>('submissions')
   const [items, setItems] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [reportedCount, setReportedCount] = useState(0)
 
   const load = () => {
     if (!user?.organisation_id) return
     getReviewQueue(user.organisation_id).then(({ data }) => { setItems((data as any) || []); setLoading(false) })
   }
   useEffect(load, [user?.organisation_id])
+
+  // Just the count, for the tab badge -- ReportedContentQueue does its
+  // own full load once that tab is actually open.
+  const refreshReportedCount = () => {
+    if (!user?.organisation_id) return
+    getReportedPosts(user.organisation_id).then(({ data }) => setReportedCount((data || []).length))
+  }
+  useEffect(refreshReportedCount, [user?.organisation_id])
 
   const pending = (items.filter(i => i.status === 'submitted') as any[])
     .sort((a, b) => {
@@ -70,23 +84,164 @@ export default function ReviewQueuePanel() {
     <div>
       <div className="flex gap-2 mb-5">
         <button
-          onClick={() => setOpenId(null)}
-          className={`px-4 py-2 rounded-lg text-[13px] font-semibold border transition ${!openItem ? 'border-ink bg-surface text-ink' : 'border-edge text-ink-tertiary hover:text-ink'}`}
+          onClick={() => setOuterTab('submissions')}
+          className={`px-4 py-2 rounded-lg text-[13px] font-semibold border transition ${outerTab === 'submissions' ? 'border-ink bg-surface text-ink' : 'border-edge text-ink-tertiary hover:text-ink'}`}
         >
-          Review queue
+          Submissions
         </button>
         <button
-          disabled={!openItem}
-          className={`px-4 py-2 rounded-lg text-[13px] font-semibold border transition disabled:opacity-40 disabled:cursor-not-allowed ${openItem ? 'border-ink bg-surface text-ink' : 'border-edge text-ink-tertiary'}`}
+          onClick={() => setOuterTab('reported')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold border transition ${outerTab === 'reported' ? 'border-ink bg-surface text-ink' : 'border-edge text-ink-tertiary hover:text-ink'}`}
         >
-          Reviewing a piece
+          <Flag className="w-3.5 h-3.5" /> Reported content
+          {reportedCount > 0 && (
+            <span className="text-[11px] font-semibold px-[8px] py-[1px] rounded-full" style={{ backgroundColor: '#FAEEDA', color: '#854F0B' }}>
+              {reportedCount}
+            </span>
+          )}
         </button>
       </div>
 
-      {openItem ? (
-        <ReviewPiece submission={openItem} onBack={() => setOpenId(null)} onDecided={() => { setOpenId(null); load() }} />
+      {outerTab === 'reported' ? (
+        <ReportedContentQueue onChanged={refreshReportedCount} />
       ) : (
-        <ReviewQueue items={pending} loading={loading} onOpen={setOpenId} />
+        <>
+          <div className="flex gap-2 mb-5">
+            <button
+              onClick={() => setOpenId(null)}
+              className={`px-4 py-2 rounded-lg text-[13px] font-semibold border transition ${!openItem ? 'border-ink bg-surface text-ink' : 'border-edge text-ink-tertiary hover:text-ink'}`}
+            >
+              Review queue
+            </button>
+            <button
+              disabled={!openItem}
+              className={`px-4 py-2 rounded-lg text-[13px] font-semibold border transition disabled:opacity-40 disabled:cursor-not-allowed ${openItem ? 'border-ink bg-surface text-ink' : 'border-edge text-ink-tertiary'}`}
+            >
+              Reviewing a piece
+            </button>
+          </div>
+
+          {openItem ? (
+            <ReviewPiece submission={openItem} onBack={() => setOpenId(null)} onDecided={() => { setOpenId(null); load() }} />
+          ) : (
+            <ReviewQueue items={pending} loading={loading} onOpen={setOpenId} />
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// Stage 3 of report -> auto-hide -> human review. Each item shows who
+// posted it, a "Hidden" pill, what it was reported for and how many
+// times, and the content itself -- Restore (it was fine) or Remove
+// (it breaks the rules) are the only two outcomes, always a person's
+// call, never automatic. Every staff member in the org (the
+// safeguarding lead included) was already notified the moment the
+// first report came in -- server-side, via the notify_report trigger
+// on the reports table -- so "serious concerns reach the safeguarding
+// lead" is already true before anyone opens this queue at all.
+function ReportedContentQueue({ onChanged }: { onChanged: () => void }) {
+  const { user } = useAuth()
+  const [groups, setGroups] = useState<{ post: any; reports: any[] }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  const load = () => {
+    if (!user?.organisation_id) return
+    setLoading(true)
+    getReportedPosts(user.organisation_id).then(({ data }) => { setGroups(data || []); setLoading(false) })
+  }
+  useEffect(load, [user?.organisation_id])
+
+  const decide = async (postId: string, action: 'restore' | 'remove') => {
+    if (!user) return
+    setBusyId(postId)
+    await (action === 'restore' ? restorePost(postId, user.id) : removePost(postId, user.id))
+    setBusyId(null)
+    load()
+    onChanged()
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <p className="text-[17px] font-semibold text-ink">Reported content</p>
+          <p className="text-[13px]" style={{ color: '#5A5A5A' }}>Hidden automatically the moment they were reported -- nothing is decided until you review them</p>
+        </div>
+        {!loading && groups.length > 0 && (
+          <span className="text-[13px] font-medium px-[10px] py-[5px] rounded-full flex-shrink-0" style={{ backgroundColor: '#FAEEDA', color: '#854F0B' }}>
+            {groups.length} to review
+          </span>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="space-y-2.5">
+          {[0, 1].map(i => <div key={i} className="h-32 rounded-xl bg-surface-muted animate-pulse" />)}
+        </div>
+      ) : groups.length === 0 ? (
+        <div className="flex flex-col items-center text-center py-16">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ backgroundColor: '#E1F5EE' }}>
+            <CheckCircle2 className="w-5 h-5" style={{ color: '#0F6E56' }} />
+          </div>
+          <p className="font-semibold text-ink text-[14px] mb-1">Nothing reported. You are all caught up.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {groups.map(({ post, reports }) => (
+            <div key={post.id} className="bg-surface border border-edge rounded-xl p-[16px]">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="min-w-0">
+                  <p className="text-[14px] font-semibold text-ink truncate">{post.author_name}</p>
+                  <p className="text-[12px]" style={{ color: '#8A8A8A' }}>{timeAgo(post.created_at)}</p>
+                </div>
+                <span className="flex items-center gap-1 text-[11px] font-semibold px-[10px] py-[3px] rounded-full flex-shrink-0" style={{ backgroundColor: '#F1EFE8', color: '#5F5E5A' }}>
+                  <EyeOff className="w-3 h-3" /> Hidden
+                </span>
+              </div>
+
+              {(post.title || post.content) && (
+                <div className="bg-surface-subtle border border-edge-subtle rounded-lg px-3.5 py-3 mb-3">
+                  {post.title && <p className="text-[13.5px] font-semibold text-ink mb-1">{post.title}</p>}
+                  {post.content && <p className="text-[13.5px] text-ink-body leading-relaxed whitespace-pre-wrap">{post.content}</p>}
+                </div>
+              )}
+
+              <div className="space-y-1 mb-3">
+                <p className="text-[12px] font-semibold" style={{ color: '#5A5A5A' }}>
+                  Reported {reports.length} time{reports.length === 1 ? '' : 's'}
+                </p>
+                {reports.slice(0, 3).map((r: any) => (
+                  <p key={r.id} className="text-[12.5px] text-ink-secondary">
+                    <span className="font-medium text-ink">{r.users?.full_name || 'Someone'}</span>: {r.reason}
+                  </p>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => decide(post.id, 'restore')} disabled={busyId === post.id}
+                  className="flex items-center gap-1.5 text-white text-[13px] font-semibold rounded-lg disabled:opacity-50 transition"
+                  style={{ backgroundColor: '#0F6E56', padding: '9px 16px' }}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Restore post
+                </button>
+                <button
+                  onClick={() => decide(post.id, 'remove')} disabled={busyId === post.id}
+                  className="flex items-center gap-1.5 text-white text-[13px] font-semibold rounded-lg disabled:opacity-50 transition"
+                  style={{ backgroundColor: '#B4362A', padding: '9px 16px' }}
+                >
+                  <EyeOff className="w-3.5 h-3.5" /> Remove post
+                </button>
+              </div>
+            </div>
+          ))}
+          <p className="flex items-center justify-center gap-1.5 text-center text-[12px] mt-2" style={{ color: '#8A8A8A' }}>
+            <ShieldAlert className="w-3.5 h-3.5" /> Serious concerns are escalated to the safeguarding lead
+          </p>
+        </div>
       )}
     </div>
   )
