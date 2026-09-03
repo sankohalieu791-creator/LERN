@@ -263,7 +263,7 @@ export default function StudentSettingsPanel() {
           onToggle={async v => { setBusyField('cookies'); await setCookieConsent(user.id, v); await refreshUser(); setBusyField(null) }}
         />
         <Row label="App version" value="1.0" noChevron />
-        <a href="mailto:support@lernapp.uk" className="flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.03] transition">
+        <a href="mailto:support@lernapp.uk" className="flex items-center justify-between px-4 py-3.5 hover:bg-[var(--app-overlay-1)] transition">
           <span className="text-[14px]">Contact and support</span>
           <span className="flex items-center gap-1 text-[13px] text-[var(--app-text-secondary)]"><Mail className="w-3.5 h-3.5" /> support@lernapp.uk</span>
         </a>
@@ -310,7 +310,7 @@ function Row({ label, value, onClick, right, noChevron, danger, multiline, busy 
   )
   if (!onClick) return <div className="flex items-center justify-between px-4 py-3.5">{content}</div>
   return (
-    <button onClick={onClick} disabled={busy} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.03] transition text-left disabled:opacity-60">
+    <button onClick={onClick} disabled={busy} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-[var(--app-overlay-1)] transition text-left disabled:opacity-60">
       {content}
     </button>
   )
@@ -325,9 +325,13 @@ function ToggleRow({ label, hint, value, onToggle, busy }: { label: string; hint
       </div>
       <button
         onClick={() => onToggle(!value)} disabled={busy}
-        className={`w-11 h-6 rounded-full transition relative flex-shrink-0 disabled:opacity-50 ${value ? 'bg-brand' : 'bg-white/10'}`}
+        className={`w-11 h-6 rounded-full transition relative flex-shrink-0 disabled:opacity-50 border ${value ? 'bg-brand border-brand' : 'bg-[var(--app-overlay-2)] border-[var(--app-border)]'}`}
       >
-        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition ${value ? 'left-[22px]' : 'left-0.5'}`} />
+        {/* Shadow, not just a flat white fill -- a white thumb on the
+            off-state track needs its own separation to read against a
+            light-mode surface, where the track itself is already close
+            to white (an all-white toggle used to just disappear). */}
+        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.4)] transition ${value ? 'left-[21px]' : 'left-0.5'}`} />
       </button>
     </div>
   )
@@ -335,7 +339,7 @@ function ToggleRow({ label, hint, value, onToggle, busy }: { label: string; hint
 
 function LinkRow({ label, href }: { label: string; href: string }) {
   return (
-    <Link href={href} className="flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.03] transition">
+    <Link href={href} className="flex items-center justify-between px-4 py-3.5 hover:bg-[var(--app-overlay-1)] transition">
       <span className="text-[14px] text-[var(--app-text)]">{label}</span>
       <ChevronRight className="w-4 h-4 text-[var(--app-text-tertiary)]" />
     </Link>
@@ -346,7 +350,7 @@ function ScreenShell({ title, onBack, children }: { title: string; onBack: () =>
   return (
     <div className="bg-[var(--app-bg)] min-h-[calc(100vh-56px)] text-[var(--app-text)]">
       <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-[var(--app-bg)]/95 backdrop-blur border-b border-[var(--app-border)]">
-        <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition">
+        <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-2)] transition">
           <ChevronLeft className="w-5 h-5" />
         </button>
         <p className="text-[15px] font-semibold ml-1">{title}</p>

@@ -21,6 +21,13 @@ const STAGE_META: Record<ApplicationStage, { label: string; bg: string; text: st
   hired: { label: 'Hired', bg: '#E1F5EE', text: '#0F6E56' },
   not_progressing: { label: 'Not progressing', bg: '#F1EFE8', text: '#5F5E5A' },
 }
+// The real pipeline, in order -- lets Job tracking draw an actual
+// LinkedIn-style progress tracker (a line of stage dots, filled up to
+// wherever the application currently sits) instead of just a bare
+// name and a status pill, which was the "needs to be a bit more
+// designed" complaint. not_progressing is a dead-end outside this
+// order, handled separately below rather than forced onto the line.
+const STAGE_ORDER: ApplicationStage[] = ['applied', 'reviewing', 'shortlisted', 'interview', 'offer', 'hired']
 
 // Sizes/structure pulled from the real deleted v1 app/discovery/page.tsx
 // (git show a07a8c2~1): "Discover" title + search bar, NO messaging
@@ -169,8 +176,9 @@ export default function StudentDiscoverPanel() {
           <button
             key={t.id} onClick={() => setTab(t.id)}
             className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition ${
-              tab === t.id ? 'bg-white text-black' : 'bg-[var(--app-surface)] text-[var(--app-text-secondary)] border border-[var(--app-border-subtle)]'
+              tab === t.id ? '' : 'bg-[var(--app-surface)] text-[var(--app-text-secondary)] border border-[var(--app-border-subtle)]'
             }`}
+            style={tab === t.id ? { backgroundColor: 'var(--app-invert-bg)', color: 'var(--app-invert-text)' } : undefined}
           >
             {t.label}
           </button>
@@ -245,7 +253,7 @@ export default function StudentDiscoverPanel() {
                 </div>
               ) : (
                 <span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-full ${
-                  i.status === 'accepted' ? 'bg-[#123a24] text-[#4ade80]' : 'bg-white/5 text-[var(--app-text-tertiary)]'
+                  i.status === 'accepted' ? 'bg-[#123a24] text-[#4ade80]' : 'bg-[var(--app-overlay-1)] text-[var(--app-text-tertiary)]'
                 }`}>
                   {i.status === 'accepted' ? 'Accepted' : 'Declined'}
                 </span>
@@ -256,26 +264,7 @@ export default function StudentDiscoverPanel() {
         ) : tab === 'tracking' ? (
           applications.length === 0 ? (
             <EmptyState label="Nothing yet — apply to a role or accept an employer's interest to start tracking it here." icon={<LineChart className="w-8 h-8 text-[var(--app-text-quaternary)] mb-2" />} />
-          ) : applications.map(a => {
-            const meta = STAGE_META[a.stage as ApplicationStage]
-            return (
-              <div key={a.id} className="bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4">
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div className="w-9 h-9 rounded-xl bg-[#252525] flex items-center justify-center text-[var(--app-text)] font-bold text-[11px] flex-shrink-0">
-                    {initials(a.employer?.full_name)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[var(--app-text)] font-bold text-sm truncate">{a.opportunity?.title || 'Direct interest'}</p>
-                    <p className="text-[var(--app-text-secondary)] text-xs truncate">{a.employer?.full_name || 'An employer'}</p>
-                  </div>
-                  <span className="text-[11px] font-semibold px-3 py-1 rounded-full flex-shrink-0" style={{ backgroundColor: meta.bg, color: meta.text }}>
-                    {meta.label}
-                  </span>
-                </div>
-                <p className="text-[var(--app-text-tertiary)] text-xs">Updated {new Date(a.stage_updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-              </div>
-            )
-          })
+          ) : applications.map(a => <TrackingCard key={a.id} application={a} />)
         ) : (
           opportunities.length === 0 ? <EmptyState label={`No ${tab === 'job' ? 'jobs' : tab === 'apprenticeship' ? 'apprenticeships' : 'internships'} posted yet.`} icon={<Briefcase className="w-8 h-8 text-[var(--app-text-quaternary)] mb-2" />} /> : opportunities.map(o => {
             const status = applicationByOpp[o.id]
@@ -315,7 +304,7 @@ export default function StudentDiscoverPanel() {
                       {STAGE_META[stageByOpp[o.id]].label}
                     </div>
                   ) : (
-                    <div className="w-full text-center py-2.5 rounded-full text-sm font-semibold bg-white/5 text-[var(--app-text-secondary)]">
+                    <div className="w-full text-center py-2.5 rounded-full text-sm font-semibold bg-[var(--app-overlay-1)] text-[var(--app-text-secondary)]">
                       {adult ? 'Applied — pending' : 'Applied — sent to your organisation'}
                     </div>
                   )
@@ -324,7 +313,7 @@ export default function StudentDiscoverPanel() {
                     <Check className="w-4 h-4" /> Accepted
                   </div>
                 ) : status === 'declined' ? (
-                  <div className="w-full text-center py-2.5 rounded-full text-sm font-semibold bg-white/5 text-[var(--app-text-tertiary)]">Declined</div>
+                  <div className="w-full text-center py-2.5 rounded-full text-sm font-semibold bg-[var(--app-overlay-1)] text-[var(--app-text-tertiary)]">Declined</div>
                 ) : (
                   <button
                     onClick={() => apply(o.id)} disabled={applying === o.id}
@@ -338,6 +327,58 @@ export default function StudentDiscoverPanel() {
           })
         )}
       </div>
+    </div>
+  )
+}
+
+// LinkedIn-style application tracker card: logo/initials, role +
+// employer, current status pill up top (unchanged), and underneath a
+// real pipeline -- a line of stage dots filled up to wherever the
+// application currently sits, with the current stage's label under
+// it. not_progressing is a dead end outside that line, so it gets its
+// own flat closed-out row instead of a tracker that can't represent it.
+function TrackingCard({ application: a }: { application: any }) {
+  const stage = a.stage as ApplicationStage
+  const meta = STAGE_META[stage]
+  const closed = stage === 'not_progressing'
+  const stageIndex = STAGE_ORDER.indexOf(stage)
+
+  return (
+    <div className="bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4">
+      <div className="flex items-center gap-2.5 mb-3.5">
+        <div className="w-10 h-10 rounded-xl bg-[#252525] flex items-center justify-center text-[var(--app-text)] font-bold text-[12px] flex-shrink-0">
+          {initials(a.employer?.full_name)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[var(--app-text)] font-bold text-sm truncate">{a.opportunity?.title || 'Direct interest'}</p>
+          <p className="text-[var(--app-text-secondary)] text-xs truncate">{a.employer?.full_name || 'An employer'}</p>
+        </div>
+        <span className="text-[11px] font-semibold px-3 py-1 rounded-full flex-shrink-0" style={{ backgroundColor: meta.bg, color: meta.text }}>
+          {meta.label}
+        </span>
+      </div>
+
+      {closed ? (
+        <div className="flex items-center gap-1.5 text-[var(--app-text-tertiary)] text-xs">
+          <Ban className="w-3.5 h-3.5" /> Closed out — not progressing
+        </div>
+      ) : (
+        <div className="flex items-center mb-1">
+          {STAGE_ORDER.map((s, i) => (
+            <div key={s} className="flex items-center flex-1 last:flex-initial">
+              <div
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: i <= stageIndex ? meta.text : 'var(--app-overlay-3)' }}
+              />
+              {i < STAGE_ORDER.length - 1 && (
+                <div className="flex-1 h-[2px]" style={{ backgroundColor: i < stageIndex ? meta.text : 'var(--app-overlay-2)' }} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="text-[var(--app-text-tertiary)] text-[11px] mt-2.5">Updated {new Date(a.stage_updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
     </div>
   )
 }

@@ -40,7 +40,7 @@ export default function StudentSearchPanel() {
     // earlier this session), so there's nothing to cancel out.
     <div>
       <div className="sticky top-0 z-10 flex items-center gap-2 h-14 px-3 bg-[var(--app-bg)]/95 backdrop-blur border-b border-[var(--app-border)]">
-        <button onClick={() => router.back()} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition flex-shrink-0">
+        <button onClick={() => router.back()} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-2)] transition flex-shrink-0">
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 flex items-center gap-2 bg-[var(--app-surface)] border border-[var(--app-border)] rounded-full px-3.5 py-2">

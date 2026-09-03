@@ -104,7 +104,7 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
           <button
             onClick={() => router.push('/student/settings')}
             aria-label="Settings"
-            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/5 transition text-[var(--app-text-secondary)]"
+            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition text-[var(--app-text-secondary)]"
           >
             <SettingsIcon className="w-5 h-5" />
           </button>
@@ -147,7 +147,7 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
           {isOwn && (
             <button
               onClick={() => setEditingBio(true)}
-              className="mt-4 px-6 py-2 rounded-full border border-white/15 text-[13px] font-semibold hover:bg-white/[0.06] active:scale-[0.98] transition"
+              className="mt-4 px-6 py-2 rounded-full border border-[var(--app-overlay-3)] text-[13px] font-semibold hover:bg-[var(--app-overlay-2)] active:scale-[0.98] transition"
             >
               Edit profile
             </button>
@@ -285,7 +285,7 @@ function FolderContent({
           <>
             <div className="grid grid-cols-2 gap-[10px]">
               {verified.map(v => (
-                <button key={v.id} onClick={() => setOpenWork(v)} className="text-left bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-xl p-[14px] hover:border-white/20 transition">
+                <button key={v.id} onClick={() => setOpenWork(v)} className="text-left bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-xl p-[14px] hover:border-[var(--app-overlay-3)] transition">
                   <span className="w-8 h-8 rounded-lg flex items-center justify-center mb-2.5" style={{ backgroundColor: '#E1F5EE' }}>
                     <CheckCircle2 className="w-4 h-4" style={{ color: '#0F6E56' }} />
                   </span>
@@ -297,7 +297,7 @@ function FolderContent({
               ))}
               {quals.map(q => (
                 <div key={q.id} className="rounded-xl p-[14px] border border-dashed relative" style={{ borderColor: '#8A8A8A' }}>
-                  <span className="w-8 h-8 rounded-lg flex items-center justify-center mb-2.5 bg-white/5">
+                  <span className="w-8 h-8 rounded-lg flex items-center justify-center mb-2.5 bg-[var(--app-overlay-1)]">
                     <FilePlus className="w-4 h-4" style={{ color: '#8A8A8A' }} />
                   </span>
                   <p className="text-[13px] font-semibold leading-snug line-clamp-2">{q.title}</p>
@@ -424,7 +424,7 @@ function VerifiedWorkDetail({ work, onClose }: { work: any; onClose: () => void 
     // matches every other full-screen overlay's convention.
     <div className="fixed inset-0 z-50 bg-[var(--app-bg)] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-[var(--app-bg)]/95 backdrop-blur border-b border-[var(--app-border)]">
-        <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition">
+        <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-2)] transition">
           <ChevronLeft className="w-5 h-5" />
         </button>
       </div>
@@ -459,7 +459,7 @@ function VerifiedWorkDetail({ work, onClose }: { work: any; onClose: () => void 
             ) : (
               <a
                 href={fileUrl || '#'} target="_blank" rel="noreferrer"
-                className="flex items-center gap-2 bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-xl px-4 py-3 text-[13px] font-semibold text-[var(--app-text)] hover:border-white/20 transition"
+                className="flex items-center gap-2 bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-xl px-4 py-3 text-[13px] font-semibold text-[var(--app-text)] hover:border-[var(--app-overlay-3)] transition"
               >
                 <FilePlus className="w-4 h-4 text-[var(--app-text-secondary)] flex-shrink-0" />
                 <span className="truncate">{sub.file_path.split('/').pop()}</span>

@@ -47,7 +47,7 @@ function initials(name?: string) {
 }
 
 const STATUS: Record<string, { label: string; cls: string }> = {
-  new: { label: 'New', cls: 'bg-white/10 text-[var(--app-text)]' },
+  new: { label: 'New', cls: 'bg-[var(--app-overlay-2)] text-[var(--app-text)]' },
   submitted: { label: 'Submitted', cls: 'bg-[#3a2e14] text-[#e0b64a]' },
   returned: { label: 'Returned', cls: 'bg-[#3a1e14] text-[#e08a4a]' },
   verified: { label: 'Completed', cls: 'bg-[#123a24] text-[#4ade80]' },
@@ -176,14 +176,17 @@ export default function StudentMyWorkPanel() {
 }
 
 // "The active tab has an orange (#D4551A) underline (2px) and dark
-// text; inactive tabs are #5A5A5A." Was white before -- a real
-// mismatch against the spec's own pinned colour.
+// text; inactive tabs are #5A5A5A." The active label was hardcoded
+// #fff -- invisible on a light-mode white surface (this was the
+// literal "cannot even see the tabs" bug). var(--app-text) inverts
+// with the theme the same way every other primary label in the app
+// does; inactive stays the pinned #5A5A5A, which reads fine on both.
 function TabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       className="flex-1 py-3.5 text-sm font-semibold border-b-2 transition"
-      style={active ? { color: '#fff', borderColor: '#D4551A' } : { color: '#5A5A5A', borderColor: 'transparent' }}
+      style={active ? { color: 'var(--app-text)', borderColor: '#D4551A' } : { color: '#5A5A5A', borderColor: 'transparent' }}
     >
       {label}
     </button>
@@ -235,7 +238,7 @@ function SubmittableCard({ item, latest, started, onOpen, onStart }: {
           <span className="text-[12px] text-[var(--app-text-tertiary)]">Not started yet</span>
           <span
             onClick={e => { e.stopPropagation(); onStart() }}
-            className="text-[12px] font-semibold text-[var(--app-text)] border border-white/20 rounded-full px-4 py-1.5 hover:bg-white/5 transition"
+            className="text-[12px] font-semibold text-[var(--app-text)] border border-[var(--app-overlay-3)] rounded-full px-4 py-1.5 hover:bg-[var(--app-overlay-1)] transition"
           >
             Start
           </span>
@@ -245,7 +248,7 @@ function SubmittableCard({ item, latest, started, onOpen, onStart }: {
       {statusKey === 'in_progress' && (
         <>
           <div className="flex items-center gap-2.5 mb-2.5">
-            <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+            <div className="flex-1 h-1.5 rounded-full bg-[var(--app-overlay-2)] overflow-hidden">
               <div className="h-full rounded-full" style={{ width: '40%', backgroundColor: '#E0A94B' }} />
             </div>
             <span className="text-[11px] text-[var(--app-text-secondary)] flex-shrink-0">Started</span>
@@ -572,7 +575,7 @@ function JoinCodePrompt({ onJoined }: { onJoined: () => Promise<void> }) {
   return (
     <div className="px-4 py-10">
       <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-2xl p-8 text-center">
-        <div className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
+        <div className="w-11 h-11 rounded-full bg-[var(--app-overlay-2)] flex items-center justify-center mx-auto mb-4">
           <KeyRound className="w-5 h-5 text-[var(--app-text)]" />
         </div>
         <p className="font-bold text-[var(--app-text)] text-[16px] mb-1.5">You're not linked to an organisation yet</p>
@@ -582,9 +585,9 @@ function JoinCodePrompt({ onJoined }: { onJoined: () => Promise<void> }) {
         {error && <p className="text-xs text-[#e04a4a] mb-3">{error}</p>}
         <input
           value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="e.g. 7K3P9XQZ"
-          className="w-full bg-[var(--app-bg)] border border-[var(--app-border)] rounded-xl px-4 py-3 text-sm text-[var(--app-text)] placeholder-[#666] text-center tracking-widest font-bold outline-none focus:border-white/30 mb-3"
+          className="w-full bg-[var(--app-bg)] border border-[var(--app-border)] rounded-xl px-4 py-3 text-sm text-[var(--app-text)] placeholder-[#666] text-center tracking-widest font-bold outline-none focus:border-[var(--app-overlay-4)] mb-3"
         />
-        <button onClick={handleJoin} disabled={loading} className="w-full bg-white text-black font-bold text-sm py-3 rounded-xl disabled:opacity-60">
+        <button onClick={handleJoin} disabled={loading} style={{ backgroundColor: 'var(--app-invert-bg)', color: 'var(--app-invert-text)' }} className="w-full font-bold text-sm py-3 rounded-xl disabled:opacity-60">
           {loading ? 'Joining…' : 'Join'}
         </button>
       </div>

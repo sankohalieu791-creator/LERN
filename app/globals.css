@@ -126,6 +126,19 @@ body {
   --app-text-secondary: #999999;
   --app-text-tertiary: #666666;
   --app-text-quaternary: #444444;
+  /* Overlay tints (hover states, subtle fills, badge/track backgrounds,
+     focus borders) that used to be written directly as bg-white/N or
+     border-white/N. Those work fine here (a white tint lightens a dark
+     surface, so it's visible) but are the literal reason light mode was
+     unreadable: a white/10 tint on an already-near-white surface is
+     just white-on-white. Same four intensities, tokenised so light mode
+     below can flip them to a black tint instead of a white one. */
+  --app-overlay-1: rgba(255, 255, 255, 0.05); /* faint hover */
+  --app-overlay-2: rgba(255, 255, 255, 0.1);  /* subtle fill / badge / track bg */
+  --app-overlay-3: rgba(255, 255, 255, 0.18); /* visible border / pill outline */
+  --app-overlay-4: rgba(255, 255, 255, 0.3);  /* focus ring / strong border */
+  --app-invert-bg: #ffffff;   /* selected-pill fill that must invert with theme */
+  --app-invert-text: #0f0f0f;
 }
 [data-theme="light"] {
   --app-bg: #fafafa;
@@ -138,6 +151,12 @@ body {
   --app-text-secondary: #666666;
   --app-text-tertiary: #999999;
   --app-text-quaternary: #bbbbbb;
+  --app-overlay-1: rgba(0, 0, 0, 0.035);
+  --app-overlay-2: rgba(0, 0, 0, 0.06);
+  --app-overlay-3: rgba(0, 0, 0, 0.12);
+  --app-overlay-4: rgba(0, 0, 0, 0.22);
+  --app-invert-bg: #0f0f0f;
+  --app-invert-text: #ffffff;
 }
 /* System preference only applies when nothing explicit is set -- an
    explicit [data-theme="dark"] (still used by the org/employer shells'
@@ -156,6 +175,12 @@ body {
     --app-text-secondary: #666666;
     --app-text-tertiary: #999999;
     --app-text-quaternary: #bbbbbb;
+    --app-overlay-1: rgba(0, 0, 0, 0.035);
+    --app-overlay-2: rgba(0, 0, 0, 0.06);
+    --app-overlay-3: rgba(0, 0, 0, 0.12);
+    --app-overlay-4: rgba(0, 0, 0, 0.22);
+    --app-invert-bg: #0f0f0f;
+    --app-invert-text: #ffffff;
   }
 }
 
