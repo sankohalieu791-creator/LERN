@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '@/context/AuthContext'
 import { createPost, uploadPostImage } from '@/lib/supabase'
 import { MILESTONE_TYPES, type MilestoneType } from '@/lib/feedConstants'
@@ -61,7 +62,14 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
     onPosted()
   }
 
-  return (
+  // Portaled to document.body -- this is now called from two places:
+  // StudentLayoutClient's own top-level instance (already fine, it's
+  // a true sibling of the shell) AND FeedPanel's local instance for
+  // the new "Share a win or an update..." prompt, which IS nested
+  // inside main. Portaling here means both callers get the same
+  // escape-the-scrolling-ancestor guarantee without needing to care
+  // where they're rendered from.
+  return createPortal((
     <div className="fixed inset-0 z-[60] flex flex-col" style={{ backgroundColor: 'var(--app-bg)', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="flex items-center justify-between p-4 flex-shrink-0">
         <button onClick={onClose} className="text-[var(--app-text)] font-semibold text-[14px]">Cancel</button>
@@ -145,5 +153,5 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
         </button>
       </div>
     </div>
-  )
+  ), document.body)
 }

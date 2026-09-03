@@ -15,7 +15,12 @@ export default function AuthShell({
   wide?: boolean
 }) {
   return (
-    <div className="min-h-screen bg-paper flex flex-col">
+    // paddingTop: env(safe-area-inset-top) -- missing entirely before,
+    // so on a standalone PWA the LERN logo sat right at the true top
+    // edge, under the status bar ("the LERN is a bit up"). Every other
+    // shell in the app has had this same fix today; this one was
+    // still missing it.
+    <div className="min-h-screen bg-paper flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <header className="flex-shrink-0 px-10 py-7">
         <Logo />
       </header>

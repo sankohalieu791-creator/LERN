@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -211,7 +212,17 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
     onAdded()
   }
 
-  return (
+  // Portaled to document.body -- rendered from inside FeedPanel, which
+  // is nested inside main (a scrolling container). fixed positioning
+  // is supposed to escape that regardless of nesting, but a full-
+  // screen modal several levels deep inside a scrolling ancestor is
+  // exactly the kind of thing mobile WebKit/webview builds render
+  // inconsistently in practice -- "the bottom nav comes up over it"
+  // matches the same class of bug PostComposer already hit once
+  // (see StudentLayoutClient's own comment on why it moved to a true
+  // top-level sibling). Portaling escapes it structurally instead of
+  // relying on z-index alone.
+  return createPortal((
     <div className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center bg-black/50" onClick={onClose}>
       <div
         className="w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl px-5 pt-5 pb-6"
@@ -263,7 +274,7 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
         )}
       </div>
     </div>
-  )
+  ), document.body)
 }
 
 // A win's own short card, full-screen, tap to close -- a story, not a
@@ -280,7 +291,7 @@ function WinViewer({ win, isOwn, organisationId, userId, onClose }: {
     if (win.image_path) getSignedFileUrl('post-images', win.image_path).then(({ url }) => setImgUrl(url))
   }, [win.image_path])
 
-  return (
+  return createPortal((
     <div
       className="fixed inset-0 z-50 flex flex-col"
       style={{ background: `linear-gradient(160deg, ${meta?.ring || '#0F6E56'}, #1A1613)`, paddingTop: 'env(safe-area-inset-top)' }}
@@ -316,7 +327,7 @@ function WinViewer({ win, isOwn, organisationId, userId, onClose }: {
         </div>
       )}
     </div>
-  )
+  ), document.body)
 }
 
 function PostCard({ post, verified, onChanged }: { post: any; verified: boolean; onChanged: () => void }) {
@@ -466,7 +477,7 @@ function ReportSheet({ onClose, onSend, onSent }: {
     onSent()
   }
 
-  return (
+  return createPortal((
     <div className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center bg-black/50" onClick={onClose}>
       <div
         className="w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl px-5 pt-5 pb-6"
@@ -512,5 +523,5 @@ function ReportSheet({ onClose, onSend, onSent }: {
         </p>
       </div>
     </div>
-  )
+  ), document.body)
 }
