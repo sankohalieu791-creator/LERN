@@ -17,14 +17,24 @@ html, body {
 }
 
 /* Every real screen paints its own full-bleed background (bg-paper on
-   light shells, bg-[#0f0f0f] on the student shell), so body's own
-   background should never normally be visible -- but during an iOS
-   momentum-scroll edge case, a transparent scroll container can
+   light shells, bg-[var(--app-bg)] on the student shell), so body's
+   own background should never normally be visible -- but during an
+   iOS momentum-scroll edge case, a transparent scroll container can
    briefly composite through to body itself rather than its immediate
-   parent. Defaulting body dark (not the light --paper) means that
-   edge case shows a dark flash, not the stark white strip that was
-   actually being reported -- the mobile dark shell is the primary
-   surface this app runs on right now.
+   parent, and now that both the student shell AND the org shells have
+   real, genuinely-used light modes, a hardcoded-dark body was wrong
+   for however many of those screens are actually in light mode right
+   now -- "the bottom nav shows black" on both student and org layouts
+   was body's own colour bleeding through at the very bottom edge,
+   dark regardless of what theme the screen above it was actually in.
+   No single CSS variable serves both shells here (--app-bg and
+   --paper are separate systems with separate defaults), so this
+   follows the OS-level prefers-color-scheme directly instead --
+   doesn't perfectly match someone who explicitly overrode light/dark
+   in-app against their OS's own setting, but correctly matches the
+   overwhelming majority (anyone on 'system', or whose in-app choice
+   already agrees with their OS) rather than assuming dark for
+   everyone the way the old hardcoded value did.
 
    NOTE: no padding-top here. StudentShell's own root div already
    applies `paddingTop: env(safe-area-inset-top)` to itself, on a box
@@ -46,6 +56,11 @@ body {
   background-color: #0f0f0f;
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+}
+@media (prefers-color-scheme: light) {
+  body {
+    background-color: #fafafa;
+  }
 }
 
 /* ── v2 theme tokens ──────────────────────────────────────────
