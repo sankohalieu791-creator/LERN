@@ -102,14 +102,17 @@ export default function OrgShell({
   // is still showing, so h-screen looked right on desktop but caused
   // exactly the same "pulls down as you scroll" mismatch on phone.
   return (
-    // paddingTop: env(safe-area-inset-top) -- missing entirely before,
-    // so on a standalone PWA the whole shell (top bar included) sat
-    // right at the true top edge, under the status bar/notch ("the top
-    // nav is so high, all the way where my wifi/data is"). Every other
-    // full-screen shell in the app already has this; this one never did.
-    // Harmless on desktop -- env() resolves to 0 with no notch/status
-    // bar to avoid.
-    <div data-theme={theme} className="h-[100dvh] overflow-hidden bg-paper flex" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    // paddingTop AND paddingBottom: env(safe-area-inset-*) -- top was
+    // missing entirely before ("the top nav is so high"). Bottom was
+    // missing too: with the old bottom tab bar gone (replaced by the
+    // drawer), there was nothing left painting that bottom safe-area
+    // strip in the shell's own bg-paper, so on a phone with a home
+    // indicator it could show body's own hardcoded dark background
+    // through the gap ("since there's no bottom nav there's a black
+    // thing under"). box-sizing:border-box (global reset) means this
+    // padding eats into the existing h-[100dvh] box rather than adding
+    // to it, so it can't push the shell taller than the real viewport.
+    <div data-theme={theme} className="h-[100dvh] overflow-hidden bg-paper flex" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* ── Laptop sidebar ── */}
       <aside className={`hidden lg:flex flex-col border-r border-edge-subtle bg-surface transition-[width] duration-150 flex-shrink-0 ${collapsed ? 'w-[72px]' : 'w-60'}`}>
         <div className={`flex items-center h-16 px-4 flex-shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>
@@ -157,9 +160,15 @@ export default function OrgShell({
           <div className="hidden lg:block text-[14px] font-semibold text-ink-secondary truncate">{orgName}</div>
           <div className="flex items-center gap-1">
             <NotificationsBell />
+            {/* Visible on phone now too, not just laptop -- direct
+                access next to the bell instead of only being reachable
+                by opening the drawer, per direct request ("add the
+                settings next to the notif bell to be easier"). Still
+                also in the drawer's own list; two paths to the same
+                place, not a conflict. */}
             <button
               aria-label="Settings" onClick={() => router.push(`${sections[0].href.split('/').slice(0, 2).join('/')}/settings`)}
-              className="hidden lg:flex w-9 h-9 items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition"
+              className="flex w-9 h-9 items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition"
             >
               <Settings className="w-[18px] h-[18px]" />
             </button>
