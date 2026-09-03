@@ -1,6 +1,6 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NotificationsBell from '@/components/v2/NotificationsBell'
 import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search } from 'lucide-react'
@@ -22,6 +22,7 @@ import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search } from 'lu
 // goes live as it's rebuilt, one at a time.
 export default function StudentShell({ children, onPlus }: { children: React.ReactNode; onPlus?: () => void }) {
   const pathname = usePathname()
+  const router = useRouter()
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
   // The real v1 Feed page has its own header (LERN + search + bell);
   // Courses/Workshops (app/courses/page.tsx) has none at all -- its
@@ -92,7 +93,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
           <div className="px-4 py-3 flex items-center justify-between">
             <span className="font-semibold text-[20px] tracking-tight" style={{ color: '#D4551A' }}>LERN</span>
             <div className="flex items-center gap-1">
-              <button aria-label="Search" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition" style={{ color: '#5A5A5A' }}>
+              <button onClick={() => router.push('/student/search')} aria-label="Search" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition" style={{ color: '#5A5A5A' }}>
                 <Search className="w-5 h-5" />
               </button>
               <NotificationsBell />

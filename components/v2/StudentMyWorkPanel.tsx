@@ -122,6 +122,16 @@ export default function StudentMyWorkPanel() {
 
   return (
     <div>
+      {/* Build Spec: Feed and My Work (student) v1.0, Part 2 --
+          "Title 'My Work' at 20px weight 600. Sub-line 'Everything set
+          for you, in one place'." Missing entirely before -- the
+          screen went straight from the shell's own top padding into
+          the tab row with no identity of its own. */}
+      <div className="px-4 pt-4 pb-3">
+        <h1 className="text-white text-[20px] font-semibold">My Work</h1>
+        <p className="text-[13px] mt-0.5" style={{ color: '#999' }}>Everything set for you, in one place</p>
+      </div>
+
       <div className="sticky top-0 z-10 flex items-stretch border-b border-white/[0.07] bg-[#0f0f0f]">
         <TabButton active={tab === 'primary'} label={primaryLabel} onClick={() => setTab('primary')} />
         <TabButton active={tab === 'assignment'} label="Assignments" onClick={() => setTab('assignment')} />
@@ -165,11 +175,15 @@ export default function StudentMyWorkPanel() {
   )
 }
 
+// "The active tab has an orange (#D4551A) underline (2px) and dark
+// text; inactive tabs are #5A5A5A." Was white before -- a real
+// mismatch against the spec's own pinned colour.
 function TabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className={`flex-1 py-3.5 text-sm font-semibold border-b-2 transition ${active ? 'text-white border-white' : 'text-[#555] border-transparent'}`}
+      className="flex-1 py-3.5 text-sm font-semibold border-b-2 transition"
+      style={active ? { color: '#fff', borderColor: '#D4551A' } : { color: '#5A5A5A', borderColor: 'transparent' }}
     >
       {label}
     </button>
@@ -273,6 +287,8 @@ function SubmittableCard({ item, latest, started, onOpen, onStart }: {
 function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
   const [memberCount, setMemberCount] = useState<number | null>(null)
   const hostName = (item as any).users?.full_name
+  const orgName = (item as any).organisations?.name
+  const inPerson = item.mode === 'in_person'
 
   useEffect(() => {
     if (item.type === 'course' || item.type === 'workshop') getWorkItemMemberCount(item.id).then(setMemberCount)
@@ -316,7 +332,7 @@ function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
             {initials(hostName)}
           </div>
           <span className="text-white text-sm font-semibold flex items-center gap-1">
-            {hostName || 'Your organisation'}
+            {hostName || orgName || 'Your organisation'}
             <BadgeCheck className="w-3.5 h-3.5 text-[#4a9de0]" />
           </span>
         </div>
@@ -330,11 +346,17 @@ function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
               {item.duration_label || ''}
             </span>
           )}
+          {item.location && (
+            <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {item.location}</span>
+          )}
           {memberCount !== null && <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {memberCount} joined</span>}
         </div>
 
+        {/* In-person has nothing to "join" online -- there's no live
+            video link, so "Start Class"/"Join Now" never made sense
+            for it. "Attend" instead, matching what it actually is. */}
         <div className={`w-full text-center rounded-2xl py-3 text-sm font-bold ${live ? 'bg-red-500 text-white' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'}`}>
-          {live ? '🔴 Join Now' : ended ? 'Ended' : 'Start Class →'}
+          {ended ? 'Ended' : inPerson ? (live ? 'Attending now' : 'Attend →') : live ? '🔴 Join Now' : 'Start Class →'}
         </div>
       </div>
     </button>
@@ -406,8 +428,13 @@ function WorkItemDetail({
         </button>
       </div>
 
-      <div className="p-4">
-        <div className="bg-surface border border-edge rounded-2xl p-5">
+      {/* py-4 only, no horizontal padding here -- the card should
+          touch both edges of the phone screen, not sit inset with
+          side margins. The card's own internal p-5 still gives its
+          CONTENT room to breathe; this is about the box's outer
+          boundary, not what's inside it. */}
+      <div className="py-4">
+        <div className="bg-surface border-y border-edge p-5">
           <h1 className="text-2xl font-bold text-ink leading-snug mb-3">{item.title}</h1>
 
           <div className="flex items-center gap-2 mb-4">
@@ -415,7 +442,7 @@ function WorkItemDetail({
               {initials(hostName)}
             </div>
             <span className="text-ink text-sm font-semibold flex items-center gap-1">
-              {hostName || 'Your organisation'}
+              {hostName || (item as any).organisations?.name || 'Your organisation'}
               <BadgeCheck className="w-3.5 h-3.5 text-[#4a9de0]" />
             </span>
           </div>

@@ -256,7 +256,7 @@ export const getSignedFileUrl = async (bucket: 'submission-files' | 'work-item-a
 export const getVisibleWorkItems = async (organisationId: string) => {
   const { data, error } = await supabase
     .from('work_items')
-    .select('*, work_item_attachments(id, file_name, file_path, file_size_bytes), users!work_items_created_by_fkey(full_name)')
+    .select('*, work_item_attachments(id, file_name, file_path, file_size_bytes), users!work_items_created_by_fkey(full_name), organisations(name)')
     .eq('organisation_id', organisationId)
     .order('created_at', { ascending: false })
   return { data, error }
@@ -581,6 +581,27 @@ export const toggleLike = async (postId: string, userId: string, liked: boolean)
 // posts_feed pre-computes author_name/author_anonymised server-side
 // (see 2026-08-28-feed-under18-anonymity.sql) -- an under-18 author's
 // real name never leaves the database for a viewer outside their org.
+// Feed's search icon -- searches title/content/category across
+// whatever the caller can already see (posts_feed already scopes this
+// correctly via RLS, same as getFeed/getPublicFeed), not a separate
+// unrestricted table scan.
+export const searchPosts = async (query: string, organisationId?: string) => {
+  const q = query.trim()
+  if (!q) return { data: [], error: null }
+  let request = supabase
+    .from('posts_feed')
+    .select('*')
+    .eq('hidden', false)
+    .or(`content.ilike.%${q}%,title.ilike.%${q}%,category.ilike.%${q}%`)
+    .order('created_at', { ascending: false })
+    .limit(30)
+  if (organisationId) request = request.or(`organisation_id.eq.${organisationId},visibility.eq.public`)
+  else request = request.eq('visibility', 'public')
+  const { data, error } = await request
+  if (error || !data) return { data, error }
+  return { data: await attachReactions(data), error: null }
+}
+
 export const getFeed = async (organisationId: string) => {
   const { data, error } = await supabase
     .from('posts_feed')
@@ -1206,6 +1227,17 @@ export const getApplicationsForOrganisation = async (organisationId: string) => 
     .from('applications')
     .select('*, student:users!applications_student_id_fkey(id, full_name, date_of_birth), employer:users!applications_employer_id_fkey(full_name), opportunity:opportunities(title)')
     .eq('organisation_id', organisationId)
+    .order('stage_updated_at', { ascending: false })
+  return { data, error }
+}
+
+// Discover's "Job tracking" (18+ only in the UI -- see the RLS policy
+// note on this table for why the read itself isn't age-gated).
+export const getMyApplications = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('applications')
+    .select('*, employer:users!applications_employer_id_fkey(full_name), opportunity:opportunities(title)')
+    .eq('student_id', studentId)
     .order('stage_updated_at', { ascending: false })
   return { data, error }
 }

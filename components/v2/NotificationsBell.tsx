@@ -83,7 +83,7 @@ export default function NotificationsBell({ size = 'md' }: { size?: 'md' | 'lg' 
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 bg-surface border border-edge rounded-xl shadow-lg w-80 max-h-96 overflow-y-auto z-20">
+        <div className="absolute right-0 top-11 bg-surface border border-edge rounded-xl shadow-lg w-80 max-h-96 overflow-y-auto z-20" style={{ maxWidth: 'calc(100vw - 32px)' }}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-edge-subtle sticky top-0 bg-surface">
             <p className="font-bold text-ink text-[14px]">Notifications</p>
             {unread > 0 && (

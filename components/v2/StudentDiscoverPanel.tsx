@@ -1,14 +1,26 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
   getDiscoverWork, getOpportunities, getMyReceivedInterest, respondToInterest,
-  applyToOpportunity, getMyOpportunityApplications, getAvatarUrl,
+  applyToOpportunity, getMyOpportunityApplications, getAvatarUrl, getMyApplications,
 } from '@/lib/supabase'
+import type { ApplicationStage } from '@/lib/supabase'
 import {
-  Search, X, BadgeCheck, MapPin, Briefcase, Clock, Check, Ban, Send,
+  Search, X, BadgeCheck, MapPin, Briefcase, Clock, Check, Ban, Send, LineChart,
 } from 'lucide-react'
+
+const STAGE_META: Record<ApplicationStage, { label: string; bg: string; text: string }> = {
+  applied: { label: 'Applied', bg: '#E6F1FB', text: '#185FA5' },
+  reviewing: { label: 'Reviewing', bg: '#FAEEDA', text: '#854F0B' },
+  shortlisted: { label: 'Shortlisted', bg: '#FAEEDA', text: '#854F0B' },
+  interview: { label: 'Interview', bg: '#FAEEDA', text: '#854F0B' },
+  offer: { label: 'Offer', bg: '#FAEEDA', text: '#854F0B' },
+  hired: { label: 'Hired', bg: '#E1F5EE', text: '#0F6E56' },
+  not_progressing: { label: 'Not progressing', bg: '#F1EFE8', text: '#5F5E5A' },
+}
 
 // Sizes/structure pulled from the real deleted v1 app/discovery/page.tsx
 // (git show a07a8c2~1): "Discover" title + search bar, NO messaging
@@ -24,7 +36,7 @@ import {
 // interest in them directly) -- for under-18s that same interest is
 // visible only to their organisation's staff, never here.
 
-type Tab = 'explore' | 'job' | 'apprenticeship' | 'internship' | 'received'
+type Tab = 'explore' | 'job' | 'apprenticeship' | 'internship' | 'received' | 'tracking'
 
 function isAdult(dob?: string) {
   if (!dob) return false
@@ -38,6 +50,7 @@ const TYPE_LABEL: Record<string, string> = { brief: 'Brief', course: 'Course', w
 
 export default function StudentDiscoverPanel() {
   const { user } = useAuth()
+  const router = useRouter()
   const adult = isAdult(user?.date_of_birth)
   const [tab, setTab] = useState<Tab>('explore')
   const [search, setSearch] = useState('')
@@ -46,6 +59,8 @@ export default function StudentDiscoverPanel() {
   const [applicationByOpp, setApplicationByOpp] = useState<Record<string, string>>({})
   const [applying, setApplying] = useState<string | null>(null)
   const [interest, setInterest] = useState<any[]>([])
+  const [applications, setApplications] = useState<any[]>([])
+  const [stageByOpp, setStageByOpp] = useState<Record<string, ApplicationStage>>({})
   const [loading, setLoading] = useState(true)
 
   const load = () => {
@@ -55,6 +70,9 @@ export default function StudentDiscoverPanel() {
     } else if (tab === 'received') {
       if (!user) return
       getMyReceivedInterest(user.id).then(({ data }) => { setInterest(data || []); setLoading(false) })
+    } else if (tab === 'tracking') {
+      if (!user) return
+      getMyApplications(user.id).then(({ data }) => { setApplications(data || []); setLoading(false) })
     } else {
       getOpportunities(tab).then(({ data }) => {
         const q = search.trim().toLowerCase()
@@ -67,6 +85,15 @@ export default function StudentDiscoverPanel() {
         setApplicationByOpp(map)
       })
     }
+    // Real stage, wherever there is one -- read alongside every tab
+    // (not just "tracking") so an opportunity card can show the actual
+    // pipeline stage instead of a flat "Applied — pending" the moment
+    // it moves past Applied.
+    if (user && tab !== 'tracking') getMyApplications(user.id).then(({ data }) => {
+      const map: Record<string, ApplicationStage> = {}
+      for (const a of data || []) if (a.opportunity_id) map[a.opportunity_id] = a.stage
+      setStageByOpp(map)
+    })
   }
   useEffect(load, [tab, user?.id])
   useEffect(() => { const t = setTimeout(load, 300); return () => clearTimeout(t) }, [search])
@@ -89,7 +116,11 @@ export default function StudentDiscoverPanel() {
     { id: 'job', label: '💼 Jobs' },
     { id: 'apprenticeship', label: '🎓 Apprenticeships' },
     { id: 'internship', label: '📋 Internships' },
-    ...(adult ? [{ id: 'received' as Tab, label: '📥 Interest received' }] : []),
+    // Job tracking (own applications, real pipeline stage) is 18+
+    // only, same rule as Interest received -- under-18s' interest with
+    // an employer is always mediated through their org, never surfaced
+    // to them directly here.
+    ...(adult ? [{ id: 'received' as Tab, label: '📥 Interest received' }, { id: 'tracking' as Tab, label: '📊 Job tracking' }] : []),
   ]
 
   return (
@@ -112,6 +143,7 @@ export default function StudentDiscoverPanel() {
       <div className="px-4 pt-4 pb-3">
         <h1 className="text-white text-2xl font-bold">Discover</h1>
         {tab === 'received' && <p className="text-[#666] text-sm mt-0.5">Employers who've expressed interest in you</p>}
+        {tab === 'tracking' && <p className="text-[#666] text-sm mt-0.5">Where each application actually stands</p>}
       </div>
 
       {/* Always rendered, every tab -- it used to only show for tabs
@@ -157,7 +189,13 @@ export default function StudentDiscoverPanel() {
             const wi = v.submissions?.work_items
             const student = v.submissions?.student
             return (
-              <div key={v.id} className="bg-[#1a1a1a] border border-white/[0.07] rounded-2xl p-4">
+              // Was a plain div -- tapping did nothing at all. Opens
+              // the student's own profile (Verified is right there),
+              // the same destination tapping a Feed author now goes to.
+              <button
+                key={v.id} onClick={() => router.push(student?.id === user?.id ? '/student/profile' : `/student/profile/${student?.id}`)}
+                className="w-full text-left bg-[#1a1a1a] border border-white/[0.07] rounded-2xl p-4"
+              >
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <span className="text-[10px] font-bold text-[#888] uppercase tracking-wide">{TYPE_LABEL[wi?.type] || wi?.type}</span>
                   <span className="flex items-center gap-1 text-[11px] font-semibold text-[#4ade80] flex-shrink-0"><BadgeCheck className="w-3.5 h-3.5" /> Verified</span>
@@ -170,7 +208,7 @@ export default function StudentDiscoverPanel() {
                   </div>
                   <p className="text-[#888] text-xs">{student?.full_name} · verified {new Date(v.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
                 </div>
-              </div>
+              </button>
             )
           })
         ) : tab === 'received' ? (
@@ -187,9 +225,15 @@ export default function StudentDiscoverPanel() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-white font-bold text-sm truncate">{i.employer?.full_name || 'An employer'}</p>
-                  <p className="text-[#666] text-xs">{new Date(i.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                  <p className="text-[#666] text-xs">
+                    {i.opportunity_label ? `${i.opportunity_label} · ` : ''}{new Date(i.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
                 </div>
               </div>
+              {/* Was fetched but never shown -- the whole point of the
+                  message is telling the student what the employer's
+                  actually after before they accept or decline. */}
+              {i.message && <p className="text-[#ccc] text-sm leading-snug mb-3">{i.message}</p>}
               {i.status === 'pending' ? (
                 <div className="flex gap-2">
                   <button onClick={() => respond(i.id, 'accepted')} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white">
@@ -209,6 +253,29 @@ export default function StudentDiscoverPanel() {
             </div>
             ))
           })()
+        ) : tab === 'tracking' ? (
+          applications.length === 0 ? (
+            <EmptyState label="Nothing yet — apply to a role or accept an employer's interest to start tracking it here." icon={<LineChart className="w-8 h-8 text-[#333] mb-2" />} />
+          ) : applications.map(a => {
+            const meta = STAGE_META[a.stage as ApplicationStage]
+            return (
+              <div key={a.id} className="bg-[#1a1a1a] border border-white/[0.07] rounded-2xl p-4">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="w-9 h-9 rounded-xl bg-[#252525] flex items-center justify-center text-white font-bold text-[11px] flex-shrink-0">
+                    {initials(a.employer?.full_name)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-white font-bold text-sm truncate">{a.opportunity?.title || 'Direct interest'}</p>
+                    <p className="text-[#888] text-xs truncate">{a.employer?.full_name || 'An employer'}</p>
+                  </div>
+                  <span className="text-[11px] font-semibold px-3 py-1 rounded-full flex-shrink-0" style={{ backgroundColor: meta.bg, color: meta.text }}>
+                    {meta.label}
+                  </span>
+                </div>
+                <p className="text-[#555] text-xs">Updated {new Date(a.stage_updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+              </div>
+            )
+          })
         ) : (
           opportunities.length === 0 ? <EmptyState label={`No ${tab === 'job' ? 'jobs' : tab === 'apprenticeship' ? 'apprenticeships' : 'internships'} posted yet.`} icon={<Briefcase className="w-8 h-8 text-[#333] mb-2" />} /> : opportunities.map(o => {
             const status = applicationByOpp[o.id]
@@ -243,9 +310,15 @@ export default function StudentDiscoverPanel() {
                   <Clock className="w-3 h-3" /> Posted {new Date(o.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                 </div>
                 {status === 'pending' ? (
-                  <div className="w-full text-center py-2.5 rounded-full text-sm font-semibold bg-white/5 text-[#888]">
-                    {adult ? 'Applied — pending' : 'Applied — sent to your organisation'}
-                  </div>
+                  adult && stageByOpp[o.id] ? (
+                    <div className="w-full text-center py-2.5 rounded-full text-sm font-semibold" style={{ backgroundColor: STAGE_META[stageByOpp[o.id]].bg, color: STAGE_META[stageByOpp[o.id]].text }}>
+                      {STAGE_META[stageByOpp[o.id]].label}
+                    </div>
+                  ) : (
+                    <div className="w-full text-center py-2.5 rounded-full text-sm font-semibold bg-white/5 text-[#888]">
+                      {adult ? 'Applied — pending' : 'Applied — sent to your organisation'}
+                    </div>
+                  )
                 ) : status === 'accepted' ? (
                   <div className="flex items-center justify-center gap-1.5 w-full text-center py-2.5 rounded-full text-sm font-semibold bg-[#123a24] text-[#4ade80]">
                     <Check className="w-4 h-4" /> Accepted
