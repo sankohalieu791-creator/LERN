@@ -286,7 +286,7 @@ function LegalCard() {
     <Card icon={FileText} title="Legal">
       <div className="flex flex-col gap-2.5">
         <Link href="/legal/terms" className="text-[13px] font-semibold text-brand hover:underline">Terms of Service</Link>
-        <Link href="/legal/privacy" className="text-[13px] font-semibold text-brand hover:underline">Privacy Policy</Link>
+        <Link href="/legal/privacy" className="text-[13px] font-semibold text-brand hover:underline">Data Protection</Link>
         <Link href="/legal/safeguarding" className="text-[13px] font-semibold text-brand hover:underline">Safeguarding</Link>
       </div>
     </Card>

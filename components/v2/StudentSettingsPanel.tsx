@@ -252,7 +252,7 @@ export default function StudentSettingsPanel() {
 
       {/* ── 8. About and legal ── */}
       <Group title="About and legal">
-        <LinkRow label="Privacy Policy" href="/legal/privacy" />
+        <LinkRow label="Data Protection" href="/legal/privacy" />
         <LinkRow label="Cookie Policy" href="/legal/cookies" />
         <LinkRow label="Terms of Service" href="/legal/terms" />
         <LinkRow label="Public safeguarding summary" href="/legal/safeguarding" />
