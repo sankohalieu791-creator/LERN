@@ -366,6 +366,25 @@ export const getReviewQueue = async (organisationId: string) => {
   return { data, error }
 }
 
+// Lightweight counts for the mobile nav drawer's badges -- head:true
+// so it's a row count, not the actual rows, on every OrgShell mount.
+export const getPendingReviewCount = async (organisationId: string) => {
+  const { count, error } = await supabase
+    .from('submissions')
+    .select('id, work_items!inner(organisation_id)', { count: 'exact', head: true })
+    .eq('work_items.organisation_id', organisationId)
+    .eq('status', 'submitted')
+  return { count: count || 0, error }
+}
+
+export const getPendingInterestCount = async () => {
+  const { count, error } = await supabase
+    .from('interest')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'pending')
+  return { count: count || 0, error }
+}
+
 // Org staff, mid-review: a student's past review decisions across all
 // their submissions, for context on the submission currently open —
 // requires the reviews RLS widen in 2026-08-27-org-sections-build.sql

@@ -5,11 +5,27 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
-import { setSidebarCollapsed, setPresenceStatus, signOut, supabase } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight, Settings, User as UserIcon, Plus, LogOut } from 'lucide-react'
+import { setSidebarCollapsed, setPresenceStatus, signOut, supabase, getPendingReviewCount, getPendingInterestCount } from '@/lib/supabase'
+import { ChevronLeft, ChevronRight, Settings, User as UserIcon, Plus, LogOut, Menu, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import Logo from '@/components/v2/Logo'
 import NotificationsBell from '@/components/v2/NotificationsBell'
+
+function orgInitials(name?: string | null) {
+  if (!name) return 'LN'
+  return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
+}
+
+// "/institution" -> "Institution", "/provider" -> "Training provider",
+// "/employer" -> "Employer" -- derived from sections[0].href the same
+// way the Settings button already derives its own path, rather than
+// threading a new prop through every layout.tsx for one label.
+function roleLabelFromHref(href: string) {
+  if (href.startsWith('/institution')) return 'Institution'
+  if (href.startsWith('/provider')) return 'Training provider'
+  if (href.startsWith('/employer')) return 'Employer'
+  return ''
+}
 
 export interface NavItem { key: string; label: string; icon: LucideIcon; href: string }
 
@@ -20,14 +36,17 @@ const PRESENCE_DOT: Record<string, string> = {
 }
 
 // The shared shell for both organisation roles — collapsible sidebar on
-// laptop (state remembered server-side, not just localStorage), bottom
-// nav with a Plus on phone (Plus only exists on phone — posting to the
-// feed happens there, not on laptop, per the layout spec).
+// laptop (state remembered server-side, not just localStorage). Phone
+// is a Gmail-style layout now: a hamburger opens a slide-out drawer
+// (org identity, the full nav list with live badge counts, Settings
+// pinned after a divider) instead of a bottom tab bar, and posting is
+// a floating "+" in the bottom-right corner rather than embedded in a
+// nav row -- built from a direct reference screenshot, not guessed.
 export default function OrgShell({
   sections, phoneItems, children,
 }: {
   sections: NavItem[]
-  phoneItems: [NavItem, NavItem, NavItem] // feed, role-specific second item, dashboard — Plus and Profile are inserted around these
+  phoneItems: [NavItem, NavItem, NavItem] // feed, role-specific second item, dashboard — kept for the FAB's own destination
   children: React.ReactNode
 }) {
   const { user, refreshUser } = useAuth()
@@ -37,6 +56,9 @@ export default function OrgShell({
   const [collapsed, setCollapsed] = useState(false)
   const [orgName, setOrgName] = useState<string | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [reviewCount, setReviewCount] = useState(0)
+  const [interestCount, setInterestCount] = useState(0)
 
   useEffect(() => { setCollapsed(!!user?.sidebar_collapsed) }, [user?.sidebar_collapsed])
   useEffect(() => {
@@ -44,6 +66,17 @@ export default function OrgShell({
     supabase.from('organisations').select('name').eq('id', user.organisation_id).single()
       .then(({ data }) => setOrgName(data?.name ?? null))
   }, [user?.organisation_id])
+
+  // Badge counts are real, not decorative -- only fetched (and only
+  // rendered, see NAV_BADGES below) for the sections that actually
+  // have a matching count. No fabricated numbers on sections that
+  // don't have one (employer's nav has neither key today).
+  useEffect(() => {
+    if (!user?.organisation_id) return
+    if (sections.some(s => s.key === 'review')) getPendingReviewCount(user.organisation_id).then(({ count }) => setReviewCount(count))
+    if (sections.some(s => s.key === 'interest')) getPendingInterestCount().then(({ count }) => setInterestCount(count))
+  }, [user?.organisation_id])
+  const NAV_BADGES: Record<string, number> = { review: reviewCount, interest: interestCount }
 
   const toggleCollapsed = async () => {
     const next = !collapsed
@@ -101,15 +134,25 @@ export default function OrgShell({
       </aside>
 
       <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-        {/* ── Top bar ── */}
+        {/* ── Top bar ── phone gets a hamburger (opens the drawer) before
+            the wordmark, and no Settings gear -- Settings lives in the
+            drawer's own list instead, last item after a divider. */}
         <header className="flex items-center justify-between h-16 px-5 lg:px-8 border-b border-edge-subtle flex-shrink-0">
-          <div className="lg:hidden"><Logo size="sm" /></div>
+          <div className="flex items-center gap-1 lg:hidden">
+            <button
+              onClick={() => setDrawerOpen(true)} aria-label="Open menu"
+              className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition flex-shrink-0"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <Logo size="sm" />
+          </div>
           <div className="hidden lg:block text-[14px] font-semibold text-ink-secondary truncate">{orgName}</div>
           <div className="flex items-center gap-1">
             <NotificationsBell />
             <button
               aria-label="Settings" onClick={() => router.push(`${sections[0].href.split('/').slice(0, 2).join('/')}/settings`)}
-              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition"
+              className="hidden lg:flex w-9 h-9 items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition"
             >
               <Settings className="w-[18px] h-[18px]" />
             </button>
@@ -156,36 +199,91 @@ export default function OrgShell({
           </div>
         </header>
 
-        <main className="flex-1 min-h-0 overflow-y-auto bg-paper px-5 lg:px-10 py-7 pb-24 lg:pb-8">
+        <main className="flex-1 min-h-0 overflow-y-auto bg-paper px-5 lg:px-10 py-7 pb-8">
           {children}
         </main>
       </div>
 
-      {/* ── Phone bottom nav ── */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-edge-subtle flex items-center justify-around h-16 z-10">
-        <PhoneNavItem item={phoneItems[0]} active={isActive(phoneItems[0].href)} />
-        <PhoneNavItem item={phoneItems[1]} active={isActive(phoneItems[1].href)} />
-        <button
-          aria-label="Post" onClick={() => router.push(phoneItems[0].href)}
-          className="flex items-center justify-center text-ink-tertiary flex-shrink-0"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
-        <PhoneNavItem item={phoneItems[2]} active={isActive(phoneItems[2].href)} />
-        <button onClick={() => setProfileOpen(v => !v)} className={`flex flex-col items-center gap-0.5 ${profileOpen ? 'text-brand' : 'text-ink-tertiary'}`}>
-          <UserIcon className="w-5 h-5" />
-          <span className="text-[10px] font-semibold">Profile</span>
-        </button>
-      </nav>
-    </div>
-  )
-}
+      {/* ── Phone floating "+" -- Gmail-style: bottom-right, elevated
+          above content rather than reserving a row for it in a bottom
+          bar (there is no bottom bar any more; navigation moved into
+          the drawer). Same destination the old Plus button had --
+          posting happens on the Feed itself, not in a separate composer
+          here. safe-area-inset-bottom so it never sits under a phone's
+          own home-indicator/gesture bar. ── */}
+      <button
+        onClick={() => router.push(phoneItems[0].href)}
+        aria-label="New post"
+        className="lg:hidden fixed right-5 z-20 w-14 h-14 rounded-full bg-brand text-white shadow-lg flex items-center justify-center active:scale-95 transition"
+        style={{ bottom: 'calc(1.25rem + env(safe-area-inset-bottom))', boxShadow: '0 4px 14px rgba(0,0,0,0.35)' }}
+      >
+        <Plus className="w-6 h-6" />
+      </button>
 
-function PhoneNavItem({ item, active }: { item: NavItem; active: boolean }) {
-  return (
-    <Link href={item.href} className={`flex flex-col items-center gap-0.5 ${active ? 'text-brand' : 'text-ink-tertiary'}`}>
-      <item.icon className="w-5 h-5" />
-      <span className="text-[10px] font-semibold">{item.label}</span>
-    </Link>
+      {/* ── Phone nav drawer -- Gmail-style: org identity card, the
+          full section list (live badge counts, active item highlighted),
+          Settings last after a divider. Replaces the old bottom tab bar
+          entirely; direct 1:1 with the reference screenshot. ── */}
+      {drawerOpen && (
+        <div className="lg:hidden fixed inset-0 z-30 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} />
+          <div
+            className="relative w-[82%] max-w-[320px] h-full bg-surface flex flex-col overflow-y-auto"
+            style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
+            <div className="flex items-center justify-between px-5 pt-4 pb-1 flex-shrink-0">
+              <span className="text-brand font-bold text-lg tracking-tight">LERN</span>
+              <button onClick={() => setDrawerOpen(false)} aria-label="Close menu" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 px-5 py-4 flex-shrink-0">
+              <span className="w-12 h-12 rounded-2xl bg-accent-bg text-brand font-bold text-[15px] flex items-center justify-center flex-shrink-0">
+                {orgInitials(orgName)}
+              </span>
+              <div className="min-w-0">
+                <p className="text-[16px] font-bold text-ink truncate">{orgName || '—'}</p>
+                <p className="text-[13px] text-ink-tertiary">{roleLabelFromHref(sections[0]?.href || '')}</p>
+              </div>
+            </div>
+            <div className="border-t border-edge-subtle flex-shrink-0" />
+
+            <nav className="flex-1 px-3 py-2 space-y-0.5">
+              {sections.map(s => {
+                const active = isActive(s.href)
+                const badge = NAV_BADGES[s.key]
+                return (
+                  <Link
+                    key={s.key} href={s.href} onClick={() => setDrawerOpen(false)}
+                    className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-semibold transition ${
+                      active ? 'bg-accent-bg text-brand' : 'text-ink-secondary'
+                    }`}
+                  >
+                    <s.icon className="w-5 h-5 flex-shrink-0" />
+                    <span className="flex-1 truncate">{s.label}</span>
+                    {!!badge && (
+                      <span className="flex-shrink-0 min-w-[22px] text-center text-[11px] font-bold text-white bg-brand rounded-full px-[7px] py-[2px]">
+                        {badge}
+                      </span>
+                    )}
+                  </Link>
+                )
+              })}
+            </nav>
+
+            <div className="border-t border-edge-subtle flex-shrink-0" />
+            <div className="px-3 py-2 flex-shrink-0">
+              <button
+                onClick={() => { setDrawerOpen(false); router.push(`${sections[0].href.split('/').slice(0, 2).join('/')}/settings`) }}
+                className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-semibold text-ink-secondary transition"
+              >
+                <Settings className="w-5 h-5 flex-shrink-0" /> Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
