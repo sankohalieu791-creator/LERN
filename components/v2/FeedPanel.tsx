@@ -148,16 +148,19 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
 
       {/* ── MEDIA: full-bleed, edge to edge. A video is a thumbnail
           here (like tapping a YouTube thumbnail), not autoplaying
-          inline -- tapping opens the real full-screen player below. ── */}
+          inline -- tapping opens the real full-screen player below.
+          aspect-video (16:9), not a tall max-h-[520px] crop -- a
+          YouTube thumbnail card is short and wide, not a portrait
+          Instagram-style crop, which was "the feed card too tall". ── */}
       {(post.image_path || post.video_path) && (
         <div
-          className="relative w-full bg-[var(--app-surface-2)]" style={{ minHeight: 240 }}
+          className="relative w-full aspect-video bg-[var(--app-surface-2)]"
           onClick={() => post.video_path && mediaUrl && setPlayerOpen(true)}
         >
-          {!mediaUrl && <div className="absolute inset-0 bg-[var(--app-surface-2)] animate-pulse" style={{ height: 240 }} />}
+          {!mediaUrl && <div className="absolute inset-0 bg-[var(--app-surface-2)] animate-pulse" />}
           {mediaUrl && post.video_path ? (
             <>
-              <video src={mediaUrl} muted playsInline preload="metadata" className="w-full max-h-[520px] object-cover" />
+              <video src={mediaUrl} muted playsInline preload="metadata" className="absolute inset-0 w-full h-full object-cover" />
               <button aria-label="Play video" className="absolute inset-0 flex items-center justify-center bg-black/10">
                 <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center">
                   <Play className="w-6 h-6 text-[var(--app-text)] fill-white ml-0.5" />
@@ -165,7 +168,7 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
               </button>
             </>
           ) : mediaUrl ? (
-            <img src={mediaUrl} alt="" className="w-full max-h-[520px] object-cover" />
+            <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
           ) : null}
         </div>
       )}

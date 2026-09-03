@@ -9,7 +9,12 @@ import { ArrowLeft } from 'lucide-react'
 export default function LegalShell({ title, children }: { title: string; children: React.ReactNode }) {
   const router = useRouter()
   return (
-    <div className="min-h-screen bg-paper">
+    // paddingTop: env(safe-area-inset-top) -- missing entirely before,
+    // so on a standalone PWA the header sat right at the true top edge
+    // of the screen, under the status bar overlay ("the logo is all
+    // the way up"). Every other full-screen shell in the app already
+    // does this; this one just never had it.
+    <div className="min-h-screen bg-paper" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <header className="flex items-center justify-between px-6 lg:px-10 py-6">
         <Logo />
         {/* router.back() -- not a hardcoded href="/". That sent a

@@ -129,11 +129,11 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
             <p className="text-[13.5px] text-[var(--app-text-body)] leading-[1.5] mt-2.5" style={{ maxWidth: 300 }}>{profile.bio}</p>
           )}
 
-          <div className="flex items-center gap-3 mt-4">
+          <div className="flex items-center gap-3.5 mt-4">
             <Stat n={folderCount.verified} label="work" />
-            <span className="text-[var(--app-text)]/15">|</span>
+            <StatDivider />
             <Stat n={counts.followers} label="followers" />
-            <span className="text-[var(--app-text)]/15">|</span>
+            <StatDivider />
             <Stat n={counts.following} label="following" />
           </div>
 
@@ -220,14 +220,24 @@ export function Avatar({ path, name, size, textSize, variant = 'light' }: { path
   )
 }
 
-// TikTok-sized, not the earlier bolder/bigger treatment -- a compact
-// "n label" pair read horizontally, no divider lines around the row.
+// Bumped up from 13.5px -- read too small next to the rest of the
+// profile. Still a compact "n label" pair read horizontally, no
+// divider lines around the whole row (just the thin "|" between each
+// stat, see StatDivider).
 function Stat({ n, label }: { n: number; label: string }) {
   return (
-    <p className="text-[13.5px] leading-none">
+    <p className="text-[15px] leading-none">
       <span className="font-bold">{n}</span> <span className="text-[var(--app-text-secondary)]">{label}</span>
     </p>
   )
+}
+
+// A real 1px bar, not a "|" glyph -- the character itself renders
+// thicker than 1px at this size/weight in most fonts, which is what
+// "the line is too thick" actually was. This gives exact control over
+// its width regardless of font.
+function StatDivider() {
+  return <span className="w-px h-3 flex-shrink-0" style={{ backgroundColor: 'var(--app-text)', opacity: 0.15 }} />
 }
 
 // TikTok-style tab, not a navigate-away tile -- icon, label, count,
