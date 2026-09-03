@@ -4,29 +4,26 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
-  getFeed, getPublicFeed, setPostReaction, toggleLike, getSignedFileUrl, incrementPostViews, getPostsByAuthor,
-  reportPost, REPORT_REASONS,
+  getFeed, getPublicFeed, setPostReaction, getSignedFileUrl,
+  reportPost, getVerifiedAuthorIds,
+  getWins, createWin, reportWin, uploadPostImage,
 } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
-import { ThumbsUp, Play, X, PartyPopper, Award, Flame, Star, Eye, MoreHorizontal, EyeOff, Check } from 'lucide-react'
+import { MILESTONE_TYPES, MILESTONE_BY_KEY, REACTIONS_BY_MILESTONE, type MilestoneType } from '@/lib/feedConstants'
+import PostComposer from '@/components/v2/PostComposer'
+import {
+  X, MoreHorizontal, EyeOff, Check, Camera, BadgeCheck, Plus,
+} from 'lucide-react'
 
-// Feed, LinkedIn-modelled per direct feedback: distinct post "cards"
-// separated by a real gap (page background showing through between
-// them), not edge-to-edge Instagram-style touching each other with
-// only a hairline divider -- each card still spans the full screen
-// width itself (touches both side edges), media is full-width WITHIN
-// that card. ThumbsUp for the like (LinkedIn's own icon), not a heart.
-// Reactions were raw emoji (🎉👏🔥⭐) -- flagged as "confusing, needs
-// to be professional" for a platform employers and institutions also
-// use. Same four concepts, drawn as real icons instead.
-const ALL_REACTIONS: { key: ReactionType; label: string; icon: any }[] = [
-  { key: 'congratulations', label: 'Celebrate', icon: PartyPopper },
-  { key: 'well_done', label: 'Well done', icon: Award },
-  { key: 'keep_going', label: 'Keep going', icon: Flame },
-  { key: 'proud', label: 'Proud', icon: Star },
-]
-const REACTION_BY_KEY = Object.fromEntries(ALL_REACTIONS.map(r => [r.key, r]))
-
+// Build Spec: The Feed (Wins strip, milestone posts) v2.0, 2 September
+// 2026 -- supersedes the earlier LinkedIn-style layout entirely.
+// Achievement, not entertainment: text-and-picture posts only (no
+// video anywhere -- the old tap-to-open video player and camera/
+// record composer are gone on purpose, not an oversight), reactions
+// instead of open comments, and a Wins strip of expiring achievement
+// stories on top. Reporting is unchanged -- same report -> auto-hide
+// -> human-review flow as before, just carried over onto the new
+// card shape.
 function timeAgo(dateStr: string) {
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
   if (diff < 60) return 'just now'
@@ -39,109 +36,320 @@ function initials(name?: string) {
   if (!name) return '?'
   return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
 }
+function firstName(name?: string) {
+  return name?.split(' ')[0] || 'Someone'
+}
 
 export default function FeedPanel() {
   const { user } = useAuth()
   const [posts, setPosts] = useState<any[]>([])
+  const [verifiedAuthors, setVerifiedAuthors] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [composerOpen, setComposerOpen] = useState(false)
   const exploring = !user?.organisation_id
 
   const load = () => {
-    (exploring ? getPublicFeed() : getFeed(user!.organisation_id!)).then(({ data }) => { setPosts(data || []); setLoading(false) })
+    (exploring ? getPublicFeed() : getFeed(user!.organisation_id!)).then(({ data }) => {
+      const rows = data || []
+      setPosts(rows)
+      setLoading(false)
+      const authorIds = Array.from(new Set(rows.map((p: any) => p.author_id).filter(Boolean)))
+      if (authorIds.length) getVerifiedAuthorIds(authorIds).then(({ data: ids }) => setVerifiedAuthors(new Set(ids)))
+    })
   }
   useEffect(load, [user?.organisation_id])
 
   if (loading) {
     return (
       <div className="px-4 py-4 space-y-4">
-        {[0, 1].map(i => <div key={i} className="h-[340px] rounded-xl bg-[var(--app-surface)] animate-pulse" />)}
-      </div>
-    )
-  }
-
-  if (posts.length === 0) {
-    return (
-      <div className="flex flex-col items-center text-center py-20 px-6">
-        <p className="font-semibold text-[var(--app-text)] text-[15px] mb-1">Nothing here yet</p>
-        <p className="text-[13px] text-[var(--app-text-tertiary)]">
-          {exploring ? 'Public educational content will show up here.' : "Your organisation's posts will show up here."}
-        </p>
+        {[0, 1].map(i => <div key={i} className="h-[220px] rounded-[14px] bg-[var(--app-surface)] animate-pulse" />)}
       </div>
     )
   }
 
   return (
-    <div className="space-y-2 pb-2">
+    <div className="pb-2">
+      {user?.organisation_id && <WinsStrip userId={user.id} organisationId={user.organisation_id} />}
+
+      {user?.organisation_id && (
+        <div className="px-4 mb-4">
+          <button
+            onClick={() => setComposerOpen(true)}
+            className="w-full flex items-center gap-3 rounded-[14px] border px-[14px] py-3 transition"
+            style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+          >
+            <span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+              {initials(user?.full_name)}
+            </span>
+            <span className="flex-1 text-left text-[13.5px]" style={{ color: '#8A8A8A' }}>Share a win or an update…</span>
+            <Camera className="w-[18px] h-[18px] flex-shrink-0" style={{ color: '#F26B21' }} />
+          </button>
+        </div>
+      )}
+
       {exploring && (
-        <div className="bg-[var(--app-surface)] border-b border-[var(--app-border)] px-4 py-3">
+        <div className="px-4 mb-4">
           <p className="text-[12.5px] text-[var(--app-text-secondary)]">
             You're seeing public educational content only — link to your organisation in My Work to see everything.
           </p>
         </div>
       )}
-      {posts.map(p => <PostCard key={p.id} post={p} onChanged={load} />)}
+
+      {posts.length === 0 ? (
+        <div className="flex flex-col items-center text-center py-20 px-6">
+          <p className="font-semibold text-[var(--app-text)] text-[15px] mb-1">Nothing here yet</p>
+          <p className="text-[13px] text-[var(--app-text-tertiary)]">
+            {exploring ? 'Public educational content will show up here.' : "Your organisation's milestones will show up here."}
+          </p>
+        </div>
+      ) : (
+        <div className="px-4 space-y-4">
+          {posts.map(p => <PostCard key={p.id} post={p} verified={verifiedAuthors.has(p.author_id)} onChanged={load} />)}
+        </div>
+      )}
+
+      {composerOpen && (
+        <PostComposer onClose={() => setComposerOpen(false)} onPosted={() => { setComposerOpen(false); load() }} />
+      )}
     </div>
   )
 }
 
-function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
+// ── Wins strip -- achievements only, expires like a story (see
+// getWins: last 2 days, client-side window, nothing stored as an
+// expiry and nothing accumulates into a permanent highlight reel). ──
+function WinsStrip({ userId, organisationId }: { userId: string; organisationId: string }) {
+  const { user } = useAuth()
+  const [wins, setWins] = useState<any[]>([])
+  const [addOpen, setAddOpen] = useState(false)
+  const [viewing, setViewing] = useState<any | null>(null)
+
+  const load = () => { getWins(organisationId).then(({ data }) => setWins(data || [])) }
+  useEffect(load, [organisationId])
+
+  return (
+    <div className="pt-3 pb-1">
+      <p className="text-[12px] font-semibold px-4 mb-2.5" style={{ color: '#5A5A5A', letterSpacing: '0.04em' }}>WINS THIS WEEK</p>
+      <div className="flex gap-3.5 overflow-x-auto px-4 pb-0.5" style={{ scrollbarWidth: 'none' }}>
+        <button onClick={() => setAddOpen(true)} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 60 }}>
+          <span className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 54, height: 54, border: '3px solid #F26B21' }}>
+            <span className="w-full h-full rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--app-overlay-2)' }}>
+              <Plus className="w-5 h-5" style={{ color: '#F26B21' }} />
+            </span>
+          </span>
+          <span className="text-[11px] truncate w-full text-center" style={{ color: '#5A5A5A' }}>Add win</span>
+        </button>
+
+        {wins.map(w => {
+          const meta = MILESTONE_BY_KEY[w.milestone_type as MilestoneType]
+          return (
+            <button key={w.id} onClick={() => setViewing(w)} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 60 }}>
+              <span className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 54, height: 54, border: `3px solid ${meta?.ring || '#0F6E56'}` }}>
+                <span className="w-full h-full rounded-full flex items-center justify-center text-[13px] font-semibold" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+                  {initials(w.author?.full_name)}
+                </span>
+              </span>
+              <span className="text-[11px] truncate w-full text-center" style={{ color: '#5A5A5A' }}>{firstName(w.author?.full_name)}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex items-center gap-3.5 px-4 mt-2.5 mb-1">
+        <Legend color="#0F6E56" label="Verified" />
+        <Legend color="#E0A94B" label="Interview" />
+        <Legend color="#F26B21" label="New job" />
+      </div>
+
+      {addOpen && (
+        <AddWinSheet
+          userId={userId} organisationId={organisationId}
+          onClose={() => setAddOpen(false)}
+          onAdded={() => { setAddOpen(false); load() }}
+        />
+      )}
+      {viewing && (
+        <WinViewer
+          win={viewing} isOwn={viewing.author_id === user?.id} organisationId={organisationId} userId={userId}
+          onClose={() => setViewing(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5 text-[11px]" style={{ color: '#8A8A8A' }}>
+      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} /> {label}
+    </span>
+  )
+}
+
+// "Tapping Add win opens a simple sheet: pick a milestone type, then
+// add a short line (5 seconds, like a quick story)."
+function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
+  userId: string; organisationId: string; onClose: () => void; onAdded: () => void
+}) {
+  const [type, setType] = useState<MilestoneType | null>(null)
+  const [content, setContent] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [posting, setPosting] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const submit = async () => {
+    if (!type) return
+    setPosting(true)
+    let image_path: string | undefined
+    if (file) {
+      const { path } = await uploadPostImage(userId, file)
+      image_path = path || undefined
+    }
+    await createWin(userId, organisationId, { milestone_type: type, content: content.trim() || undefined, image_path })
+    setPosting(false)
+    onAdded()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center bg-black/50" onClick={onClose}>
+      <div
+        className="w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl px-5 pt-5 pb-6"
+        style={{ backgroundColor: 'var(--app-surface)', paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {!type ? (
+          <>
+            <p className="text-[16px] font-bold text-[var(--app-text)] mb-4">Add a win</p>
+            <div className="space-y-2">
+              {MILESTONE_TYPES.map(m => (
+                <button
+                  key={m.key} onClick={() => setType(m.key)}
+                  className="w-full flex items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition"
+                  style={{ borderColor: 'var(--app-border)' }}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: m.ring }} />
+                  <span className="text-[13.5px] text-[var(--app-text)]">{m.sheetLabel}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <button onClick={() => setType(null)} className="text-[13px] font-semibold mb-3" style={{ color: 'var(--app-text-secondary)' }}>← Change type</button>
+            <p className="text-[15px] font-bold text-[var(--app-text)] mb-3">{MILESTONE_BY_KEY[type].sheetLabel}</p>
+            <textarea
+              value={content} onChange={e => setContent(e.target.value)}
+              placeholder="Add a short line (optional)" rows={2}
+              className="w-full bg-[var(--app-overlay-2)] border rounded-xl px-3.5 py-2.5 text-[13px] text-[var(--app-text)] placeholder:text-[var(--app-text-tertiary)] outline-none resize-none mb-3"
+              style={{ borderColor: 'var(--app-border)' }}
+            />
+            {previewUrl && <img src={previewUrl} alt="" className="w-full h-32 object-cover rounded-lg mb-3" />}
+            <button onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 text-[13px] font-semibold mb-4" style={{ color: '#F26B21' }}>
+              <Camera className="w-4 h-4" /> {file ? 'Change photo' : 'Add a photo (optional)'}
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => {
+              const f = e.target.files?.[0]
+              if (f) { setFile(f); setPreviewUrl(URL.createObjectURL(f)) }
+            }} />
+            <button
+              onClick={submit} disabled={posting}
+              className="w-full text-white font-semibold text-[14px] py-3 rounded-xl disabled:opacity-50 transition"
+              style={{ backgroundColor: '#F26B21' }}
+            >
+              {posting ? 'Sharing…' : 'Share win'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// A win's own short card, full-screen, tap to close -- a story, not a
+// permanent post. No reactions here (that's the post card's thing);
+// still reportable, same as everything else on the feed.
+function WinViewer({ win, isOwn, organisationId, userId, onClose }: {
+  win: any; isOwn: boolean; organisationId: string; userId: string; onClose: () => void
+}) {
+  const [imgUrl, setImgUrl] = useState<string | null>(null)
+  const [reportOpen, setReportOpen] = useState(false)
+  const meta = MILESTONE_BY_KEY[win.milestone_type as MilestoneType]
+
+  useEffect(() => {
+    if (win.image_path) getSignedFileUrl('post-images', win.image_path).then(({ url }) => setImgUrl(url))
+  }, [win.image_path])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col"
+      style={{ background: `linear-gradient(160deg, ${meta?.ring || '#0F6E56'}, #1A1613)`, paddingTop: 'env(safe-area-inset-top)' }}
+      onClick={onClose}
+    >
+      <div className="flex items-center justify-end gap-1 px-4 flex-shrink-0" style={{ paddingTop: '1rem' }}>
+        {!isOwn && (
+          <button onClick={e => { e.stopPropagation(); setReportOpen(true) }} aria-label="Report this win" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white">
+            <MoreHorizontal className="w-[18px] h-[18px]" />
+          </button>
+        )}
+        <button onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center px-8 text-center text-white" onClick={e => e.stopPropagation()}>
+        <span className="w-16 h-16 rounded-full flex items-center justify-center text-[20px] font-bold mb-4" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
+          {initials(win.author?.full_name)}
+        </span>
+        <p className="font-bold text-[16px] mb-1.5">{win.author?.full_name}</p>
+        <span className="text-[11.5px] font-semibold px-3 py-1 rounded-full mb-5" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>{meta?.pillLabel}</span>
+        {win.content && <p className="text-[18px] leading-snug mb-5 max-w-xs">{win.content}</p>}
+        {imgUrl && <img src={imgUrl} alt="" className="max-h-[280px] max-w-full rounded-2xl object-cover" />}
+      </div>
+
+      {reportOpen && (
+        <div onClick={e => e.stopPropagation()}>
+          <ReportSheet
+            onClose={() => setReportOpen(false)}
+            onSent={() => { setReportOpen(false); onClose() }}
+            onSend={(reasonKey, note) => reportWin(win.id, organisationId, userId, reasonKey, note)}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PostCard({ post, verified, onChanged }: { post: any; verified: boolean; onChanged: () => void }) {
   const { user } = useAuth()
   const router = useRouter()
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
-  const [playerOpen, setPlayerOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
-  const viewedRef = useRef(false)
-
   const reactions: any[] = post.post_reactions || []
-  const likes: any[] = post.post_likes || []
   const myReaction = reactions.find(r => r.user_id === user?.id)?.reaction as ReactionType | undefined
-  const liked = likes.some(l => l.user_id === user?.id)
-
-  // Falls back to the first 2 of the full set for any post created
-  // before this -- sticker_choices is null on those, never an empty
-  // pick, so there's always something to react with.
-  const stickers = (post.sticker_choices && post.sticker_choices.length > 0
-    ? post.sticker_choices.map((k: string) => REACTION_BY_KEY[k]).filter(Boolean)
-    : ALL_REACTIONS.slice(0, 2)) as typeof ALL_REACTIONS
+  const meta = post.milestone_type ? MILESTONE_BY_KEY[post.milestone_type as MilestoneType] : null
+  const options = REACTIONS_BY_MILESTONE[post.milestone_type || 'default'] || REACTIONS_BY_MILESTONE.default
 
   useEffect(() => {
     if (post.image_path) getSignedFileUrl('post-images', post.image_path).then(({ url }) => setMediaUrl(url))
-    else if (post.video_path) getSignedFileUrl('post-videos', post.video_path).then(({ url }) => setMediaUrl(url))
-  }, [post.image_path, post.video_path])
+  }, [post.image_path])
 
-  useEffect(() => {
-    if (viewedRef.current) return
-    viewedRef.current = true
-    incrementPostViews(post.id)
-  }, [post.id])
-
-  const react = async (key: ReactionType) => {
+  const react = async (key: string) => {
     if (!user) return
-    await setPostReaction(post.id, user.id, myReaction === key ? null : key)
-    onChanged()
-  }
-
-  const like = async () => {
-    if (!user) return
-    await toggleLike(post.id, user.id, !liked)
+    await setPostReaction(post.id, user.id, myReaction === key ? null : (key as ReactionType))
     onChanged()
   }
 
   // Auto-hide is instant and protective, but it is NEVER a decision
-  // against the person who posted -- the state is neutral, not an
-  // accusation, and worded that way for every viewer including the
-  // author themselves (the only person besides org staff who can even
-  // still see this row at all -- getFeed/getPublicFeed rely on RLS to
-  // keep it from reaching anyone else). Nothing else about the post
-  // renders while it's in this state. This has to come after every
-  // hook above, not as an early return before them -- the same
-  // PostCard instance (same key=post.id) can go from hidden back to
-  // not-hidden across a reload once staff restores it, and an early
-  // return before hooks would skip calling the effects below on some
-  // renders and not others, which breaks React's rules of hooks.
+  // against the person who posted -- neutral wording, shown to
+  // whoever can still see the row at all (the author, or org staff --
+  // RLS keeps it from reaching anyone else). Unchanged from before;
+  // only the card shape around it changed.
   if (post.hidden) {
     return (
-      <div className="bg-[var(--app-surface)] px-4 py-6 flex flex-col items-center text-center gap-2">
+      <div
+        className="rounded-[14px] border px-4 py-6 flex flex-col items-center text-center gap-2"
+        style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+      >
         <EyeOff className="w-5 h-5" style={{ color: 'var(--app-text-tertiary)' }} />
         <p className="text-[13px] font-semibold text-[var(--app-text)]">This post has been hidden while it is checked by a person.</p>
         <p className="text-[12px]" style={{ color: 'var(--app-text-tertiary)' }}>Hidden automatically after being reported. Nothing has been decided yet.</p>
@@ -150,97 +358,74 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
   }
 
   return (
-    <div className="bg-[var(--app-surface)]">
-      {/* ── AUTHOR ROW -- tapping opens their profile, own view if it's
-          you, public view otherwise. "···" opens the report sheet --
-          not shown on your own post, you can't report yourself. ── */}
-      <div className="flex items-center justify-between pl-4 pr-2.5 pt-3.5 pb-2.5">
+    <div className="rounded-[14px] border overflow-hidden" style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
+      {meta && <div className="h-[5px]" style={{ background: 'linear-gradient(to right, #F26B21, #E0A94B)' }} />}
+
+      <div className="flex items-start justify-between gap-2 px-4 pt-3.5 pb-2.5">
         <button
           onClick={() => router.push(post.author_id === user?.id ? '/student/profile' : `/student/profile/${post.author_id}`)}
           className="flex-1 min-w-0 flex items-center gap-2.5 text-left"
         >
-          <span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+          <span className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
             {initials(post.author_name)}
           </span>
           <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-[var(--app-text)] truncate">{post.author_name}</p>
-            <p className="text-[11px] flex items-center gap-1" style={{ color: 'var(--app-text-secondary)' }}>
-              {[post.category, timeAgo(post.created_at)].filter(Boolean).join(' · ')}
-              {typeof post.views_count === 'number' && (
-                <span className="flex items-center gap-0.5">· <Eye className="w-3 h-3" /> {post.views_count}</span>
-              )}
+            <p className="flex items-center gap-1 text-[13px] font-semibold text-[var(--app-text)] truncate">
+              {post.author_name}
+              {verified && <BadgeCheck className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#0F6E56' }} />}
             </p>
+            <p className="text-[11px]" style={{ color: '#5A5A5A' }}>{timeAgo(post.created_at)}</p>
           </div>
         </button>
-        {post.author_id !== user?.id && (
-          <button onClick={() => setReportOpen(true)} aria-label="Report this post" className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition">
-            <MoreHorizontal className="w-[18px] h-[18px]" style={{ color: 'var(--app-text-tertiary)' }} />
-          </button>
-        )}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {meta && (
+            <span className="text-[11px] font-semibold px-[10px] py-[3px] rounded-full whitespace-nowrap" style={{ backgroundColor: meta.pillBg, color: meta.pillText }}>
+              {meta.pillLabel}
+            </span>
+          )}
+          {post.author_id !== user?.id && (
+            <button onClick={() => setReportOpen(true)} aria-label="Report this post" className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition">
+              <MoreHorizontal className="w-4 h-4" style={{ color: 'var(--app-text-tertiary)' }} />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* ── MEDIA: full-bleed, edge to edge. A video is a thumbnail
-          here (like tapping a YouTube thumbnail), not autoplaying
-          inline -- tapping opens the real full-screen player below.
-          aspect-video (16:9), not a tall max-h-[520px] crop -- a
-          YouTube thumbnail card is short and wide, not a portrait
-          Instagram-style crop, which was "the feed card too tall". ── */}
-      {(post.image_path || post.video_path) && (
-        <div
-          className="relative w-full aspect-video bg-[var(--app-surface-2)]"
-          onClick={() => post.video_path && mediaUrl && setPlayerOpen(true)}
-        >
-          {!mediaUrl && <div className="absolute inset-0 bg-[var(--app-surface-2)] animate-pulse" />}
-          {mediaUrl && post.video_path ? (
-            <>
-              <video src={mediaUrl} muted playsInline preload="metadata" className="absolute inset-0 w-full h-full object-cover" />
-              <button aria-label="Play video" className="absolute inset-0 flex items-center justify-center bg-black/10">
-                <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center">
-                  <Play className="w-6 h-6 text-[var(--app-text)] fill-white ml-0.5" />
-                </div>
-              </button>
-            </>
-          ) : mediaUrl ? (
-            <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-          ) : null}
-        </div>
-      )}
-
-      {/* ── CAPTION ── */}
       {(post.title || post.content) && (
-        <div className="px-4 pt-3">
-          {post.title && <p className="text-[13px] font-semibold text-[var(--app-text)] leading-[1.5] mb-0.5">{post.title}</p>}
-          {post.content && <p className="text-[13px] text-[var(--app-text-body)] leading-[1.5]">{post.content}</p>}
+        <div className="px-4 pb-3">
+          {post.title && <p className="text-[14px] font-semibold text-[var(--app-text)] leading-[1.55] mb-0.5">{post.title}</p>}
+          {post.content && <p className="text-[14px] text-[var(--app-text-body)] leading-[1.55]">{post.content}</p>}
         </div>
       )}
 
-      {/* ── LIKE (left) + up to 2 chosen stickers (right) ── */}
-      <div className="flex items-center justify-between px-4 py-3.5">
-        <button onClick={like} className="flex items-center gap-1.5 active:scale-90 transition-transform">
-          <ThumbsUp className="w-5 h-5" fill={liked ? '#F26B21' : 'none'} color={liked ? '#F26B21' : 'var(--app-text-secondary)'} strokeWidth={1.75} />
-          {likes.length > 0 && <span className="text-[13px] font-semibold" style={{ color: liked ? '#F26B21' : 'var(--app-text-secondary)' }}>{likes.length}</span>}
-        </button>
-        <div className="flex items-center gap-1.5">
-          {stickers.map(r => (
+      {/* Medium, not edge-to-edge huge and not a thumbnail -- pinned to
+          ~210px regardless of the source image's own aspect ratio. */}
+      {post.image_path && (
+        <div className="relative w-full bg-[var(--app-surface-2)]" style={{ height: 210 }}>
+          {!mediaUrl && <div className="absolute inset-0 animate-pulse" style={{ backgroundColor: 'var(--app-surface-2)' }} />}
+          {mediaUrl && <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2 px-4 py-3.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {options.map(r => (
             <button
               key={r.key} onClick={() => react(r.key)} title={r.label}
-              className="flex items-center gap-1 rounded-full border transition"
+              className="flex items-center gap-1.5 rounded-full border transition"
               style={{
-                borderColor: myReaction === r.key ? '#F26B21' : 'var(--app-overlay-2)',
-                backgroundColor: myReaction === r.key ? 'rgba(242,107,33,0.12)' : 'var(--app-surface-2)',
-                padding: '5px 10px',
+                borderColor: myReaction === r.key ? '#F26B21' : '#E7E4DE',
+                backgroundColor: myReaction === r.key ? 'rgba(242,107,33,0.1)' : '#F7F5F0',
+                padding: '6px 12px',
               }}
             >
-              <r.icon className="w-3.5 h-3.5" style={{ color: myReaction === r.key ? '#F26B21' : 'var(--app-text-secondary)' }} />
+              <span className="text-[13px] leading-none">{r.emoji}</span>
+              <span className="text-[12px] font-medium leading-none" style={{ color: myReaction === r.key ? '#F26B21' : '#5A5A5A' }}>{r.label}</span>
             </button>
           ))}
-          {reactions.length > 0 && <span className="text-[12px] ml-1" style={{ color: 'var(--app-text-secondary)' }}>{reactions.length}</span>}
         </div>
+        {reactions.length > 0 && <span className="text-[12px] flex-shrink-0" style={{ color: '#5A5A5A' }}>{reactions.length}</span>}
       </div>
-
-      {playerOpen && mediaUrl && (
-        <VideoPlayerOverlay initialPost={post} initialUrl={mediaUrl} onClose={() => setPlayerOpen(false)} />
-      )}
 
       {reportOpen && (
         <ReportSheet
@@ -255,14 +440,19 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
 
 // Stage 1 of report -> auto-hide -> human review. Plain, single-choice
 // reasons a young person can understand, an optional note, and a
-// quiet safety line -- reporting a post is not the place to handle an
-// actual emergency, so it says so directly rather than leaving that
-// unstated.
+// quiet safety line. Shared by posts and wins -- only the onSend
+// callback differs.
 function ReportSheet({ onClose, onSend, onSent }: {
   onClose: () => void
   onSend: (reasonKey: string, note: string) => Promise<{ error: any }>
   onSent: () => void
 }) {
+  const REPORT_REASONS = [
+    { key: 'bullying', label: 'It is bullying or unkind' },
+    { key: 'inappropriate', label: 'It is inappropriate or upsetting' },
+    { key: 'not_real', label: 'It is not real, or not their work' },
+    { key: 'other', label: 'Something else' },
+  ]
   const [reasonKey, setReasonKey] = useState<string>(REPORT_REASONS[0].key)
   const [note, setNote] = useState('')
   const [sending, setSending] = useState(false)
@@ -279,8 +469,8 @@ function ReportSheet({ onClose, onSend, onSent }: {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center bg-black/50" onClick={onClose}>
       <div
-        className="w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl bg-[var(--app-surface)] px-5 pt-5 pb-6"
-        style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+        className="w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl px-5 pt-5 pb-6"
+        style={{ backgroundColor: 'var(--app-surface)', paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
         onClick={e => e.stopPropagation()}
       >
         <p className="text-[16px] font-bold text-[var(--app-text)] mb-1">Report this post</p>
@@ -322,80 +512,5 @@ function ReportSheet({ onClose, onSend, onSent }: {
         </p>
       </div>
     </div>
-  )
-}
-
-// YouTube-style: tap a video, it opens fullscreen -- but what's listed
-// below the player is only ever THIS author's other videos, not an
-// algorithmic mix of everyone else's the way YouTube's own "up next"
-// would be ("underneath you'll see the videos of that person only").
-// Player chrome stays fixed black regardless of theme on purpose --
-// same convention as YouTube's own fullscreen player, or PostComposer's
-// camera screens: a video surface, not a themed page.
-function VideoPlayerOverlay({ initialPost, initialUrl, onClose }: { initialPost: any; initialUrl: string; onClose: () => void }) {
-  const router = useRouter()
-  const [activePost, setActivePost] = useState(initialPost)
-  const [activeUrl, setActiveUrl] = useState(initialUrl)
-  const [more, setMore] = useState<any[]>([])
-
-  useEffect(() => {
-    getPostsByAuthor(activePost.author_id, activePost.id).then(({ data }) => setMore(data || []))
-  }, [activePost.author_id, activePost.id])
-
-  const playOther = async (p: any) => {
-    const { url } = await getSignedFileUrl('post-videos', p.video_path)
-    if (url) { setActivePost(p); setActiveUrl(url) }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col overflow-y-auto overscroll-contain" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <button onClick={onClose} className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-black/50 flex items-center justify-center" style={{ marginTop: 'env(safe-area-inset-top)' }}>
-        <X className="w-5 h-5 text-white" />
-      </button>
-      <div className="w-full flex items-center justify-center bg-black flex-shrink-0">
-        <video key={activePost.id} src={activeUrl} controls autoPlay playsInline className="max-h-[65vh] max-w-full" />
-      </div>
-
-      <button
-        onClick={() => router.push(activePost.author_id ? `/student/profile/${activePost.author_id}` : '/student/profile')}
-        className="w-full flex items-center gap-2.5 px-4 py-3 flex-shrink-0 text-left"
-      >
-        <span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
-          {initials(activePost.author_name)}
-        </span>
-        <div className="min-w-0">
-          <p className="text-white text-[13px] font-semibold truncate">{activePost.author_name}</p>
-          {(activePost.title || activePost.content) && <p className="text-white/60 text-[12px] mt-0.5 line-clamp-2">{activePost.title || activePost.content}</p>}
-        </div>
-      </button>
-
-      {more.length > 0 && (
-        <div className="px-4 pb-8 flex-1">
-          <p className="text-white/40 text-[11px] font-bold uppercase tracking-wide mb-2 mt-1">More from {activePost.author_name}</p>
-          <div className="space-y-2">
-            {more.map(p => <MoreFromAuthorRow key={p.id} post={p} onPlay={() => playOther(p)} />)}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function MoreFromAuthorRow({ post, onPlay }: { post: any; onPlay: () => void }) {
-  const [thumb, setThumb] = useState<string | null>(null)
-  useEffect(() => { if (post.video_path) getSignedFileUrl('post-videos', post.video_path).then(({ url }) => setThumb(url)) }, [post.video_path])
-  return (
-    <button onClick={onPlay} className="w-full flex items-center gap-3 bg-white/5 rounded-xl p-2 text-left">
-      <div className="relative w-24 h-16 rounded-lg overflow-hidden bg-white/10 flex-shrink-0">
-        {thumb && <video src={thumb} className="w-full h-full object-cover" muted preload="metadata" />}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-          <Play className="w-5 h-5 text-white fill-white" />
-        </div>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-white text-[13px] font-medium line-clamp-2">{post.title || post.content || 'Untitled'}</p>
-        <p className="text-white/50 text-[11px] mt-0.5">{timeAgo(post.created_at)}</p>
-      </div>
-    </button>
   )
 }

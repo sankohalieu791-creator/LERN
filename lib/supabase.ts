@@ -687,7 +687,7 @@ export const uploadPostVideo = async (userId: string, file: File | Blob, ext: st
 
 export const createPost = async (
   organisationId: string, authorId: string,
-  fields: { content?: string; image_path?: string; video_path?: string; visibility?: 'organisation' | 'public'; sticker_choices?: string[] }
+  fields: { content?: string; image_path?: string; video_path?: string; visibility?: 'organisation' | 'public'; sticker_choices?: string[]; milestone_type?: string | null }
 ) => {
   const { data, error } = await supabase
     .from('posts')
@@ -700,6 +700,56 @@ export const createPost = async (
 export const deletePost = async (postId: string) => {
   const { error } = await supabase.from('posts').delete().eq('id', postId)
   return { error }
+}
+
+// ── Wins strip (Feed v2.0) -- ephemeral, achievement-only, expires
+// like a story. Same org-or-public visibility model as posts, but
+// scoped to roughly the last two days client-side rather than a
+// stored expiry -- nothing here is meant to accumulate into a
+// permanent highlight reel. ──
+export const createWin = async (
+  authorId: string, organisationId: string,
+  fields: { milestone_type: string; content?: string; image_path?: string; visibility?: 'organisation' | 'public' }
+) => {
+  const { data, error } = await supabase
+    .from('wins')
+    .insert([{ author_id: authorId, organisation_id: organisationId, visibility: 'organisation', ...fields }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+// The green tick beside a post author's name -- "verified" means this
+// person has at least one live (non-revoked) piece of verified work,
+// not that this specific post is a verification milestone. Batch-
+// checked once per Feed load across every distinct author showing.
+export const getVerifiedAuthorIds = async (authorIds: string[]) => {
+  if (authorIds.length === 0) return { data: [] as string[], error: null }
+  const { data, error } = await supabase
+    .from('verifications')
+    .select('submissions!inner(student_id)')
+    .is('revoked_at', null)
+    .in('submissions.student_id', authorIds)
+  if (error || !data) return { data: [], error }
+  return { data: Array.from(new Set((data as any[]).map(v => v.submissions?.student_id).filter(Boolean))), error: null }
+}
+
+export const reportWin = async (winId: string, organisationId: string | null, reporterId: string, reasonKey: string, note: string) => {
+  const reasonLabel = REPORT_REASONS.find(r => r.key === reasonKey)?.label || 'Something else'
+  const reason = note.trim() ? `${reasonLabel} — ${note.trim()}` : reasonLabel
+  return submitReport(reporterId, organisationId, 'win', reason, winId)
+}
+
+export const getWins = async (organisationId: string) => {
+  const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+  const { data, error } = await supabase
+    .from('wins')
+    .select('*, author:users!wins_author_id_fkey(full_name)')
+    .or(`organisation_id.eq.${organisationId},visibility.eq.public`)
+    .eq('hidden', false)
+    .gte('created_at', cutoff)
+    .order('created_at', { ascending: false })
+  return { data, error }
 }
 
 // One reaction per user per post — upsert swaps it if they tap a
@@ -897,7 +947,7 @@ export const setCookieConsent = async (userId: string, analytics: boolean) => {
 // ── Reporting ───────────────────────────────────────────────────
 export const submitReport = async (
   reporterId: string, organisationId: string | null,
-  targetType: 'post' | 'user' | 'submission' | 'general', reason: string, targetId?: string
+  targetType: 'post' | 'user' | 'submission' | 'general' | 'win', reason: string, targetId?: string
 ) => {
   const { data, error } = await supabase
     .from('reports')
