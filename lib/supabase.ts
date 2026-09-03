@@ -1550,20 +1550,24 @@ export const getStudentsAdultStatus = async (studentIds: string[]): Promise<Reco
 // ── Guest employer invite (Type 1 — org-invited, scoped to one
 // student, no browsing beyond what's explicitly shared) ──────────
 
-// Org staff: create an invite scoped to one student, in one step —
-// there's no reason to split "create the invite" from "pick who it's
-// for" into two screens for the simple, most-common case.
-export const createGuestInviteForStudent = async (organisationId: string, createdBy: string, studentId: string) => {
+// Org staff: create an invite scoped to one OR MORE students, in one
+// step. guest_invite_shares is a one-invite-to-many-students join
+// table -- "the common case is one student; a role with several
+// candidates can include a few, without creating separate links."
+// employer_email is optional metadata (who to send the link to) --
+// it does not itself send anything, the org still copies/shares the
+// link today.
+export const createGuestInvite = async (organisationId: string, createdBy: string, studentIds: string[], employerEmail?: string) => {
   const token = crypto.randomUUID()
   const { data: invite, error } = await supabase
     .from('guest_invites')
-    .insert([{ organisation_id: organisationId, created_by: createdBy, token }])
+    .insert([{ organisation_id: organisationId, created_by: createdBy, token, employer_email: employerEmail?.trim() || null }])
     .select()
     .single()
   if (error || !invite) return { data: null, error }
   const { error: shareError } = await supabase
     .from('guest_invite_shares')
-    .insert([{ invite_id: (invite as any).id, student_id: studentId }])
+    .insert(studentIds.map(studentId => ({ invite_id: (invite as any).id, student_id: studentId })))
   if (shareError) return { data: null, error: shareError }
   return { data: invite, error: null }
 }

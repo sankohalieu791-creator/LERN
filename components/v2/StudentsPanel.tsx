@@ -5,10 +5,30 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getOrgStudents, getMySubmissions, getGroups, createGroup, setStudentGroup,
   getAttendanceForSession, markAttendance, getStudentAttendanceSummary,
-  createGuestInviteForStudent, getGuestInvites, revokeGuestInvite,
+  createGuestInvite, getGuestInvites, revokeGuestInvite,
 } from '@/lib/supabase'
-import { Clock, ChevronDown, ChevronUp, CheckCircle2, RotateCcw, Ban, Users2, ClipboardList, RefreshCw, UserPlus, Copy, Check } from 'lucide-react'
+import {
+  ChevronRight, ArrowLeft, Clock, CheckCircle2, RotateCcw, Ban, Users2,
+  ClipboardList, Link as LinkIcon, Shield, Copy, Check, Square, CheckSquare,
+} from 'lucide-react'
 import type { Group, AttendanceStatus } from '@/lib/types'
+
+// Build Spec: Students area (roster, attendance, guest invite) v1.0,
+// 2 September 2026. Card/border/structural colours stay this app's
+// own theme tokens (bg-surface/text-ink/border-edge) rather than the
+// spec's literal #FFFFFF/#E7E4DE -- the same call made for Review and
+// every other org-side rebuild this session, since the values are
+// numerically almost identical in light mode and this is what
+// actually delivers real dark-mode support instead of a hardcoded
+// copy of one theme. Every pinned SEMANTIC colour (status pills, the
+// orange tab underline, the primary button, the blue safeguarding
+// note, the green check) is the spec's exact hex regardless of theme.
+// One area for both institutions and providers -- "no difference
+// between them here."
+function initials(name?: string) {
+  if (!name) return '?'
+  return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
+}
 
 const STATUS_ICON: Record<string, { icon: any; cls: string }> = {
   submitted: { icon: Clock, cls: 'text-warning-text' },
@@ -24,7 +44,7 @@ export default function StudentsPanel() {
   const [students, setStudents] = useState<any[]>([])
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [detailStudent, setDetailStudent] = useState<any | null>(null)
   const [filterGroup, setFilterGroup] = useState<string>('all')
   const [tab, setTab] = useState<Tab>('students')
 
@@ -48,42 +68,43 @@ export default function StudentsPanel() {
   const visible = filterGroup === 'all' ? students : students.filter(s => s.group_id === filterGroup)
 
   return (
-    <div className="space-y-5">
-      <div className="flex gap-1 border-b border-edge-subtle">
-        {([['students', 'Students'], ['attendance', 'Attendance register'], ['guests', 'Guest invites']] as [Tab, string][]).map(([key, label]) => (
-          <button
-            key={key} onClick={() => setTab(key)}
-            className={`px-4 py-2.5 text-[14px] font-semibold border-b-2 -mb-px transition ${
-              tab === key ? 'text-ink border-brand' : 'text-ink-tertiary border-transparent hover:text-ink'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+    <div>
+      <p className="text-[18px] font-semibold text-ink">Students</p>
+      <p className="text-[13px] mt-0.5 mb-4" style={{ color: '#5A5A5A' }}>Your learners, attendance, and employer invites</p>
+
+      <div className="flex gap-5 border-b border-edge-subtle mb-5">
+        {([['students', 'Students'], ['attendance', 'Attendance'], ['guests', 'Guest invite']] as [Tab, string][]).map(([key, label]) => {
+          const active = tab === key
+          return (
+            <button
+              key={key} onClick={() => setTab(key)}
+              className="pb-2.5 text-[14px] font-semibold border-b-2 -mb-px transition"
+              style={{ borderColor: active ? '#D4551A' : 'transparent', color: active ? undefined : '#5A5A5A' }}
+            >
+              <span className={active ? 'text-ink' : ''}>{label}</span>
+            </button>
+          )
+        })}
       </div>
 
       {tab === 'students' ? (
-        <div className="bg-surface border border-edge rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-5">
-            <p className="font-bold text-ink text-[15px]">Students ({visible.length})</p>
-            <div className="flex items-center gap-2">
-              {groups.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[13px]" style={{ color: '#5A5A5A' }}>{visible.length} student{visible.length === 1 ? '' : 's'}</p>
+            {groups.length > 0 && (
+              <div className="relative">
                 <select
                   value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
-                  className="bg-surface border border-edge rounded-lg px-3 py-1.5 text-[13px] text-ink outline-none focus:border-brand transition"
+                  className="appearance-none bg-transparent text-brand text-[13px] font-semibold outline-none cursor-pointer pr-4"
                 >
-                  <option value="all">All groups</option>
+                  <option value="all">Filter by group</option>
                   {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
-              )}
-              <button
-                onClick={load}
-                className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-secondary hover:text-brand transition px-2 py-1.5"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> Refresh
-              </button>
-            </div>
+                <ChevronRight className="w-3 h-3 text-brand rotate-90 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            )}
           </div>
+
           {loading ? (
             <p className="text-ink-tertiary text-[14px]">Loading…</p>
           ) : visible.length === 0 ? (
@@ -91,11 +112,21 @@ export default function StudentsPanel() {
           ) : (
             <div className="space-y-2">
               {visible.map(s => (
-                <StudentRow
-                  key={s.id} student={s} groups={groups}
-                  open={openId === s.id} onToggle={() => setOpenId(o => o === s.id ? null : s.id)}
-                  onGroupChanged={load}
-                />
+                <button
+                  key={s.id} onClick={() => setDetailStudent(s)}
+                  className="w-full flex items-center gap-3 bg-surface border border-edge rounded-xl px-[14px] py-3 text-left hover:border-edge-input transition"
+                >
+                  <span className="w-[34px] h-[34px] rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+                    {initials(s.full_name)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-ink truncate">{s.full_name}</p>
+                    <p className="text-[12px] truncate" style={{ color: '#5A5A5A' }}>
+                      {[s.groups?.name, `${s.verified} verified`].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: '#5A5A5A' }} />
+                </button>
               ))}
             </div>
           )}
@@ -103,26 +134,35 @@ export default function StudentsPanel() {
       ) : tab === 'attendance' ? (
         <AttendanceRegister groups={groups} students={students} onChanged={load} />
       ) : (
-        <GuestInvitesPanel students={students} />
+        <GuestInvitePanel students={students} />
+      )}
+
+      {detailStudent && (
+        <StudentDetail
+          student={detailStudent} groups={groups}
+          onClose={() => setDetailStudent(null)}
+          onGroupChanged={load}
+        />
       )}
     </div>
   )
 }
 
-function StudentRow({
-  student, groups, open, onToggle, onGroupChanged,
-}: { student: any; groups: Group[]; open: boolean; onToggle: () => void; onGroupChanged: () => void }) {
-  const { user } = useAuth()
+// "Tapping a row opens that student (their profile and history)" --
+// a real full-screen detail, not an inline expand. Same overlay
+// convention every other detail screen in this app uses (a sticky
+// back-button header over one scrolling page).
+function StudentDetail({ student, groups, onClose, onGroupChanged }: {
+  student: any; groups: Group[]; onClose: () => void; onGroupChanged: () => void
+}) {
   const [submissions, setSubmissions] = useState<any[] | null>(null)
   const [attendance, setAttendance] = useState<any>(null)
   const [savingGroup, setSavingGroup] = useState(false)
 
   useEffect(() => {
-    if (!open) return
-    if (submissions === null) getMySubmissions(student.id).then(({ data }) => setSubmissions(data || []))
-    if (attendance === null) getStudentAttendanceSummary(student.id).then(({ data }) => setAttendance(data))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+    getMySubmissions(student.id).then(({ data }) => setSubmissions(data || []))
+    getStudentAttendanceSummary(student.id).then(({ data }) => setAttendance(data))
+  }, [student.id])
 
   const changeGroup = async (groupId: string) => {
     if (!groupId) return
@@ -133,34 +173,50 @@ function StudentRow({
   }
 
   return (
-    <div className="border border-edge-subtle rounded-xl overflow-hidden">
-      <button onClick={onToggle} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-subtle transition">
-        <div>
-          <p className="font-semibold text-ink text-[14px]">{student.full_name}</p>
-          <p className="text-[12px] text-ink-tertiary">{student.email} {student.groups?.name && `· ${student.groups.name}`}</p>
-        </div>
-        <div className="flex items-center gap-4 text-[12px] text-ink-secondary">
-          <span>{student.submitted} submitted</span>
-          <span className="text-success-text font-semibold">{student.verified} verified</span>
-          {open ? <ChevronUp className="w-4 h-4 text-ink-tertiary" /> : <ChevronDown className="w-4 h-4 text-ink-tertiary" />}
-        </div>
-      </button>
+    <div className="fixed inset-0 z-50 bg-paper overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-paper/95 backdrop-blur border-b border-edge-subtle">
+        <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-muted text-ink">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+      </div>
 
-      {open && (
-        <div className="px-4 pb-4 border-t border-edge-subtle pt-3.5">
+      <div className="max-w-2xl mx-auto px-5 py-5">
+        <div className="flex items-center gap-3 mb-6">
+          <span className="w-12 h-12 rounded-full flex items-center justify-center text-[15px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+            {initials(student.full_name)}
+          </span>
+          <div className="min-w-0">
+            <p className="text-[17px] font-bold text-ink truncate">{student.full_name}</p>
+            <p className="text-[13px] text-ink-tertiary truncate">{student.email}</p>
+          </div>
+        </div>
+
+        <div className="bg-surface border border-edge rounded-2xl p-5 mb-4">
+          <p className="text-[12px] font-medium uppercase tracking-wide mb-3" style={{ color: '#5A5A5A' }}>Group</p>
+          <select
+            value={student.group_id || ''} onChange={e => changeGroup(e.target.value)} disabled={savingGroup}
+            className="bg-surface border border-edge rounded-lg px-3 py-2 text-[13px] text-ink outline-none focus:border-brand transition"
+          >
+            <option value="" disabled>No group</option>
+            {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        </div>
+
+        <div className="bg-surface border border-edge rounded-2xl p-5 mb-4">
+          <p className="text-[12px] font-medium uppercase tracking-wide mb-3" style={{ color: '#5A5A5A' }}>Work</p>
           {submissions === null ? (
             <p className="text-[13px] text-ink-tertiary">Loading…</p>
           ) : submissions.length === 0 ? (
             <p className="text-[13px] text-ink-tertiary">No work submitted yet.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {submissions.map(s => {
                 const status = STATUS_ICON[s.status] || STATUS_ICON.submitted
                 const Icon = status.icon
                 return (
                   <div key={s.id} className="flex items-center justify-between text-[13px]">
                     <span className="text-ink">{s.work_items?.title}</span>
-                    <span className={`flex items-center gap-1.5 font-semibold ${status.cls}`}>
+                    <span className={`flex items-center gap-1.5 font-semibold capitalize ${status.cls}`}>
                       <Icon className="w-3.5 h-3.5" /> {s.status}
                     </span>
                   </div>
@@ -168,31 +224,25 @@ function StudentRow({
               })}
             </div>
           )}
-
-          <div className="flex items-center justify-between mt-3.5 pt-3.5 border-t border-edge-subtle">
-            <div className="flex items-center gap-2 text-[12px] text-ink-tertiary">
-              <ClipboardList className="w-3.5 h-3.5" />
-              {attendance === null ? 'Loading attendance…'
-                : attendance.total === 0 ? 'No attendance recorded yet.'
-                : `${attendance.percentPresent}% present (${attendance.present} present, ${attendance.late} late, ${attendance.absent} absent)`}
-            </div>
-            <select
-              value={student.group_id || ''} onChange={e => changeGroup(e.target.value)} disabled={savingGroup}
-              className="bg-surface border border-edge rounded-lg px-2.5 py-1.5 text-[12px] text-ink outline-none focus:border-brand transition"
-            >
-              <option value="" disabled>No group</option>
-              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-          </div>
         </div>
-      )}
+
+        <div className="bg-surface border border-edge rounded-2xl p-5 flex items-center gap-2.5">
+          <ClipboardList className="w-4 h-4 flex-shrink-0" style={{ color: '#5A5A5A' }} />
+          <p className="text-[13px] text-ink-secondary">
+            {attendance === null ? 'Loading attendance…'
+              : attendance.total === 0 ? 'No attendance recorded yet.'
+              : `${attendance.percentPresent}% present (${attendance.present} present, ${attendance.late} late, ${attendance.absent} absent)`}
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
 
-// Staff-marked, per session date -- pick a group and a date, mark each
-// student present/absent/late, save. Not automatic, no fabricated data:
-// a session with nothing marked just shows blank until staff mark it.
+// Group + date, tap a name to mark, saves the instant it's tapped --
+// no submit button to forget. Present/Late/Absent, one status per
+// student per date, stored against student+group+date from day one so
+// attendance-over-time can read straight off this later.
 function AttendanceRegister({ groups, students, onChanged }: { groups: Group[]; students: any[]; onChanged: () => void }) {
   const { user } = useAuth()
   const [groupId, setGroupId] = useState('')
@@ -253,7 +303,7 @@ function AttendanceRegister({ groups, students, onChanged }: { groups: Group[]; 
       <div className="bg-surface border border-edge rounded-2xl p-6">
         <p className="font-bold text-ink text-[15px] mb-2">Take attendance</p>
         <p className="text-[13px] text-ink-tertiary mb-4">First time here — start with everyone in one register, or split into classes if you'd rather.</p>
-        <button onClick={handleQuickStart} disabled={students.length === 0} className="px-4 py-2.5 rounded-lg bg-brand text-white text-[13px] font-semibold disabled:opacity-40 mb-4">
+        <button onClick={handleQuickStart} disabled={students.length === 0} className="px-4 py-2.5 rounded-lg text-white text-[13px] font-semibold disabled:opacity-40 mb-4" style={{ backgroundColor: '#F26B21' }}>
           {students.length === 0 ? 'No students yet' : 'Start with all students'}
         </button>
         {!creatingGroup ? (
@@ -266,7 +316,7 @@ function AttendanceRegister({ groups, students, onChanged }: { groups: Group[]; 
               value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="e.g. Year 12 Media Studies" autoFocus
               className="flex-1 bg-surface border border-edge rounded-lg px-3 py-2 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
             />
-            <button onClick={handleCreateGroup} disabled={!newGroupName.trim()} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[13px] font-semibold disabled:opacity-40">Create</button>
+            <button onClick={handleCreateGroup} disabled={!newGroupName.trim()} className="px-3.5 py-2 rounded-lg text-white text-[13px] font-semibold disabled:opacity-40" style={{ backgroundColor: '#F26B21' }}>Create</button>
           </div>
         )}
       </div>
@@ -274,8 +324,8 @@ function AttendanceRegister({ groups, students, onChanged }: { groups: Group[]; 
   }
 
   return (
-    <div className="bg-surface border border-edge rounded-2xl p-6">
-      <div className="flex items-center gap-3 mb-5">
+    <div>
+      <div className="flex items-center gap-3 mb-1.5">
         <select
           value={groupId} onChange={e => setGroupId(e.target.value)}
           className="bg-surface border border-edge rounded-lg px-3 py-2 text-[13px] text-ink outline-none focus:border-brand transition"
@@ -287,64 +337,77 @@ function AttendanceRegister({ groups, students, onChanged }: { groups: Group[]; 
           type="date" value={date} onChange={e => setDate(e.target.value)}
           className="bg-surface border border-edge rounded-lg px-3 py-2 text-[13px] text-ink outline-none focus:border-brand transition"
         />
-        {!creatingGroup ? (
-          <button onClick={() => setCreatingGroup(true)} className="text-[12px] font-semibold text-ink-secondary hover:text-brand transition flex items-center gap-1">
-            <Users2 className="w-3.5 h-3.5" /> New group
-          </button>
-        ) : (
-          <div className="flex gap-1.5">
-            <input
-              value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="Group name" autoFocus
-              className="bg-surface border border-edge rounded-lg px-2.5 py-1.5 text-[12px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition w-40"
-            />
-            <button onClick={handleCreateGroup} disabled={!newGroupName.trim()} className="px-2.5 py-1.5 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">Add</button>
-          </div>
-        )}
       </div>
+      <p className="text-[12px] mb-4" style={{ color: '#8A8A8A' }}>Tap a name to mark. Saved automatically.</p>
 
       {!groupId ? (
         <p className="text-[13px] text-ink-tertiary">Choose a group to take its register for {new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}.</p>
       ) : members.length === 0 ? (
         <p className="text-[13px] text-ink-tertiary">No students assigned to this group yet — assign them from the Students tab.</p>
       ) : (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {members.map(m => (
-            <div key={m.id} className="flex items-center justify-between px-3.5 py-2.5 border border-edge-subtle rounded-lg">
-              <div className="min-w-0">
-                <span className="text-[13px] font-semibold text-ink">{m.full_name}</span>
-                <span className="ml-2 text-[11px] text-success-text font-semibold">{m.verified || 0} verified</span>
+            <div key={m.id} className="flex items-center justify-between gap-3 bg-surface border border-edge rounded-xl px-[13px] py-[11px]">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+                  {initials(m.full_name)}
+                </span>
+                <span className="text-[13px] font-semibold text-ink truncate">{m.full_name}</span>
               </div>
-              <div className="flex gap-1.5">
-                {(['present', 'absent'] as AttendanceStatus[]).map(status => (
-                  <button
-                    key={status} onClick={() => mark(m.id, status)}
-                    className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold capitalize transition ${
-                      marks[m.id] === status
-                        ? status === 'present' ? 'bg-success-solid text-white' : 'bg-danger-solid text-white'
-                        : 'bg-surface-muted text-ink-tertiary hover:bg-edge-subtle'
-                    }`}
-                  >
-                    {status}
-                  </button>
-                ))}
+              <div className="flex gap-1.5 flex-shrink-0">
+                <AttendancePill label="Present" selected={marks[m.id] === 'present'} bg="#E1F5EE" text="#0F6E56" onClick={() => mark(m.id, 'present')} />
+                <AttendancePill label="Late" selected={marks[m.id] === 'late'} bg="#FAEEDA" text="#854F0B" onClick={() => mark(m.id, 'late')} />
+                <AttendancePill label="Absent" selected={marks[m.id] === 'absent'} bg="#F1EFE8" text="#5F5E5A" onClick={() => mark(m.id, 'absent')} />
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <div className="text-center mt-5">
+        {!creatingGroup ? (
+          <button onClick={() => setCreatingGroup(true)} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand hover:opacity-80 transition">
+            <Users2 className="w-3.5 h-3.5" /> Create a new group
+          </button>
+        ) : (
+          <div className="inline-flex gap-1.5">
+            <input
+              value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="Group name" autoFocus
+              className="bg-surface border border-edge rounded-lg px-2.5 py-1.5 text-[12px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition w-40"
+            />
+            <button onClick={handleCreateGroup} disabled={!newGroupName.trim()} className="px-2.5 py-1.5 rounded-lg text-white text-[12px] font-semibold disabled:opacity-40" style={{ backgroundColor: '#F26B21' }}>Add</button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-// Org-wide list of guest invites, plus generating a new one scoped to
-// a chosen student — the org-side half of the guest employer flow.
-// A guest sees only what's shared here; nothing about this panel
-// exposes more than a name + a shareable link.
-function GuestInvitesPanel({ students }: { students: any[] }) {
+// Selected Present is green, Late is amber, Absent is a filled muted
+// state -- unselected pills of any status are a plain outline. Exact
+// pill colours from the spec's own table.
+function AttendancePill({ label, selected, bg, text, onClick }: { label: string; selected: boolean; bg: string; text: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-3 py-1.5 rounded-full text-[12px] font-semibold transition border"
+      style={selected ? { backgroundColor: bg, color: text, borderColor: bg } : { backgroundColor: 'transparent', color: '#8A8A8A', borderColor: '#E7E4DE' }}
+    >
+      {label}
+    </button>
+  )
+}
+
+// One or more students, defaulting to one -- "the common case is one
+// student; a role with several candidates can include a few, without
+// creating separate links." The guest sees only the chosen students,
+// only their verified work, whether it's one or several.
+function GuestInvitePanel({ students }: { students: any[] }) {
   const { user } = useAuth()
   const [invites, setInvites] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [studentId, setStudentId] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [email, setEmail] = useState('')
   const [creating, setCreating] = useState(false)
   const [newLink, setNewLink] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -355,15 +418,28 @@ function GuestInvitesPanel({ students }: { students: any[] }) {
   }
   useEffect(load, [user?.organisation_id])
 
+  // One student selected by default, per spec -- the first time the
+  // roster arrives with nothing chosen yet.
+  useEffect(() => {
+    if (students.length > 0 && selected.size === 0) setSelected(new Set([students[0].id]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [students])
+
+  const toggle = (id: string) => setSelected(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
   const handleCreate = async () => {
-    if (!studentId || !user?.organisation_id) return
+    if (selected.size === 0 || !user?.organisation_id) return
     setCreating(true)
     setNewLink(null)
-    const { data, error } = await createGuestInviteForStudent(user.organisation_id, user.id, studentId)
+    const { data, error } = await createGuestInvite(user.organisation_id, user.id, Array.from(selected), email)
     setCreating(false)
     if (!error && data) {
       setNewLink(`${window.location.origin}/guest/${(data as any).token}`)
-      setStudentId('')
+      setEmail('')
       load()
     }
   }
@@ -380,46 +456,85 @@ function GuestInvitesPanel({ students }: { students: any[] }) {
   }
 
   return (
-    <div className="bg-surface border border-edge rounded-2xl p-6">
-      <p className="font-bold text-ink text-[15px] mb-1.5 flex items-center gap-1.5"><UserPlus className="w-4 h-4" /> Invite an employer</p>
-      <p className="text-[13px] text-ink-tertiary mb-4">Bring in one employer to see one student's verified work — no account, no browsing the rest of LERN. Interest they raise routes straight back to you.</p>
+    <div>
+      <div className="bg-surface border border-edge rounded-2xl p-6 mb-5">
+        <p className="text-[14px] font-semibold text-ink mb-1.5">Invite an employer</p>
+        <p className="text-[12px] mb-5 leading-relaxed" style={{ color: '#5A5A5A' }}>
+          Bring in one employer to see a student's verified work. No account, no browsing the rest of LERN. Any interest comes straight back to you.
+        </p>
 
-      <div className="flex gap-2 mb-5">
-        <select
-          value={studentId} onChange={e => setStudentId(e.target.value)}
-          className="flex-1 bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+        <p className="text-[12px] font-medium mb-2" style={{ color: '#5A5A5A' }}>Who should they see?</p>
+        {students.length === 0 ? (
+          <p className="text-[13px] text-ink-tertiary mb-1">No students have joined yet.</p>
+        ) : (
+          <div className="space-y-1.5 mb-1.5">
+            {students.map(s => {
+              const checked = selected.has(s.id)
+              return (
+                <button
+                  key={s.id} onClick={() => toggle(s.id)}
+                  className="w-full flex items-center gap-3 border rounded-xl px-3.5 py-2.5 text-left transition"
+                  style={{ borderColor: checked ? '#0F6E56' : '#E7E4DE' }}
+                >
+                  {checked
+                    ? <CheckSquare className="w-4 h-4 flex-shrink-0" style={{ color: '#0F6E56' }} />
+                    : <Square className="w-4 h-4 flex-shrink-0" style={{ color: '#B9B4A8' }} />}
+                  <span className="flex-1 min-w-0 text-[13px] font-semibold text-ink truncate">{s.full_name}</span>
+                  <span className="text-[12px] flex-shrink-0" style={{ color: '#5A5A5A' }}>{s.verified} verified piece{s.verified === 1 ? '' : 's'}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+        <p className="text-[11px] mb-5" style={{ color: '#8A8A8A' }}>You can add more than one student if this employer is hiring for a role.</p>
+
+        <label className="block mb-5">
+          <span className="block text-[12px] font-medium mb-1.5" style={{ color: '#5A5A5A' }}>Employer's email (optional)</span>
+          <input
+            value={email} onChange={e => setEmail(e.target.value)} placeholder="name@company.com" type="email"
+            className="w-full bg-surface border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
+          />
+        </label>
+
+        {newLink && (
+          <div className="flex items-center gap-2 bg-success-bg border border-success-text/20 rounded-lg px-3.5 py-2.5 mb-4">
+            <p className="text-[12.5px] text-ink flex-1 truncate font-mono">{newLink}</p>
+            <button onClick={() => copy(newLink, 'new')} className="text-success-text hover:opacity-70 transition flex-shrink-0">
+              {copiedId === 'new' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            </button>
+          </div>
+        )}
+
+        <button
+          onClick={handleCreate} disabled={selected.size === 0 || creating}
+          className="w-full flex items-center justify-center gap-1.5 text-white text-[14px] font-semibold py-3 rounded-xl disabled:opacity-40 transition mb-4"
+          style={{ backgroundColor: '#F26B21' }}
         >
-          <option value="">Choose a student…</option>
-          {students.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-        </select>
-        <button onClick={handleCreate} disabled={!studentId || creating} className="px-4 py-2.5 rounded-lg bg-brand text-white text-[13px] font-semibold disabled:opacity-40 flex-shrink-0">
-          {creating ? 'Creating…' : 'Create invite link'}
+          <LinkIcon className="w-4 h-4" /> {creating ? 'Creating…' : 'Create invite link'}
         </button>
-      </div>
 
-      {newLink && (
-        <div className="flex items-center gap-2 bg-success-bg border border-success-text/20 rounded-lg px-3.5 py-2.5 mb-5">
-          <p className="text-[12.5px] text-ink flex-1 truncate font-mono">{newLink}</p>
-          <button onClick={() => copy(newLink, 'new')} className="text-success-text hover:opacity-70 transition flex-shrink-0">
-            {copiedId === 'new' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          </button>
+        <div className="flex items-start gap-2.5 rounded-lg px-3.5 py-3" style={{ backgroundColor: '#E6F1FB' }}>
+          <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#0C447C' }} />
+          <p className="text-[12px] leading-relaxed" style={{ color: '#0C447C' }}>
+            The guest sees only the students you pick, and only their verified work. You can revoke the link any time.
+          </p>
         </div>
-      )}
+      </div>
 
       {loading ? (
         <p className="text-ink-tertiary text-[14px]">Loading…</p>
-      ) : invites.length === 0 ? (
-        <p className="text-ink-tertiary text-[14px]">No guest invites yet.</p>
-      ) : (
+      ) : invites.length > 0 && (
         <div className="space-y-2">
           {invites.map(inv => {
             const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/guest/${inv.token}`
-            const share = inv.guest_invite_shares?.[0]
+            const shares = inv.guest_invite_shares || []
+            const names = shares.map((s: any) => s.users?.full_name).filter(Boolean)
+            const nameLabel = names.length === 0 ? 'Student' : names.length === 1 ? names[0] : `${names[0]} +${names.length - 1} more`
             const status = inv.revoked_at ? 'Revoked' : inv.claimed_by ? 'Claimed' : 'Pending'
             return (
-              <div key={inv.id} className="flex items-center justify-between border border-edge-subtle rounded-xl px-4 py-3">
+              <div key={inv.id} className="flex items-center justify-between bg-surface border border-edge rounded-xl px-4 py-3">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-ink truncate">{share?.users?.full_name || 'Student'}</p>
+                  <p className="text-[13px] font-semibold text-ink truncate">{nameLabel}</p>
                   <p className="text-[11px] text-ink-tertiary">{status} · {new Date(inv.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
