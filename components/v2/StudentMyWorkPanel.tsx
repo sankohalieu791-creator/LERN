@@ -47,7 +47,7 @@ function initials(name?: string) {
 }
 
 const STATUS: Record<string, { label: string; cls: string }> = {
-  new: { label: 'New', cls: 'bg-white/10 text-white' },
+  new: { label: 'New', cls: 'bg-white/10 text-[var(--app-text)]' },
   submitted: { label: 'Submitted', cls: 'bg-[#3a2e14] text-[#e0b64a]' },
   returned: { label: 'Returned', cls: 'bg-[#3a1e14] text-[#e08a4a]' },
   verified: { label: 'Completed', cls: 'bg-[#123a24] text-[#4ade80]' },
@@ -106,7 +106,7 @@ export default function StudentMyWorkPanel() {
   if (loading || !orgType) {
     return (
       <div className="p-4 space-y-3">
-        {[0, 1].map(i => <div key={i} className="h-52 rounded-2xl bg-[#1a1a1a] animate-pulse" />)}
+        {[0, 1].map(i => <div key={i} className="h-52 rounded-2xl bg-[var(--app-surface)] animate-pulse" />)}
       </div>
     )
   }
@@ -128,24 +128,24 @@ export default function StudentMyWorkPanel() {
           screen went straight from the shell's own top padding into
           the tab row with no identity of its own. */}
       <div className="px-4 pt-4 pb-3">
-        <h1 className="text-white text-[20px] font-semibold">My Work</h1>
-        <p className="text-[13px] mt-0.5" style={{ color: '#999' }}>Everything set for you, in one place</p>
+        <h1 className="text-[var(--app-text)] text-[20px] font-semibold">My Work</h1>
+        <p className="text-[13px] mt-0.5" style={{ color: 'var(--app-text-secondary)' }}>Everything set for you, in one place</p>
       </div>
 
-      <div className="sticky top-0 z-10 flex items-stretch border-b border-white/[0.07] bg-[#0f0f0f]">
+      <div className="sticky top-0 z-10 flex items-stretch border-b border-[var(--app-border-subtle)] bg-[var(--app-bg)]">
         <TabButton active={tab === 'primary'} label={primaryLabel} onClick={() => setTab('primary')} />
         <TabButton active={tab === 'assignment'} label="Assignments" onClick={() => setTab('assignment')} />
         <TabButton active={tab === 'workshop'} label="Workshops" onClick={() => setTab('workshop')} />
       </div>
 
       <div className="px-4 pt-3 pb-1">
-        <span className="text-[13px] font-semibold text-[#666]">{items.length} {items.length === 1 ? tab === 'primary' ? primaryLabel.slice(0, -1).toLowerCase() : tab : tab === 'primary' ? primaryLabel.toLowerCase() : `${tab}s`}</span>
+        <span className="text-[13px] font-semibold text-[var(--app-text-tertiary)]">{items.length} {items.length === 1 ? tab === 'primary' ? primaryLabel.slice(0, -1).toLowerCase() : tab : tab === 'primary' ? primaryLabel.toLowerCase() : `${tab}s`}</span>
       </div>
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center text-center py-16 px-6">
-          <p className="font-bold text-white text-[15px] mb-1">Nothing here yet</p>
-          <p className="text-sm text-[#666]">Check back once your organisation posts something.</p>
+          <p className="font-bold text-[var(--app-text)] text-[15px] mb-1">Nothing here yet</p>
+          <p className="text-sm text-[var(--app-text-tertiary)]">Check back once your organisation posts something.</p>
         </div>
       ) : (
         <div className="px-4 py-3 space-y-3">
@@ -219,23 +219,23 @@ function SubmittableCard({ item, latest, started, onOpen, onStart }: {
       : null
 
   return (
-    <button onClick={onOpen} className="block w-full text-left bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-[14px]">
+    <button onClick={onOpen} className="block w-full text-left bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-[14px]">
       <div className="flex items-start justify-between gap-2 mb-1">
-        <p className="text-[14px] font-semibold text-white flex-1 min-w-0 leading-snug">{item.title}</p>
+        <p className="text-[14px] font-semibold text-[var(--app-text)] flex-1 min-w-0 leading-snug">{item.title}</p>
         <span className="text-[11px] font-semibold px-[10px] py-[3px] rounded-full flex-shrink-0" style={{ backgroundColor: spec.bg, color: spec.text }}>
           {spec.label}
         </span>
       </div>
-      <p className="text-[12px] text-[#999] mb-3">
+      <p className="text-[12px] text-[var(--app-text-secondary)] mb-3">
         {TYPE_LABEL[item.type] || item.type}{dateLine ? ` · ${dateLine}` : ''}
       </p>
 
       {statusKey === 'new' && (
         <div className="flex items-center justify-between">
-          <span className="text-[12px] text-[#666]">Not started yet</span>
+          <span className="text-[12px] text-[var(--app-text-tertiary)]">Not started yet</span>
           <span
             onClick={e => { e.stopPropagation(); onStart() }}
-            className="text-[12px] font-semibold text-white border border-white/20 rounded-full px-4 py-1.5 hover:bg-white/5 transition"
+            className="text-[12px] font-semibold text-[var(--app-text)] border border-white/20 rounded-full px-4 py-1.5 hover:bg-white/5 transition"
           >
             Start
           </span>
@@ -248,11 +248,11 @@ function SubmittableCard({ item, latest, started, onOpen, onStart }: {
             <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
               <div className="h-full rounded-full" style={{ width: '40%', backgroundColor: '#E0A94B' }} />
             </div>
-            <span className="text-[11px] text-[#999] flex-shrink-0">Started</span>
+            <span className="text-[11px] text-[var(--app-text-secondary)] flex-shrink-0">Started</span>
           </div>
           <span
             onClick={e => { e.stopPropagation(); onOpen() }}
-            className="block w-full text-center text-[13px] font-semibold text-white bg-brand rounded-full py-2 hover:bg-brand-hover transition"
+            className="block w-full text-center text-[13px] font-semibold text-[var(--app-text)] bg-brand rounded-full py-2 hover:bg-brand-hover transition"
           >
             Continue
           </span>
@@ -262,7 +262,7 @@ function SubmittableCard({ item, latest, started, onOpen, onStart }: {
       {statusKey === 'returned' && (
         <span
           onClick={e => { e.stopPropagation(); onOpen() }}
-          className="block w-full text-center text-[13px] font-semibold text-white bg-brand rounded-full py-2 hover:bg-brand-hover transition"
+          className="block w-full text-center text-[13px] font-semibold text-[var(--app-text)] bg-brand rounded-full py-2 hover:bg-brand-hover transition"
         >
           Resubmit
         </span>
@@ -299,24 +299,24 @@ function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
   const imgHeight = item.type === 'workshop' ? 190 : 200
 
   return (
-    <button onClick={onOpen} className="block w-full text-left bg-[#1a1a1a] rounded-2xl overflow-hidden border border-white/[0.06]">
+    <button onClick={onOpen} className="block w-full text-left bg-[var(--app-surface)] rounded-2xl overflow-hidden border border-[var(--app-border-subtle)]">
       <div className={`relative bg-gradient-to-br ${bannerGradient(item.id)} flex items-center justify-center`} style={{ height: imgHeight }}>
-        <span className="text-white/10 font-black text-4xl tracking-tight select-none">LERN</span>
+        <span className="text-[var(--app-text)]/10 font-black text-4xl tracking-tight select-none">LERN</span>
 
-        <span className="absolute top-2.5 left-2.5 text-[10px] font-bold bg-black/80 text-white px-2.5 py-1 rounded-full uppercase tracking-wide">
+        <span className="absolute top-2.5 left-2.5 text-[10px] font-bold bg-black/80 text-[var(--app-text)] px-2.5 py-1 rounded-full uppercase tracking-wide">
           {[item.topic, item.level].filter(Boolean).join(' · ') || item.type}
         </span>
         {item.type === 'course' && (
-          <span className="absolute top-2.5 right-2.5 text-[10px] font-bold bg-[#FF6B2B] text-white px-2.5 py-1 rounded-full">YOUR COURSE</span>
+          <span className="absolute top-2.5 right-2.5 text-[10px] font-bold bg-[#FF6B2B] text-[var(--app-text)] px-2.5 py-1 rounded-full">YOUR COURSE</span>
         )}
         {item.type === 'workshop' && (
           live ? (
             <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 bg-red-500/90 rounded-full px-2.5 py-1">
               <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-              <span className="text-white text-[10px] font-bold">LIVE NOW</span>
+              <span className="text-[var(--app-text)] text-[10px] font-bold">LIVE NOW</span>
             </div>
           ) : (
-            <span className={`absolute top-2.5 right-2.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide ${ended ? 'bg-black/80 text-white/60' : 'bg-[#FF6B2B]/90 text-white'}`}>
+            <span className={`absolute top-2.5 right-2.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide ${ended ? 'bg-black/80 text-[var(--app-text)]/60' : 'bg-[#FF6B2B]/90 text-[var(--app-text)]'}`}>
               {ended ? 'Ended' : (item.mode || 'online')}
             </span>
           )
@@ -324,20 +324,20 @@ function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
       </div>
 
       <div className="p-4">
-        <h3 className="text-white font-bold text-[15px] leading-snug line-clamp-2 mb-2">{item.title}</h3>
+        <h3 className="text-[var(--app-text)] font-bold text-[15px] leading-snug line-clamp-2 mb-2">{item.title}</h3>
         {item.description && <p className="text-[#777] text-sm line-clamp-2 mb-3 leading-snug">{item.description}</p>}
 
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-[var(--app-text)] font-bold text-[10px] flex-shrink-0">
             {initials(hostName)}
           </div>
-          <span className="text-white text-sm font-semibold flex items-center gap-1">
+          <span className="text-[var(--app-text)] text-sm font-semibold flex items-center gap-1">
             {hostName || orgName || 'Your organisation'}
             <BadgeCheck className="w-3.5 h-3.5 text-[#4a9de0]" />
           </span>
         </div>
 
-        <div className="flex items-center gap-4 text-[#666] text-xs mb-4">
+        <div className="flex items-center gap-4 text-[var(--app-text-tertiary)] text-xs mb-4">
           {(item.duration_label || item.starts_at) && (
             <span className="flex items-center gap-1">
               <Clock className="w-3 h-3" />
@@ -355,7 +355,7 @@ function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
         {/* In-person has nothing to "join" online -- there's no live
             video link, so "Start Class"/"Join Now" never made sense
             for it. "Attend" instead, matching what it actually is. */}
-        <div className={`w-full text-center rounded-2xl py-3 text-sm font-bold ${live ? 'bg-red-500 text-white' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'}`}>
+        <div className={`w-full text-center rounded-2xl py-3 text-sm font-bold ${live ? 'bg-red-500 text-[var(--app-text)]' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-[var(--app-text)]'}`}>
           {ended ? 'Ended' : inPerson ? (live ? 'Attending now' : 'Attend →') : live ? '🔴 Join Now' : 'Start Class →'}
         </div>
       </div>
@@ -438,7 +438,7 @@ function WorkItemDetail({
           <h1 className="text-2xl font-bold text-ink leading-snug mb-3">{item.title}</h1>
 
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-[var(--app-text)] font-bold text-[10px] flex-shrink-0">
               {initials(hostName)}
             </div>
             <span className="text-ink text-sm font-semibold flex items-center gap-1">
@@ -478,7 +478,7 @@ function WorkItemDetail({
                   <CalendarClock className="w-4 h-4" /> Starts {new Date(item.starts_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} — join opens once it's started.
                 </p>
               ) : item.mode === 'online' ? (
-                <button onClick={() => setInSession(true)} className="flex items-center gap-2 bg-red-500 text-white font-bold text-sm px-5 py-3 rounded-2xl">
+                <button onClick={() => setInSession(true)} className="flex items-center gap-2 bg-red-500 text-[var(--app-text)] font-bold text-sm px-5 py-3 rounded-2xl">
                   <Video className="w-4 h-4" /> Join session
                 </button>
               ) : item.location && (
@@ -511,7 +511,7 @@ function WorkItemDetail({
                 {file && <span onClick={e => { e.stopPropagation(); setFile(null) }} className="hover:text-danger-text"><X className="w-3.5 h-3.5" /></span>}
               </button>
               <input ref={fileRef} type="file" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
-              <button onClick={handleSubmit} disabled={loading} className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold text-sm py-3 rounded-2xl disabled:opacity-60">
+              <button onClick={handleSubmit} disabled={loading} className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-[var(--app-text)] font-bold text-sm py-3 rounded-2xl disabled:opacity-60">
                 {loading ? 'Submitting…' : latest?.status === 'returned' ? 'Resubmit' : 'Submit work'}
               </button>
             </div>
@@ -543,12 +543,12 @@ function SubmissionRow({ submission }: { submission: any }) {
         </a>
       )}
       {submission.status === 'verified' && (
-        <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-1.5 text-[11px] text-[#4ade80]">
+        <div className="mt-2 pt-2 border-t border-[var(--app-border)] flex items-center gap-1.5 text-[11px] text-[#4ade80]">
           <CheckCircle2 className="w-3.5 h-3.5" /> Verified {submission.verifications?.[0]?.verified_at ? new Date(submission.verifications[0].verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
         </div>
       )}
       {submission.status === 'returned' && (
-        <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-1.5 text-[11px] text-[#e08a4a]"><RotateCcw className="w-3.5 h-3.5" /> Returned — resubmit above</div>
+        <div className="mt-2 pt-2 border-t border-[var(--app-border)] flex items-center gap-1.5 text-[11px] text-[#e08a4a]"><RotateCcw className="w-3.5 h-3.5" /> Returned — resubmit above</div>
       )}
     </div>
   )
@@ -571,18 +571,18 @@ function JoinCodePrompt({ onJoined }: { onJoined: () => Promise<void> }) {
 
   return (
     <div className="px-4 py-10">
-      <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-8 text-center">
+      <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-2xl p-8 text-center">
         <div className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
-          <KeyRound className="w-5 h-5 text-white" />
+          <KeyRound className="w-5 h-5 text-[var(--app-text)]" />
         </div>
-        <p className="font-bold text-white text-[16px] mb-1.5">You're not linked to an organisation yet</p>
-        <p className="text-sm text-[#999] mb-5 leading-snug">
+        <p className="font-bold text-[var(--app-text)] text-[16px] mb-1.5">You're not linked to an organisation yet</p>
+        <p className="text-sm text-[var(--app-text-secondary)] mb-5 leading-snug">
           Enter the code your school, college or training provider gave you to unlock briefs, courses, and submitting your own work.
         </p>
         {error && <p className="text-xs text-[#e04a4a] mb-3">{error}</p>}
         <input
           value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="e.g. 7K3P9XQZ"
-          className="w-full bg-[#0f0f0f] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-[#666] text-center tracking-widest font-bold outline-none focus:border-white/30 mb-3"
+          className="w-full bg-[var(--app-bg)] border border-[var(--app-border)] rounded-xl px-4 py-3 text-sm text-[var(--app-text)] placeholder-[#666] text-center tracking-widest font-bold outline-none focus:border-white/30 mb-3"
         />
         <button onClick={handleJoin} disabled={loading} className="w-full bg-white text-black font-bold text-sm py-3 rounded-xl disabled:opacity-60">
           {loading ? 'Joining…' : 'Join'}

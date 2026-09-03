@@ -96,7 +96,7 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
     // one move -- there's no card left that needs to be tricked into
     // filling a guessed-at height, content just flows like every other
     // screen here does.
-    <div className="relative bg-[#0f0f0f] min-h-[calc(100vh-56px)] px-4 pt-4 pb-8 text-white">
+    <div className="relative bg-[var(--app-bg)] min-h-[calc(100vh-56px)] px-4 pt-4 pb-8 text-[var(--app-text)]">
         {/* Settings: a quiet icon in the corner, own view only. Always
             here now -- there's no separate "inside a folder" screen
             to hide it behind any more. */}
@@ -104,7 +104,7 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
           <button
             onClick={() => router.push('/student/settings')}
             aria-label="Settings"
-            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/5 transition text-[#999]"
+            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/5 transition text-[var(--app-text-secondary)]"
           >
             <SettingsIcon className="w-5 h-5" />
           </button>
@@ -124,16 +124,16 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
         <div className="flex flex-col items-center text-center pt-1">
           <Avatar path={profile.avatar_path} name={profile.full_name} size={88} textSize={30} variant="solid" />
           <p className="text-[19px] font-bold mt-3.5 tracking-tight">{profile.full_name}</p>
-          {profile.username && <p className="text-[13px] text-[#888] mt-0.5">@{profile.username}</p>}
+          {profile.username && <p className="text-[13px] text-[var(--app-text-secondary)] mt-0.5">@{profile.username}</p>}
           {profile.bio && (
-            <p className="text-[13.5px] text-[#ccc] leading-[1.5] mt-2.5" style={{ maxWidth: 300 }}>{profile.bio}</p>
+            <p className="text-[13.5px] text-[var(--app-text-body)] leading-[1.5] mt-2.5" style={{ maxWidth: 300 }}>{profile.bio}</p>
           )}
 
           <div className="flex items-center gap-3 mt-4">
             <Stat n={folderCount.verified} label="work" />
-            <span className="text-white/15">|</span>
+            <span className="text-[var(--app-text)]/15">|</span>
             <Stat n={counts.followers} label="followers" />
-            <span className="text-white/15">|</span>
+            <span className="text-[var(--app-text)]/15">|</span>
             <Stat n={counts.following} label="following" />
           </div>
 
@@ -159,7 +159,7 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
             navigate anywhere -- it swaps the grid below, same screen,
             tabs stay visible, active tab gets an underline. "Tap
             Posts, see your posts. Tap Saved, see what's saved." ── */}
-        <div className={`grid ${isOwn ? 'grid-cols-4' : 'grid-cols-3'} mt-6 border-b border-white/10`}>
+        <div className={`grid ${isOwn ? 'grid-cols-4' : 'grid-cols-3'} mt-6 border-b border-[var(--app-border)]`}>
           <FolderTab active={folder === 'verified'} onClick={() => setFolder('verified')} icon={FolderCheck} iconColor="#0F6E56" label="Verified" count={folderCount.verified} />
           <FolderTab active={folder === 'experience'} onClick={() => setFolder('experience')} icon={Briefcase} iconColor="#D4551A" label="Experience" count={folderCount.experience} />
           <FolderTab active={folder === 'posts'} onClick={() => setFolder('posts')} icon={Grid3x3} iconColor="#5A5A5A" label="Posts" count={folderCount.posts} />
@@ -225,7 +225,7 @@ export function Avatar({ path, name, size, textSize, variant = 'light' }: { path
 function Stat({ n, label }: { n: number; label: string }) {
   return (
     <p className="text-[13.5px] leading-none">
-      <span className="font-bold">{n}</span> <span className="text-[#999]">{label}</span>
+      <span className="font-bold">{n}</span> <span className="text-[var(--app-text-secondary)]">{label}</span>
     </p>
   )
 }
@@ -244,8 +244,8 @@ function FolderTab({ active, onClick, icon: Icon, iconColor, label, count }: {
     >
       <Icon className="w-4 h-4" style={{ color: active ? iconColor : '#666' }} />
       <span>
-        <span className={`text-[12px] font-semibold ${active ? 'text-white' : 'text-[#888]'}`}>{label}</span>
-        <span className="text-[10.5px] text-[#999]"> · {count}</span>
+        <span className={`text-[12px] font-semibold ${active ? 'text-[var(--app-text)]' : 'text-[var(--app-text-secondary)]'}`}>{label}</span>
+        <span className="text-[10.5px] text-[var(--app-text-secondary)]"> · {count}</span>
       </span>
     </button>
   )
@@ -254,9 +254,9 @@ function FolderTab({ active, onClick, icon: Icon, iconColor, label, count }: {
 function EmptyState({ icon: Icon, title, hint }: { icon: any; title: string; hint: string }) {
   return (
     <div className="flex flex-col items-center text-center py-10">
-      <Icon className="w-7 h-7 text-[#333] mb-2.5" />
+      <Icon className="w-7 h-7 text-[var(--app-text-quaternary)] mb-2.5" />
       <p className="font-semibold text-[13px] mb-1">{title}</p>
-      <p className="text-[12px] text-[#666]">{hint}</p>
+      <p className="text-[12px] text-[var(--app-text-tertiary)]">{hint}</p>
     </div>
   )
 }
@@ -279,13 +279,13 @@ function FolderContent({
   return (
     <div>
       {folder === 'verified' && (
-        loading ? <p className="text-[13px] text-[#666]">Loading…</p> : (verified.length === 0 && quals.length === 0) ? (
+        loading ? <p className="text-[13px] text-[var(--app-text-tertiary)]">Loading…</p> : (verified.length === 0 && quals.length === 0) ? (
           <EmptyState icon={FolderCheck} title="Nothing here yet" hint="It'll show up here the moment a tutor verifies your first piece of work" />
         ) : (
           <>
             <div className="grid grid-cols-2 gap-[10px]">
               {verified.map(v => (
-                <button key={v.id} onClick={() => setOpenWork(v)} className="text-left bg-[#141414] border border-white/10 rounded-xl p-[14px] hover:border-white/20 transition">
+                <button key={v.id} onClick={() => setOpenWork(v)} className="text-left bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-xl p-[14px] hover:border-white/20 transition">
                   <span className="w-8 h-8 rounded-lg flex items-center justify-center mb-2.5" style={{ backgroundColor: '#E1F5EE' }}>
                     <CheckCircle2 className="w-4 h-4" style={{ color: '#0F6E56' }} />
                   </span>
@@ -305,7 +305,7 @@ function FolderContent({
                     <span>Self-added certificate</span><span style={{ color: '#8A8A8A' }}> · not verified by LERN</span>
                   </p>
                   {isOwn && (
-                    <button onClick={async () => { await deleteSelfQualification(q.id); onChanged() }} className="absolute top-2.5 right-2.5 text-[#666] hover:text-danger-text transition">
+                    <button onClick={async () => { await deleteSelfQualification(q.id); onChanged() }} className="absolute top-2.5 right-2.5 text-[var(--app-text-tertiary)] hover:text-danger-text transition">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
@@ -329,14 +329,14 @@ function FolderContent({
           ) : (
             <div className="grid grid-cols-2 gap-[10px]">
               {experience.map(e => (
-                <div key={e.id} className="bg-[#141414] border border-white/10 rounded-xl p-[14px] relative">
+                <div key={e.id} className="bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-xl p-[14px] relative">
                   <span className="w-8 h-8 rounded-lg flex items-center justify-center mb-2.5" style={{ backgroundColor: '#E6F1FB' }}>
                     <Briefcase className="w-4 h-4" style={{ color: '#D4551A' }} />
                   </span>
                   <p className="text-[13px] font-semibold leading-snug line-clamp-2">{e.title}</p>
-                  <p className="text-[12px] text-[#999] mt-1 truncate">{e.organisation || 'Work experience'}</p>
+                  <p className="text-[12px] text-[var(--app-text-secondary)] mt-1 truncate">{e.organisation || 'Work experience'}</p>
                   {isOwn && (
-                    <button onClick={async () => { await deleteExperienceEntry(e.id); onChanged() }} className="absolute top-2.5 right-2.5 text-[#666] hover:text-danger-text transition">
+                    <button onClick={async () => { await deleteExperienceEntry(e.id); onChanged() }} className="absolute top-2.5 right-2.5 text-[var(--app-text-tertiary)] hover:text-danger-text transition">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
@@ -370,18 +370,18 @@ function FolderContent({
           ) : (
             <div className="space-y-2 mb-4">
               {saved.map(s => (
-                <div key={s.id} className="bg-[#141414] border border-white/10 rounded-xl px-[14px] py-3 flex items-center gap-2.5">
+                <div key={s.id} className="bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-xl px-[14px] py-3 flex items-center gap-2.5">
                   <Bookmark className="w-[18px] h-[18px] flex-shrink-0" style={{ color: '#D4551A' }} />
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-medium truncate">{s.opportunity?.title}</p>
-                    <p className="text-[12px] text-[#999] truncate">{s.opportunity?.employer?.full_name || 'An employer'} · saved {daysAgo(s.created_at)} days ago</p>
+                    <p className="text-[12px] text-[var(--app-text-secondary)] truncate">{s.opportunity?.employer?.full_name || 'An employer'} · saved {daysAgo(s.created_at)} days ago</p>
                   </div>
                   <a href="/student/discover" className="flex items-center gap-1 text-[13px] font-semibold flex-shrink-0" style={{ color: '#D4551A' }}>
                     Apply <ArrowRight className="w-3.5 h-3.5" />
                   </a>
                   <button
                     onClick={async () => { await unsaveOpportunity(profileId, s.opportunity_id); onChanged() }}
-                    aria-label="Remove from saved" className="text-[#666] hover:text-danger-text transition flex-shrink-0"
+                    aria-label="Remove from saved" className="text-[var(--app-text-tertiary)] hover:text-danger-text transition flex-shrink-0"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -422,46 +422,46 @@ function VerifiedWorkDetail({ work, onClose }: { work: any; onClose: () => void 
     // open, not sit alongside it. paddingBottom added for the home
     // indicator's own safe area, which nothing here was reserving --
     // matches every other full-screen overlay's convention.
-    <div className="fixed inset-0 z-50 bg-[#0f0f0f] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-[#0f0f0f]/95 backdrop-blur border-b border-white/10">
+    <div className="fixed inset-0 z-50 bg-[var(--app-bg)] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-[var(--app-bg)]/95 backdrop-blur border-b border-[var(--app-border)]">
         <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition">
           <ChevronLeft className="w-5 h-5" />
         </button>
       </div>
 
       <div className="p-4 pb-10">
-        <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-5">
+        <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-2xl p-5">
           <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1 rounded-full mb-3" style={{ backgroundColor: '#E1F5EE', color: '#0F6E56' }}>
             <CheckCircle2 className="w-3.5 h-3.5" /> Verified
           </span>
           <h1 className="text-[20px] font-bold leading-snug mb-2">{wi?.title}</h1>
-          <p className="text-[12.5px] text-[#999] mb-4">
+          <p className="text-[12.5px] text-[var(--app-text-secondary)] mb-4">
             Verified by {wi?.organisations?.name || work.verifier?.full_name || 'a reviewer'} · {new Date(work.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
 
           {wi?.criteria && (
-            <div className="bg-[#141414] border border-white/10 rounded-xl px-4 py-3 mb-4">
-              <p className="text-[11px] font-semibold text-[#999] uppercase tracking-wide mb-1">Criteria</p>
-              <p className="text-[13px] text-[#ccc] leading-relaxed">{wi.criteria}</p>
+            <div className="bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-xl px-4 py-3 mb-4">
+              <p className="text-[11px] font-semibold text-[var(--app-text-secondary)] uppercase tracking-wide mb-1">Criteria</p>
+              <p className="text-[13px] text-[var(--app-text-body)] leading-relaxed">{wi.criteria}</p>
             </div>
           )}
 
           {sub?.content && (
             <div className="mb-4">
-              <p className="text-[11px] font-semibold text-[#999] uppercase tracking-wide mb-1.5">The work</p>
-              <p className="text-[14px] text-white whitespace-pre-wrap leading-relaxed">{sub.content}</p>
+              <p className="text-[11px] font-semibold text-[var(--app-text-secondary)] uppercase tracking-wide mb-1.5">The work</p>
+              <p className="text-[14px] text-[var(--app-text)] whitespace-pre-wrap leading-relaxed">{sub.content}</p>
             </div>
           )}
 
           {sub?.file_path && (
             isImage && fileUrl ? (
-              <img src={fileUrl} alt="" className="w-full rounded-lg border border-white/10" />
+              <img src={fileUrl} alt="" className="w-full rounded-lg border border-[var(--app-border)]" />
             ) : (
               <a
                 href={fileUrl || '#'} target="_blank" rel="noreferrer"
-                className="flex items-center gap-2 bg-[#141414] border border-white/10 rounded-xl px-4 py-3 text-[13px] font-semibold text-white hover:border-white/20 transition"
+                className="flex items-center gap-2 bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-xl px-4 py-3 text-[13px] font-semibold text-[var(--app-text)] hover:border-white/20 transition"
               >
-                <FilePlus className="w-4 h-4 text-[#999] flex-shrink-0" />
+                <FilePlus className="w-4 h-4 text-[var(--app-text-secondary)] flex-shrink-0" />
                 <span className="truncate">{sub.file_path.split('/').pop()}</span>
               </a>
             )
@@ -533,10 +533,10 @@ export function EditProfileScreen({ profile, onDone, onClose }: { profile: any; 
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0f0f0f] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <div className="sticky top-0 z-10 flex items-center justify-between h-14 px-4 bg-[#0f0f0f]/95 backdrop-blur border-b border-white/10">
-        <button onClick={onClose} className="text-[15px] text-[#999]">Cancel</button>
-        <p className="text-[15px] font-semibold text-white">Edit profile</p>
+    <div className="fixed inset-0 z-50 bg-[var(--app-bg)] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div className="sticky top-0 z-10 flex items-center justify-between h-14 px-4 bg-[var(--app-bg)]/95 backdrop-blur border-b border-[var(--app-border)]">
+        <button onClick={onClose} className="text-[15px] text-[var(--app-text-secondary)]">Cancel</button>
+        <p className="text-[15px] font-semibold text-[var(--app-text)]">Edit profile</p>
         <button onClick={save} disabled={saving || !name.trim()} className="text-[15px] font-semibold text-brand disabled:opacity-40">
           {saving ? 'Saving…' : 'Save'}
         </button>
@@ -546,7 +546,7 @@ export function EditProfileScreen({ profile, onDone, onClose }: { profile: any; 
         <button onClick={pickPhoto} disabled={uploadingPhoto} className="relative disabled:opacity-60">
           <Avatar path={avatarPath} name={name || profile.full_name} size={96} textSize={32} variant="solid" />
           <span className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-brand flex items-center justify-center border-2 border-[#0f0f0f]">
-            <Camera className="w-3.5 h-3.5 text-white" />
+            <Camera className="w-3.5 h-3.5 text-[var(--app-text)]" />
           </span>
         </button>
         <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={e => onPhotoChosen(e.target.files?.[0] || null)} />
@@ -556,7 +556,7 @@ export function EditProfileScreen({ profile, onDone, onClose }: { profile: any; 
             {uploadingPhoto ? 'Uploading…' : avatarPath ? 'Change photo' : 'Add photo'}
           </button>
           {avatarPath && (
-            <button onClick={removePhoto} disabled={uploadingPhoto} className="text-[13px] font-semibold text-[#999] disabled:opacity-40">
+            <button onClick={removePhoto} disabled={uploadingPhoto} className="text-[13px] font-semibold text-[var(--app-text-secondary)] disabled:opacity-40">
               Remove
             </button>
           )}
@@ -589,19 +589,19 @@ function EditField({ label, value, onChange, placeholder, hint, multiline, maxLe
 }) {
   return (
     <label className="block">
-      <span className="block text-[13px] font-semibold text-[#999] mb-2">{label}</span>
+      <span className="block text-[13px] font-semibold text-[var(--app-text-secondary)] mb-2">{label}</span>
       {multiline ? (
         <textarea
           value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={3} maxLength={maxLength}
-          className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-[15px] text-white placeholder-[#555] outline-none focus:border-brand transition resize-none leading-relaxed"
+          className="w-full bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-3 text-[15px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition resize-none leading-relaxed"
         />
       ) : (
         <input
           value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-          className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-[15px] text-white placeholder-[#555] outline-none focus:border-brand transition"
+          className="w-full bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-3 text-[15px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition"
         />
       )}
-      {hint && <span className="block text-[12px] text-[#666] mt-1.5">{hint}</span>}
+      {hint && <span className="block text-[12px] text-[var(--app-text-tertiary)] mt-1.5">{hint}</span>}
     </label>
   )
 }
@@ -620,10 +620,10 @@ function AddExperienceForm({ profileId, onAdded }: { profileId: string; onAdded:
   }
 
   return (
-    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3.5 space-y-2">
-      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Saturday job at a local print shop" className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition" />
-      <input value={organisation} onChange={e => setOrganisation(e.target.value)} placeholder="Where (optional)" className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition" />
-      <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
+    <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl p-3.5 space-y-2">
+      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Saturday job at a local print shop" className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition" />
+      <input value={organisation} onChange={e => setOrganisation(e.target.value)} placeholder="Where (optional)" className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition" />
+      <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-[var(--app-text)] text-[12px] font-semibold disabled:opacity-40">
         {saving ? 'Saving…' : 'Save'}
       </button>
     </div>
@@ -651,15 +651,15 @@ function AddQualForm({ profileId, onAdded }: { profileId: string; onAdded: () =>
   }
 
   return (
-    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3.5 space-y-2">
-      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Level 2 Food Hygiene Certificate" className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition" />
-      <input value={issuer} onChange={e => setIssuer(e.target.value)} placeholder="Issued by (optional)" className="w-full bg-[#141414] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-brand transition" />
-      <button onClick={() => fileRef.current?.click()} className="text-[12px] font-semibold text-[#999] hover:text-brand transition">
+    <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl p-3.5 space-y-2">
+      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Level 2 Food Hygiene Certificate" className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition" />
+      <input value={issuer} onChange={e => setIssuer(e.target.value)} placeholder="Issued by (optional)" className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition" />
+      <button onClick={() => fileRef.current?.click()} className="text-[12px] font-semibold text-[var(--app-text-secondary)] hover:text-brand transition">
         {file ? file.name : 'Attach a file (optional)'}
       </button>
       <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
       <div>
-        <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
+        <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-[var(--app-text)] text-[12px] font-semibold disabled:opacity-40">
           {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
@@ -677,7 +677,7 @@ function PostThumb({ post, canDelete, onDeleted }: { post: any; canDelete: boole
   const remove = async () => { await deletePost(post.id); onDeleted() }
 
   return (
-    <div className="relative aspect-square bg-[#141414] rounded-lg overflow-hidden group">
+    <div className="relative aspect-square bg-[var(--app-surface-2)] rounded-lg overflow-hidden group">
       {post.video_path && url ? (
         <video src={url} className="w-full h-full object-cover" muted />
       ) : url ? (
@@ -685,8 +685,8 @@ function PostThumb({ post, canDelete, onDeleted }: { post: any; canDelete: boole
       ) : (
         <div className="w-full h-full flex items-center justify-center p-2">
           {post.video_path
-            ? <Play className="w-6 h-6 text-[#333]" />
-            : <p className="text-[11px] text-[#666] line-clamp-4">{post.content}</p>}
+            ? <Play className="w-6 h-6 text-[var(--app-text-quaternary)]" />
+            : <p className="text-[11px] text-[var(--app-text-tertiary)] line-clamp-4">{post.content}</p>}
         </div>
       )}
       {canDelete && (
@@ -694,7 +694,7 @@ function PostThumb({ post, canDelete, onDeleted }: { post: any; canDelete: boole
           onClick={remove}
           className="absolute top-1.5 right-1.5 w-7 h-7 bg-[#2a2a2a] rounded-full flex items-center justify-center z-10"
         >
-          <Trash2 className="w-3.5 h-3.5 text-white" />
+          <Trash2 className="w-3.5 h-3.5 text-[var(--app-text)]" />
         </button>
       )}
     </div>

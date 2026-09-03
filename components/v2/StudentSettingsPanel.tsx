@@ -111,24 +111,24 @@ export default function StudentSettingsPanel() {
   if (screen === 'consent') {
     return (
       <ScreenShell title="Consent" onBack={() => setScreen(null)}>
-        <p className="text-[14px] leading-relaxed text-[#ccc] mb-4">
+        <p className="text-[14px] leading-relaxed text-[var(--app-text-body)] mb-4">
           {user.consented_at
             ? `You agreed to LERN's Terms of Service and Privacy Policy on ${new Date(user.consented_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`
             : "We don't have a record of when you agreed to LERN's Terms of Service and Privacy Policy."}
         </p>
-        <p className="text-[13px] text-[#999] leading-relaxed mb-6">
+        <p className="text-[13px] text-[var(--app-text-secondary)] leading-relaxed mb-6">
           To withdraw your consent, delete your account below — using LERN depends on having agreed to these, so withdrawing means the account itself is deleted.
         </p>
         <DarkButton danger onClick={() => setScreen(adult ? 'deleteAdult' : null)}>
           {adult ? 'Delete my account' : 'Close'}
         </DarkButton>
-        {!adult && <p className="text-[12px] text-[#666] mt-3">As you're under 18, deleting your account routes through your school — see "Your data" below.</p>}
+        {!adult && <p className="text-[12px] text-[var(--app-text-tertiary)] mt-3">As you're under 18, deleting your account routes through your school — see "Your data" below.</p>}
       </ScreenShell>
     )
   }
 
   return (
-    <div className="bg-[#0f0f0f] min-h-[calc(100vh-56px)] text-white px-4 pt-4 pb-10">
+    <div className="bg-[var(--app-bg)] min-h-[calc(100vh-56px)] text-[var(--app-text)] px-4 pt-4 pb-10">
       <p className="text-[22px] font-bold mb-5">Settings</p>
 
       {editingProfile && (
@@ -162,7 +162,7 @@ export default function StudentSettingsPanel() {
         {!adult ? (
           <div className="px-4 py-3.5 flex items-start gap-2.5">
             <Shield className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#4ade80]" />
-            <p className="text-[13px] leading-relaxed text-[#ccc]">
+            <p className="text-[13px] leading-relaxed text-[var(--app-text-body)]">
               Because you are under 18, your profile is not public and you cannot be searched for by name. Your work can be shared through your school, but you cannot be contacted directly.
             </p>
           </div>
@@ -174,8 +174,8 @@ export default function StudentSettingsPanel() {
             <ToggleRow label="Following visible" value={user.following_visible !== false} busy={busyField === 'following_visible'} onToggle={v => savePrivacy('following_visible', v)} />
           </>
         )}
-        <div className="px-4 py-3 border-t border-white/[0.06]">
-          <p className="text-[12px] text-[#666] leading-relaxed">Each verified piece of work can be set public or private individually, from the work itself.</p>
+        <div className="px-4 py-3 border-t border-[var(--app-border-subtle)]">
+          <p className="text-[12px] text-[var(--app-text-tertiary)] leading-relaxed">Each verified piece of work can be set public or private individually, from the work itself.</p>
         </div>
         <Row label="Blocked accounts" onClick={() => setScreen('blocked')} />
       </Group>
@@ -201,8 +201,8 @@ export default function StudentSettingsPanel() {
           a.href = url; a.download = `lern-my-data-${new Date().toISOString().split('T')[0]}.json`; a.click()
           URL.revokeObjectURL(url)
         }} />
-        <div className="px-4 py-3.5 border-t border-white/[0.06]">
-          <p className="text-[12.5px] text-[#999] leading-relaxed">
+        <div className="px-4 py-3.5 border-t border-[var(--app-border-subtle)]">
+          <p className="text-[12.5px] text-[var(--app-text-secondary)] leading-relaxed">
             Most details can be corrected by editing your profile above. For anything else, contact your safeguarding lead below or use "Report a problem" in Safety.
           </p>
         </div>
@@ -217,9 +217,9 @@ export default function StudentSettingsPanel() {
       {/* ── 6. Safety and reporting ── */}
       <Group title="Safety and reporting">
         <Row label="Report a problem or something that worries you" onClick={() => setScreen('report')} />
-        <div className="px-4 py-3 border-t border-white/[0.06] space-y-2">
-          <p className="text-[12px] text-[#666] leading-relaxed">A post or piece of content can also be reported directly from the content itself.</p>
-          <p className="text-[12px] text-[#666] leading-relaxed">A report is looked at by a person. Content can be automatically hidden while that happens — nothing is auto-actioned against another user without human review.</p>
+        <div className="px-4 py-3 border-t border-[var(--app-border-subtle)] space-y-2">
+          <p className="text-[12px] text-[var(--app-text-tertiary)] leading-relaxed">A post or piece of content can also be reported directly from the content itself.</p>
+          <p className="text-[12px] text-[var(--app-text-tertiary)] leading-relaxed">A report is looked at by a person. Content can be automatically hidden while that happens — nothing is auto-actioned against another user without human review.</p>
         </div>
         <Row label="Block or hide an account" onClick={() => setScreen('blocked')} />
         <Row
@@ -238,7 +238,7 @@ export default function StudentSettingsPanel() {
               <button
                 key={t} onClick={() => saveTheme(t)} disabled={busyField === 'theme'}
                 className={`flex-1 flex flex-col items-center gap-1.5 py-2.5 rounded-xl border text-[12px] font-medium transition ${
-                  (user.theme_preference || 'dark') === t ? 'border-brand bg-brand/10 text-white' : 'border-white/10 text-[#888]'
+                  (user.theme_preference || 'dark') === t ? 'border-brand bg-brand/10 text-[var(--app-text)]' : 'border-[var(--app-border)] text-[var(--app-text-secondary)]'
                 }`}
               >
                 {t === 'light' ? <Sun className="w-4 h-4" /> : t === 'dark' ? <Moon className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
@@ -246,7 +246,7 @@ export default function StudentSettingsPanel() {
               </button>
             ))}
           </div>
-          <p className="text-[12px] text-[#666] mt-3 leading-relaxed">Saved now. LERN's phone app is dark-only at the moment — Light and System will take effect once that's switched on across every screen.</p>
+          <p className="text-[12px] text-[var(--app-text-tertiary)] mt-3 leading-relaxed">Saved now. LERN's phone app is dark-only at the moment — Light and System will take effect once that's switched on across every screen.</p>
         </div>
       </Group>
 
@@ -265,7 +265,7 @@ export default function StudentSettingsPanel() {
         <Row label="App version" value="1.0" noChevron />
         <a href="mailto:support@lernapp.uk" className="flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.03] transition">
           <span className="text-[14px]">Contact and support</span>
-          <span className="flex items-center gap-1 text-[13px] text-[#999]"><Mail className="w-3.5 h-3.5" /> support@lernapp.uk</span>
+          <span className="flex items-center gap-1 text-[13px] text-[var(--app-text-secondary)]"><Mail className="w-3.5 h-3.5" /> support@lernapp.uk</span>
         </a>
       </Group>
 
@@ -284,8 +284,8 @@ export default function StudentSettingsPanel() {
 function Group({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
     <div className="mb-3">
-      {title && <p className="text-[13px] font-medium text-[#999] mb-2 px-1">{title}</p>}
-      <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl divide-y divide-white/[0.06] overflow-hidden">
+      {title && <p className="text-[13px] font-medium text-[var(--app-text-secondary)] mb-2 px-1">{title}</p>}
+      <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-2xl divide-y divide-white/[0.06] overflow-hidden">
         {children}
       </div>
     </div>
@@ -298,13 +298,13 @@ function Row({ label, value, onClick, right, noChevron, danger, multiline, busy 
 }) {
   const content = (
     <>
-      <span className={`text-[14px] ${multiline ? 'leading-relaxed pr-2' : ''} ${danger ? 'text-danger-text' : 'text-white'}`}>
+      <span className={`text-[14px] ${multiline ? 'leading-relaxed pr-2' : ''} ${danger ? 'text-danger-text' : 'text-[var(--app-text)]'}`}>
         {busy ? 'Working…' : label}
       </span>
       <span className="flex items-center gap-2 flex-shrink-0">
-        {value && <span className="text-[13px] text-[#999] truncate max-w-[140px]">{value}</span>}
+        {value && <span className="text-[13px] text-[var(--app-text-secondary)] truncate max-w-[140px]">{value}</span>}
         {right}
-        {onClick && !noChevron && <ChevronRight className="w-4 h-4 text-[#555]" />}
+        {onClick && !noChevron && <ChevronRight className="w-4 h-4 text-[var(--app-text-tertiary)]" />}
       </span>
     </>
   )
@@ -320,8 +320,8 @@ function ToggleRow({ label, hint, value, onToggle, busy }: { label: string; hint
   return (
     <div className="flex items-center justify-between px-4 py-3.5 gap-3">
       <div className="min-w-0">
-        <p className="text-[14px] text-white">{label}</p>
-        {hint && <p className="text-[12px] text-[#666] mt-0.5">{hint}</p>}
+        <p className="text-[14px] text-[var(--app-text)]">{label}</p>
+        {hint && <p className="text-[12px] text-[var(--app-text-tertiary)] mt-0.5">{hint}</p>}
       </div>
       <button
         onClick={() => onToggle(!value)} disabled={busy}
@@ -336,16 +336,16 @@ function ToggleRow({ label, hint, value, onToggle, busy }: { label: string; hint
 function LinkRow({ label, href }: { label: string; href: string }) {
   return (
     <Link href={href} className="flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.03] transition">
-      <span className="text-[14px] text-white">{label}</span>
-      <ChevronRight className="w-4 h-4 text-[#555]" />
+      <span className="text-[14px] text-[var(--app-text)]">{label}</span>
+      <ChevronRight className="w-4 h-4 text-[var(--app-text-tertiary)]" />
     </Link>
   )
 }
 
 function ScreenShell({ title, onBack, children }: { title: string; onBack: () => void; children: React.ReactNode }) {
   return (
-    <div className="bg-[#0f0f0f] min-h-[calc(100vh-56px)] text-white">
-      <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-[#0f0f0f]/95 backdrop-blur border-b border-white/10">
+    <div className="bg-[var(--app-bg)] min-h-[calc(100vh-56px)] text-[var(--app-text)]">
+      <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-[var(--app-bg)]/95 backdrop-blur border-b border-[var(--app-border)]">
         <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition">
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -359,10 +359,10 @@ function ScreenShell({ title, onBack, children }: { title: string; onBack: () =>
 function DarkField({ label, ...props }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="block mb-4">
-      <span className="block text-[13px] font-semibold text-[#999] mb-1.5">{label}</span>
+      <span className="block text-[13px] font-semibold text-[var(--app-text-secondary)] mb-1.5">{label}</span>
       <input
         {...props}
-        className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-[15px] text-white placeholder-[#555] outline-none focus:border-brand transition"
+        className="w-full bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-3 text-[15px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition"
       />
     </label>
   )
@@ -373,7 +373,7 @@ function DarkButton({ children, onClick, disabled, danger }: { children: React.R
     <button
       onClick={onClick} disabled={disabled}
       className={`w-full py-3 rounded-xl text-[14px] font-semibold transition disabled:opacity-40 ${
-        danger ? 'bg-danger-solid text-white' : 'bg-[#1a1a1a] border border-white/10 text-white hover:bg-[#222]'
+        danger ? 'bg-danger-solid text-[var(--app-text)]' : 'bg-[var(--app-surface)] border border-[var(--app-border)] text-[var(--app-text)] hover:bg-[#222]'
       }`}
     >
       {children}
@@ -429,7 +429,7 @@ function ChangeEmailScreen({ currentEmail, onBack }: { currentEmail: string; onB
 
   return (
     <ScreenShell title="Email" onBack={onBack}>
-      <p className="text-[13px] text-[#999] mb-4">Current email: {currentEmail}</p>
+      <p className="text-[13px] text-[var(--app-text-secondary)] mb-4">Current email: {currentEmail}</p>
       {sent ? (
         <p className="text-[14px] text-success-text leading-relaxed">Check <b>{email}</b> for a confirmation link — your email only changes once you click it.</p>
       ) : (
@@ -453,14 +453,14 @@ function BlockedAccountsScreen({ userId, onBack }: { userId: string; onBack: () 
   return (
     <ScreenShell title="Blocked accounts" onBack={onBack}>
       {loading ? (
-        <p className="text-[13px] text-[#666]">Loading…</p>
+        <p className="text-[13px] text-[var(--app-text-tertiary)]">Loading…</p>
       ) : rows.length === 0 ? (
         <div className="text-center py-12">
-          <UserX className="w-7 h-7 text-[#333] mx-auto mb-2.5" />
-          <p className="text-[13px] text-[#666]">Nobody's blocked. Block someone from their profile and they'll show up here.</p>
+          <UserX className="w-7 h-7 text-[var(--app-text-quaternary)] mx-auto mb-2.5" />
+          <p className="text-[13px] text-[var(--app-text-tertiary)]">Nobody's blocked. Block someone from their profile and they'll show up here.</p>
         </div>
       ) : (
-        <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl divide-y divide-white/[0.06] overflow-hidden">
+        <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-2xl divide-y divide-white/[0.06] overflow-hidden">
           {rows.map(r => (
             <div key={r.id} className="flex items-center justify-between px-4 py-3.5">
               <span className="text-[14px]">{r.blocked?.full_name || 'A user'}</span>
@@ -517,16 +517,16 @@ function ReportScreen({ userId, organisationId, onBack }: { userId: string; orga
 
   return (
     <ScreenShell title="Report a problem" onBack={onBack}>
-      <p className="text-[13px] text-[#999] mb-4 leading-relaxed">
+      <p className="text-[13px] text-[var(--app-text-secondary)] mb-4 leading-relaxed">
         Something wrong, or something that worries you? Tell us here — a person reviews every report, never an automated ban.
       </p>
       {sent && <p className="text-[13px] text-success-text font-semibold mb-3">Sent — thank you. A person will look at this.</p>}
       {error && <p className="text-[13px] text-danger-text mb-3">{error}</p>}
       <label className="block mb-4">
-        <span className="block text-[13px] font-semibold text-[#999] mb-1.5">What happened?</span>
+        <span className="block text-[13px] font-semibold text-[var(--app-text-secondary)] mb-1.5">What happened?</span>
         <textarea
           value={reason} onChange={e => setReason(e.target.value)} rows={4}
-          className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-[15px] text-white placeholder-[#555] outline-none focus:border-brand transition resize-none"
+          className="w-full bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-3 text-[15px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition resize-none"
         />
       </label>
       <DarkButton onClick={send} disabled={loading}>{loading ? 'Sending…' : 'Send report'}</DarkButton>

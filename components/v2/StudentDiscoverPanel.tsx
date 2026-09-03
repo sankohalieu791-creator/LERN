@@ -141,9 +141,9 @@ export default function StudentDiscoverPanel() {
           organisation"), so it isn't lost, just not duplicated up here
           at the cost of a layout shift between tabs. */}
       <div className="px-4 pt-4 pb-3">
-        <h1 className="text-white text-2xl font-bold">Discover</h1>
-        {tab === 'received' && <p className="text-[#666] text-sm mt-0.5">Employers who've expressed interest in you</p>}
-        {tab === 'tracking' && <p className="text-[#666] text-sm mt-0.5">Where each application actually stands</p>}
+        <h1 className="text-[var(--app-text)] text-2xl font-bold">Discover</h1>
+        {tab === 'received' && <p className="text-[var(--app-text-tertiary)] text-sm mt-0.5">Employers who've expressed interest in you</p>}
+        {tab === 'tracking' && <p className="text-[var(--app-text-tertiary)] text-sm mt-0.5">Where each application actually stands</p>}
       </div>
 
       {/* Always rendered, every tab -- it used to only show for tabs
@@ -153,14 +153,14 @@ export default function StudentDiscoverPanel() {
           does something real on every tab, including this one
           (filters by employer name client-side, below). */}
       <div className="px-4 mb-3">
-        <div className="flex items-center gap-2 bg-[#1a1a1a] border border-white/[0.08] rounded-2xl px-4 py-3">
-          <Search className="w-4 h-4 text-[#555] flex-shrink-0" />
+        <div className="flex items-center gap-2 bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl px-4 py-3">
+          <Search className="w-4 h-4 text-[var(--app-text-tertiary)] flex-shrink-0" />
           <input
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder={tab === 'received' ? 'Search by employer…' : 'Search…'}
-            className="flex-1 bg-transparent text-white text-sm placeholder-[#444] outline-none"
+            className="flex-1 bg-transparent text-[var(--app-text)] text-sm placeholder-[#444] outline-none"
           />
-          {search && <button onClick={() => setSearch('')}><X className="w-4 h-4 text-[#555]" /></button>}
+          {search && <button onClick={() => setSearch('')}><X className="w-4 h-4 text-[var(--app-text-tertiary)]" /></button>}
         </div>
       </div>
 
@@ -169,7 +169,7 @@ export default function StudentDiscoverPanel() {
           <button
             key={t.id} onClick={() => setTab(t.id)}
             className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition ${
-              tab === t.id ? 'bg-white text-black' : 'bg-[#1a1a1a] text-[#888] border border-white/[0.08]'
+              tab === t.id ? 'bg-white text-black' : 'bg-[var(--app-surface)] text-[var(--app-text-secondary)] border border-[var(--app-border-subtle)]'
             }`}
           >
             {t.label}
@@ -181,7 +181,7 @@ export default function StudentDiscoverPanel() {
         {loading ? (
           <div className="space-y-3 pt-1">
             {[0, 1].map(i => (
-              <div key={i} className="bg-[#1a1a1a] border border-white/[0.07] rounded-2xl p-4 h-28 animate-pulse" />
+              <div key={i} className="bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4 h-28 animate-pulse" />
             ))}
           </div>
         ) : tab === 'explore' ? (
@@ -194,19 +194,19 @@ export default function StudentDiscoverPanel() {
               // the same destination tapping a Feed author now goes to.
               <button
                 key={v.id} onClick={() => router.push(student?.id === user?.id ? '/student/profile' : `/student/profile/${student?.id}`)}
-                className="w-full text-left bg-[#1a1a1a] border border-white/[0.07] rounded-2xl p-4"
+                className="w-full text-left bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4"
               >
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className="text-[10px] font-bold text-[#888] uppercase tracking-wide">{TYPE_LABEL[wi?.type] || wi?.type}</span>
+                  <span className="text-[10px] font-bold text-[var(--app-text-secondary)] uppercase tracking-wide">{TYPE_LABEL[wi?.type] || wi?.type}</span>
                   <span className="flex items-center gap-1 text-[11px] font-semibold text-[#4ade80] flex-shrink-0"><BadgeCheck className="w-3.5 h-3.5" /> Verified</span>
                 </div>
-                <p className="text-white font-bold text-[15px] leading-snug mb-1">{wi?.title}</p>
-                {wi?.description && <p className="text-[#888] text-sm line-clamp-2 mb-3 leading-snug">{wi.description}</p>}
-                <div className="flex items-center gap-2 pt-2 border-t border-white/[0.06]">
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[9px] flex-shrink-0">
+                <p className="text-[var(--app-text)] font-bold text-[15px] leading-snug mb-1">{wi?.title}</p>
+                {wi?.description && <p className="text-[var(--app-text-secondary)] text-sm line-clamp-2 mb-3 leading-snug">{wi.description}</p>}
+                <div className="flex items-center gap-2 pt-2 border-t border-[var(--app-border-subtle)]">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-[var(--app-text)] font-bold text-[9px] flex-shrink-0">
                     {initials(student?.full_name)}
                   </div>
-                  <p className="text-[#888] text-xs">{student?.full_name} · verified {new Date(v.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+                  <p className="text-[var(--app-text-secondary)] text-xs">{student?.full_name} · verified {new Date(v.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
                 </div>
               </button>
             )
@@ -218,14 +218,14 @@ export default function StudentDiscoverPanel() {
             if (interest.length === 0) return <EmptyState label="Nothing yet — when an employer's interested in your verified work, it'll show up here." />
             if (filtered.length === 0) return <EmptyState label={`No requests from an employer matching "${search}".`} />
             return filtered.map(i => (
-            <div key={i.id} className="bg-[#1a1a1a] border border-white/[0.07] rounded-2xl p-4">
+            <div key={i.id} className="bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4">
               <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-[#252525] flex items-center justify-center text-white font-bold text-[11px] flex-shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-[#252525] flex items-center justify-center text-[var(--app-text)] font-bold text-[11px] flex-shrink-0">
                   {initials(i.employer?.full_name)}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-white font-bold text-sm truncate">{i.employer?.full_name || 'An employer'}</p>
-                  <p className="text-[#666] text-xs">
+                  <p className="text-[var(--app-text)] font-bold text-sm truncate">{i.employer?.full_name || 'An employer'}</p>
+                  <p className="text-[var(--app-text-tertiary)] text-xs">
                     {i.opportunity_label ? `${i.opportunity_label} · ` : ''}{new Date(i.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </p>
                 </div>
@@ -233,19 +233,19 @@ export default function StudentDiscoverPanel() {
               {/* Was fetched but never shown -- the whole point of the
                   message is telling the student what the employer's
                   actually after before they accept or decline. */}
-              {i.message && <p className="text-[#ccc] text-sm leading-snug mb-3">{i.message}</p>}
+              {i.message && <p className="text-[var(--app-text-body)] text-sm leading-snug mb-3">{i.message}</p>}
               {i.status === 'pending' ? (
                 <div className="flex gap-2">
-                  <button onClick={() => respond(i.id, 'accepted')} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white">
+                  <button onClick={() => respond(i.id, 'accepted')} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-[var(--app-text)]">
                     <Check className="w-4 h-4" /> Accept
                   </button>
-                  <button onClick={() => respond(i.id, 'declined')} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-[#252525] text-[#888] border border-white/10">
+                  <button onClick={() => respond(i.id, 'declined')} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-[#252525] text-[var(--app-text-secondary)] border border-[var(--app-border)]">
                     <Ban className="w-4 h-4" /> Decline
                   </button>
                 </div>
               ) : (
                 <span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-full ${
-                  i.status === 'accepted' ? 'bg-[#123a24] text-[#4ade80]' : 'bg-white/5 text-[#666]'
+                  i.status === 'accepted' ? 'bg-[#123a24] text-[#4ade80]' : 'bg-white/5 text-[var(--app-text-tertiary)]'
                 }`}>
                   {i.status === 'accepted' ? 'Accepted' : 'Declined'}
                 </span>
@@ -255,32 +255,32 @@ export default function StudentDiscoverPanel() {
           })()
         ) : tab === 'tracking' ? (
           applications.length === 0 ? (
-            <EmptyState label="Nothing yet — apply to a role or accept an employer's interest to start tracking it here." icon={<LineChart className="w-8 h-8 text-[#333] mb-2" />} />
+            <EmptyState label="Nothing yet — apply to a role or accept an employer's interest to start tracking it here." icon={<LineChart className="w-8 h-8 text-[var(--app-text-quaternary)] mb-2" />} />
           ) : applications.map(a => {
             const meta = STAGE_META[a.stage as ApplicationStage]
             return (
-              <div key={a.id} className="bg-[#1a1a1a] border border-white/[0.07] rounded-2xl p-4">
+              <div key={a.id} className="bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4">
                 <div className="flex items-center gap-2.5 mb-3">
-                  <div className="w-9 h-9 rounded-xl bg-[#252525] flex items-center justify-center text-white font-bold text-[11px] flex-shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-[#252525] flex items-center justify-center text-[var(--app-text)] font-bold text-[11px] flex-shrink-0">
                     {initials(a.employer?.full_name)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-white font-bold text-sm truncate">{a.opportunity?.title || 'Direct interest'}</p>
-                    <p className="text-[#888] text-xs truncate">{a.employer?.full_name || 'An employer'}</p>
+                    <p className="text-[var(--app-text)] font-bold text-sm truncate">{a.opportunity?.title || 'Direct interest'}</p>
+                    <p className="text-[var(--app-text-secondary)] text-xs truncate">{a.employer?.full_name || 'An employer'}</p>
                   </div>
                   <span className="text-[11px] font-semibold px-3 py-1 rounded-full flex-shrink-0" style={{ backgroundColor: meta.bg, color: meta.text }}>
                     {meta.label}
                   </span>
                 </div>
-                <p className="text-[#555] text-xs">Updated {new Date(a.stage_updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                <p className="text-[var(--app-text-tertiary)] text-xs">Updated {new Date(a.stage_updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
               </div>
             )
           })
         ) : (
-          opportunities.length === 0 ? <EmptyState label={`No ${tab === 'job' ? 'jobs' : tab === 'apprenticeship' ? 'apprenticeships' : 'internships'} posted yet.`} icon={<Briefcase className="w-8 h-8 text-[#333] mb-2" />} /> : opportunities.map(o => {
+          opportunities.length === 0 ? <EmptyState label={`No ${tab === 'job' ? 'jobs' : tab === 'apprenticeship' ? 'apprenticeships' : 'internships'} posted yet.`} icon={<Briefcase className="w-8 h-8 text-[var(--app-text-quaternary)] mb-2" />} /> : opportunities.map(o => {
             const status = applicationByOpp[o.id]
             return (
-              <div key={o.id} className="bg-[#1a1a1a] border border-white/[0.07] rounded-2xl p-4">
+              <div key={o.id} className="bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4">
                 <div className="flex items-start gap-3 mb-3">
                   {/* Real company logo when the employer's added one --
                       gradient-initials fallback otherwise, same as
@@ -288,13 +288,13 @@ export default function StudentDiscoverPanel() {
                   {o.logo_path ? (
                     <img src={getAvatarUrl(o.logo_path) || ''} alt="" className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" />
                   ) : (
-                    <div className="w-14 h-14 rounded-2xl bg-[#252525] flex items-center justify-center text-white font-bold text-[16px] flex-shrink-0">
+                    <div className="w-14 h-14 rounded-2xl bg-[#252525] flex items-center justify-center text-[var(--app-text)] font-bold text-[16px] flex-shrink-0">
                       {initials(o.employer?.full_name)}
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-bold text-[17px] leading-tight">{o.title}</p>
-                    {o.employer?.full_name && <p className="text-[#888] text-sm">{o.employer.full_name}</p>}
+                    <p className="text-[var(--app-text)] font-bold text-[17px] leading-tight">{o.title}</p>
+                    {o.employer?.full_name && <p className="text-[var(--app-text-secondary)] text-sm">{o.employer.full_name}</p>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -302,11 +302,11 @@ export default function StudentDiscoverPanel() {
                       JobCard exactly (git show a07a8c2~1), not a generic
                       "money = green" default. */}
                   {o.salary && <p className="text-[#FF6B2B] font-bold text-sm">{o.salary}</p>}
-                  {o.location && <p className="text-[#888] text-sm">{o.salary ? '· ' : ''}{o.location}</p>}
+                  {o.location && <p className="text-[var(--app-text-secondary)] text-sm">{o.salary ? '· ' : ''}{o.location}</p>}
                 </div>
-                {o.description && <p className="text-[#666] text-sm leading-relaxed line-clamp-2 mb-2">{o.description}</p>}
-                {o.requirements && <p className="text-[#666] text-sm leading-relaxed line-clamp-2 mb-3"><span className="font-semibold text-[#888]">Looking for: </span>{o.requirements}</p>}
-                <div className="flex items-center gap-1 text-[#555] text-xs mb-3">
+                {o.description && <p className="text-[var(--app-text-tertiary)] text-sm leading-relaxed line-clamp-2 mb-2">{o.description}</p>}
+                {o.requirements && <p className="text-[var(--app-text-tertiary)] text-sm leading-relaxed line-clamp-2 mb-3"><span className="font-semibold text-[var(--app-text-secondary)]">Looking for: </span>{o.requirements}</p>}
+                <div className="flex items-center gap-1 text-[var(--app-text-tertiary)] text-xs mb-3">
                   <Clock className="w-3 h-3" /> Posted {new Date(o.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                 </div>
                 {status === 'pending' ? (
@@ -315,7 +315,7 @@ export default function StudentDiscoverPanel() {
                       {STAGE_META[stageByOpp[o.id]].label}
                     </div>
                   ) : (
-                    <div className="w-full text-center py-2.5 rounded-full text-sm font-semibold bg-white/5 text-[#888]">
+                    <div className="w-full text-center py-2.5 rounded-full text-sm font-semibold bg-white/5 text-[var(--app-text-secondary)]">
                       {adult ? 'Applied — pending' : 'Applied — sent to your organisation'}
                     </div>
                   )
@@ -324,11 +324,11 @@ export default function StudentDiscoverPanel() {
                     <Check className="w-4 h-4" /> Accepted
                   </div>
                 ) : status === 'declined' ? (
-                  <div className="w-full text-center py-2.5 rounded-full text-sm font-semibold bg-white/5 text-[#666]">Declined</div>
+                  <div className="w-full text-center py-2.5 rounded-full text-sm font-semibold bg-white/5 text-[var(--app-text-tertiary)]">Declined</div>
                 ) : (
                   <button
                     onClick={() => apply(o.id)} disabled={applying === o.id}
-                    className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white disabled:opacity-50"
+                    className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-[var(--app-text)] disabled:opacity-50"
                   >
                     <Send className="w-3.5 h-3.5" /> {applying === o.id ? 'Applying…' : 'Apply'}
                   </button>
@@ -345,8 +345,8 @@ export default function StudentDiscoverPanel() {
 function EmptyState({ label, icon }: { label: string; icon?: React.ReactNode }) {
   return (
     <div className="text-center py-16">
-      {icon ?? <Search className="w-8 h-8 text-[#333] mx-auto mb-3" />}
-      <p className="text-[#666] text-sm">{label}</p>
+      {icon ?? <Search className="w-8 h-8 text-[var(--app-text-quaternary)] mx-auto mb-3" />}
+      <p className="text-[var(--app-text-tertiary)] text-sm">{label}</p>
     </div>
   )
 }

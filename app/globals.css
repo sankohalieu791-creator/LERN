@@ -103,6 +103,62 @@ body {
   --warning-solid: #B3651E;
 }
 
+/* The student app's own dark palette -- a separate token set from
+   --paper/--surface above on purpose. Those already have a light
+   DEFAULT (#FFFDF9) with #131110 as their dark override, a warm
+   dark-brown built for the org/employer desktop shells. The student
+   app was never built on that system at all -- every screen hardcodes
+   a true-black palette (#0f0f0f/#1a1a1a/#141414) closer to Instagram/
+   TikTok's own look, which is a deliberately different, darker,
+   cooler aesthetic. Reusing --surface's existing dark value here would
+   have silently changed what dark mode already looks like today.
+   These tokens carry that EXACT existing palette as their dark value
+   (so converting a hardcoded #0f0f0f to var(--app-bg) is a genuine
+   no-op today), with real light values defined for the first time. */
+:root {
+  --app-bg: #0f0f0f;
+  --app-surface: #1a1a1a;
+  --app-surface-2: #141414;
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-border-subtle: rgba(255, 255, 255, 0.06);
+  --app-text: #ffffff;
+  --app-text-body: #cccccc;
+  --app-text-secondary: #999999;
+  --app-text-tertiary: #666666;
+  --app-text-quaternary: #444444;
+}
+[data-theme="light"] {
+  --app-bg: #fafafa;
+  --app-surface: #ffffff;
+  --app-surface-2: #f2f2f2;
+  --app-border: #e5e5e5;
+  --app-border-subtle: #eeeeee;
+  --app-text: #0f0f0f;
+  --app-text-body: #333333;
+  --app-text-secondary: #666666;
+  --app-text-tertiary: #999999;
+  --app-text-quaternary: #bbbbbb;
+}
+/* System preference only applies when nothing explicit is set -- an
+   explicit [data-theme="dark"] (still used by the org/employer shells'
+   own toggle) must keep winning, so this is scoped to :root only, the
+   same guard pattern --paper/--surface's own dark override doesn't
+   need since student is a new, separate system. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --app-bg: #fafafa;
+    --app-surface: #ffffff;
+    --app-surface-2: #f2f2f2;
+    --app-border: #e5e5e5;
+    --app-border-subtle: #eeeeee;
+    --app-text: #0f0f0f;
+    --app-text-body: #333333;
+    --app-text-secondary: #666666;
+    --app-text-tertiary: #999999;
+    --app-text-quaternary: #bbbbbb;
+  }
+}
+
 [data-theme="dark"] {
   --paper: #131110;
   --ink: #F3EEE6;

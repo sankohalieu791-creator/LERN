@@ -426,7 +426,7 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
               value={caption} onChange={e => setCaption(e.target.value)}
               placeholder="Add a caption…"
               rows={3}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white placeholder-white/40 outline-none resize-none"
+              className="w-full bg-white/5 border border-[var(--app-border)] rounded-xl px-4 py-3 text-[14px] text-white placeholder-white/40 outline-none resize-none"
             />
 
             <div>
@@ -442,7 +442,7 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
                           : prev.length >= 2 ? [prev[1], s.key] : [...prev, s.key]
                       )}
                       className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-medium transition ${
-                        active ? 'border-brand bg-brand/15 text-white' : 'border-white/10 bg-white/5 text-white/60'
+                        active ? 'border-brand bg-brand/15 text-white' : 'border-[var(--app-border)] bg-white/5 text-white/60'
                       }`}
                     >
                       <span>{s.emoji}</span> {s.label}
@@ -455,7 +455,7 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
             {isAdult && (
               <button
                 onClick={() => setVisibility(v => v === 'organisation' ? 'public' : 'organisation')}
-                className="flex items-center gap-1.5 text-[12.5px] font-semibold text-white/70 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+                className="flex items-center gap-1.5 text-[12.5px] font-semibold text-white/70 px-3 py-2 rounded-lg bg-white/5 border border-[var(--app-border)]"
               >
                 {visibility === 'public' ? <Globe className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
                 {visibility === 'public' ? 'Public — anyone on LERN' : 'Organisation only'}

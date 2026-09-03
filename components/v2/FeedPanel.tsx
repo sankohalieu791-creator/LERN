@@ -50,7 +50,7 @@ export default function FeedPanel() {
   if (loading) {
     return (
       <div className="px-4 py-4 space-y-4">
-        {[0, 1].map(i => <div key={i} className="h-[340px] rounded-xl bg-[#1a1a1a] animate-pulse" />)}
+        {[0, 1].map(i => <div key={i} className="h-[340px] rounded-xl bg-[var(--app-surface)] animate-pulse" />)}
       </div>
     )
   }
@@ -58,8 +58,8 @@ export default function FeedPanel() {
   if (posts.length === 0) {
     return (
       <div className="flex flex-col items-center text-center py-20 px-6">
-        <p className="font-semibold text-white text-[15px] mb-1">Nothing here yet</p>
-        <p className="text-[13px] text-[#666]">
+        <p className="font-semibold text-[var(--app-text)] text-[15px] mb-1">Nothing here yet</p>
+        <p className="text-[13px] text-[var(--app-text-tertiary)]">
           {exploring ? 'Public educational content will show up here.' : "Your organisation's posts will show up here."}
         </p>
       </div>
@@ -69,8 +69,8 @@ export default function FeedPanel() {
   return (
     <div className="space-y-2 pb-2">
       {exploring && (
-        <div className="bg-[#1a1a1a] border-b border-white/10 px-4 py-3">
-          <p className="text-[12.5px] text-[#999]">
+        <div className="bg-[var(--app-surface)] border-b border-[var(--app-border)] px-4 py-3">
+          <p className="text-[12.5px] text-[var(--app-text-secondary)]">
             You're seeing public educational content only — link to your organisation in My Work to see everything.
           </p>
         </div>
@@ -122,7 +122,7 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
   }
 
   return (
-    <div className="bg-[#1a1a1a]">
+    <div className="bg-[var(--app-surface)]">
       {/* ── AUTHOR ROW -- tapping opens their profile, own view if it's
           you, public view otherwise ── */}
       <button
@@ -133,8 +133,8 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
           {initials(post.author_name)}
         </span>
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold text-white truncate">{post.author_name}</p>
-          <p className="text-[11px]" style={{ color: '#999' }}>
+          <p className="text-[13px] font-semibold text-[var(--app-text)] truncate">{post.author_name}</p>
+          <p className="text-[11px]" style={{ color: 'var(--app-text-secondary)' }}>
             {[post.category, timeAgo(post.created_at)].filter(Boolean).join(' · ')}
           </p>
         </div>
@@ -145,16 +145,16 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
           inline -- tapping opens the real full-screen player below. ── */}
       {(post.image_path || post.video_path) && (
         <div
-          className="relative w-full bg-[#141414]" style={{ minHeight: 240 }}
+          className="relative w-full bg-[var(--app-surface-2)]" style={{ minHeight: 240 }}
           onClick={() => post.video_path && mediaUrl && setPlayerOpen(true)}
         >
-          {!mediaUrl && <div className="absolute inset-0 bg-[#141414] animate-pulse" style={{ height: 240 }} />}
+          {!mediaUrl && <div className="absolute inset-0 bg-[var(--app-surface-2)] animate-pulse" style={{ height: 240 }} />}
           {mediaUrl && post.video_path ? (
             <>
               <video src={mediaUrl} muted playsInline preload="metadata" className="w-full max-h-[520px] object-cover" />
               <button aria-label="Play video" className="absolute inset-0 flex items-center justify-center bg-black/10">
                 <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center">
-                  <Play className="w-6 h-6 text-white fill-white ml-0.5" />
+                  <Play className="w-6 h-6 text-[var(--app-text)] fill-white ml-0.5" />
                 </div>
               </button>
             </>
@@ -167,8 +167,8 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
       {/* ── CAPTION ── */}
       {(post.title || post.content) && (
         <div className="px-4 pt-3">
-          {post.title && <p className="text-[13px] font-semibold text-white leading-[1.5] mb-0.5">{post.title}</p>}
-          {post.content && <p className="text-[13px] text-[#ccc] leading-[1.5]">{post.content}</p>}
+          {post.title && <p className="text-[13px] font-semibold text-[var(--app-text)] leading-[1.5] mb-0.5">{post.title}</p>}
+          {post.content && <p className="text-[13px] text-[var(--app-text-body)] leading-[1.5]">{post.content}</p>}
         </div>
       )}
 
@@ -192,14 +192,14 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
               <span className="text-[14px] leading-none">{r.emoji}</span>
             </button>
           ))}
-          {reactions.length > 0 && <span className="text-[12px] ml-1" style={{ color: '#999' }}>{reactions.length}</span>}
+          {reactions.length > 0 && <span className="text-[12px] ml-1" style={{ color: 'var(--app-text-secondary)' }}>{reactions.length}</span>}
         </div>
       </div>
 
       {playerOpen && mediaUrl && (
         <div className="fixed inset-0 z-50 bg-black flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
           <button onClick={() => setPlayerOpen(false)} className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-black/50 flex items-center justify-center" style={{ marginTop: 'env(safe-area-inset-top)' }}>
-            <X className="w-5 h-5 text-white" />
+            <X className="w-5 h-5 text-[var(--app-text)]" />
           </button>
           <div className="flex-1 flex items-center justify-center">
             <video src={mediaUrl} controls autoPlay playsInline className="max-h-full max-w-full" />

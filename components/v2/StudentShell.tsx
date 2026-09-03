@@ -3,12 +3,17 @@
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NotificationsBell from '@/components/v2/NotificationsBell'
+import { useAuth } from '@/context/AuthContext'
 import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search } from 'lucide-react'
 
-// Hardcoded dark for now, on purpose — not a theme decision, just
-// matching the real reference exactly while that's the only thing
-// being built. Light/dark as an actual toggle is real, separate,
-// later work, not something to half-wire in here today.
+// theme_preference now actually drives what renders here: 'light' or
+// 'dark' set data-theme explicitly; 'system' (or unset) sets nothing
+// at all, which lets globals.css's own prefers-color-scheme media
+// query resolve it -- no JS media-query listener needed for that case,
+// the CSS cascade already does it. An explicit 'dark' choice still
+// needs data-theme="dark" set literally though, not left absent --
+// otherwise a device whose OS is in light mode would have the light
+// media query override it despite the user's own explicit choice.
 //
 // Sizes here are pulled directly from the actual deleted v1
 // components/BottomNav.tsx (git show a07a8c2~1), not eyeballed off a
@@ -23,6 +28,9 @@ import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search } from 'lu
 export default function StudentShell({ children, onPlus }: { children: React.ReactNode; onPlus?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { user } = useAuth()
+  const pref = user?.theme_preference
+  const dataTheme = pref === 'light' ? 'light' : pref === 'dark' ? 'dark' : undefined
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
   // The real v1 Feed page has its own header (LERN + search + bell);
   // Courses/Workshops (app/courses/page.tsx) has none at all -- its
@@ -62,7 +70,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   // auto, which lets it refuse to shrink below its content's natural
   // height even with flex-1, silently defeating overflow-y-auto.
   return (
-    <div data-theme="dark" className="h-[100dvh] overflow-hidden bg-[#0f0f0f] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div data-theme={dataTheme} className="h-[100dvh] overflow-hidden bg-[var(--app-bg)] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {showHeader && (
         // Plain static position, not sticky -- header is already a
         // non-scrolling flex sibling of main (never inside the scroll
@@ -81,7 +89,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
         // gives the header the same real isolation explicitly, since
         // static elements don't get it for free.
         <header
-          className="flex-shrink-0 bg-[#0f0f0f] border-b border-white/10 z-20 will-change-transform"
+          className="flex-shrink-0 bg-[var(--app-bg)] border-b border-[var(--app-border)] z-20 will-change-transform"
           style={{ transform: 'translateZ(0)' }}
         >
           {/* Build Spec: Feed and My Work (student) v1.0, Part 1 --
@@ -102,16 +110,16 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
         </header>
       )}
 
-      {/* bg-[#0f0f0f] here too, not just on the outer wrapper -- during
+      {/* bg-[var(--app-bg)] here too, not just on the outer wrapper -- during
           iOS momentum/rubber-band scrolling a transparent overflow-y-auto
           element can composite straight through to whatever's behind the
           WHOLE app (body, which has no dark background of its own) rather
           than just its immediate parent. Painting main itself removes any
           chance of that white flash showing mid-scroll. */}
-      <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[#0f0f0f]" style={{ paddingBottom: 'calc(60px + env(safe-area-inset-bottom))' }}>{children}</main>
+      <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[var(--app-bg)]" style={{ paddingBottom: 'calc(60px + env(safe-area-inset-bottom))' }}>{children}</main>
 
       <nav
-        className="fixed bottom-0 left-0 right-0 bg-[#0f0f0f] border-t border-white/10 z-30"
+        className="fixed bottom-0 left-0 right-0 bg-[var(--app-bg)] border-t border-[var(--app-border)] z-30"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="flex items-center h-[60px]">
@@ -128,7 +136,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
 
 function NavItem({ href, icon: Icon, label, active }: { href: string; icon: any; label: string; active: boolean }) {
   return (
-    <Link href={href} className={`flex-1 flex flex-col items-center justify-center gap-0.5 h-full ${active ? 'text-white' : 'text-[#444]'}`}>
+    <Link href={href} className="flex-1 flex flex-col items-center justify-center gap-0.5 h-full" style={{ color: active ? 'var(--app-text)' : 'var(--app-text-quaternary)' }}>
       <Icon className="w-6 h-6" />
       <span className="text-[10px] font-medium">{label}</span>
     </Link>
@@ -140,7 +148,7 @@ function NavItem({ href, icon: Icon, label, active }: { href: string; icon: any;
 function PlusButton({ onClick }: { onClick?: () => void }) {
   return (
     <div className="flex-shrink-0 flex items-center justify-center w-[72px]">
-      <button onClick={onClick} aria-label="New post" className="flex items-center justify-center w-[46px] h-[46px] -mt-4 text-white">
+      <button onClick={onClick} aria-label="New post" className="flex items-center justify-center w-[46px] h-[46px] -mt-4" style={{ color: 'var(--app-text)' }}>
         <Plus className="w-7 h-7 transition-transform duration-200 active:rotate-45" />
       </button>
     </div>
