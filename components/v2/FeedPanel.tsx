@@ -7,15 +7,14 @@ import {
   getFeed, getPublicFeed, setPostReaction, toggleLike, getSignedFileUrl, incrementPostViews,
 } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
-import { Heart, Play, X } from 'lucide-react'
+import { ThumbsUp, Play, X } from 'lucide-react'
 
-// Feed, revised: edge-to-edge like Instagram actually is on a phone
-// (no card border/radius, no outer side margin -- those made it read
-// as a floating box rather than a real full-width feed), a real Like
-// on the left plus exactly 2 sticker reactions on the right (chosen by
-// the POST'S AUTHOR at posting time via PostComposer's own sticker
-// picker, not fixed globally), and inline autoplay video instead of a
-// tap-to-open full-screen player.
+// Feed, LinkedIn-modelled per direct feedback: distinct post "cards"
+// separated by a real gap (page background showing through between
+// them), not edge-to-edge Instagram-style touching each other with
+// only a hairline divider -- each card still spans the full screen
+// width itself (touches both side edges), media is full-width WITHIN
+// that card. ThumbsUp for the like (LinkedIn's own icon), not a heart.
 const ALL_REACTIONS: { key: ReactionType; label: string; emoji: string }[] = [
   { key: 'congratulations', label: 'Celebrate', emoji: '🎉' },
   { key: 'well_done', label: 'Well done', emoji: '👏' },
@@ -68,7 +67,7 @@ export default function FeedPanel() {
   }
 
   return (
-    <div>
+    <div className="space-y-2 pb-2">
       {exploring && (
         <div className="bg-[#1a1a1a] border-b border-white/10 px-4 py-3">
           <p className="text-[12.5px] text-[#999]">
@@ -123,7 +122,7 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
   }
 
   return (
-    <div className="border-b border-white/10">
+    <div className="bg-[#1a1a1a]">
       {/* ── AUTHOR ROW -- tapping opens their profile, own view if it's
           you, public view otherwise ── */}
       <button
@@ -176,7 +175,7 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
       {/* ── LIKE (left) + up to 2 chosen stickers (right) ── */}
       <div className="flex items-center justify-between px-4 py-3.5">
         <button onClick={like} className="flex items-center gap-1.5 active:scale-90 transition-transform">
-          <Heart className="w-5 h-5" fill={liked ? '#F26B21' : 'none'} color={liked ? '#F26B21' : '#999'} strokeWidth={1.75} />
+          <ThumbsUp className="w-5 h-5" fill={liked ? '#F26B21' : 'none'} color={liked ? '#F26B21' : '#999'} strokeWidth={1.75} />
           {likes.length > 0 && <span className="text-[13px] font-semibold" style={{ color: liked ? '#F26B21' : '#999' }}>{likes.length}</span>}
         </button>
         <div className="flex items-center gap-1.5">

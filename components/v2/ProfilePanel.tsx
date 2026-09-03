@@ -56,9 +56,11 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
   const [posts, setPosts] = useState<any[]>([])
   const [saved, setSaved] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  // null = the top profile itself; a folder replaces the body with its
-  // own contents and a "Profile" back link, per spec section 5.
-  const [folder, setFolder] = useState<Folder | null>(null)
+  // TikTok-style now, not a navigate-away screen: the tabs stay put,
+  // this just tracks which one is active. Always has a value -- there
+  // is no "closed" state, same as TikTok's own profile always having
+  // one of Posts/Private/Liked selected.
+  const [folder, setFolder] = useState<Folder>('verified')
   const [editingBio, setEditingBio] = useState(false)
   const [addingExperience, setAddingExperience] = useState(false)
   const [addingQual, setAddingQual] = useState(false)
@@ -95,11 +97,10 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
     // filling a guessed-at height, content just flows like every other
     // screen here does.
     <div className="relative bg-[#0f0f0f] min-h-[calc(100vh-56px)] px-4 pt-4 pb-8 text-white">
-        {/* Settings moved here, TikTok-style -- a quiet icon in the
-            corner rather than its own full row further down competing
-            with Saved jobs for attention. Only on the top view (not
-            inside an open folder), own view only. */}
-        {isOwn && !folder && (
+        {/* Settings: a quiet icon in the corner, own view only. Always
+            here now -- there's no separate "inside a folder" screen
+            to hide it behind any more. */}
+        {isOwn && (
           <button
             onClick={() => router.push('/student/settings')}
             aria-label="Settings"
@@ -117,67 +118,68 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
           />
         )}
 
-        {folder ? (
-          <FolderDetail
+        {/* ── 1. Top block: avatar/name/username/bio, stat numbers
+            (with thin "|" dividers between them, TikTok-style), tags,
+            Edit profile. ── */}
+        <div className="flex flex-col items-center text-center pt-1">
+          <Avatar path={profile.avatar_path} name={profile.full_name} size={88} textSize={30} variant="solid" />
+          <p className="text-[19px] font-bold mt-3.5 tracking-tight">{profile.full_name}</p>
+          {profile.username && <p className="text-[13px] text-[#888] mt-0.5">@{profile.username}</p>}
+          {profile.bio && (
+            <p className="text-[13.5px] text-[#ccc] leading-[1.5] mt-2.5" style={{ maxWidth: 300 }}>{profile.bio}</p>
+          )}
+
+          <div className="flex items-center gap-3 mt-4">
+            <Stat n={folderCount.verified} label="work" />
+            <span className="text-white/15">|</span>
+            <Stat n={counts.followers} label="followers" />
+            <span className="text-white/15">|</span>
+            <Stat n={counts.following} label="following" />
+          </div>
+
+          {(profile.interest_tags || []).length > 0 && (
+            <div className="flex flex-wrap justify-center gap-1.5 mt-3.5">
+              {profile.interest_tags.slice(0, 3).map((t: string) => (
+                <span key={t} className="text-[11.5px] font-medium px-3 py-[5px] rounded-full" style={{ backgroundColor: '#E6F1FB', color: '#0C447C' }}>{t}</span>
+              ))}
+            </div>
+          )}
+          {isOwn && (
+            <button
+              onClick={() => setEditingBio(true)}
+              className="mt-4 px-6 py-2 rounded-full border border-white/15 text-[13px] font-semibold hover:bg-white/[0.06] active:scale-[0.98] transition"
+            >
+              Edit profile
+            </button>
+          )}
+        </div>
+
+        {/* ── 2. Folders as TikTok-style tabs: Verified, Experience,
+            Posts, and (own view only) Saved jobs. Tapping one doesn't
+            navigate anywhere -- it swaps the grid below, same screen,
+            tabs stay visible, active tab gets an underline. "Tap
+            Posts, see your posts. Tap Saved, see what's saved." ── */}
+        <div className={`grid ${isOwn ? 'grid-cols-4' : 'grid-cols-3'} mt-6 border-b border-white/10`}>
+          <FolderTab active={folder === 'verified'} onClick={() => setFolder('verified')} icon={FolderCheck} iconColor="#0F6E56" label="Verified" count={folderCount.verified} />
+          <FolderTab active={folder === 'experience'} onClick={() => setFolder('experience')} icon={Briefcase} iconColor="#D4551A" label="Experience" count={folderCount.experience} />
+          <FolderTab active={folder === 'posts'} onClick={() => setFolder('posts')} icon={Grid3x3} iconColor="#5A5A5A" label="Posts" count={folderCount.posts} />
+          {isOwn && (
+            <FolderTab active={folder === 'saved'} onClick={() => setFolder('saved')} icon={Bookmark} iconColor="#D4551A" label="Saved" count={folderCount.saved} />
+          )}
+        </div>
+
+        {/* ── 3. The active tab's content, directly below -- no back
+            link, nothing to navigate away from. ── */}
+        <div className="pt-4">
+          <FolderContent
             folder={folder} isOwn={isOwn} loading={loading}
             verified={verified} quals={quals} experience={experience} posts={posts} saved={saved}
             profileId={profileId!}
-            onBack={() => setFolder(null)}
             onChanged={load}
             addingExperience={addingExperience} setAddingExperience={setAddingExperience}
             addingQual={addingQual} setAddingQual={setAddingQual}
           />
-        ) : (
-          <>
-            {/* ── 1. Top block, reordered per direct feedback:
-                avatar/name/username/bio, then the stat numbers (TikTok
-                size, no divider lines/border-y -- that band read as
-                too heavy), then interest tags, then Edit profile. ── */}
-            <div className="flex flex-col items-center text-center pt-1">
-              <Avatar path={profile.avatar_path} name={profile.full_name} size={88} textSize={30} variant="solid" />
-              <p className="text-[19px] font-bold mt-3.5 tracking-tight">{profile.full_name}</p>
-              {profile.username && <p className="text-[13px] text-[#888] mt-0.5">@{profile.username}</p>}
-              {profile.bio && (
-                <p className="text-[13.5px] text-[#ccc] leading-[1.5] mt-2.5" style={{ maxWidth: 300 }}>{profile.bio}</p>
-              )}
-
-              <div className="flex items-center gap-6 mt-4">
-                <Stat n={folderCount.verified} label="work" />
-                <Stat n={counts.followers} label="followers" />
-                <Stat n={counts.following} label="following" />
-              </div>
-
-              {(profile.interest_tags || []).length > 0 && (
-                <div className="flex flex-wrap justify-center gap-1.5 mt-3.5">
-                  {profile.interest_tags.slice(0, 3).map((t: string) => (
-                    <span key={t} className="text-[11.5px] font-medium px-3 py-[5px] rounded-full" style={{ backgroundColor: '#E6F1FB', color: '#0C447C' }}>{t}</span>
-                  ))}
-                </div>
-              )}
-              {isOwn && (
-                <button
-                  onClick={() => setEditingBio(true)}
-                  className="mt-4 px-6 py-2 rounded-full border border-white/15 text-[13px] font-semibold hover:bg-white/[0.06] active:scale-[0.98] transition"
-                >
-                  Edit profile
-                </button>
-              )}
-            </div>
-
-            {/* ── 2. Folders: Verified, Experience, Posts, and (own
-                view only) Saved jobs -- four in a row now, smaller,
-                and no card box around each -- just the icon badge,
-                label and count, no bg/border, per direct feedback. ── */}
-            <div className={`grid ${isOwn ? 'grid-cols-4' : 'grid-cols-3'} gap-2 mt-6`}>
-              <CompactFolderTile onClick={() => setFolder('verified')} icon={FolderCheck} badgeBg="#E1F5EE" iconColor="#0F6E56" label="Verified" count={folderCount.verified} />
-              <CompactFolderTile onClick={() => setFolder('experience')} icon={Briefcase} badgeBg="#E6F1FB" iconColor="#D4551A" label="Experience" count={folderCount.experience} />
-              <CompactFolderTile onClick={() => setFolder('posts')} icon={Grid3x3} badgeBg="#EFEDE7" iconColor="#5A5A5A" label="Posts" count={folderCount.posts} />
-              {isOwn && (
-                <CompactFolderTile onClick={() => setFolder('saved')} icon={Bookmark} badgeBg="#FBEAE0" iconColor="#D4551A" label="Saved" count={folderCount.saved} />
-              )}
-            </div>
-          </>
-        )}
+        </div>
     </div>
   )
 }
@@ -228,19 +230,23 @@ function Stat({ n, label }: { n: number; label: string }) {
   )
 }
 
-// No card box around each tile any more -- just the icon badge, label
-// and count on the bare page, per direct feedback ("remove the box
-// around them just the thing remains"). Slightly smaller badge too.
-function CompactFolderTile({ onClick, icon: Icon, badgeBg, iconColor, label, count }: {
-  onClick: () => void; icon: any; badgeBg: string; iconColor: string; label: string; count: number
+// TikTok-style tab, not a navigate-away tile -- icon, label, count,
+// and an underline that only appears on the active one. No card box
+// around it, per direct feedback.
+function FolderTab({ active, onClick, icon: Icon, iconColor, label, count }: {
+  active: boolean; onClick: () => void; icon: any; iconColor: string; label: string; count: number
 }) {
   return (
-    <button onClick={onClick} className="flex flex-col items-center py-1 transition active:opacity-70">
-      <span className="w-9 h-9 rounded-[11px] flex items-center justify-center" style={{ backgroundColor: badgeBg }}>
-        <Icon className="w-4 h-4" style={{ color: iconColor }} />
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center gap-1.5 pb-2.5 border-b-2 transition"
+      style={{ borderColor: active ? '#D4551A' : 'transparent' }}
+    >
+      <Icon className="w-4 h-4" style={{ color: active ? iconColor : '#666' }} />
+      <span>
+        <span className={`text-[12px] font-semibold ${active ? 'text-white' : 'text-[#888]'}`}>{label}</span>
+        <span className="text-[10.5px] text-[#999]"> · {count}</span>
       </span>
-      <p className="text-[12px] font-semibold mt-1.5">{label}</p>
-      <p className="text-[10.5px] text-[#999] mt-0.5">{count}</p>
     </button>
   )
 }
@@ -255,46 +261,23 @@ function EmptyState({ icon: Icon, title, hint }: { icon: any; title: string; hin
   )
 }
 
-// ── 5. Opening a folder -- replaces the profile body, "Profile" back
-// link returns. One component for all four, since the header/back-link
-// shape is identical and only the grid inside changes.
-const FOLDER_META: Record<Folder, { icon: any; badgeBg: string; iconColor: string; title: string; sub: (n: number) => string }> = {
-  verified: { icon: FolderCheck, badgeBg: '#E1F5EE', iconColor: '#0F6E56', title: 'Verified work', sub: n => `${n} verified piece${n === 1 ? '' : 's'}` },
-  experience: { icon: Briefcase, badgeBg: '#E6F1FB', iconColor: '#D4551A', title: 'Experience', sub: n => `${n} ${n === 1 ? 'entry' : 'entries'}` },
-  posts: { icon: Grid3x3, badgeBg: '#EFEDE7', iconColor: '#5A5A5A', title: 'Posts', sub: n => `${n} post${n === 1 ? '' : 's'}` },
-  saved: { icon: Bookmark, badgeBg: '#FBEAE0', iconColor: '#D4551A', title: 'Saved jobs', sub: n => `${n} saved · private to you` },
-}
-
-function FolderDetail({
-  folder, isOwn, loading, verified, quals, experience, posts, saved, profileId, onBack, onChanged,
+// ── 3. The active tab's content -- TikTok-style, no back link and no
+// repeated header (the tab itself already shows what's selected).
+// Same component for all four, just the grid inside changes.
+function FolderContent({
+  folder, isOwn, loading, verified, quals, experience, posts, saved, profileId, onChanged,
   addingExperience, setAddingExperience, addingQual, setAddingQual,
 }: {
   folder: Folder; isOwn: boolean; loading: boolean
   verified: any[]; quals: any[]; experience: any[]; posts: any[]; saved: any[]
-  profileId: string; onBack: () => void; onChanged: () => void
+  profileId: string; onChanged: () => void
   addingExperience: boolean; setAddingExperience: (v: boolean | ((v: boolean) => boolean)) => void
   addingQual: boolean; setAddingQual: (v: boolean | ((v: boolean) => boolean)) => void
 }) {
-  const meta = FOLDER_META[folder]
-  const count = folder === 'verified' ? verified.length : folder === 'experience' ? experience.length : folder === 'posts' ? posts.length : saved.length
   const [openWork, setOpenWork] = useState<any | null>(null)
 
   return (
     <div>
-      <button onClick={onBack} className="flex items-center gap-1 text-[13px] font-semibold text-[#999] hover:text-white transition mb-4">
-        <ChevronLeft className="w-4 h-4" /> Profile
-      </button>
-
-      <div className="flex items-center gap-3 mb-5">
-        <span className="w-11 h-11 rounded-[12px] flex items-center justify-center flex-shrink-0" style={{ backgroundColor: meta.badgeBg }}>
-          <meta.icon className="w-5 h-5" style={{ color: meta.iconColor }} />
-        </span>
-        <div>
-          <p className="text-[16px] font-semibold">{meta.title}</p>
-          <p className="text-[13px] text-[#999]">{meta.sub(count)}</p>
-        </div>
-      </div>
-
       {folder === 'verified' && (
         loading ? <p className="text-[13px] text-[#666]">Loading…</p> : (verified.length === 0 && quals.length === 0) ? (
           <EmptyState icon={FolderCheck} title="Nothing here yet" hint="It'll show up here the moment a tutor verifies your first piece of work" />
@@ -434,14 +417,19 @@ function VerifiedWorkDetail({ work, onClose }: { work: any; onClose: () => void 
   }, [sub?.file_path])
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0f0f0f] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    // z-50 already paints this over the shell's nav (z-30) entirely --
+    // this screen is meant to fully replace the visible chrome while
+    // open, not sit alongside it. paddingBottom added for the home
+    // indicator's own safe area, which nothing here was reserving --
+    // matches every other full-screen overlay's convention.
+    <div className="fixed inset-0 z-50 bg-[#0f0f0f] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-[#0f0f0f]/95 backdrop-blur border-b border-white/10">
         <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition">
           <ChevronLeft className="w-5 h-5" />
         </button>
       </div>
 
-      <div className="p-4">
+      <div className="p-4 pb-10">
         <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-5">
           <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1 rounded-full mb-3" style={{ backgroundColor: '#E1F5EE', color: '#0F6E56' }}>
             <CheckCircle2 className="w-3.5 h-3.5" /> Verified
