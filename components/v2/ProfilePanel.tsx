@@ -632,7 +632,7 @@ function AddExperienceForm({ profileId, onAdded }: { profileId: string; onAdded:
     <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl p-3.5 space-y-2">
       <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Saturday job at a local print shop" className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition" />
       <input value={organisation} onChange={e => setOrganisation(e.target.value)} placeholder="Where (optional)" className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition" />
-      <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-[var(--app-text)] text-[12px] font-semibold disabled:opacity-40">
+      <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
         {saving ? 'Saving…' : 'Save'}
       </button>
     </div>
@@ -668,7 +668,7 @@ function AddQualForm({ profileId, onAdded }: { profileId: string; onAdded: () =>
       </button>
       <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
       <div>
-        <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-[var(--app-text)] text-[12px] font-semibold disabled:opacity-40">
+        <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
           {saving ? 'Saving…' : 'Save'}
         </button>
       </div>

@@ -46,24 +46,29 @@ function initials(name?: string) {
   return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
 }
 
+// Was pinned dark-navy/amber/green hex, correct contrast against a
+// dark card but read as heavy, oversaturated blocks once cards went
+// light ("colours are too strong"). Now theme tokens -- dark values
+// identical to before (no change to dark mode), light values are the
+// same light-pill convention Discover's stage badges already use.
 const STATUS: Record<string, { label: string; cls: string }> = {
   new: { label: 'New', cls: 'bg-[var(--app-overlay-2)] text-[var(--app-text)]' },
-  submitted: { label: 'Submitted', cls: 'bg-[#3a2e14] text-[#e0b64a]' },
-  returned: { label: 'Returned', cls: 'bg-[#3a1e14] text-[#e08a4a]' },
-  verified: { label: 'Completed', cls: 'bg-[#123a24] text-[#4ade80]' },
-  revoked: { label: 'Revoked', cls: 'bg-[#3a1414] text-[#e04a4a]' },
+  submitted: { label: 'Submitted', cls: 'bg-[var(--status-warn-bg)] text-[var(--status-warn-text)]' },
+  returned: { label: 'Returned', cls: 'bg-[var(--status-orange-bg)] text-[var(--status-orange-text)]' },
+  verified: { label: 'Completed', cls: 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' },
+  revoked: { label: 'Revoked', cls: 'bg-[var(--status-danger-bg)] text-[var(--status-danger-text)]' },
 }
 
 // Build Spec: Feed and My Work (student) v1.0, Part 2 -- pinned pill
-// colours used exactly, structural bg stays this app's own dark
-// palette (same call as every other rebuild this session).
+// colours used exactly for dark mode; theme tokens now carry the
+// light-mode equivalents (see STATUS above for why).
 const SPEC_STATUS: Record<string, { label: string; bg: string; text: string }> = {
-  new: { label: 'New', bg: '#123049', text: '#6FB2E8' },
-  overdue: { label: 'Overdue', bg: '#3A2A10', text: '#E0A94B' },
-  in_progress: { label: 'In progress', bg: '#3A2A10', text: '#E0A94B' },
-  submitted: { label: 'In review', bg: '#3A2A10', text: '#E0A94B' },
-  returned: { label: 'Returned', bg: '#3A2A10', text: '#E0A94B' },
-  verified: { label: 'Verified', bg: '#12321F', text: '#4ade80' },
+  new: { label: 'New', bg: 'var(--status-info-bg)', text: 'var(--status-info-text)' },
+  overdue: { label: 'Overdue', bg: 'var(--status-warn-bg)', text: 'var(--status-warn-text)' },
+  in_progress: { label: 'In progress', bg: 'var(--status-warn-bg)', text: 'var(--status-warn-text)' },
+  submitted: { label: 'In review', bg: 'var(--status-warn-bg)', text: 'var(--status-warn-text)' },
+  returned: { label: 'Returned', bg: 'var(--status-warn-bg)', text: 'var(--status-warn-text)' },
+  verified: { label: 'Verified', bg: 'var(--status-success-bg)', text: 'var(--status-success-text)' },
 }
 const TYPE_LABEL: Record<string, string> = { brief: 'Design brief', assignment: 'Assignment', course: 'Course' }
 
@@ -320,23 +325,31 @@ function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
 
   return (
     <button onClick={onOpen} className="block w-full text-left bg-[var(--app-surface)] rounded-2xl overflow-hidden border border-[var(--app-border-subtle)]">
+      {/* Every badge in this banner sits on a FIXED colour (the
+          gradient, black/80, brand orange, red) that never changes
+          with the theme -- var(--app-text) doesn't belong on any of
+          them, since it flips to near-black in light mode and goes
+          near-invisible on a background that's still dark. Fixed
+          white/black labels instead, same as every other pinned-colour
+          badge in the app. This was the real "completely black, can't
+          see it" bug on workshop/course cards in light mode. */}
       <div className={`relative bg-gradient-to-br ${bannerGradient(item.id)} flex items-center justify-center`} style={{ height: imgHeight }}>
-        <span className="text-[var(--app-text)]/10 font-black text-4xl tracking-tight select-none">LERN</span>
+        <span className="text-white/10 font-black text-4xl tracking-tight select-none">LERN</span>
 
-        <span className="absolute top-2.5 left-2.5 text-[10px] font-bold bg-black/80 text-[var(--app-text)] px-2.5 py-1 rounded-full uppercase tracking-wide">
+        <span className="absolute top-2.5 left-2.5 text-[10px] font-bold bg-black/80 text-white px-2.5 py-1 rounded-full uppercase tracking-wide">
           {[item.topic, item.level].filter(Boolean).join(' · ') || item.type}
         </span>
         {item.type === 'course' && (
-          <span className="absolute top-2.5 right-2.5 text-[10px] font-bold bg-[#FF6B2B] text-[var(--app-text)] px-2.5 py-1 rounded-full">YOUR COURSE</span>
+          <span className="absolute top-2.5 right-2.5 text-[10px] font-bold bg-[#FF6B2B] text-white px-2.5 py-1 rounded-full">YOUR COURSE</span>
         )}
         {item.type === 'workshop' && (
           live ? (
             <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 bg-red-500/90 rounded-full px-2.5 py-1">
               <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-              <span className="text-[var(--app-text)] text-[10px] font-bold">LIVE NOW</span>
+              <span className="text-white text-[10px] font-bold">LIVE NOW</span>
             </div>
           ) : (
-            <span className={`absolute top-2.5 right-2.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide ${ended ? 'bg-black/80 text-[var(--app-text)]/60' : 'bg-[#FF6B2B]/90 text-[var(--app-text)]'}`}>
+            <span className={`absolute top-2.5 right-2.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide ${ended ? 'bg-black/80 text-white/60' : 'bg-[#FF6B2B]/90 text-white'}`}>
               {ended ? 'Ended' : (item.mode || 'online')}
             </span>
           )
@@ -348,7 +361,7 @@ function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
         {item.description && <p className="text-[#777] text-sm line-clamp-2 mb-3 leading-snug">{item.description}</p>}
 
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-[var(--app-text)] font-bold text-[10px] flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
             {initials(hostName)}
           </div>
           <span className="text-[var(--app-text)] text-sm font-semibold flex items-center gap-1">
@@ -378,7 +391,7 @@ function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
             🔴 emoji replaced with a real pulsing dot + icon -- flagged
             alongside Feed's reaction emoji as "confusing, needs to be
             professional". */}
-        <div className={`w-full flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold ${live ? 'bg-red-500 text-[var(--app-text)]' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-[var(--app-text)]'}`}>
+        <div className={`w-full flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold ${live ? 'bg-red-500 text-white' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'}`}>
           {ended ? 'Ended' : inPerson ? (live ? 'Attending now' : 'Attend →') : live ? (
             <><span className="w-2 h-2 rounded-full bg-white animate-pulse" /> Join Now</>
           ) : 'Start Class →'}
@@ -463,7 +476,7 @@ function WorkItemDetail({
           <h1 className="text-2xl font-bold text-ink leading-snug mb-3">{item.title}</h1>
 
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-[var(--app-text)] font-bold text-[10px] flex-shrink-0">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
               {initials(hostName)}
             </div>
             <span className="text-ink text-sm font-semibold flex items-center gap-1">
@@ -503,7 +516,7 @@ function WorkItemDetail({
                   <CalendarClock className="w-4 h-4" /> Starts {new Date(item.starts_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} — join opens once it's started.
                 </p>
               ) : item.mode === 'online' ? (
-                <button onClick={() => setInSession(true)} className="flex items-center gap-2 bg-red-500 text-[var(--app-text)] font-bold text-sm px-5 py-3 rounded-2xl">
+                <button onClick={() => setInSession(true)} className="flex items-center gap-2 bg-red-500 text-white font-bold text-sm px-5 py-3 rounded-2xl">
                   <Video className="w-4 h-4" /> Join session
                 </button>
               ) : item.location && (
@@ -536,7 +549,7 @@ function WorkItemDetail({
                 {file && <span onClick={e => { e.stopPropagation(); setFile(null) }} className="hover:text-danger-text"><X className="w-3.5 h-3.5" /></span>}
               </button>
               <input ref={fileRef} type="file" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
-              <button onClick={handleSubmit} disabled={loading} className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-[var(--app-text)] font-bold text-sm py-3 rounded-2xl disabled:opacity-60">
+              <button onClick={handleSubmit} disabled={loading} className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold text-sm py-3 rounded-2xl disabled:opacity-60">
                 {loading ? 'Submitting…' : latest?.status === 'returned' ? 'Resubmit' : 'Submit work'}
               </button>
             </div>

@@ -139,6 +139,24 @@ body {
   --app-overlay-4: rgba(255, 255, 255, 0.3);  /* focus ring / strong border */
   --app-invert-bg: #ffffff;   /* selected-pill fill that must invert with theme */
   --app-invert-text: #0f0f0f;
+  /* Status pill pairs (My Work's New/Overdue/In progress/Verified etc)
+     were pinned bg+text hex meant for a dark surface (dark navy bg,
+     light blue text) -- correct contrast against a dark card, but
+     read as heavy, oversaturated blocks dropped onto a light-mode
+     card ("colours are too strong"). Light values below reuse the
+     exact light-pill convention Discover's own stage badges already
+     use (light tint bg, saturated-but-readable text) for one
+     consistent status-pill look across the app. */
+  --status-info-bg: #123049;
+  --status-info-text: #6FB2E8;
+  --status-warn-bg: #3A2A10;
+  --status-warn-text: #E0A94B;
+  --status-success-bg: #12321F;
+  --status-success-text: #4ade80;
+  --status-orange-bg: #3a1e14;
+  --status-orange-text: #e08a4a;
+  --status-danger-bg: #3a1414;
+  --status-danger-text: #e04a4a;
 }
 [data-theme="light"] {
   --app-bg: #fafafa;
@@ -157,6 +175,16 @@ body {
   --app-overlay-4: rgba(0, 0, 0, 0.22);
   --app-invert-bg: #0f0f0f;
   --app-invert-text: #ffffff;
+  --status-info-bg: #E6F1FB;
+  --status-info-text: #185FA5;
+  --status-warn-bg: #FAEEDA;
+  --status-warn-text: #854F0B;
+  --status-success-bg: #E1F5EE;
+  --status-success-text: #0F6E56;
+  --status-orange-bg: #FDE9DC;
+  --status-orange-text: #9C4B1E;
+  --status-danger-bg: #FDEEEA;
+  --status-danger-text: #B3401E;
 }
 /* System preference only applies when nothing explicit is set -- an
    explicit [data-theme="dark"] (still used by the org/employer shells'
@@ -181,6 +209,16 @@ body {
     --app-overlay-4: rgba(0, 0, 0, 0.22);
     --app-invert-bg: #0f0f0f;
     --app-invert-text: #ffffff;
+    --status-info-bg: #E6F1FB;
+    --status-info-text: #185FA5;
+    --status-warn-bg: #FAEEDA;
+    --status-warn-text: #854F0B;
+    --status-success-bg: #E1F5EE;
+    --status-success-text: #0F6E56;
+    --status-orange-bg: #FDE9DC;
+    --status-orange-text: #9C4B1E;
+    --status-danger-bg: #FDEEEA;
+    --status-danger-text: #B3401E;
   }
 }
 

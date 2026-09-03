@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
-  getFeed, getPublicFeed, setPostReaction, toggleLike, getSignedFileUrl, incrementPostViews,
+  getFeed, getPublicFeed, setPostReaction, toggleLike, getSignedFileUrl, incrementPostViews, getPostsByAuthor,
 } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
 import { ThumbsUp, Play, X, PartyPopper, Award, Flame, Star, Eye } from 'lucide-react'
@@ -203,15 +203,83 @@ function PostCard({ post, onChanged }: { post: any; onChanged: () => void }) {
       </div>
 
       {playerOpen && mediaUrl && (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-          <button onClick={() => setPlayerOpen(false)} className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-black/50 flex items-center justify-center" style={{ marginTop: 'env(safe-area-inset-top)' }}>
-            <X className="w-5 h-5 text-[var(--app-text)]" />
-          </button>
-          <div className="flex-1 flex items-center justify-center">
-            <video src={mediaUrl} controls autoPlay playsInline className="max-h-full max-w-full" />
+        <VideoPlayerOverlay initialPost={post} initialUrl={mediaUrl} onClose={() => setPlayerOpen(false)} />
+      )}
+    </div>
+  )
+}
+
+// YouTube-style: tap a video, it opens fullscreen -- but what's listed
+// below the player is only ever THIS author's other videos, not an
+// algorithmic mix of everyone else's the way YouTube's own "up next"
+// would be ("underneath you'll see the videos of that person only").
+// Player chrome stays fixed black regardless of theme on purpose --
+// same convention as YouTube's own fullscreen player, or PostComposer's
+// camera screens: a video surface, not a themed page.
+function VideoPlayerOverlay({ initialPost, initialUrl, onClose }: { initialPost: any; initialUrl: string; onClose: () => void }) {
+  const router = useRouter()
+  const [activePost, setActivePost] = useState(initialPost)
+  const [activeUrl, setActiveUrl] = useState(initialUrl)
+  const [more, setMore] = useState<any[]>([])
+
+  useEffect(() => {
+    getPostsByAuthor(activePost.author_id, activePost.id).then(({ data }) => setMore(data || []))
+  }, [activePost.author_id, activePost.id])
+
+  const playOther = async (p: any) => {
+    const { url } = await getSignedFileUrl('post-videos', p.video_path)
+    if (url) { setActivePost(p); setActiveUrl(url) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black flex flex-col overflow-y-auto overscroll-contain" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <button onClick={onClose} className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-black/50 flex items-center justify-center" style={{ marginTop: 'env(safe-area-inset-top)' }}>
+        <X className="w-5 h-5 text-white" />
+      </button>
+      <div className="w-full flex items-center justify-center bg-black flex-shrink-0">
+        <video key={activePost.id} src={activeUrl} controls autoPlay playsInline className="max-h-[65vh] max-w-full" />
+      </div>
+
+      <button
+        onClick={() => router.push(activePost.author_id ? `/student/profile/${activePost.author_id}` : '/student/profile')}
+        className="w-full flex items-center gap-2.5 px-4 py-3 flex-shrink-0 text-left"
+      >
+        <span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+          {initials(activePost.author_name)}
+        </span>
+        <div className="min-w-0">
+          <p className="text-white text-[13px] font-semibold truncate">{activePost.author_name}</p>
+          {(activePost.title || activePost.content) && <p className="text-white/60 text-[12px] mt-0.5 line-clamp-2">{activePost.title || activePost.content}</p>}
+        </div>
+      </button>
+
+      {more.length > 0 && (
+        <div className="px-4 pb-8 flex-1">
+          <p className="text-white/40 text-[11px] font-bold uppercase tracking-wide mb-2 mt-1">More from {activePost.author_name}</p>
+          <div className="space-y-2">
+            {more.map(p => <MoreFromAuthorRow key={p.id} post={p} onPlay={() => playOther(p)} />)}
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+function MoreFromAuthorRow({ post, onPlay }: { post: any; onPlay: () => void }) {
+  const [thumb, setThumb] = useState<string | null>(null)
+  useEffect(() => { if (post.video_path) getSignedFileUrl('post-videos', post.video_path).then(({ url }) => setThumb(url)) }, [post.video_path])
+  return (
+    <button onClick={onPlay} className="w-full flex items-center gap-3 bg-white/5 rounded-xl p-2 text-left">
+      <div className="relative w-24 h-16 rounded-lg overflow-hidden bg-white/10 flex-shrink-0">
+        {thumb && <video src={thumb} className="w-full h-full object-cover" muted preload="metadata" />}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+          <Play className="w-5 h-5 text-white fill-white" />
+        </div>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-white text-[13px] font-medium line-clamp-2">{post.title || post.content || 'Untitled'}</p>
+        <p className="text-white/50 text-[11px] mt-0.5">{timeAgo(post.created_at)}</p>
+      </div>
+    </button>
   )
 }

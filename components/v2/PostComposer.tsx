@@ -3,19 +3,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { createPost, uploadPostImage, uploadPostVideo } from '@/lib/supabase'
-import { X, RotateCcw, Timer, Video, Image as ImageIcon, Type, Circle, Square, Globe, Users, Check, Scissors } from 'lucide-react'
+import {
+  X, RotateCcw, Timer, Video, Image as ImageIcon, Type, Circle, Square, Globe, Users, Check, Scissors,
+  PartyPopper, Award, Flame, Star,
+} from 'lucide-react'
 
 type Step = 'camera' | 'preview' | 'trim' | 'write' | 'details'
 type CaptureMode = 'photo' | 'video'
 const MAX_RECORD_SECS = 60
 
 // The author picks exactly 2 of these -- what shows on their post in
-// Feed, not a fixed global set every viewer sees on every post.
+// Feed, not a fixed global set every viewer sees on every post. Same
+// icons as Feed's own reaction row (real icons, not raw emoji --
+// flagged as "confusing, not professional").
 const STICKER_OPTIONS = [
-  { key: 'congratulations', label: 'Celebrate', emoji: '🎉' },
-  { key: 'well_done', label: 'Well done', emoji: '👏' },
-  { key: 'keep_going', label: 'Keep going', emoji: '🔥' },
-  { key: 'proud', label: 'Proud', emoji: '⭐' },
+  { key: 'congratulations', label: 'Celebrate', icon: PartyPopper },
+  { key: 'well_done', label: 'Well done', icon: Award },
+  { key: 'keep_going', label: 'Keep going', icon: Flame },
+  { key: 'proud', label: 'Proud', icon: Star },
 ]
 
 // Re-encodes [start, end] of a video into a new, genuinely shorter
@@ -390,33 +395,38 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
         />
       )}
 
-      {/* ── WRITE (text-only post) ── */}
+      {/* ── WRITE (text-only post) ── Camera/preview/trim stay dark-only
+          on purpose (a camera viewfinder is dark in every real camera
+          app, theme or not) -- but write/details are a form, not a
+          viewfinder, and were still hardcoded to bg-[#141110]/text-white
+          regardless of the student's theme choice. Themed now, same as
+          every other screen. */}
       {step === 'write' && (
-        <div className="flex-1 flex flex-col bg-[#141110]">
+        <div className="flex-1 flex flex-col bg-[var(--app-bg)]">
           <div className="flex items-center justify-between p-4 flex-shrink-0">
-            <button onClick={() => setStep('camera')} className="text-white font-semibold text-[14px]">Back</button>
-            <p className="text-white font-semibold text-[14px]">Write a post</p>
+            <button onClick={() => setStep('camera')} className="text-[var(--app-text)] font-semibold text-[14px]">Back</button>
+            <p className="text-[var(--app-text)] font-semibold text-[14px]">Write a post</p>
             <button onClick={() => setStep('details')} disabled={!caption.trim()} className="text-brand font-semibold text-[14px] disabled:opacity-40">Next</button>
           </div>
           <textarea
             value={caption} onChange={e => setCaption(e.target.value)} autoFocus
             placeholder="Share something educational…"
-            className="flex-1 bg-transparent text-white text-[16px] p-4 outline-none resize-none placeholder-white/40"
+            className="flex-1 bg-transparent text-[var(--app-text)] text-[16px] p-4 outline-none resize-none placeholder:text-[var(--app-text-tertiary)]"
           />
         </div>
       )}
 
       {/* ── DETAILS (caption + post, for a camera capture) ── */}
       {step === 'details' && (
-        <div className="flex-1 flex flex-col bg-[#141110]">
+        <div className="flex-1 flex flex-col bg-[var(--app-bg)]">
           <div className="flex items-center justify-between p-4 flex-shrink-0">
-            <button onClick={() => setStep(previewUrl ? 'preview' : 'write')} className="text-white font-semibold text-[14px]">Back</button>
-            <p className="text-white font-semibold text-[14px]">New post</p>
+            <button onClick={() => setStep(previewUrl ? 'preview' : 'write')} className="text-[var(--app-text)] font-semibold text-[14px]">Back</button>
+            <p className="text-[var(--app-text)] font-semibold text-[14px]">New post</p>
             <div className="w-10" />
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-4">
-            {error && <p className="text-[13px] text-[#FFB89E] bg-[#3A241C] border border-[#5A3226] rounded-lg px-3.5 py-2.5">{error}</p>}
+            {error && <p className="text-[13px] text-danger-text bg-danger-bg border border-danger-hover rounded-lg px-3.5 py-2.5">{error}</p>}
             {previewUrl && (
               <div className="rounded-xl overflow-hidden max-h-48 flex items-center justify-center bg-black">
                 {capturedKind === 'photo' ? <img src={previewUrl} alt="" className="max-h-48 object-contain" /> : <video src={previewUrl} className="max-h-48 object-contain" />}
@@ -426,11 +436,11 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
               value={caption} onChange={e => setCaption(e.target.value)}
               placeholder="Add a caption…"
               rows={3}
-              className="w-full bg-white/5 border border-[var(--app-border)] rounded-xl px-4 py-3 text-[14px] text-white placeholder-white/40 outline-none resize-none"
+              className="w-full bg-[var(--app-overlay-2)] border border-[var(--app-border)] rounded-xl px-4 py-3 text-[14px] text-[var(--app-text)] placeholder:text-[var(--app-text-tertiary)] outline-none resize-none"
             />
 
             <div>
-              <p className="text-[12.5px] font-semibold text-white/70 mb-2">Pick 2 stickers for this post</p>
+              <p className="text-[12.5px] font-semibold text-[var(--app-text-secondary)] mb-2">Pick 2 stickers for this post</p>
               <div className="flex flex-wrap gap-2">
                 {STICKER_OPTIONS.map(s => {
                   const active = stickers.includes(s.key)
@@ -442,10 +452,10 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
                           : prev.length >= 2 ? [prev[1], s.key] : [...prev, s.key]
                       )}
                       className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-medium transition ${
-                        active ? 'border-brand bg-brand/15 text-white' : 'border-[var(--app-border)] bg-white/5 text-white/60'
+                        active ? 'border-brand bg-brand/15 text-[var(--app-text)]' : 'border-[var(--app-border)] bg-[var(--app-overlay-2)] text-[var(--app-text-secondary)]'
                       }`}
                     >
-                      <span>{s.emoji}</span> {s.label}
+                      <s.icon className="w-3.5 h-3.5" /> {s.label}
                     </button>
                   )
                 })}
@@ -455,7 +465,7 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
             {isAdult && (
               <button
                 onClick={() => setVisibility(v => v === 'organisation' ? 'public' : 'organisation')}
-                className="flex items-center gap-1.5 text-[12.5px] font-semibold text-white/70 px-3 py-2 rounded-lg bg-white/5 border border-[var(--app-border)]"
+                className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--app-text-secondary)] px-3 py-2 rounded-lg bg-[var(--app-overlay-2)] border border-[var(--app-border)]"
               >
                 {visibility === 'public' ? <Globe className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
                 {visibility === 'public' ? 'Public — anyone on LERN' : 'Organisation only'}

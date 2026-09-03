@@ -203,7 +203,7 @@ export default function StudentDiscoverPanel() {
             return filtered.map(i => (
             <div key={i.id} className="bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4">
               <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-[#252525] flex items-center justify-center text-[var(--app-text)] font-bold text-[11px] flex-shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-[#252525] flex items-center justify-center text-white font-bold text-[11px] flex-shrink-0">
                   {initials(i.employer?.full_name)}
                 </div>
                 <div className="min-w-0">
@@ -219,10 +219,10 @@ export default function StudentDiscoverPanel() {
               {i.message && <p className="text-[var(--app-text-body)] text-sm leading-snug mb-3">{i.message}</p>}
               {i.status === 'pending' ? (
                 <div className="flex gap-2">
-                  <button onClick={() => respond(i.id, 'accepted')} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-[var(--app-text)]">
+                  <button onClick={() => respond(i.id, 'accepted')} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white">
                     <Check className="w-4 h-4" /> Accept
                   </button>
-                  <button onClick={() => respond(i.id, 'declined')} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-[#252525] text-[var(--app-text-secondary)] border border-[var(--app-border)]">
+                  <button onClick={() => respond(i.id, 'declined')} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-[#252525] text-[#ccc] border border-[var(--app-border)]">
                     <Ban className="w-4 h-4" /> Decline
                   </button>
                 </div>
@@ -252,7 +252,7 @@ export default function StudentDiscoverPanel() {
                   {o.logo_path ? (
                     <img src={getAvatarUrl(o.logo_path) || ''} alt="" className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" />
                   ) : (
-                    <div className="w-14 h-14 rounded-2xl bg-[#252525] flex items-center justify-center text-[var(--app-text)] font-bold text-[16px] flex-shrink-0">
+                    <div className="w-14 h-14 rounded-2xl bg-[#252525] flex items-center justify-center text-white font-bold text-[16px] flex-shrink-0">
                       {initials(o.employer?.full_name)}
                     </div>
                   )}
@@ -292,7 +292,7 @@ export default function StudentDiscoverPanel() {
                 ) : (
                   <button
                     onClick={() => apply(o.id)} disabled={applying === o.id}
-                    className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-[var(--app-text)] disabled:opacity-50"
+                    className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white disabled:opacity-50"
                   >
                     <Send className="w-3.5 h-3.5" /> {applying === o.id ? 'Applying…' : 'Apply'}
                   </button>
@@ -321,7 +321,7 @@ function TrackingCard({ application: a }: { application: any }) {
   return (
     <div className="bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4">
       <div className="flex items-center gap-2.5 mb-3.5">
-        <div className="w-10 h-10 rounded-xl bg-[#252525] flex items-center justify-center text-[var(--app-text)] font-bold text-[12px] flex-shrink-0">
+        <div className="w-10 h-10 rounded-xl bg-[#252525] flex items-center justify-center text-white font-bold text-[12px] flex-shrink-0">
           {initials(a.employer?.full_name)}
         </div>
         <div className="min-w-0 flex-1">
@@ -387,7 +387,7 @@ function ExploreCard({ v, isOwn }: { v: any; isOwn: boolean }) {
       <p className="text-[var(--app-text)] font-bold text-[15px] leading-snug mb-1">{wi?.title}</p>
       {wi?.description && <p className="text-[var(--app-text-secondary)] text-sm line-clamp-2 mb-3 leading-snug">{wi.description}</p>}
       <div className="flex items-center gap-2 pt-2 border-t border-[var(--app-border-subtle)]">
-        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-[var(--app-text)] font-bold text-[9px] flex-shrink-0">
+        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[9px] flex-shrink-0">
           {initials(student?.full_name)}
         </div>
         <p className="text-[var(--app-text-secondary)] text-xs flex-1 min-w-0">{student?.full_name} · verified {new Date(v.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>

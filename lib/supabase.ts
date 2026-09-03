@@ -602,6 +602,24 @@ export const searchPosts = async (query: string, organisationId?: string) => {
   return { data: await attachReactions(data), error: null }
 }
 
+// Powers the "more from this person" list under Feed's fullscreen
+// video player -- YouTube-style tap-to-open, but the videos listed
+// below are only ever this same author's, not an algorithmic mix of
+// everyone else's like YouTube's own "up next" would be. hidden posts
+// stay excluded, same as the feed itself.
+export const getPostsByAuthor = async (authorId: string, excludePostId: string) => {
+  const { data, error } = await supabase
+    .from('posts_feed')
+    .select('*')
+    .eq('author_id', authorId)
+    .not('video_path', 'is', null)
+    .neq('id', excludePostId)
+    .eq('hidden', false)
+    .order('created_at', { ascending: false })
+    .limit(20)
+  return { data, error }
+}
+
 export const getFeed = async (organisationId: string) => {
   const { data, error } = await supabase
     .from('posts_feed')
