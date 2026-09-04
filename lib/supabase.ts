@@ -256,7 +256,7 @@ export const getSignedFileUrl = async (bucket: 'submission-files' | 'work-item-a
 export const getVisibleWorkItems = async (organisationId: string) => {
   const { data, error } = await supabase
     .from('work_items')
-    .select('*, work_item_attachments(id, file_name, file_path, file_size_bytes), users!work_items_created_by_fkey(full_name), organisations(name)')
+    .select('*, work_item_attachments(id, file_name, file_path, file_size_bytes), users!work_items_created_by_fkey(full_name), organisations(name, logo_path, verified)')
     .eq('organisation_id', organisationId)
     .order('created_at', { ascending: false })
   return { data, error }
@@ -833,9 +833,26 @@ export const deleteMyAccount = async () => {
 }
 
 // ── Settings: organisation admin ──────────────────────────────────
-export const updateOrganisationProfile = async (organisationId: string, updates: { name?: string; safeguarding_lead_id?: string }) => {
+export const updateOrganisationProfile = async (organisationId: string, updates: { name?: string; safeguarding_lead_id?: string; logo_path?: string | null }) => {
   const { error } = await supabase.from('organisations').update(updates).eq('id', organisationId)
   return { error }
+}
+
+// Org logo -- "a profile picture so it appears proper when they post
+// a course/brief/workshop". Reuses the avatars bucket (public read,
+// owner-folder write, same as uploadOpportunityLogo already does for
+// an employer's own job postings) rather than needing a new storage
+// policy: the path is keyed to the UPLOADING STAFF MEMBER's own uid
+// (they own that file object under existing "avatars: owner *"
+// policies), the resulting path is then just stored on the
+// organisation row itself -- ownership of the storage object and
+// ownership of the org are two different things, and only the second
+// one is what actually gates who can change organisations.logo_path
+// (RLS: "organisations: staff update own org").
+export const uploadOrgLogo = async (staffUserId: string, file: File) => {
+  const path = `${staffUserId}/org-logo-${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from('avatars').upload(path, file)
+  return { path: error ? null : path, error }
 }
 
 export const getOrgStaff = async (organisationId: string) => {

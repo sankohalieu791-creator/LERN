@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
@@ -9,13 +9,13 @@ import {
   exportMyData, deleteMyAccount, submitReport, signOut,
   getOrgStaff, updateOrganisationProfile, supabase,
   requestEmailChange, sendPasswordResetEmail, signOutEverywhere,
-  getBlockedUsers, unblockUser, setCookieConsent,
+  getBlockedUsers, unblockUser, setCookieConsent, uploadOrgLogo, getAvatarUrl,
 } from '@/lib/supabase'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
 import {
   User, Lock, Sun, Moon, Monitor, Bell, Download, Trash2, Flag,
   FileText, LogOut, ShieldCheck, Users2, Ticket, KeyRound, Smartphone,
-  Mail, UserX, Cookie, ChevronRight, ChevronLeft,
+  Mail, UserX, Cookie, ChevronRight, ChevronLeft, Camera, BadgeCheck,
 } from 'lucide-react'
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
 
@@ -403,8 +403,10 @@ function OrganisationCard() {
   const [staff, setStaff] = useState<any[]>([])
   const [savingName, setSavingName] = useState(false)
   const [savingLead, setSavingLead] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const logoRef = useRef<HTMLInputElement>(null)
 
   const load = () => {
     if (!user?.organisation_id) return
@@ -425,6 +427,20 @@ function OrganisationCard() {
     load()
   }
 
+  // "A profile picture so it appears proper when they post a course/
+  // brief/workshop" -- the logo shows up wherever a course/brief/
+  // workshop card renders its host row (StudentMyWorkPanel).
+  const onLogoChosen = async (file: File | null) => {
+    if (!file || !user || !org) return
+    setUploadingLogo(true); setError(''); setNotice('')
+    const { path, error: upErr } = await uploadOrgLogo(user.id, file)
+    if (upErr || !path) { setUploadingLogo(false); setError(upErr?.message || 'Logo upload failed.'); return }
+    const { error: err } = await updateOrganisationProfile(org.id, { logo_path: path })
+    setUploadingLogo(false)
+    if (err) return setError(err.message)
+    load()
+  }
+
   const changeLead = async (leadId: string) => {
     if (!org) return
     setSavingLead(true); setError(''); setNotice('')
@@ -435,10 +451,41 @@ function OrganisationCard() {
     load()
   }
 
+  const logoUrl = org?.logo_path ? getAvatarUrl(org.logo_path) : null
+
   return (
     <Card icon={Users2} title="Organisation">
       <ErrorBanner message={error} />
       {notice && <p className="text-[13px] text-success-text font-semibold mb-3">{notice}</p>}
+
+      <div className="flex items-center gap-3.5 mb-5">
+        <button onClick={() => logoRef.current?.click()} disabled={uploadingLogo} className="relative flex-shrink-0 disabled:opacity-60" aria-label="Change organisation logo">
+          {logoUrl ? (
+            <img src={logoUrl} alt="" className="w-14 h-14 rounded-2xl object-cover" />
+          ) : (
+            <div className="w-14 h-14 rounded-2xl bg-accent-bg text-brand font-bold text-[16px] flex items-center justify-center">
+              {org?.name?.[0]?.toUpperCase() || 'O'}
+            </div>
+          )}
+          <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-brand flex items-center justify-center border-2 border-surface">
+            <Camera className="w-3 h-3 text-white" />
+          </span>
+        </button>
+        <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={e => onLogoChosen(e.target.files?.[0] || null)} />
+        <div className="min-w-0">
+          <p className="text-[13px] font-semibold text-ink">{uploadingLogo ? 'Uploading…' : 'Organisation logo'}</p>
+          <p className="text-[12px] text-ink-tertiary leading-relaxed">Shown wherever your courses, briefs and workshops appear to students.</p>
+          {/* Verified is platform-granted, not something an org can
+              switch on itself -- shown here as status, not a toggle. */}
+          {org?.verified ? (
+            <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold mt-1" style={{ color: '#4a9de0' }}>
+              <BadgeCheck className="w-3.5 h-3.5" /> Verified organisation
+            </span>
+          ) : (
+            <p className="text-[11px] text-ink-quaternary mt-1">Not yet verified by LERN</p>
+          )}
+        </div>
+      </div>
 
       <TextField label="Organisation name" value={name} onChange={setName} />
       <SecondaryButton onClick={saveName} disabled={savingName}>{savingName ? "Saving…" : "Save name"}</SecondaryButton>

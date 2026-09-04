@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getVisibleWorkItems, getMySubmissions, getMyOrgType, getWorkItemMemberCount,
   submitWork, uploadSubmissionFile, getSignedFileUrl, redeemJoinCode,
-  markWorkItemStarted, getMyStartedWorkItemIds,
+  markWorkItemStarted, getMyStartedWorkItemIds, getAvatarUrl,
 } from '@/lib/supabase'
 import type { WorkItem } from '@/lib/types'
 import {
@@ -45,6 +45,24 @@ function bannerGradient(id: string) {
 function initials(name?: string) {
   if (!name) return '?'
   return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
+}
+
+// The host row's own avatar on a course/workshop/brief card -- was
+// always a plain gradient-initials circle regardless of whether the
+// organisation had uploaded a real logo ("it needs to appear
+// proper"). Real logo when set (Settings -> Organisation), initials
+// otherwise. Just the avatar, not the name/tick text next to it --
+// the two call sites use different theme-token systems for that
+// (WorkItemDetail is portaled outside StudentShell's own data-theme
+// scope), so each keeps its own span rather than sharing one here.
+function OrgHostAvatar({ hostName, org }: { hostName?: string; org?: { name?: string; logo_path?: string | null } }) {
+  const logoUrl = org?.logo_path ? getAvatarUrl(org.logo_path) : null
+  if (logoUrl) return <img src={logoUrl} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+  return (
+    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
+      {initials(hostName || org?.name)}
+    </div>
+  )
 }
 
 // Was pinned dark-navy/amber/green hex, correct contrast against a
@@ -362,12 +380,10 @@ function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
         {item.description && <p className="text-[#777] text-sm line-clamp-2 mb-3 leading-snug">{item.description}</p>}
 
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
-            {initials(hostName)}
-          </div>
+          <OrgHostAvatar hostName={hostName} org={(item as any).organisations} />
           <span className="text-[var(--app-text)] text-sm font-semibold flex items-center gap-1">
             {hostName || orgName || 'Your organisation'}
-            <BadgeCheck className="w-3.5 h-3.5 text-[#4a9de0]" />
+            {(item as any).organisations?.verified && <BadgeCheck className="w-3.5 h-3.5 text-[#4a9de0]" />}
           </span>
         </div>
 
@@ -480,12 +496,10 @@ function WorkItemDetail({
           <h1 className="text-2xl font-bold text-ink leading-snug mb-3">{item.title}</h1>
 
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
-              {initials(hostName)}
-            </div>
+            <OrgHostAvatar hostName={hostName} org={(item as any).organisations} />
             <span className="text-ink text-sm font-semibold flex items-center gap-1">
               {hostName || (item as any).organisations?.name || 'Your organisation'}
-              <BadgeCheck className="w-3.5 h-3.5 text-[#4a9de0]" />
+              {(item as any).organisations?.verified && <BadgeCheck className="w-3.5 h-3.5 text-[#4a9de0]" />}
             </span>
           </div>
 

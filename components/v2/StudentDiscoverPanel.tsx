@@ -66,6 +66,7 @@ export default function StudentDiscoverPanel() {
   const [applications, setApplications] = useState<any[]>([])
   const [stageByOpp, setStageByOpp] = useState<Record<string, ApplicationStage>>({})
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
 
   // Saved (bookmarked) opportunities, loaded once and kept as a set so
@@ -76,8 +77,14 @@ export default function StudentDiscoverPanel() {
     getSavedOpportunities(user.id).then(({ data }) => setSavedIds(new Set((data || []).map((s: any) => s.opportunity_id))))
   }, [user?.id])
 
+  // Guarded against a double-tap firing this twice before the first
+  // request round-trips -- both calls would otherwise read the same
+  // stale savedIds, both try to insert, and the second hits the
+  // unique constraint (student_id, opportunity_id) as a silent error
+  // nobody ever saw.
   const toggleSave = async (opportunityId: string) => {
-    if (!user) return
+    if (!user || savingIds.has(opportunityId)) return
+    setSavingIds(prev => new Set(prev).add(opportunityId))
     const already = savedIds.has(opportunityId)
     setSavedIds(prev => {
       const next = new Set(prev)
@@ -86,6 +93,7 @@ export default function StudentDiscoverPanel() {
     })
     if (already) await unsaveOpportunity(user.id, opportunityId)
     else await saveOpportunity(user.id, opportunityId)
+    setSavingIds(prev => { const next = new Set(prev); next.delete(opportunityId); return next })
   }
 
   const load = () => {
@@ -272,8 +280,17 @@ export default function StudentDiscoverPanel() {
                   {/* Real company logo when the employer's added one --
                       gradient-initials fallback otherwise, same as
                       every other avatar in the app. */}
+                  {/* draggable/onContextMenu guards -- a long-press on
+                      a real logo image was opening the phone's own
+                      native "save image" sheet at the same time as a
+                      tap nearby landed on the bookmark button, which
+                      is what "two save popups" on a logo'd (employer)
+                      listing actually was. */}
                   {o.logo_path ? (
-                    <img src={getAvatarUrl(o.logo_path) || ''} alt="" className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" />
+                    <img
+                      src={getAvatarUrl(o.logo_path) || ''} alt="" draggable={false} onContextMenu={e => e.preventDefault()}
+                      className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' } as any}
+                    />
                   ) : (
                     <div className="w-14 h-14 rounded-2xl bg-[#252525] flex items-center justify-center text-white font-bold text-[16px] flex-shrink-0">
                       {initials(o.employer?.full_name)}
@@ -294,8 +311,8 @@ export default function StudentDiscoverPanel() {
                       posted it; every posting lives in the same
                       opportunities table. */}
                   <button
-                    onClick={() => toggleSave(o.id)} aria-label={saved ? 'Unsave' : 'Save'}
-                    className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition"
+                    onClick={() => toggleSave(o.id)} disabled={savingIds.has(o.id)} aria-label={saved ? 'Unsave' : 'Save'}
+                    className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition disabled:opacity-50"
                   >
                     <Bookmark className="w-[18px] h-[18px]" style={{ color: saved ? '#FF6B2B' : 'var(--app-text-tertiary)' }} fill={saved ? '#FF6B2B' : 'none'} />
                   </button>
