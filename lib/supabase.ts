@@ -1126,6 +1126,26 @@ export const sendWorkshopMessage = async (workItemId: string, senderId: string, 
   return { error }
 }
 
+// ── Live-session host moderation ("kick" that actually sticks) ──
+// Checked before ever attempting to join -- someone removed earlier in
+// this same session can't just rejoin a moment later.
+export const isParticipantRemoved = async (workItemId: string, userId: string) => {
+  const { data } = await supabase
+    .from('workshop_removed_participants')
+    .select('id')
+    .eq('work_item_id', workItemId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  return !!data
+}
+
+export const removeWorkshopParticipant = async (workItemId: string, userId: string, removedBy: string) => {
+  const { error } = await supabase
+    .from('workshop_removed_participants')
+    .insert([{ work_item_id: workItemId, user_id: userId, removed_by: removedBy }])
+  return { error }
+}
+
 export const setPresenceStatus = async (userId: string, status: 'active' | 'busy' | 'away' | 'offline' | 'do_not_disturb') => {
   const { error } = await supabase.from('users').update({ presence_status: status }).eq('id', userId)
   return { error }

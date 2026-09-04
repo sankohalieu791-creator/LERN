@@ -686,6 +686,12 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
       </label>
       <label className="block mb-5">
         <span className="block text-[13px] font-semibold text-ink mb-1.5">Visibility</span>
+        {/* "Private — join code only" inside a half-width flex-1 button
+            next to "Public" wrapped onto two lines on a phone-width
+            screen, stretching that whole row taller than the button
+            beside it -- short label in the button, same as the
+            brief form's own visibility toggle, explanation as a
+            hint underneath instead. */}
         <div className="flex gap-2">
           {(['private', 'public'] as const).map(v => (
             <button
@@ -696,10 +702,11 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
                 visibility === v ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
               }`}
             >
-              {v === 'private' ? 'Private — join code only' : 'Public'}
+              {v}
             </button>
           ))}
         </div>
+        {visibility === 'private' && <p className="text-[11px] text-ink-tertiary mt-1.5">Only students with a join code can see this.</p>}
       </label>
       <PrimaryButton onClick={handleSubmit} loading={loading}>Create</PrimaryButton>
     </div>

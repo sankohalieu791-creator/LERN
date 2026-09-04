@@ -1,9 +1,11 @@
 'use client'
 
+import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NotificationsBell from '@/components/v2/NotificationsBell'
 import { useAuth } from '@/context/AuthContext'
+import { useResolvedTheme } from '@/context/ThemeProvider'
 import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -39,6 +41,22 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   const { user } = useAuth()
   const pref = user?.theme_preference
   const dataTheme = pref === 'light' ? 'light' : pref === 'dark' ? 'dark' : undefined
+  const resolvedTheme = useResolvedTheme()
+  // The actual "black thing" bug: app/student/layout.tsx's own
+  // viewport.themeColor is a static '#0f0f0f' -- correct for a dark
+  // session, but pinned there regardless of the light mode this app
+  // has had for a while now. That colours the phone's OWN browser
+  // chrome (Android's address bar, iOS's status-bar tint), not
+  // anything inside the page -- which is exactly why it read as "a
+  // black thing" appearing on top of an otherwise-light screen rather
+  // than a bug in any one component. Mirroring the resolved theme into
+  // a cookie lets the layout's generateViewport read it server-side
+  // and return the right colour for THIS session, no client-side
+  // meta-tag override needed (the earlier attempt at that got stomped
+  // on every navigation, since the static export re-asserts itself).
+  useEffect(() => {
+    document.cookie = `lern-theme=${resolvedTheme}; path=/; max-age=31536000; samesite=lax`
+  }, [resolvedTheme])
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
   // The real v1 Feed page has its own header (LERN + search + bell);
   // Courses/Workshops (app/courses/page.tsx) has none at all -- its

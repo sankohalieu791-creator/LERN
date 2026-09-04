@@ -1,12 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack, ILocalVideoTrack } from 'agora-rtc-sdk-ng'
 import { useAuth } from '@/context/AuthContext'
-import { supabase, endWorkshop, getWorkshopMessages, sendWorkshopMessage } from '@/lib/supabase'
+import { supabase, endWorkshop, getWorkshopMessages, sendWorkshopMessage, isParticipantRemoved, removeWorkshopParticipant } from '@/lib/supabase'
 import {
   Mic, MicOff, Video, VideoOff, ScreenShare, PhoneOff, Users, Square,
   HelpCircle, Send, Hand, Circle, StopCircle, X, Download, Save, Loader2,
+  MoreVertical, UserX,
 } from 'lucide-react'
 
 const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!
@@ -49,7 +51,7 @@ function isBenignCancel(e: any): boolean {
   return name.includes('notallowed') || name.includes('permission') || msg.includes('permission') || msg.includes('cancel') || msg.includes('denied')
 }
 
-type Participant = { uid: number; name: string; isHost: boolean; handRaised?: boolean }
+type Participant = { uid: number; userId?: string; name: string; isHost: boolean; handRaised?: boolean; muted?: boolean }
 
 // A live online session room. Main-stage layout: one big feed up top,
 // everyone else as a name+avatar strip underneath — click a strip tile
@@ -60,8 +62,13 @@ type Participant = { uid: number; name: string; isHost: boolean; handRaised?: bo
 // is a persisted table + Realtime subscription, not a broadcast, so
 // someone joining late still sees what was asked.
 //
-// Deliberately not in this pass, flagged rather than rushed: a waiting
-// room / admit-to-join gate and host mute/kick of a participant.
+// Host moderation: mute (a live signal on the presence channel a
+// participant's own client complies with -- there's no media server
+// here to force a track off at the network level) and remove (the
+// same signal, plus a persisted workshop_removed_participants row so
+// it actually sticks past this one moment and blocks a rejoin).
+// Deliberately still not in this pass, flagged rather than rushed: a
+// waiting room / admit-to-join gate before someone can enter at all.
 export default function WorkshopSession({
   workItemId, title, canEnd, onClose, onEnded,
 }: { workItemId: string; title: string; canEnd?: boolean; onClose: () => void; onEnded?: () => void }) {
@@ -78,6 +85,13 @@ export default function WorkshopSession({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordedChunksRef = useRef<Blob[]>([])
   const recordingStreamRef = useRef<MediaStream | null>(null)
+  // Always-latest-handler refs -- the presence channel's broadcast
+  // listener is wired up once inside join() (a useCallback with its
+  // own dependency array), so it can't safely close over toggleMic/
+  // leave directly without redefining the whole join flow on every
+  // render. Kept current below, read from inside the listener instead.
+  const muteSelfRef = useRef<(() => void) | null>(null)
+  const kickSelfRef = useRef<(() => void) | null>(null)
 
   const [connecting, setConnecting] = useState(true)
   const [joined, setJoined] = useState(false)
@@ -103,14 +117,24 @@ export default function WorkshopSession({
   const [savingRecording, setSavingRecording] = useState(false)
 
   const trackPresence = useCallback((extra?: Partial<Participant>) => {
-    presenceRef.current?.track({ name: user?.full_name, isHost: !!canEnd, handRaised, ...extra })
-  }, [user?.full_name, canEnd, handRaised])
+    presenceRef.current?.track({ name: user?.full_name, userId: user?.id, isHost: !!canEnd, handRaised, muted: !micOn, ...extra })
+  }, [user?.full_name, user?.id, canEnd, handRaised, micOn])
+  useEffect(() => { trackPresence() }, [micOn]) // re-broadcast presence whenever mic state changes, so everyone else's mute icon stays accurate
 
   const join = useCallback(async () => {
     if (clientRef.current || !user) return
     setConnecting(true)
     setError('')
     try {
+      // Checked before ever attempting to connect -- someone the host
+      // removed earlier in this same session can't just tap "Join
+      // session" again a moment later and be straight back in.
+      if (!canEnd && await isParticipantRemoved(workItemId, user.id)) {
+        setError('The host removed you from this session.')
+        setConnecting(false)
+        return
+      }
+
       let token: string | null = null
       try {
         const res = await fetch(`/api/agora-token?channel=${encodeURIComponent(channelName)}&uid=${myUid}`)
@@ -145,12 +169,23 @@ export default function WorkshopSession({
         const next: Record<number, Participant> = {}
         for (const key of Object.keys(state)) {
           const entry: any = (state[key] as any[])[0]
-          if (entry) next[Number(key)] = { uid: Number(key), name: entry.name, isHost: entry.isHost, handRaised: entry.handRaised }
+          if (entry) next[Number(key)] = { uid: Number(key), userId: entry.userId, name: entry.name, isHost: entry.isHost, handRaised: entry.handRaised, muted: entry.muted }
         }
         setParticipants(next)
       })
+      // Host moderation signals -- there's no media server here that
+      // can force someone else's track off at the network level, so
+      // this is the same "the host's request reaches your client and
+      // it complies" model most WebRTC apps without one use. Every
+      // client listens on the same channel; only the one actually
+      // named as the target acts on it.
+      presence.on('broadcast', { event: 'control' }, ({ payload }: any) => {
+        if (payload?.targetUid !== myUid) return
+        if (payload.action === 'mute') muteSelfRef.current?.()
+        else if (payload.action === 'kick') kickSelfRef.current?.()
+      })
       presence.subscribe(async status => {
-        if (status === 'SUBSCRIBED') await presence.track({ name: user.full_name, isHost: !!canEnd, handRaised: false })
+        if (status === 'SUBSCRIBED') await presence.track({ name: user.full_name, userId: user.id, isHost: !!canEnd, handRaised: false, muted: true })
       })
       presenceRef.current = presence
     } catch (err: any) {
@@ -159,7 +194,7 @@ export default function WorkshopSession({
     } finally {
       setConnecting(false)
     }
-  }, [channelName, myUid, user, canEnd])
+  }, [channelName, myUid, user, canEnd, workItemId])
 
   useEffect(() => {
     join()
@@ -286,6 +321,19 @@ export default function WorkshopSession({
     } catch (e: any) { setActionError(cameraErrorMessage(e)) }
   }
 
+  // Called on THIS client when the host mutes them -- a request, not
+  // an enforced network-level mute, but it's what actually turns the
+  // mic off locally the instant the host's signal arrives.
+  const muteSelf = async () => {
+    if (!micOn || !clientRef.current || !micRef.current) return
+    await clientRef.current.unpublish([micRef.current])
+    micRef.current.close()
+    micRef.current = null
+    setMicOn(false)
+    setActionError('The host muted your microphone.')
+  }
+  useEffect(() => { muteSelfRef.current = muteSelf })
+
   const toggleScreenShare = async () => {
     if (!clientRef.current) return
     if (typeof navigator === 'undefined' || typeof navigator.mediaDevices?.getDisplayMedia !== 'function') {
@@ -360,6 +408,34 @@ export default function WorkshopSession({
   // what it's doing.
   const endForEveryone = leave
 
+  // Called on THIS client when the host removes them. Doesn't call
+  // onClose() straight away -- surfacing why (the same full-screen
+  // message a real connection failure uses) beats just silently
+  // vanishing back to the previous page with no explanation. The
+  // removed_participants row (written by the host, see
+  // removeParticipant below) is what stops a rejoin attempt after this.
+  const kickSelf = async () => {
+    cameraRef.current?.close(); micRef.current?.close(); screenRef.current?.close()
+    await clientRef.current?.leave().catch(() => {})
+    clientRef.current = null
+    presenceRef.current?.unsubscribe()
+    presenceRef.current = null
+    setJoined(false)
+    setError('The host removed you from this session.')
+  }
+  useEffect(() => { kickSelfRef.current = kickSelf })
+
+  // Host-only: send the live signal, and for a removal, persist it too
+  // so it actually sticks past this one moment.
+  const muteParticipant = (targetUid: number) => {
+    presenceRef.current?.send({ type: 'broadcast', event: 'control', payload: { action: 'mute', targetUid } })
+  }
+  const kickParticipant = async (targetUid: number) => {
+    presenceRef.current?.send({ type: 'broadcast', event: 'control', payload: { action: 'kick', targetUid } })
+    const targetUserId = participants[targetUid]?.userId
+    if (user && targetUserId) await removeWorkshopParticipant(workItemId, targetUserId, user.id)
+  }
+
   const startRecording = async () => {
     try {
       // A separate getUserMedia call, deliberately not reusing the
@@ -427,13 +503,23 @@ export default function WorkshopSession({
   }
 
   const allTiles: Participant[] = [
-    { uid: myUid, name: user?.full_name ? `${user.full_name} (you)` : 'You', isHost: !!canEnd, handRaised },
+    { uid: myUid, name: user?.full_name ? `${user.full_name} (you)` : 'You', isHost: !!canEnd, handRaised, muted: !micOn },
     ...remoteUsers.map(u => participants[u.uid as number] || { uid: u.uid as number, name: 'Participant', isHost: false }),
   ]
   const raisedHands = allTiles.filter(p => p.handRaised && p.uid !== myUid)
 
-  return (
-    <div className="fixed inset-0 z-50 bg-[#141110] flex flex-col">
+  // Portaled to document.body -- rendered from inside WorkItemCard on
+  // the org side, nested inside OrgShell's own scrolling <main>. Same
+  // fix as every other full-screen modal this session: a fixed-inset
+  // element several levels deep inside a scrolling ancestor is exactly
+  // what mobile WebKit/webview builds render inconsistently in
+  // practice ("the layout is messed up, things are pushed up") --
+  // portaling escapes that structurally. env(safe-area-inset-*) on the
+  // outer box is the other half of that same complaint: without it the
+  // header sits under the phone's own notch/status bar and the control
+  // bar sits under the home-indicator/gesture area.
+  return createPortal((
+    <div className="fixed inset-0 z-50 bg-[#141110] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="flex items-center justify-between px-5 py-3.5 flex-shrink-0">
         <div>
           <p className="text-white font-bold text-[15px]">{title}</p>
@@ -524,23 +610,13 @@ export default function WorkshopSession({
                   growing forever. */}
               <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 flex-shrink-0">
                 {allTiles.slice(0, 10).map(p => (
-                  <button
-                    key={p.uid} onClick={() => { pickedMainRef.current = true; setMainUid(p.uid) }}
-                    className={`flex flex-col items-center gap-1.5 rounded-xl py-2.5 transition ${p.uid === mainUid ? 'bg-white/10 ring-1 ring-white/20' : 'hover:bg-white/5'}`}
-                  >
-                    <div className="relative">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[12px] shadow-inner">
-                        {initials(p.name)}
-                      </div>
-                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#1E7A34] border-2 border-[#141110]" />
-                      {p.handRaised && (
-                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-brand border-2 border-[#141110] flex items-center justify-center">
-                          <Hand className="w-2.5 h-2.5 text-white" />
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-[#B8AE9C] truncate w-full text-center px-0.5">{p.isHost ? 'Host' : p.name.split(' ')[0]}</span>
-                  </button>
+                  <ParticipantTile
+                    key={p.uid} participant={p} isMain={p.uid === mainUid} isSelf={p.uid === myUid}
+                    isHostViewer={!!canEnd}
+                    onSelect={() => { pickedMainRef.current = true; setMainUid(p.uid) }}
+                    onMute={() => muteParticipant(p.uid)}
+                    onKick={() => kickParticipant(p.uid)}
+                  />
                 ))}
                 {allTiles.length > 10 && (
                   <div className="flex flex-col items-center justify-center gap-1.5 rounded-xl py-2.5">
@@ -556,9 +632,21 @@ export default function WorkshopSession({
         </div>
 
         {qaOpen && (
-          <div className="w-72 flex-shrink-0 border-l border-white/10 flex flex-col">
-            <div className="px-4 py-3 border-b border-white/10">
+          // A real side panel on a wide screen, same as before -- but
+          // squeezing a fixed 288px sidebar in next to the main stage
+          // on a phone-width screen left almost nothing for the video
+          // itself. Below md this becomes a bottom sheet instead: fixed
+          // to the bottom, capped height with its own scroll, rounded
+          // top corners -- the main stage stays full-width behind it.
+          <div
+            className="fixed md:static inset-x-0 bottom-0 md:inset-auto max-h-[65vh] md:max-h-none w-full md:w-72 flex-shrink-0 border-t md:border-t-0 md:border-l border-white/10 bg-[#141110] md:bg-transparent rounded-t-2xl md:rounded-none flex flex-col z-10"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
+            <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
               <p className="text-white font-semibold text-[13px]">Q&A</p>
+              <button onClick={() => setQaOpen(false)} className="md:hidden text-[#8A8373] hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
             </div>
             {raisedHands.length > 0 && (
               <div className="px-4 py-2.5 border-b border-white/10">
@@ -640,7 +728,7 @@ export default function WorkshopSession({
         </button>
       </div>
     </div>
-  )
+  ), document.body)
 }
 
 function RoomButton({ active, onClick, onIcon: OnIcon, offIcon: OffIcon, disabled }: { active: boolean; onClick: () => void; onIcon: any; offIcon: any; disabled?: boolean }) {
@@ -652,5 +740,75 @@ function RoomButton({ active, onClick, onIcon: OnIcon, offIcon: OffIcon, disable
     >
       <Icon className="w-[18px] h-[18px]" />
     </button>
+  )
+}
+
+// A tile in the "everyone else" grid: tap to bring that person's feed
+// to the main stage, same as before. The host-only kebab (Mute/
+// Remove) is a separate button layered on top, not the same clickable
+// surface -- a button nested inside another button isn't valid HTML,
+// and conflating "pick this tile" with "open a moderation menu" on the
+// exact same tap would make both worse.
+function ParticipantTile({
+  participant: p, isMain, isSelf, isHostViewer, onSelect, onMute, onKick,
+}: {
+  participant: Participant; isMain: boolean; isSelf: boolean; isHostViewer: boolean
+  onSelect: () => void; onMute: () => void; onKick: () => void
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  // Only the viewing host gets a menu, and never on their own tile --
+  // hosts don't mute or remove themselves through this.
+  const showMenu = isHostViewer && !isSelf && !p.isHost
+
+  return (
+    <div className={`relative flex flex-col items-center gap-1.5 rounded-xl py-2.5 transition ${isMain ? 'bg-white/10 ring-1 ring-white/20' : 'hover:bg-white/5'}`}>
+      <button onClick={onSelect} className="flex flex-col items-center gap-1.5 w-full">
+        <div className="relative">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[12px] shadow-inner">
+            {initials(p.name)}
+          </div>
+          <span className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-[#141110] flex items-center justify-center ${p.muted ? 'bg-[#5A544A]' : 'bg-[#1E7A34]'}`}>
+            {p.muted && <MicOff className="w-2.5 h-2.5 text-white" />}
+          </span>
+          {p.handRaised && (
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-brand border-2 border-[#141110] flex items-center justify-center">
+              <Hand className="w-2.5 h-2.5 text-white" />
+            </span>
+          )}
+        </div>
+        <span className="text-[10px] text-[#B8AE9C] truncate w-full text-center px-0.5">{p.isHost ? 'Host' : p.name.split(' ')[0]}</span>
+      </button>
+
+      {showMenu && (
+        <div className="absolute top-1 right-1">
+          <button
+            onClick={e => { e.stopPropagation(); setMenuOpen(v => !v) }}
+            aria-label="Participant options"
+            className="w-5 h-5 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white transition"
+          >
+            <MoreVertical className="w-3 h-3" />
+          </button>
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-6 bg-[#221D19] border border-white/10 rounded-lg shadow-xl py-1 w-32 z-20">
+                <button
+                  onClick={() => { setMenuOpen(false); onMute() }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-white hover:bg-white/10 transition"
+                >
+                  <MicOff className="w-3.5 h-3.5" /> Mute
+                </button>
+                <button
+                  onClick={() => { setMenuOpen(false); onKick() }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-[#FF8A6B] hover:bg-white/10 transition"
+                >
+                  <UserX className="w-3.5 h-3.5" /> Remove
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
