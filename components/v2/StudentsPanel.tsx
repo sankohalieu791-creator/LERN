@@ -91,7 +91,14 @@ export default function StudentsPanel() {
       {tab === 'students' ? (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[13px]" style={{ color: '#5A5A5A' }}>{visible.length} student{visible.length === 1 ? '' : 's'}</p>
+            {/* Wasn't gated on loading at all -- always read straight
+                off students (starts as []), so it confidently said "0
+                students" the instant this screen mounted, before the
+                real roster had even come back. Combined with the
+                getOrgStudents ambiguous-embed bug (fixed separately),
+                this is what made "0 students" look like a genuine,
+                settled answer rather than a fetch in progress. */}
+            <p className="text-[13px]" style={{ color: '#5A5A5A' }}>{loading ? 'Loading…' : `${visible.length} student${visible.length === 1 ? '' : 's'}`}</p>
             {groups.length > 0 && (
               <div className="relative">
                 <select

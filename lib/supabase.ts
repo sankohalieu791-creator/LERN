@@ -437,9 +437,18 @@ export const setShareVisibility = async (verificationId: string, visibility: 'or
 // Institution "Students" section: the org's students with a rollup of
 // their submitted/verified work counts and their group (enrolment + progress).
 export const getOrgStudents = async (organisationId: string) => {
+  // groups(name) alone is ambiguous to PostgREST -- there are two FK
+  // paths between users and groups (users.group_id -> groups.id, AND
+  // groups.created_by -> users.id), so an unqualified embed returns
+  // HTTP 300 "Multiple Choices" instead of data. Confirmed live in the
+  // logs: this has been silently failing (data: null on every call),
+  // which every caller's own `data || []` fallback then quietly turned
+  // into "0 students" -- a confidently-wrong empty state, not a
+  // loading flash. Qualifying with the actual FK constraint name picks
+  // the right one unambiguously.
   const { data: students, error } = await supabase
     .from('users')
-    .select('id, full_name, email, created_at, group_id, groups(name)')
+    .select('id, full_name, email, created_at, group_id, groups!users_group_id_fkey(name)')
     .eq('organisation_id', organisationId)
     .eq('role', 'student')
     .order('full_name')
