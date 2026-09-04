@@ -10,6 +10,7 @@ import {
   getOrgStaff, updateOrganisationProfile, supabase,
   requestEmailChange, sendPasswordResetEmail, signOutEverywhere,
   getBlockedUsers, unblockUser, setCookieConsent, uploadOrgLogo, getAvatarUrl,
+  uploadAvatar, removeAvatar,
 } from '@/lib/supabase'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
 import {
@@ -91,8 +92,10 @@ function AccountCard({ onChangeEmail }: { onChangeEmail: () => void }) {
   const [newPassword, setNewPassword] = useState('')
   const [savingName, setSavingName] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const photoRef = useRef<HTMLInputElement>(null)
 
   const saveName = async () => {
     if (!user || !fullName.trim()) return
@@ -114,10 +117,68 @@ function AccountCard({ onChangeEmail }: { onChangeEmail: () => void }) {
     setNotice('Password changed.')
   }
 
+  // Employer's own equivalent of the institution/provider org logo --
+  // employers have no organisations row to hang one off, so this is a
+  // personal profile picture on their own account instead. Shows on
+  // every job/apprenticeship/internship they post automatically
+  // (Discover falls back to it when a specific posting has no logo
+  // of its own).
+  const onPhotoChosen = async (file: File | null) => {
+    if (!file || !user) return
+    setUploadingPhoto(true); setError(''); setNotice('')
+    const { error: err } = await uploadAvatar(user.id, file)
+    setUploadingPhoto(false)
+    if (err) return setError(err.message || 'Photo upload failed.')
+    await refreshUser()
+  }
+  const removePhoto = async () => {
+    if (!user) return
+    setUploadingPhoto(true); setError('')
+    const { error: err } = await removeAvatar(user.id, user.avatar_path)
+    setUploadingPhoto(false)
+    if (err) return setError(err.message)
+    await refreshUser()
+  }
+
   return (
     <Card icon={User} title="Account">
       <ErrorBanner message={error} />
       {notice && <p className="text-[13px] text-success-text font-semibold mb-3">{notice}</p>}
+
+      {user?.role === 'employer' && (
+        <div className="flex items-center gap-3.5 mb-5">
+          <button onClick={() => photoRef.current?.click()} disabled={uploadingPhoto} className="relative flex-shrink-0 disabled:opacity-60" aria-label="Change profile picture">
+            {user.avatar_path ? (
+              <img src={getAvatarUrl(user.avatar_path) || ''} alt="" className="w-14 h-14 rounded-full object-cover" />
+            ) : (
+              <div className="w-14 h-14 rounded-full bg-accent-bg text-brand font-bold text-[16px] flex items-center justify-center">
+                {user.full_name?.[0]?.toUpperCase() || 'E'}
+              </div>
+            )}
+            <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-brand flex items-center justify-center border-2 border-surface">
+              <Camera className="w-3 h-3 text-white" />
+            </span>
+          </button>
+          <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={e => onPhotoChosen(e.target.files?.[0] || null)} />
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold text-ink">{uploadingPhoto ? 'Uploading…' : 'Profile picture'}</p>
+            <p className="text-[12px] text-ink-tertiary leading-relaxed">Shown on the jobs and roles you post.</p>
+            <div className="flex items-center gap-3 mt-1">
+              {user.avatar_path && (
+                <button onClick={removePhoto} disabled={uploadingPhoto} className="text-[11.5px] font-semibold text-ink-secondary disabled:opacity-40">Remove</button>
+              )}
+              {user.employer_verified ? (
+                <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold" style={{ color: '#4a9de0' }}>
+                  <BadgeCheck className="w-3.5 h-3.5" /> Verified employer
+                </span>
+              ) : (
+                <p className="text-[11px] text-ink-quaternary">Not yet verified by LERN</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <TextField label="Full name" value={fullName} onChange={setFullName} placeholder="Your name" />
       <SecondaryButton onClick={saveName} disabled={savingName}>{savingName ? "Saving…" : "Save name"}</SecondaryButton>
 

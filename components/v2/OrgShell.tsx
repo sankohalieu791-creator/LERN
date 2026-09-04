@@ -91,8 +91,11 @@ export default function OrgShell({
   // The logo uploaded in Settings' Organisation card was only ever
   // used on the student-facing course/brief/workshop cards -- it
   // needs to show up here too, wherever the org's own identity badge
-  // renders (the drawer), not just in the form that set it.
-  const identityLogoUrl = orgLogoPath ? getAvatarUrl(orgLogoPath) : null
+  // renders (the drawer), not just in the form that set it. An
+  // employer has no org logo to fall back to (no organisations row at
+  // all) -- their own profile picture (Settings' Account card) is the
+  // equivalent identity image for them.
+  const identityLogoUrl = orgLogoPath ? getAvatarUrl(orgLogoPath) : (!user?.organisation_id && user?.avatar_path ? getAvatarUrl(user.avatar_path) : null)
 
   // Badge counts are real, not decorative -- only fetched (and only
   // rendered, see NAV_BADGES below) for the sections that actually
@@ -208,9 +211,13 @@ export default function OrgShell({
               <button
                 onClick={() => setProfileOpen(v => !v)}
                 aria-label="Profile menu"
-                className="relative w-10 h-10 flex items-center justify-center rounded-full bg-accent-bg text-brand font-bold text-[14px] ml-1"
+                className="relative w-10 h-10 flex items-center justify-center rounded-full bg-accent-bg text-brand font-bold text-[14px] ml-1 overflow-hidden"
               >
-                {user?.full_name?.[0]?.toUpperCase() || <UserIcon className="w-[18px] h-[18px]" />}
+                {user?.avatar_path ? (
+                  <img src={getAvatarUrl(user.avatar_path) || ''} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  user?.full_name?.[0]?.toUpperCase() || <UserIcon className="w-[18px] h-[18px]" />
+                )}
                 <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface ${PRESENCE_DOT[user?.presence_status || 'active']}`} />
               </button>
               {profileOpen && (

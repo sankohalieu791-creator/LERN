@@ -9,7 +9,7 @@ import {
 } from '@/lib/supabase'
 import type { ApplicationStage } from '@/lib/supabase'
 import {
-  Search, X, Briefcase, Clock, Check, Ban, Send, LineChart, Bookmark,
+  Search, X, Briefcase, Clock, Check, Ban, Send, LineChart, Bookmark, BadgeCheck,
 } from 'lucide-react'
 
 const STAGE_META: Record<ApplicationStage, { label: string; bg: string; text: string }> = {
@@ -286,9 +286,13 @@ export default function StudentDiscoverPanel() {
                       tap nearby landed on the bookmark button, which
                       is what "two save popups" on a logo'd (employer)
                       listing actually was. */}
-                  {o.logo_path ? (
+                  {/* Per-posting logo first (set on this specific
+                      opportunity), then the employer's own profile
+                      picture (set once in Settings, covers every
+                      posting automatically), initials last. */}
+                  {(o.logo_path || o.employer?.avatar_path) ? (
                     <img
-                      src={getAvatarUrl(o.logo_path) || ''} alt="" draggable={false} onContextMenu={e => e.preventDefault()}
+                      src={getAvatarUrl(o.logo_path || o.employer?.avatar_path) || ''} alt="" draggable={false} onContextMenu={e => e.preventDefault()}
                       className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' } as any}
                     />
                   ) : (
@@ -304,7 +308,12 @@ export default function StudentDiscoverPanel() {
                       <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--app-text-tertiary)]">{o.type}</span>
                     )}
                     <p className="text-[var(--app-text)] font-bold text-[17px] leading-tight">{o.title}</p>
-                    {o.employer?.full_name && <p className="text-[var(--app-text-secondary)] text-sm">{o.employer.full_name}</p>}
+                    {o.employer?.full_name && (
+                      <p className="text-[var(--app-text-secondary)] text-sm flex items-center gap-1">
+                        {o.employer.full_name}
+                        {o.employer.employer_verified && <BadgeCheck className="w-3.5 h-3.5 text-[#4a9de0] flex-shrink-0" />}
+                      </p>
+                    )}
                   </div>
                   {/* Save/bookmark -- works the same regardless of
                       whether an employer, institution or provider

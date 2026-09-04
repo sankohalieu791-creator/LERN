@@ -1255,7 +1255,7 @@ export const getAllOpportunities = async () => {
 export const getOpportunities = async (type?: 'job' | 'apprenticeship' | 'internship') => {
   let query = supabase
     .from('opportunities')
-    .select('*, employer:users!opportunities_employer_id_fkey(full_name)')
+    .select('*, employer:users!opportunities_employer_id_fkey(full_name, avatar_path, employer_verified)')
     .order('created_at', { ascending: false })
     .limit(50)
   if (type) query = query.eq('type', type)
