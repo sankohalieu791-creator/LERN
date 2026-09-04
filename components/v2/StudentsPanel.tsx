@@ -412,6 +412,7 @@ function GuestInvitePanel({ students }: { students: any[] }) {
   const [creating, setCreating] = useState(false)
   const [newLink, setNewLink] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [error, setError] = useState('')
 
   const load = () => {
     if (!user?.organisation_id) return
@@ -432,17 +433,23 @@ function GuestInvitePanel({ students }: { students: any[] }) {
     return next
   })
 
+  // Was a silent no-op on failure before -- disabled button with no
+  // explanation if nothing was selected, and any real error from
+  // createGuestInvite (RLS, network, a bad organisation_id) just
+  // vanished with nothing shown. Every path now either creates the
+  // link or tells the person why not.
   const handleCreate = async () => {
-    if (selected.size === 0 || !user?.organisation_id) return
+    setError('')
+    if (selected.size === 0) return setError('Select at least one student first.')
+    if (!user?.organisation_id) return setError("Your organisation hasn't loaded yet — wait a moment and try again.")
     setCreating(true)
     setNewLink(null)
-    const { data, error } = await createGuestInvite(user.organisation_id, user.id, Array.from(selected), email)
+    const { data, error: err } = await createGuestInvite(user.organisation_id, user.id, Array.from(selected), email)
     setCreating(false)
-    if (!error && data) {
-      setNewLink(`${window.location.origin}/guest/${(data as any).token}`)
-      setEmail('')
-      load()
-    }
+    if (err || !data) { setError(err?.message || "Couldn't create the invite — try again."); return }
+    setNewLink(`${window.location.origin}/guest/${(data as any).token}`)
+    setEmail('')
+    load()
   }
 
   const handleRevoke = async (id: string) => {
@@ -497,6 +504,12 @@ function GuestInvitePanel({ students }: { students: any[] }) {
           />
         </label>
 
+        {error && (
+          <div className="bg-danger-bg border border-danger-hover rounded-lg px-3.5 py-2.5 mb-4">
+            <p className="text-[12.5px] text-danger-text">{error}</p>
+          </div>
+        )}
+
         {newLink && (
           <div className="flex items-center gap-2 bg-success-bg border border-success-text/20 rounded-lg px-3.5 py-2.5 mb-4">
             <p className="text-[12.5px] text-ink flex-1 truncate font-mono">{newLink}</p>
@@ -506,9 +519,13 @@ function GuestInvitePanel({ students }: { students: any[] }) {
           </div>
         )}
 
+        {/* Always clickable now, even with nothing selected -- a
+            disabled button with no explanation is indistinguishable
+            from a broken one. handleCreate itself explains why, if
+            there's a reason it can't proceed. */}
         <button
-          onClick={handleCreate} disabled={selected.size === 0 || creating}
-          className="w-full flex items-center justify-center gap-1.5 text-white text-[14px] font-semibold py-3 rounded-xl disabled:opacity-40 transition mb-4"
+          onClick={handleCreate} disabled={creating}
+          className="w-full flex items-center justify-center gap-1.5 text-white text-[14px] font-semibold py-3 rounded-xl disabled:opacity-60 transition mb-4"
           style={{ backgroundColor: '#F26B21' }}
         >
           <LinkIcon className="w-4 h-4" /> {creating ? 'Creating…' : 'Create invite link'}

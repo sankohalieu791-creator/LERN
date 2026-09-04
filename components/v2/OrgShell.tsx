@@ -30,12 +30,19 @@ function roleLabelFromHref(href: string) {
 
 export interface NavItem { key: string; label: string; icon: LucideIcon; href: string }
 
+// Five real colours, not the same one reused twice -- away and offline
+// used to both be ink-quaternary grey, busy and do-not-disturb both
+// danger-solid red, so two of the five options were visually
+// indistinguishable from another. do_not_disturb has no existing
+// token (nothing else in the app needed purple before this), so it's
+// the one hardcoded hex here -- same pattern already used for other
+// one-off brand colours elsewhere in this file.
 const PRESENCE_DOT: Record<string, string> = {
   active: 'bg-success-solid',
   busy: 'bg-danger-solid',
-  away: 'bg-ink-quaternary',
+  away: 'bg-warning-solid',
+  do_not_disturb: 'bg-[#8B5CF6]',
   offline: 'bg-ink-quaternary',
-  do_not_disturb: 'bg-danger-solid',
 }
 const PRESENCE_LABEL: Record<string, string> = {
   active: 'Active', busy: 'Busy', away: 'Away', offline: 'Offline', do_not_disturb: 'Do not disturb',
@@ -74,6 +81,12 @@ export default function OrgShell({
     supabase.from('organisations').select('name').eq('id', user.organisation_id).single()
       .then(({ data }) => setOrgName(data?.name ?? null))
   }, [user?.organisation_id])
+  // Employers have no organisation row at all (only institution/
+  // provider do) -- orgName stays null for them forever, which left
+  // the top bar blank and the drawer showing "—" with a fallback "LN"
+  // badge for the one role that actually needs its own identity shown
+  // here most. Falls back to their own name in that case.
+  const identityName = orgName || (!user?.organisation_id ? user?.full_name : null) || null
 
   // Badge counts are real, not decorative -- only fetched (and only
   // rendered, see NAV_BADGES below) for the sections that actually
@@ -167,7 +180,7 @@ export default function OrgShell({
             </button>
             <Logo size="sm" />
           </div>
-          <div className="hidden lg:block text-[14px] font-semibold text-ink-secondary truncate">{orgName}</div>
+          <div className="hidden lg:block text-[14px] font-semibold text-ink-secondary truncate">{identityName}</div>
           <div className="flex items-center gap-1">
             <NotificationsBell />
             {/* Visible on phone now too, not just laptop -- direct
@@ -285,10 +298,10 @@ export default function OrgShell({
                   is a circle; a squared badge here was the exact
                   inconsistency flagged before on Profile. */}
               <span className="w-12 h-12 rounded-full bg-accent-bg text-brand font-bold text-[15px] flex items-center justify-center flex-shrink-0">
-                {orgInitials(orgName)}
+                {orgInitials(identityName)}
               </span>
               <div className="min-w-0">
-                <p className="text-[16px] font-bold text-ink truncate">{orgName || '—'}</p>
+                <p className="text-[16px] font-bold text-ink truncate">{identityName || '—'}</p>
                 <p className="text-[13px] text-ink-tertiary">{roleLabelFromHref(sections[0]?.href || '')}</p>
               </div>
             </div>

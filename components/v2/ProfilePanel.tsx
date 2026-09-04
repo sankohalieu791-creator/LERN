@@ -9,7 +9,7 @@ import {
   addSelfQualification, deleteSelfQualification, uploadSelfQualificationFile, getSignedFileUrl, deletePost,
   updateProfileBioTags, getExperienceEntries, addExperienceEntry, deleteExperienceEntry,
   getSavedOpportunities, unsaveOpportunity, updateUserProfile, uploadAvatar, removeAvatar, getAvatarUrl,
-  isUsernameAvailable,
+  isUsernameAvailable, getMyOrganisationInfo,
 } from '@/lib/supabase'
 import {
   FolderCheck, Briefcase, Grid3x3, Settings as SettingsIcon, Plus, X, Trash2, Play,
@@ -19,6 +19,10 @@ import {
 function initials(name?: string) {
   if (!name) return '?'
   return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
+}
+function isAdult(dob?: string) {
+  if (!dob) return false
+  return (Date.now() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25) >= 18
 }
 function daysAgo(dateStr: string) {
   return Math.max(0, Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)))
@@ -65,6 +69,7 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
   const [editingBio, setEditingBio] = useState(false)
   const [addingExperience, setAddingExperience] = useState(false)
   const [addingQual, setAddingQual] = useState(false)
+  const [orgName, setOrgName] = useState<string | null>(null)
 
   const load = () => {
     if (!profileId) return
@@ -78,7 +83,20 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
   }
   useEffect(load, [profileId, isOwn])
 
+  // "Needs more detail" -- a title line under the name, same logic as
+  // planned for the Verified Skill Profile: organisation name if
+  // they're in one, "Student" if under 18 and not (so the profile
+  // still reads as a real person's page, not blank), nothing at all
+  // if 18+ and independent. Own-profile only -- getMyOrganisationInfo
+  // needs the org's own RLS-visible id, which is only reliably known
+  // here for the signed-in viewer's own profile.
+  useEffect(() => {
+    if (!isOwn || !profile?.organisation_id) { setOrgName(null); return }
+    getMyOrganisationInfo(profile.organisation_id).then(({ data }) => setOrgName(data?.name || null))
+  }, [isOwn, profile?.organisation_id])
+
   if (!profile) return null
+  const title = orgName || (!profile.organisation_id && !isAdult(profile.date_of_birth) ? 'Student' : '')
 
   const folderCount = { verified: verified.length, experience: experience.length, posts: posts.length, saved: saved.length }
 
@@ -126,6 +144,7 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
           <Avatar path={profile.avatar_path} name={profile.full_name} size={88} textSize={30} variant="solid" />
           <p className="text-[19px] font-bold mt-3.5 tracking-tight">{profile.full_name}</p>
           {profile.username && <p className="text-[13px] text-[var(--app-text-secondary)] mt-0.5">@{profile.username}</p>}
+          {title && <p className="text-[12.5px] font-medium mt-1" style={{ color: '#D4551A' }}>{title}</p>}
           {profile.bio && (
             <p className="text-[13.5px] text-[var(--app-text-body)] leading-[1.5] mt-2.5" style={{ maxWidth: 300 }}>{profile.bio}</p>
           )}

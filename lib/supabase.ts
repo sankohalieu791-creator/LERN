@@ -605,6 +605,18 @@ export const toggleLike = async (postId: string, userId: string, liked: boolean)
 // security_invoker now, so RLS -- "posts: read" -- is what actually
 // scopes this, same open-to-everyone model as getFeed), not a
 // separate unrestricted table scan.
+// "For both searching video and people" -- search_people is a
+// SECURITY DEFINER RPC (see migration) since a student can't SELECT
+// another student's users row directly under RLS; it applies its own
+// narrow visibility rule instead (same org, or already shown
+// un-anonymised somewhere in the Feed).
+export const searchPeople = async (query: string) => {
+  const q = query.trim()
+  if (!q) return { data: [], error: null }
+  const { data, error } = await supabase.rpc('search_people', { q })
+  return { data: data as { id: string; full_name: string; avatar_path: string | null; role: string }[] | null, error }
+}
+
 export const searchPosts = async (query: string) => {
   const q = query.trim()
   if (!q) return { data: [], error: null }

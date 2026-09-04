@@ -315,35 +315,60 @@ function WinViewer({ win, isOwn, organisationId, userId, onClose }: {
     else if (win.image_path) getSignedFileUrl('post-images', win.image_path).then(({ url }) => setMediaUrl(url))
   }, [win.image_path, win.video_path])
 
+  // Real Instagram-Story shape now: the photo/video is the full-bleed
+  // background, not a small rounded thumbnail sitting under the text
+  // ("show the full picture or video" -- it was capped at 280px tall
+  // with padding around it, which is what made it look small
+  // regardless of the source image's own size). A text-only win (no
+  // media at all) still gets the milestone-colour gradient as its
+  // background, same as before.
   return createPortal((
-    <div
-      className="fixed inset-0 z-50 flex flex-col"
-      style={{ background: `linear-gradient(160deg, ${meta?.ring || '#0F6E56'}, #1A1613)`, paddingTop: 'env(safe-area-inset-top)' }}
-      onClick={onClose}
-    >
-      <div className="flex items-center justify-end gap-1 px-4 flex-shrink-0" style={{ paddingTop: '1rem' }}>
-        {!isOwn && (
-          <button onClick={e => { e.stopPropagation(); setReportOpen(true) }} aria-label="Report this win" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white">
-            <MoreHorizontal className="w-[18px] h-[18px]" />
+    <div className="fixed inset-0 z-50 bg-black" onClick={onClose}>
+      {mediaUrl ? (
+        win.video_path
+          ? <video src={mediaUrl} className="absolute inset-0 w-full h-full object-cover" autoPlay loop muted playsInline />
+          : <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      ) : (
+        <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${meta?.ring || '#0F6E56'}, #1A1613)` }} />
+      )}
+
+      {/* Top scrim + controls -- name/pill readable over any media,
+          bright or dark. */}
+      <div
+        className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-4 pb-10"
+        style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))', background: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2.5 text-white min-w-0">
+          <span className="w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold flex-shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+            {initials(win.author?.full_name)}
+          </span>
+          <div className="min-w-0">
+            <p className="font-bold text-[14px] truncate">{win.author?.full_name}</p>
+            <span className="inline-block text-[11px] font-semibold px-2.5 py-[3px] rounded-full mt-0.5" style={{ backgroundColor: 'rgba(255,255,255,0.22)' }}>{meta?.pillLabel}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {!isOwn && (
+            <button onClick={() => setReportOpen(true)} aria-label="Report this win" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white">
+              <MoreHorizontal className="w-[18px] h-[18px]" />
+            </button>
+          )}
+          <button onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white">
+            <X className="w-5 h-5" />
           </button>
-        )}
-        <button onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white">
-          <X className="w-5 h-5" />
-        </button>
+        </div>
       </div>
-      <div className="flex-1 flex flex-col items-center justify-center px-8 text-center text-white" onClick={e => e.stopPropagation()}>
-        <span className="w-16 h-16 rounded-full flex items-center justify-center text-[20px] font-bold mb-4" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
-          {initials(win.author?.full_name)}
-        </span>
-        <p className="font-bold text-[16px] mb-1.5">{win.author?.full_name}</p>
-        <span className="text-[11.5px] font-semibold px-3 py-1 rounded-full mb-5" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>{meta?.pillLabel}</span>
-        {win.content && <p className="text-[18px] leading-snug mb-5 max-w-xs">{win.content}</p>}
-        {mediaUrl && (
-          win.video_path
-            ? <video src={mediaUrl} className="max-h-[280px] max-w-full rounded-2xl object-cover" autoPlay loop muted playsInline controls />
-            : <img src={mediaUrl} alt="" className="max-h-[280px] max-w-full rounded-2xl object-cover" />
-        )}
-      </div>
+
+      {win.content && (
+        <div
+          className="absolute inset-x-0 bottom-0 px-6 pt-16 text-white text-center"
+          style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))', background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)' }}
+          onClick={e => e.stopPropagation()}
+        >
+          <p className="text-[17px] leading-snug">{win.content}</p>
+        </div>
+      )}
 
       {reportOpen && (
         <div onClick={e => e.stopPropagation()}>
