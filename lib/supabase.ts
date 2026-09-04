@@ -1497,9 +1497,21 @@ export const deleteTalentPool = async (id: string) => {
 export const getTalentPoolMembers = async (poolId: string) => {
   const { data, error } = await supabase
     .from('talent_pool_members')
-    .select('id, created_at, student:users(id, full_name)')
+    .select('id, created_at, student:users(id, full_name, avatar_path)')
     .eq('pool_id', poolId)
     .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// A small avatar preview for the pools grid -- just enough to render
+// a stack of faces on each card without a second round-trip per pool.
+export const getTalentPoolPreviewMembers = async (poolId: string, limit = 4) => {
+  const { data, error } = await supabase
+    .from('talent_pool_members')
+    .select('student:users(id, full_name, avatar_path)')
+    .eq('pool_id', poolId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
   return { data, error }
 }
 
