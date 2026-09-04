@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
-import { setSidebarCollapsed, setPresenceStatus, signOut, supabase, getPendingReviewCount, getPendingInterestCount } from '@/lib/supabase'
+import { setSidebarCollapsed, setPresenceStatus, signOut, supabase, getPendingReviewCount, getPendingInterestCount, getAvatarUrl } from '@/lib/supabase'
 import { ChevronLeft, ChevronRight, Settings, User as UserIcon, Plus, LogOut, Menu, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import Logo from '@/components/v2/Logo'
@@ -69,6 +69,7 @@ export default function OrgShell({
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [orgName, setOrgName] = useState<string | null>(null)
+  const [orgLogoPath, setOrgLogoPath] = useState<string | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [composerOpen, setComposerOpen] = useState(false)
@@ -78,8 +79,8 @@ export default function OrgShell({
   useEffect(() => { setCollapsed(!!user?.sidebar_collapsed) }, [user?.sidebar_collapsed])
   useEffect(() => {
     if (!user?.organisation_id) return
-    supabase.from('organisations').select('name').eq('id', user.organisation_id).single()
-      .then(({ data }) => setOrgName(data?.name ?? null))
+    supabase.from('organisations').select('name, logo_path').eq('id', user.organisation_id).single()
+      .then(({ data }) => { setOrgName(data?.name ?? null); setOrgLogoPath(data?.logo_path ?? null) })
   }, [user?.organisation_id])
   // Employers have no organisation row at all (only institution/
   // provider do) -- orgName stays null for them forever, which left
@@ -87,6 +88,11 @@ export default function OrgShell({
   // badge for the one role that actually needs its own identity shown
   // here most. Falls back to their own name in that case.
   const identityName = orgName || (!user?.organisation_id ? user?.full_name : null) || null
+  // The logo uploaded in Settings' Organisation card was only ever
+  // used on the student-facing course/brief/workshop cards -- it
+  // needs to show up here too, wherever the org's own identity badge
+  // renders (the drawer), not just in the form that set it.
+  const identityLogoUrl = orgLogoPath ? getAvatarUrl(orgLogoPath) : null
 
   // Badge counts are real, not decorative -- only fetched (and only
   // rendered, see NAV_BADGES below) for the sections that actually
@@ -180,7 +186,10 @@ export default function OrgShell({
             </button>
             <Logo size="sm" />
           </div>
-          <div className="hidden lg:block text-[14px] font-semibold text-ink-secondary truncate">{identityName}</div>
+          <div className="hidden lg:flex items-center gap-2 min-w-0">
+            {identityLogoUrl && <img src={identityLogoUrl} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />}
+            <span className="text-[14px] font-semibold text-ink-secondary truncate">{identityName}</span>
+          </div>
           <div className="flex items-center gap-1">
             <NotificationsBell />
             {/* Visible on phone now too, not just laptop -- direct
@@ -297,9 +306,13 @@ export default function OrgShell({
                   the app (profile, feed, students roster, review queue)
                   is a circle; a squared badge here was the exact
                   inconsistency flagged before on Profile. */}
-              <span className="w-12 h-12 rounded-full bg-accent-bg text-brand font-bold text-[15px] flex items-center justify-center flex-shrink-0">
-                {orgInitials(identityName)}
-              </span>
+              {identityLogoUrl ? (
+                <img src={identityLogoUrl} alt="" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+              ) : (
+                <span className="w-12 h-12 rounded-full bg-accent-bg text-brand font-bold text-[15px] flex items-center justify-center flex-shrink-0">
+                  {orgInitials(identityName)}
+                </span>
+              )}
               <div className="min-w-0">
                 <p className="text-[16px] font-bold text-ink truncate">{identityName || '—'}</p>
                 <p className="text-[13px] text-ink-tertiary">{roleLabelFromHref(sections[0]?.href || '')}</p>
