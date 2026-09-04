@@ -18,6 +18,13 @@ const HEAVY_USE = 20
 export default function InstitutionDashboardPage() {
   const { user } = useAuth()
   const [org, setOrg] = useState<any>(null)
+  // Was shown as a real "0" the instant the page mounted, before any
+  // of these counts had actually come back -- on a slow connection (or
+  // if a query is still in flight for any reason) that reads exactly
+  // like "it says I have 0 students" even when the real number is
+  // about to arrive. statsLoading gates the stat cards on a skeleton
+  // instead of a number until the first real response lands.
+  const [statsLoading, setStatsLoading] = useState(true)
   const [stats, setStats] = useState({ students: 0, briefs: 0, pending: 0, verified: 0 })
   const [overdue, setOverdue] = useState<any[]>([])
   const [flagged, setFlagged] = useState<any[]>([])
@@ -33,7 +40,7 @@ export default function InstitutionDashboardPage() {
 
     supabase.from('users').select('id', { count: 'exact', head: true })
       .eq('organisation_id', orgId).eq('role', 'student')
-      .then(({ count }) => setStats(s => ({ ...s, students: count || 0 })))
+      .then(({ count }) => { setStats(s => ({ ...s, students: count || 0 })); setStatsLoading(false) })
 
     supabase.from('work_items').select('id', { count: 'exact', head: true })
       .eq('organisation_id', orgId).eq('type', 'brief')
@@ -109,10 +116,10 @@ export default function InstitutionDashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-        <StatCard icon={Users} label="Students" value={stats.students} />
-        <StatCard icon={FileText} label="Active briefs" value={stats.briefs} />
-        <StatCard icon={ClipboardCheck} label="Awaiting review" value={stats.pending} accent={stats.pending > 0} />
-        <StatCard icon={CheckCircle2} label="Verified" value={stats.verified} />
+        <StatCard icon={Users} label="Students" value={stats.students} loading={statsLoading} />
+        <StatCard icon={FileText} label="Active briefs" value={stats.briefs} loading={statsLoading} />
+        <StatCard icon={ClipboardCheck} label="Awaiting review" value={stats.pending} accent={stats.pending > 0} loading={statsLoading} />
+        <StatCard icon={CheckCircle2} label="Verified" value={stats.verified} loading={statsLoading} />
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -228,13 +235,20 @@ function QuickAction({ href, icon: Icon, label }: { href: string; icon: any; lab
   )
 }
 
-function StatCard({ icon: Icon, label, value, accent }: { icon: any; label: string; value: number; accent?: boolean }) {
+function StatCard({ icon: Icon, label, value, accent, loading }: { icon: any; label: string; value: number; accent?: boolean; loading?: boolean }) {
   return (
     <div className="bg-surface border border-edge rounded-2xl p-5">
       <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${accent ? 'bg-accent-bg' : 'bg-surface-muted'}`}>
         <Icon className={`w-4 h-4 ${accent ? 'text-brand' : 'text-ink-tertiary'}`} />
       </div>
-      <p className="text-2xl font-bold text-ink">{value}</p>
+      {/* A skeleton, not a real "0" -- showing zero before the count
+          has actually come back read exactly like "it says I have 0
+          students" even when the real number just hadn't landed yet. */}
+      {loading ? (
+        <div className="h-8 w-10 rounded bg-surface-muted animate-pulse mb-1" />
+      ) : (
+        <p className="text-2xl font-bold text-ink">{value}</p>
+      )}
       <p className="text-[13px] text-ink-tertiary">{label}</p>
     </div>
   )

@@ -18,6 +18,11 @@ const HEAVY_USE = 20
 export default function ProviderDashboardPage() {
   const { user } = useAuth()
   const [org, setOrg] = useState<any>(null)
+  // Same fix as institution's dashboard -- was a real "0" the instant
+  // the page mounted, before any count had actually come back, which
+  // reads exactly like "it says I have 0 learners" even when the real
+  // number is about to arrive.
+  const [statsLoading, setStatsLoading] = useState(true)
   const [stats, setStats] = useState({ learners: 0, courses: 0, pending: 0, verified: 0 })
   const [overdue, setOverdue] = useState<any[]>([])
   const [flagged, setFlagged] = useState<any[]>([])
@@ -33,7 +38,7 @@ export default function ProviderDashboardPage() {
 
     supabase.from('users').select('id', { count: 'exact', head: true })
       .eq('organisation_id', orgId).eq('role', 'student')
-      .then(({ count }) => setStats(s => ({ ...s, learners: count || 0 })))
+      .then(({ count }) => { setStats(s => ({ ...s, learners: count || 0 })); setStatsLoading(false) })
 
     supabase.from('work_items').select('id', { count: 'exact', head: true })
       .eq('organisation_id', orgId).eq('type', 'course')
@@ -101,10 +106,10 @@ export default function ProviderDashboardPage() {
       <p className="text-ink-secondary mb-6">Reviewing and verifying learner work happens here.</p>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
-        <StatCard icon={Users} label="Learners" value={stats.learners} />
-        <StatCard icon={BookOpen} label="Courses" value={stats.courses} />
-        <StatCard icon={ClipboardCheck} label="Awaiting review" value={stats.pending} accent={stats.pending > 0} />
-        <StatCard icon={CheckCircle2} label="Verified" value={stats.verified} />
+        <StatCard icon={Users} label="Learners" value={stats.learners} loading={statsLoading} />
+        <StatCard icon={BookOpen} label="Courses" value={stats.courses} loading={statsLoading} />
+        <StatCard icon={ClipboardCheck} label="Awaiting review" value={stats.pending} accent={stats.pending > 0} loading={statsLoading} />
+        <StatCard icon={CheckCircle2} label="Verified" value={stats.verified} loading={statsLoading} />
       </div>
 
       <div className="flex flex-wrap gap-3 mb-6">
@@ -218,13 +223,17 @@ function QuickLink({ href, icon: Icon, label }: { href: string; icon: any; label
   )
 }
 
-function StatCard({ icon: Icon, label, value, accent }: { icon: any; label: string; value: number; accent?: boolean }) {
+function StatCard({ icon: Icon, label, value, accent, loading }: { icon: any; label: string; value: number; accent?: boolean; loading?: boolean }) {
   return (
     <div className="bg-surface border border-edge rounded-2xl p-5">
       <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${accent ? 'bg-accent-bg' : 'bg-surface-muted'}`}>
         <Icon className={`w-4 h-4 ${accent ? 'text-brand' : 'text-ink-tertiary'}`} />
       </div>
-      <p className="text-2xl font-bold text-ink">{value}</p>
+      {loading ? (
+        <div className="h-8 w-10 rounded bg-surface-muted animate-pulse mb-1" />
+      ) : (
+        <p className="text-2xl font-bold text-ink">{value}</p>
+      )}
       <p className="text-[13px] text-ink-tertiary">{label}</p>
     </div>
   )
