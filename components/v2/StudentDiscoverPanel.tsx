@@ -1,16 +1,15 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import {
-  getDiscoverWork, getOpportunities, getMyReceivedInterest, respondToInterest,
+  getOpportunities, getMyReceivedInterest, respondToInterest,
   applyToOpportunity, getMyOpportunityApplications, getAvatarUrl, getMyApplications,
-  incrementVerificationViews,
+  getSavedOpportunities, saveOpportunity, unsaveOpportunity,
 } from '@/lib/supabase'
 import type { ApplicationStage } from '@/lib/supabase'
 import {
-  Search, X, BadgeCheck, MapPin, Briefcase, Clock, Check, Ban, Send, LineChart, Eye,
+  Search, X, Briefcase, Clock, Check, Ban, Send, LineChart, Bookmark,
 } from 'lucide-react'
 
 const STAGE_META: Record<ApplicationStage, { label: string; bg: string; text: string }> = {
@@ -54,34 +53,54 @@ function initials(name?: string) {
   if (!name) return '?'
   return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
 }
-const TYPE_LABEL: Record<string, string> = { brief: 'Brief', course: 'Course', workshop: 'Workshop' }
 
 export default function StudentDiscoverPanel() {
   const { user } = useAuth()
   const adult = isAdult(user?.date_of_birth)
   const [tab, setTab] = useState<Tab>('explore')
   const [search, setSearch] = useState('')
-  const [work, setWork] = useState<any[]>([])
   const [opportunities, setOpportunities] = useState<any[]>([])
   const [applicationByOpp, setApplicationByOpp] = useState<Record<string, string>>({})
   const [applying, setApplying] = useState<string | null>(null)
   const [interest, setInterest] = useState<any[]>([])
   const [applications, setApplications] = useState<any[]>([])
   const [stageByOpp, setStageByOpp] = useState<Record<string, ApplicationStage>>({})
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+
+  // Saved (bookmarked) opportunities, loaded once and kept as a set so
+  // any card anywhere can just check membership -- not re-fetched per
+  // tab switch since saving/unsaving already updates it optimistically.
+  useEffect(() => {
+    if (!user) return
+    getSavedOpportunities(user.id).then(({ data }) => setSavedIds(new Set((data || []).map((s: any) => s.opportunity_id))))
+  }, [user?.id])
+
+  const toggleSave = async (opportunityId: string) => {
+    if (!user) return
+    const already = savedIds.has(opportunityId)
+    setSavedIds(prev => {
+      const next = new Set(prev)
+      already ? next.delete(opportunityId) : next.add(opportunityId)
+      return next
+    })
+    if (already) await unsaveOpportunity(user.id, opportunityId)
+    else await saveOpportunity(user.id, opportunityId)
+  }
 
   const load = () => {
     setLoading(true)
-    if (tab === 'explore') {
-      getDiscoverWork({ q: search.trim() || undefined }).then(({ data }) => { setWork(data || []); setLoading(false) })
-    } else if (tab === 'received') {
+    if (tab === 'received') {
       if (!user) return
       getMyReceivedInterest(user.id).then(({ data }) => { setInterest(data || []); setLoading(false) })
     } else if (tab === 'tracking') {
       if (!user) return
       getMyApplications(user.id).then(({ data }) => { setApplications(data || []); setLoading(false) })
     } else {
-      getOpportunities(tab).then(({ data }) => {
+      // Explore is the combination of every type together -- Jobs,
+      // Apprenticeships and Internships each stay as their own filtered
+      // tab too, this is just the "all of it in one place" view.
+      getOpportunities(tab === 'explore' ? undefined : tab).then(({ data }) => {
         const q = search.trim().toLowerCase()
         setOpportunities(q ? (data || []).filter((o: any) => o.title?.toLowerCase().includes(q) || o.description?.toLowerCase().includes(q)) : (data || []))
         setLoading(false)
@@ -192,8 +211,6 @@ export default function StudentDiscoverPanel() {
               <div key={i} className="bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4 h-28 animate-pulse" />
             ))}
           </div>
-        ) : tab === 'explore' ? (
-          work.length === 0 ? <EmptyState label="No public verified work matches yet — check back soon." /> : work.map(v => <ExploreCard key={v.id} v={v} isOwn={v.submissions?.student?.id === user?.id} />)
         ) : tab === 'received' ? (
           (() => {
             const q = search.trim().toLowerCase()
@@ -241,8 +258,14 @@ export default function StudentDiscoverPanel() {
             <EmptyState label="Nothing yet — apply to a role or accept an employer's interest to start tracking it here." icon={<LineChart className="w-8 h-8 text-[var(--app-text-quaternary)] mb-2" />} />
           ) : applications.map(a => <TrackingCard key={a.id} application={a} />)
         ) : (
-          opportunities.length === 0 ? <EmptyState label={`No ${tab === 'job' ? 'jobs' : tab === 'apprenticeship' ? 'apprenticeships' : 'internships'} posted yet.`} icon={<Briefcase className="w-8 h-8 text-[var(--app-text-quaternary)] mb-2" />} /> : opportunities.map(o => {
+          opportunities.length === 0 ? (
+            <EmptyState
+              label={tab === 'explore' ? 'No jobs, apprenticeships or internships posted yet.' : `No ${tab === 'job' ? 'jobs' : tab === 'apprenticeship' ? 'apprenticeships' : 'internships'} posted yet.`}
+              icon={<Briefcase className="w-8 h-8 text-[var(--app-text-quaternary)] mb-2" />}
+            />
+          ) : opportunities.map(o => {
             const status = applicationByOpp[o.id]
+            const saved = savedIds.has(o.id)
             return (
               <div key={o.id} className="bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4">
                 <div className="flex items-start gap-3 mb-3">
@@ -257,9 +280,25 @@ export default function StudentDiscoverPanel() {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
+                    {/* Type badge only on the combined Explore tab --
+                        redundant once you're already inside a
+                        type-filtered tab. */}
+                    {tab === 'explore' && o.type && (
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--app-text-tertiary)]">{o.type}</span>
+                    )}
                     <p className="text-[var(--app-text)] font-bold text-[17px] leading-tight">{o.title}</p>
                     {o.employer?.full_name && <p className="text-[var(--app-text-secondary)] text-sm">{o.employer.full_name}</p>}
                   </div>
+                  {/* Save/bookmark -- works the same regardless of
+                      whether an employer, institution or provider
+                      posted it; every posting lives in the same
+                      opportunities table. */}
+                  <button
+                    onClick={() => toggleSave(o.id)} aria-label={saved ? 'Unsave' : 'Save'}
+                    className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition"
+                  >
+                    <Bookmark className="w-[18px] h-[18px]" style={{ color: saved ? '#FF6B2B' : 'var(--app-text-tertiary)' }} fill={saved ? '#FF6B2B' : 'none'} />
+                  </button>
                 </div>
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   {/* Brand orange, not green -- matches the real old
@@ -355,47 +394,6 @@ function TrackingCard({ application: a }: { application: any }) {
 
       <p className="text-[var(--app-text-tertiary)] text-[11px] mt-2.5">Updated {new Date(a.stage_updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
     </div>
-  )
-}
-
-// Same "shown once per page-load" view count Feed already tracks --
-// requested here too ("add how many views on discover as well").
-function ExploreCard({ v, isOwn }: { v: any; isOwn: boolean }) {
-  const router = useRouter()
-  const wi = v.submissions?.work_items
-  const student = v.submissions?.student
-  const viewedRef = useRef(false)
-
-  useEffect(() => {
-    if (viewedRef.current) return
-    viewedRef.current = true
-    incrementVerificationViews(v.id)
-  }, [v.id])
-
-  return (
-    // Was a plain div -- tapping did nothing at all. Opens the
-    // student's own profile (Verified is right there), the same
-    // destination tapping a Feed author now goes to.
-    <button
-      onClick={() => router.push(isOwn ? '/student/profile' : `/student/profile/${student?.id}`)}
-      className="w-full text-left bg-[var(--app-surface)] border border-[var(--app-border-subtle)] rounded-2xl p-4"
-    >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="text-[10px] font-bold text-[var(--app-text-secondary)] uppercase tracking-wide">{TYPE_LABEL[wi?.type] || wi?.type}</span>
-        <span className="flex items-center gap-1 text-[11px] font-semibold text-[#4ade80] flex-shrink-0"><BadgeCheck className="w-3.5 h-3.5" /> Verified</span>
-      </div>
-      <p className="text-[var(--app-text)] font-bold text-[15px] leading-snug mb-1">{wi?.title}</p>
-      {wi?.description && <p className="text-[var(--app-text-secondary)] text-sm line-clamp-2 mb-3 leading-snug">{wi.description}</p>}
-      <div className="flex items-center gap-2 pt-2 border-t border-[var(--app-border-subtle)]">
-        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[9px] flex-shrink-0">
-          {initials(student?.full_name)}
-        </div>
-        <p className="text-[var(--app-text-secondary)] text-xs flex-1 min-w-0">{student?.full_name} · verified {new Date(v.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
-        {typeof v.views_count === 'number' && (
-          <span className="flex items-center gap-1 text-[var(--app-text-tertiary)] text-xs flex-shrink-0"><Eye className="w-3 h-3" /> {v.views_count}</span>
-        )}
-      </div>
-    </button>
   )
 }
 

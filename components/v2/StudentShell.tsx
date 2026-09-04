@@ -100,11 +100,15 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
               renders it. */}
           <div className="px-4 py-3 flex items-center justify-between">
             <span className="font-semibold text-[20px] tracking-tight" style={{ color: '#D4551A' }}>LERN</span>
+            {/* Bigger and a bit darker than the original #5A5A5A -- same
+                request as the notifications bell right next to it, so
+                they read as a matched pair rather than one standing out
+                more than the other. */}
             <div className="flex items-center gap-1">
-              <button onClick={() => router.push('/student/search')} aria-label="Search" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-2)] transition" style={{ color: '#5A5A5A' }}>
-                <Search className="w-5 h-5" />
+              <button onClick={() => router.push('/student/search')} aria-label="Search" className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-2)] transition" style={{ color: '#404040' }}>
+                <Search className="w-[22px] h-[22px]" />
               </button>
-              <NotificationsBell />
+              <NotificationsBell size="lg" iconColor="#404040" />
             </div>
           </div>
         </header>

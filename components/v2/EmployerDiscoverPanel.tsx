@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '@/context/AuthContext'
 import { getDiscoverWork, getMyInterest, expressInterest, getTalentPools, createTalentPool, addToTalentPool } from '@/lib/supabase'
 import { BadgeCheck, Search, Send, Check, Clock, Bookmark, Shield } from 'lucide-react'
@@ -234,7 +235,7 @@ function PoolPicker({ studentId, onClose }: { studentId: string; onClose: () => 
 // just a bare "interested" flag with nothing to respond to.
 function OfferComposer({ studentName, sending, onClose, onSend }: { studentName: string; sending: boolean; onClose: () => void; onSend: (message: string) => void }) {
   const [message, setMessage] = useState('')
-  return (
+  return createPortal((
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4">
       <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md p-5">
         <p className="font-bold text-ink text-[15px] mb-1">Place your offer</p>
@@ -258,5 +259,5 @@ function OfferComposer({ studentName, sending, onClose, onSend }: { studentName:
         </div>
       </div>
     </div>
-  )
+  ), document.body)
 }

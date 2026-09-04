@@ -5,26 +5,30 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
-  getFeed, getPublicFeed, setPostReaction, getSignedFileUrl,
+  getFeed, setPostReaction, getSignedFileUrl,
   reportPost, getVerifiedAuthorIds,
-  getWins, createWin, reportWin, uploadPostImage,
+  getWins, createWin, reportWin, uploadPostImage, uploadPostVideo,
 } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
-import { MILESTONE_TYPES, MILESTONE_BY_KEY, REACTIONS_BY_MILESTONE, type MilestoneType } from '@/lib/feedConstants'
-import PostComposer from '@/components/v2/PostComposer'
+import { MILESTONE_TYPES, MILESTONE_BY_KEY, STICKER_OPTIONS, type MilestoneType } from '@/lib/feedConstants'
 import {
   X, MoreHorizontal, EyeOff, Check, Camera, BadgeCheck, Plus,
 } from 'lucide-react'
 
+// Max length for a win's own video, in seconds -- "as a win maximum is
+// 20 sec", Instagram-Story-like (photo or video, author's choice).
+const WIN_VIDEO_MAX_SECONDS = 20
+
 // Build Spec: The Feed (Wins strip, milestone posts) v2.0, 2 September
-// 2026 -- supersedes the earlier LinkedIn-style layout entirely.
-// Achievement, not entertainment: text-and-picture posts only (no
-// video anywhere -- the old tap-to-open video player and camera/
-// record composer are gone on purpose, not an oversight), reactions
-// instead of open comments, and a Wins strip of expiring achievement
-// stories on top. Reporting is unchanged -- same report -> auto-hide
-// -> human-review flow as before, just carried over onto the new
-// card shape.
+// 2026, since revised -- a Wins strip of expiring achievement stories
+// on top (now photo OR short video, Insta-story-style) and edge-to-
+// edge post cards underneath. Posting is camera-first again (see
+// PostComposer): photo only, no video on regular posts, author picks
+// two stickers as that post's reaction options. Reporting is
+// unchanged -- same report -> auto-hide -> human-review flow as
+// before. Visibility is no longer org-scoped -- "everyone can see it,
+// don't limit it" -- getFeed/getWins return everything RLS allows any
+// signed-in viewer to see, across organisations.
 function timeAgo(dateStr: string) {
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
   if (diff < 60) return 'just now'
@@ -46,11 +50,13 @@ export default function FeedPanel() {
   const [posts, setPosts] = useState<any[]>([])
   const [verifiedAuthors, setVerifiedAuthors] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
-  const [composerOpen, setComposerOpen] = useState(false)
+  // No longer means "can't see the real feed" -- everyone sees the
+  // same feed now. Still means "can't post yet" -- posting requires an
+  // organisation (RLS: author insert own org).
   const exploring = !user?.organisation_id
 
   const load = () => {
-    (exploring ? getPublicFeed() : getFeed(user!.organisation_id!)).then(({ data }) => {
+    getFeed().then(({ data }) => {
       const rows = data || []
       setPosts(rows)
       setLoading(false)
@@ -58,7 +64,7 @@ export default function FeedPanel() {
       if (authorIds.length) getVerifiedAuthorIds(authorIds).then(({ data: ids }) => setVerifiedAuthors(new Set(ids)))
     })
   }
-  useEffect(load, [user?.organisation_id])
+  useEffect(load, [])
 
   if (loading) {
     return (
@@ -72,26 +78,10 @@ export default function FeedPanel() {
     <div className="pb-2">
       {user?.organisation_id && <WinsStrip userId={user.id} organisationId={user.organisation_id} />}
 
-      {user?.organisation_id && (
-        <div className="px-4 mb-4">
-          <button
-            onClick={() => setComposerOpen(true)}
-            className="w-full flex items-center gap-3 rounded-[14px] border px-[14px] py-3 transition"
-            style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
-          >
-            <span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
-              {initials(user?.full_name)}
-            </span>
-            <span className="flex-1 text-left text-[13.5px]" style={{ color: '#8A8A8A' }}>Share a win or an update…</span>
-            <Camera className="w-[18px] h-[18px] flex-shrink-0" style={{ color: '#F26B21' }} />
-          </button>
-        </div>
-      )}
-
       {exploring && (
         <div className="px-4 mb-4">
           <p className="text-[12.5px] text-[var(--app-text-secondary)]">
-            You're seeing public educational content only — link to your organisation in My Work to see everything.
+            Link to your organisation in My Work to start posting your own wins and updates.
           </p>
         </div>
       )}
@@ -99,18 +89,17 @@ export default function FeedPanel() {
       {posts.length === 0 ? (
         <div className="flex flex-col items-center text-center py-20 px-6">
           <p className="font-semibold text-[var(--app-text)] text-[15px] mb-1">Nothing here yet</p>
-          <p className="text-[13px] text-[var(--app-text-tertiary)]">
-            {exploring ? 'Public educational content will show up here.' : "Your organisation's milestones will show up here."}
-          </p>
+          <p className="text-[13px] text-[var(--app-text-tertiary)]">Wins and updates will show up here.</p>
         </div>
       ) : (
-        <div className="px-4 space-y-4">
+        // Edge-to-edge, Instagram-style -- no side padding here any
+        // more (each card carries its own internal padding for text,
+        // but an image spans the full card width with nothing inset).
+        // A thin divider between cards stands in for the old bordered/
+        // floating-card look.
+        <div>
           {posts.map(p => <PostCard key={p.id} post={p} verified={verifiedAuthors.has(p.author_id)} onChanged={load} />)}
         </div>
-      )}
-
-      {composerOpen && (
-        <PostComposer onClose={() => setComposerOpen(false)} onPosted={() => { setComposerOpen(false); load() }} />
       )}
     </div>
   )
@@ -125,12 +114,11 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
   const [addOpen, setAddOpen] = useState(false)
   const [viewing, setViewing] = useState<any | null>(null)
 
-  const load = () => { getWins(organisationId).then(({ data }) => setWins(data || [])) }
-  useEffect(load, [organisationId])
+  const load = () => { getWins().then(({ data }) => setWins(data || [])) }
+  useEffect(load, [])
 
   return (
     <div className="pt-3 pb-1">
-      <p className="text-[12px] font-semibold px-4 mb-2.5" style={{ color: '#5A5A5A', letterSpacing: '0.04em' }}>WINS THIS WEEK</p>
       <div className="flex gap-3.5 overflow-x-auto px-4 pb-0.5" style={{ scrollbarWidth: 'none' }}>
         <button onClick={() => setAddOpen(true)} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 60 }}>
           <span className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 54, height: 54, border: '3px solid #F26B21' }}>
@@ -195,19 +183,52 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
   const [type, setType] = useState<MilestoneType | null>(null)
   const [content, setContent] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [isVideo, setIsVideo] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [mediaError, setMediaError] = useState('')
   const [posting, setPosting] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Insta-story-style: photo or a short video, author's choice. Video
+  // is capped at 20 seconds -- checked client-side by loading it into
+  // an off-screen <video> and reading its real duration before it's
+  // ever accepted, not just relying on a picker limit that isn't
+  // enforceable anyway.
+  const pickMedia = (f: File | null) => {
+    if (!f) return
+    setMediaError('')
+    const video = f.type.startsWith('video/')
+    if (!video) {
+      setFile(f); setIsVideo(false); setPreviewUrl(URL.createObjectURL(f))
+      return
+    }
+    const url = URL.createObjectURL(f)
+    const probe = document.createElement('video')
+    probe.preload = 'metadata'
+    probe.onloadedmetadata = () => {
+      if (probe.duration > WIN_VIDEO_MAX_SECONDS) {
+        setMediaError(`Videos for a win can be up to ${WIN_VIDEO_MAX_SECONDS} seconds — this one's ${Math.round(probe.duration)}s.`)
+        URL.revokeObjectURL(url)
+        return
+      }
+      setFile(f); setIsVideo(true); setPreviewUrl(url)
+    }
+    probe.src = url
+  }
 
   const submit = async () => {
     if (!type) return
     setPosting(true)
     let image_path: string | undefined
-    if (file) {
+    let video_path: string | undefined
+    if (file && isVideo) {
+      const { path } = await uploadPostVideo(userId, file, file.name.split('.').pop() || 'mp4')
+      video_path = path || undefined
+    } else if (file) {
       const { path } = await uploadPostImage(userId, file)
       image_path = path || undefined
     }
-    await createWin(userId, organisationId, { milestone_type: type, content: content.trim() || undefined, image_path })
+    await createWin(userId, organisationId, { milestone_type: type, content: content.trim() || undefined, image_path, video_path })
     setPosting(false)
     onAdded()
   }
@@ -255,14 +276,16 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
               className="w-full bg-[var(--app-overlay-2)] border rounded-xl px-3.5 py-2.5 text-[13px] text-[var(--app-text)] placeholder:text-[var(--app-text-tertiary)] outline-none resize-none mb-3"
               style={{ borderColor: 'var(--app-border)' }}
             />
-            {previewUrl && <img src={previewUrl} alt="" className="w-full h-32 object-cover rounded-lg mb-3" />}
+            {previewUrl && (
+              isVideo
+                ? <video src={previewUrl} className="w-full h-32 object-cover rounded-lg mb-3" muted autoPlay loop playsInline />
+                : <img src={previewUrl} alt="" className="w-full h-32 object-cover rounded-lg mb-3" />
+            )}
+            {mediaError && <p className="text-[12px] text-danger-text mb-3">{mediaError}</p>}
             <button onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 text-[13px] font-semibold mb-4" style={{ color: '#F26B21' }}>
-              <Camera className="w-4 h-4" /> {file ? 'Change photo' : 'Add a photo (optional)'}
+              <Camera className="w-4 h-4" /> {file ? `Change ${isVideo ? 'video' : 'photo'}` : `Add a photo or video, up to ${WIN_VIDEO_MAX_SECONDS}s (optional)`}
             </button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => {
-              const f = e.target.files?.[0]
-              if (f) { setFile(f); setPreviewUrl(URL.createObjectURL(f)) }
-            }} />
+            <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={e => pickMedia(e.target.files?.[0] || null)} />
             <button
               onClick={submit} disabled={posting}
               className="w-full text-white font-semibold text-[14px] py-3 rounded-xl disabled:opacity-50 transition"
@@ -283,13 +306,14 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
 function WinViewer({ win, isOwn, organisationId, userId, onClose }: {
   win: any; isOwn: boolean; organisationId: string; userId: string; onClose: () => void
 }) {
-  const [imgUrl, setImgUrl] = useState<string | null>(null)
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
   const meta = MILESTONE_BY_KEY[win.milestone_type as MilestoneType]
 
   useEffect(() => {
-    if (win.image_path) getSignedFileUrl('post-images', win.image_path).then(({ url }) => setImgUrl(url))
-  }, [win.image_path])
+    if (win.video_path) getSignedFileUrl('post-videos', win.video_path).then(({ url }) => setMediaUrl(url))
+    else if (win.image_path) getSignedFileUrl('post-images', win.image_path).then(({ url }) => setMediaUrl(url))
+  }, [win.image_path, win.video_path])
 
   return createPortal((
     <div
@@ -314,7 +338,11 @@ function WinViewer({ win, isOwn, organisationId, userId, onClose }: {
         <p className="font-bold text-[16px] mb-1.5">{win.author?.full_name}</p>
         <span className="text-[11.5px] font-semibold px-3 py-1 rounded-full mb-5" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>{meta?.pillLabel}</span>
         {win.content && <p className="text-[18px] leading-snug mb-5 max-w-xs">{win.content}</p>}
-        {imgUrl && <img src={imgUrl} alt="" className="max-h-[280px] max-w-full rounded-2xl object-cover" />}
+        {mediaUrl && (
+          win.video_path
+            ? <video src={mediaUrl} className="max-h-[280px] max-w-full rounded-2xl object-cover" autoPlay loop muted playsInline controls />
+            : <img src={mediaUrl} alt="" className="max-h-[280px] max-w-full rounded-2xl object-cover" />
+        )}
       </div>
 
       {reportOpen && (
@@ -338,7 +366,13 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
   const reactions: any[] = post.post_reactions || []
   const myReaction = reactions.find(r => r.user_id === user?.id)?.reaction as ReactionType | undefined
   const meta = post.milestone_type ? MILESTONE_BY_KEY[post.milestone_type as MilestoneType] : null
-  const options = REACTIONS_BY_MILESTONE[post.milestone_type || 'default'] || REACTIONS_BY_MILESTONE.default
+  // Reverted from the milestone-driven set back to the old author-
+  // picked model: whatever two stickers the author chose in the
+  // composer are this post's own reaction options. Any post with none
+  // set (old milestone-tagged rows, mainly) falls back to the first
+  // two stickers rather than showing nothing.
+  const choiceKeys: string[] = post.sticker_choices?.length ? post.sticker_choices : STICKER_OPTIONS.slice(0, 2).map(s => s.key)
+  const options = choiceKeys.map(k => STICKER_OPTIONS.find(s => s.key === k)).filter(Boolean) as typeof STICKER_OPTIONS
 
   useEffect(() => {
     if (post.image_path) getSignedFileUrl('post-images', post.image_path).then(({ url }) => setMediaUrl(url))
@@ -353,13 +387,12 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
   // Auto-hide is instant and protective, but it is NEVER a decision
   // against the person who posted -- neutral wording, shown to
   // whoever can still see the row at all (the author, or org staff --
-  // RLS keeps it from reaching anyone else). Unchanged from before;
-  // only the card shape around it changed.
+  // RLS keeps it from reaching anyone else).
   if (post.hidden) {
     return (
       <div
-        className="rounded-[14px] border px-4 py-6 flex flex-col items-center text-center gap-2"
-        style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+        className="px-4 py-6 flex flex-col items-center text-center gap-2 border-b"
+        style={{ borderColor: 'var(--app-border)' }}
       >
         <EyeOff className="w-5 h-5" style={{ color: 'var(--app-text-tertiary)' }} />
         <p className="text-[13px] font-semibold text-[var(--app-text)]">This post has been hidden while it is checked by a person.</p>
@@ -368,9 +401,16 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
     )
   }
 
+  // Edge-to-edge, Instagram-style: an image spans the full card width
+  // with nothing inset around it (no rounded corners, no border) --
+  // only the header and text keep their own internal padding for
+  // readability. A text-only post (no image) reads LinkedIn-style: no
+  // photo block at all, just a clean padded card. A thin bottom border
+  // stands in for what used to be a floating bordered/rounded card,
+  // matching how Instagram separates posts in one continuous feed.
   return (
-    <div className="rounded-[14px] border overflow-hidden" style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
-      {meta && <div className="h-[5px]" style={{ background: 'linear-gradient(to right, #F26B21, #E0A94B)' }} />}
+    <div className="border-b" style={{ borderColor: 'var(--app-border)' }}>
+      {meta && <div className="h-[4px]" style={{ background: 'linear-gradient(to right, #F26B21, #E0A94B)' }} />}
 
       <div className="flex items-start justify-between gap-2 px-4 pt-3.5 pb-2.5">
         <button
@@ -409,10 +449,10 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
         </div>
       )}
 
-      {/* Medium, not edge-to-edge huge and not a thumbnail -- pinned to
-          ~210px regardless of the source image's own aspect ratio. */}
+      {/* Fixed height so the card never enlarges to fit a tall source
+          image -- edge-to-edge width, but not edge-to-edge height. */}
       {post.image_path && (
-        <div className="relative w-full bg-[var(--app-surface-2)]" style={{ height: 210 }}>
+        <div className="relative w-full bg-[var(--app-surface-2)]" style={{ height: 300 }}>
           {!mediaUrl && <div className="absolute inset-0 animate-pulse" style={{ backgroundColor: 'var(--app-surface-2)' }} />}
           {mediaUrl && <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />}
         </div>

@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight, Settings, User as UserIcon, Plus, LogOut, Me
 import type { LucideIcon } from 'lucide-react'
 import Logo from '@/components/v2/Logo'
 import NotificationsBell from '@/components/v2/NotificationsBell'
+import PostComposer from '@/components/v2/PostComposer'
 
 function orgInitials(name?: string | null) {
   if (!name) return 'LN'
@@ -33,7 +34,13 @@ const PRESENCE_DOT: Record<string, string> = {
   active: 'bg-success-solid',
   busy: 'bg-danger-solid',
   away: 'bg-ink-quaternary',
+  offline: 'bg-ink-quaternary',
+  do_not_disturb: 'bg-danger-solid',
 }
+const PRESENCE_LABEL: Record<string, string> = {
+  active: 'Active', busy: 'Busy', away: 'Away', offline: 'Offline', do_not_disturb: 'Do not disturb',
+}
+const PRESENCE_OPTIONS = ['active', 'busy', 'away', 'do_not_disturb', 'offline'] as const
 
 // The shared shell for both organisation roles — collapsible sidebar on
 // laptop (state remembered server-side, not just localStorage). Phone
@@ -46,7 +53,7 @@ export default function OrgShell({
   sections, phoneItems, children,
 }: {
   sections: NavItem[]
-  phoneItems: [NavItem, NavItem, NavItem] // feed, role-specific second item, dashboard — kept for the FAB's own destination
+  phoneItems: [NavItem, NavItem, NavItem] // feed, role-specific second item, dashboard — [0] is where a successful post lands
   children: React.ReactNode
 }) {
   const { user, refreshUser } = useAuth()
@@ -57,6 +64,7 @@ export default function OrgShell({
   const [orgName, setOrgName] = useState<string | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [composerOpen, setComposerOpen] = useState(false)
   const [reviewCount, setReviewCount] = useState(0)
   const [interestCount, setInterestCount] = useState(0)
 
@@ -132,11 +140,11 @@ export default function OrgShell({
             <Link
               key={s.key} href={s.href}
               title={collapsed ? s.label : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-semibold transition ${
+              className={`flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] font-semibold transition ${
                 isActive(s.href) ? 'bg-accent-bg text-brand' : 'text-ink-secondary hover:bg-surface-muted'
               } ${collapsed ? 'justify-center' : ''}`}
             >
-              <s.icon className="w-[18px] h-[18px] flex-shrink-0" />
+              <s.icon className="w-5 h-5 flex-shrink-0" />
               {!collapsed && <span className="truncate">{s.label}</span>}
             </Link>
           ))}
@@ -145,8 +153,10 @@ export default function OrgShell({
 
       <div className="flex-1 min-w-0 min-h-0 flex flex-col">
         {/* ── Top bar ── phone gets a hamburger (opens the drawer) before
-            the wordmark, and no Settings gear -- Settings lives in the
-            drawer's own list instead, last item after a divider. */}
+            the wordmark, and the same Settings gear laptop has, next
+            to the bell -- it used to be drawer-only on phone, which is
+            what the drawer's own trailing Settings row was for; that
+            row is gone now this is the one path to Settings everywhere. */}
         <header className="flex items-center justify-between h-16 px-5 lg:px-8 border-b border-edge-subtle flex-shrink-0">
           <div className="flex items-center gap-1 lg:hidden">
             <button
@@ -163,22 +173,22 @@ export default function OrgShell({
             {/* Visible on phone now too, not just laptop -- direct
                 access next to the bell instead of only being reachable
                 by opening the drawer, per direct request ("add the
-                settings next to the notif bell to be easier"). Still
-                also in the drawer's own list; two paths to the same
-                place, not a conflict. */}
+                settings next to the notif bell to be easier"). The only
+                path to Settings now -- the drawer's own trailing
+                Settings row was removed as the duplicate it had become. */}
             <button
               aria-label="Settings" onClick={() => router.push(`${sections[0].href.split('/').slice(0, 2).join('/')}/settings`)}
-              className="flex w-9 h-9 items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition"
+              className="flex w-10 h-10 items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition"
             >
-              <Settings className="w-[18px] h-[18px]" />
+              <Settings className="w-5 h-5" />
             </button>
             <div className="relative">
               <button
                 onClick={() => setProfileOpen(v => !v)}
                 aria-label="Profile menu"
-                className="relative w-9 h-9 flex items-center justify-center rounded-full bg-accent-bg text-brand font-bold text-[13px] ml-1"
+                className="relative w-10 h-10 flex items-center justify-center rounded-full bg-accent-bg text-brand font-bold text-[14px] ml-1"
               >
-                {user?.full_name?.[0]?.toUpperCase() || <UserIcon className="w-4 h-4" />}
+                {user?.full_name?.[0]?.toUpperCase() || <UserIcon className="w-[18px] h-[18px]" />}
                 <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface ${PRESENCE_DOT[user?.presence_status || 'active']}`} />
               </button>
               {profileOpen && (
@@ -191,16 +201,16 @@ export default function OrgShell({
                     </div>
                     <div className="px-3.5 py-2.5 border-b border-edge-subtle">
                       <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-1.5">Status</p>
-                      <div className="flex gap-1.5">
-                        {(['active', 'busy', 'away'] as const).map(s => (
+                      <div className="grid grid-cols-2 gap-1">
+                        {PRESENCE_OPTIONS.map(s => (
                           <button
                             key={s}
                             onClick={async () => { if (user) { await setPresenceStatus(user.id, s); await refreshUser() } }}
-                            className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-[11px] font-semibold capitalize transition ${
+                            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[11.5px] font-semibold transition ${
                               (user?.presence_status || 'active') === s ? 'bg-surface-muted text-ink' : 'text-ink-tertiary hover:bg-surface-muted'
                             }`}
                           >
-                            <span className={`w-1.5 h-1.5 rounded-full ${PRESENCE_DOT[s]}`} /> {s}
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${PRESENCE_DOT[s]}`} /> <span className="truncate">{PRESENCE_LABEL[s]}</span>
                           </button>
                         ))}
                       </div>
@@ -223,12 +233,14 @@ export default function OrgShell({
       {/* ── Phone floating "+" -- Gmail-style: bottom-right, elevated
           above content rather than reserving a row for it in a bottom
           bar (there is no bottom bar any more; navigation moved into
-          the drawer). Same destination the old Plus button had --
-          posting happens on the Feed itself, not in a separate composer
-          here. safe-area-inset-bottom so it never sits under a phone's
-          own home-indicator/gesture bar. ── */}
+          the drawer). Opens the post composer directly now, same as
+          the student app's own "+" -- it used to just navigate to
+          Feed and leave posting to a control on that page, which
+          wasn't actually "to post", just "to the place you post from".
+          safe-area-inset-bottom so it never sits under a phone's own
+          home-indicator/gesture bar. ── */}
       <button
-        onClick={() => router.push(phoneItems[0].href)}
+        onClick={() => setComposerOpen(true)}
         aria-label="New post"
         className="lg:hidden fixed right-5 z-20 w-14 h-14 rounded-full bg-brand text-white shadow-lg flex items-center justify-center active:scale-95 transition"
         style={{ bottom: 'calc(1.25rem + env(safe-area-inset-bottom))', boxShadow: '0 4px 14px rgba(0,0,0,0.35)' }}
@@ -236,10 +248,23 @@ export default function OrgShell({
         <Plus className="w-6 h-6" />
       </button>
 
+      {composerOpen && (
+        <PostComposer
+          onClose={() => setComposerOpen(false)}
+          onPosted={() => {
+            setComposerOpen(false)
+            if (pathname === phoneItems[0].href) window.location.reload()
+            else router.push(phoneItems[0].href)
+          }}
+        />
+      )}
+
       {/* ── Phone nav drawer -- Gmail-style: org identity card, the
-          full section list (live badge counts, active item highlighted),
-          Settings last after a divider. Replaces the old bottom tab bar
-          entirely; direct 1:1 with the reference screenshot. ── */}
+          full section list (live badge counts, active item highlighted).
+          Settings is reachable from the top bar's own gear icon now
+          (visible on phone too), so it isn't duplicated down here any
+          more. Replaces the old bottom tab bar entirely; direct 1:1
+          with the reference screenshot. ── */}
       {drawerOpen && (
         <div className="lg:hidden fixed inset-0 z-30 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} />
@@ -276,11 +301,11 @@ export default function OrgShell({
                 return (
                   <Link
                     key={s.key} href={s.href} onClick={() => setDrawerOpen(false)}
-                    className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-semibold transition ${
+                    className={`flex items-center gap-3.5 px-3.5 py-3.5 rounded-xl text-[16px] font-semibold transition ${
                       active ? 'bg-accent-bg text-brand' : 'text-ink-secondary'
                     }`}
                   >
-                    <s.icon className="w-5 h-5 flex-shrink-0" />
+                    <s.icon className="w-[22px] h-[22px] flex-shrink-0" />
                     <span className="flex-1 min-w-0 truncate">{s.label}</span>
                     {!!badge && (
                       <span className="flex-shrink-0 min-w-[22px] text-center text-[11px] font-bold text-white bg-brand rounded-full px-[7px] py-[2px]">
@@ -291,16 +316,6 @@ export default function OrgShell({
                 )
               })}
             </nav>
-
-            <div className="border-t border-edge-subtle flex-shrink-0" />
-            <div className="px-3 py-2 flex-shrink-0">
-              <button
-                onClick={() => { setDrawerOpen(false); router.push(`${sections[0].href.split('/').slice(0, 2).join('/')}/settings`) }}
-                className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-semibold text-ink-secondary transition"
-              >
-                <Settings className="w-5 h-5 flex-shrink-0" /> Settings
-              </button>
-            </div>
           </div>
         </div>
       )}

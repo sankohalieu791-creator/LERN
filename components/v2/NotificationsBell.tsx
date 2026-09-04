@@ -22,7 +22,7 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(diff / 86400)}d`
 }
 
-export default function NotificationsBell({ size = 'md' }: { size?: 'md' | 'lg' }) {
+export default function NotificationsBell({ size = 'md', iconColor }: { size?: 'md' | 'lg'; iconColor?: string }) {
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<any[]>([])
@@ -75,6 +75,7 @@ export default function NotificationsBell({ size = 'md' }: { size?: 'md' | 'lg' 
         className={`relative flex items-center justify-center text-ink-secondary transition hover:bg-surface-muted ${
           size === 'lg' ? 'w-11 h-11 rounded-full' : 'w-9 h-9 rounded-lg'
         }`}
+        style={iconColor ? { color: iconColor } : undefined}
       >
         <Bell className={size === 'lg' ? 'w-6 h-6' : 'w-[18px] h-[18px]'} />
         {unread > 0 && (

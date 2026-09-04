@@ -30,7 +30,7 @@ export interface User {
   sidebar_collapsed?: boolean
   consented_at?: string
   theme_preference?: 'light' | 'dark' | 'system'
-  presence_status?: 'active' | 'busy' | 'away'
+  presence_status?: 'active' | 'busy' | 'away' | 'offline' | 'do_not_disturb'
   notification_prefs?: Record<string, boolean>
   is_guest?: boolean
   guest_invite_id?: string

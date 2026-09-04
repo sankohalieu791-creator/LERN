@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -430,12 +431,17 @@ function VerifiedWorkDetail({ work, onClose }: { work: any; onClose: () => void 
     if (sub?.file_path) getSignedFileUrl('submission-files', sub.file_path).then(({ url }) => setFileUrl(url))
   }, [sub?.file_path])
 
-  return (
+  return createPortal((
     // z-50 already paints this over the shell's nav (z-30) entirely --
     // this screen is meant to fully replace the visible chrome while
     // open, not sit alongside it. paddingBottom added for the home
     // indicator's own safe area, which nothing here was reserving --
-    // matches every other full-screen overlay's convention.
+    // matches every other full-screen overlay's convention. Portaled
+    // to document.body for the same reason as every other feed/composer
+    // modal fixed today -- this renders nested inside main, and a
+    // full-screen overlay several levels deep inside a scrolling
+    // ancestor is the class of bug that let the bottom nav render over
+    // it on some devices.
     <div className="fixed inset-0 z-50 bg-[var(--app-bg)] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-[var(--app-bg)]/95 backdrop-blur border-b border-[var(--app-border)]">
         <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-2)] transition">
@@ -483,7 +489,7 @@ function VerifiedWorkDetail({ work, onClose }: { work: any; onClose: () => void 
         </div>
       </div>
     </div>
-  )
+  ), document.body)
 }
 
 // Full-screen, not an inline card -- matches how Instagram/TikTok
@@ -546,7 +552,7 @@ export function EditProfileScreen({ profile, onDone, onClose }: { profile: any; 
     onDone()
   }
 
-  return (
+  return createPortal((
     <div className="fixed inset-0 z-50 bg-[var(--app-bg)] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="sticky top-0 z-10 flex items-center justify-between h-14 px-4 bg-[var(--app-bg)]/95 backdrop-blur border-b border-[var(--app-border)]">
         <button onClick={onClose} className="text-[15px] text-[var(--app-text-secondary)]">Cancel</button>
@@ -600,7 +606,7 @@ export function EditProfileScreen({ profile, onDone, onClose }: { profile: any; 
         />
       </div>
     </div>
-  )
+  ), document.body)
 }
 
 function EditField({ label, value, onChange, placeholder, hint, multiline, maxLength }: {
@@ -711,9 +717,10 @@ function PostThumb({ post, canDelete, onDeleted }: { post: any; canDelete: boole
       {canDelete && (
         <button
           onClick={remove}
-          className="absolute top-1.5 right-1.5 w-7 h-7 bg-[#2a2a2a] rounded-full flex items-center justify-center z-10"
+          aria-label="Delete post"
+          className="absolute top-1.5 right-1.5 w-7 h-7 bg-black/55 rounded-full flex items-center justify-center z-10"
         >
-          <Trash2 className="w-3.5 h-3.5 text-[var(--app-text)]" />
+          <Trash2 className="w-3.5 h-3.5 text-white" />
         </button>
       )}
     </div>

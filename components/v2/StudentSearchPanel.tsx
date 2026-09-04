@@ -7,9 +7,8 @@ import { searchPosts, getSignedFileUrl } from '@/lib/supabase'
 import { ChevronLeft, Search as SearchIcon, X, Play } from 'lucide-react'
 
 // The Feed header's search icon used to do nothing at all -- searches
-// posts (which covers both "videos" and "posts": a video is just a
-// post with video_path set) by title, caption and category, scoped to
-// whatever the student can already see in Feed (their org + public).
+// posts by title, caption and category, scoped to whatever the
+// viewer can already see in Feed (everyone, minus hidden rows).
 export default function StudentSearchPanel() {
   const { user } = useAuth()
   const router = useRouter()
@@ -26,7 +25,7 @@ export default function StudentSearchPanel() {
     if (!query) { setResults([]); setSearched(false); return }
     setLoading(true)
     const t = setTimeout(() => {
-      searchPosts(query, user?.organisation_id).then(({ data }) => {
+      searchPosts(query).then(({ data }) => {
         setResults(data || []); setLoading(false); setSearched(true)
       })
     }, 300)

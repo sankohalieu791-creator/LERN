@@ -55,3 +55,19 @@ export const REACTIONS_BY_MILESTONE: Record<string, { key: string; emoji: string
     { key: 'keep_going', emoji: '🔥', label: 'Keep going' },
   ],
 }
+
+// Reverted per direct request: regular posts go back to the old
+// author-picked model -- "bring back the whole front and back, the
+// choosing two stickers" -- rather than the milestone-driven set
+// above, which stays Wins-only. The composer lets an author choose
+// exactly two of these (posts.sticker_choices); PostCard reads them
+// back as that post's own reaction options, falling back to the first
+// two here for any post with none set (old milestone-tagged rows,
+// mainly).
+export const STICKER_OPTIONS: { key: string; emoji: string; label: string }[] = [
+  { key: 'congratulations', emoji: '🎉', label: 'Congratulations' },
+  { key: 'well_done', emoji: '👏', label: 'Well done' },
+  { key: 'keep_going', emoji: '💪', label: 'Keep going' },
+  { key: 'proud', emoji: '⭐', label: 'Proud of you' },
+  { key: 'good_luck', emoji: '🍀', label: 'Good luck' },
+]

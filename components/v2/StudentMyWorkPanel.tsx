@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '@/context/AuthContext'
 import {
   getVisibleWorkItems, getMySubmissions, getMyOrgType, getWorkItemMemberCount,
@@ -450,7 +451,7 @@ function WorkItemDetail({
     onChanged()
   }
 
-  return (
+  return createPortal((
     // Rebuilt as an actual BOX, not just recoloured -- a slim bar
     // (back arrow only) above one rounded card that holds everything,
     // with the title big and bold right at the top of that card, in
@@ -459,6 +460,9 @@ function WorkItemDetail({
     // shape (small header bar + a gradient banner + loose flat
     // sections) and only swapped its colours for theme tokens -- that
     // matched the PALETTE, not the actual layout being asked for.
+    // Portaled to document.body -- same fix as every other feed/
+    // composer modal today, this was nested inside main and at risk of
+    // the same "bottom nav renders over it" bug.
     <div className="fixed inset-0 z-50 bg-paper overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-paper/95 backdrop-blur border-b border-edge-subtle">
         <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-muted text-ink">
@@ -557,7 +561,7 @@ function WorkItemDetail({
         </div>
       </div>
     </div>
-  )
+  ), document.body)
 }
 
 function SubmissionRow({ submission }: { submission: any }) {

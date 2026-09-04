@@ -601,22 +601,20 @@ export const toggleLike = async (postId: string, userId: string, liked: boolean)
 // (see 2026-08-28-feed-under18-anonymity.sql) -- an under-18 author's
 // real name never leaves the database for a viewer outside their org.
 // Feed's search icon -- searches title/content/category across
-// whatever the caller can already see (posts_feed already scopes this
-// correctly via RLS, same as getFeed/getPublicFeed), not a separate
-// unrestricted table scan.
-export const searchPosts = async (query: string, organisationId?: string) => {
+// whatever the caller can already see (posts_feed runs with
+// security_invoker now, so RLS -- "posts: read" -- is what actually
+// scopes this, same open-to-everyone model as getFeed), not a
+// separate unrestricted table scan.
+export const searchPosts = async (query: string) => {
   const q = query.trim()
   if (!q) return { data: [], error: null }
-  let request = supabase
+  const { data, error } = await supabase
     .from('posts_feed')
     .select('*')
     .eq('hidden', false)
     .or(`content.ilike.%${q}%,title.ilike.%${q}%,category.ilike.%${q}%`)
     .order('created_at', { ascending: false })
     .limit(30)
-  if (organisationId) request = request.or(`organisation_id.eq.${organisationId},visibility.eq.public`)
-  else request = request.eq('visibility', 'public')
-  const { data, error } = await request
   if (error || !data) return { data, error }
   return { data: await attachReactions(data), error: null }
 }
@@ -639,34 +637,23 @@ export const getPostsByAuthor = async (authorId: string, excludePostId: string) 
   return { data, error }
 }
 
-// hidden posts are NOT filtered out here on purpose -- RLS on the
-// underlying posts table already decides who gets a hidden row back at
-// all (the post's own author, always; org staff, always; everyone
-// else, never -- a hidden post simply isn't in their results). That
-// lets the author still see their own post (rendered as the neutral
-// "hidden while checked" placeholder, see FeedPanel) instead of it
-// just vanishing on them with no explanation, while a hidden post
-// genuinely disappears for every other regular viewer.
-export const getFeed = async (organisationId: string) => {
+// "Everyone can see it, don't limit it" -- no org/public scoping here
+// any more; institution and provider students see each other's posts,
+// and an org-less/employer viewer sees the same feed too. hidden posts
+// are NOT filtered out here on purpose -- posts_feed now runs with
+// security_invoker, so RLS on the underlying posts table ("posts:
+// read") is what actually decides who gets a hidden row back at all
+// (the post's own author, always; that org's own staff, always;
+// everyone else, never -- a hidden post simply isn't in their results
+// any more, this isn't just a client-side filter). That lets the
+// author still see their own post (rendered as the neutral "hidden
+// while checked" placeholder, see FeedPanel) instead of it just
+// vanishing on them with no explanation, while a hidden post genuinely
+// disappears for every other viewer.
+export const getFeed = async () => {
   const { data, error } = await supabase
     .from('posts_feed')
     .select('*')
-    .or(`organisation_id.eq.${organisationId},visibility.eq.public`)
-    .order('created_at', { ascending: false })
-    .limit(50)
-  if (error || !data) return { data, error }
-  return { data: await attachReactions(data), error: null }
-}
-
-// Explore mode (no organisation yet): "a public, safe educational feed —
-// LERN's own and general educational content only." RLS already limits
-// an org-less caller to public posts regardless, this just avoids
-// passing a null organisation_id into the .or() filter above.
-export const getPublicFeed = async () => {
-  const { data, error } = await supabase
-    .from('posts_feed')
-    .select('*')
-    .eq('visibility', 'public')
     .order('created_at', { ascending: false })
     .limit(50)
   if (error || !data) return { data, error }
@@ -709,7 +696,7 @@ export const deletePost = async (postId: string) => {
 // permanent highlight reel. ──
 export const createWin = async (
   authorId: string, organisationId: string,
-  fields: { milestone_type: string; content?: string; image_path?: string; visibility?: 'organisation' | 'public' }
+  fields: { milestone_type: string; content?: string; image_path?: string; video_path?: string; visibility?: 'organisation' | 'public' }
 ) => {
   const { data, error } = await supabase
     .from('wins')
@@ -740,12 +727,15 @@ export const reportWin = async (winId: string, organisationId: string | null, re
   return submitReport(reporterId, organisationId, 'win', reason, winId)
 }
 
-export const getWins = async (organisationId: string) => {
+// "Everyone can see it, don't limit it" -- no org-scoping here any
+// more, same call as getFeed. RLS ("wins: read") already narrows a
+// hidden row to just its own author/org-staff, so this stays safe
+// without a client-side filter doing that job.
+export const getWins = async () => {
   const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
   const { data, error } = await supabase
     .from('wins')
     .select('*, author:users!wins_author_id_fkey(full_name)')
-    .or(`organisation_id.eq.${organisationId},visibility.eq.public`)
     .eq('hidden', false)
     .gte('created_at', cutoff)
     .order('created_at', { ascending: false })
@@ -1098,7 +1088,7 @@ export const sendWorkshopMessage = async (workItemId: string, senderId: string, 
   return { error }
 }
 
-export const setPresenceStatus = async (userId: string, status: 'active' | 'busy' | 'away') => {
+export const setPresenceStatus = async (userId: string, status: 'active' | 'busy' | 'away' | 'offline' | 'do_not_disturb') => {
   const { error } = await supabase.from('users').update({ presence_status: status }).eq('id', userId)
   return { error }
 }
@@ -1529,13 +1519,15 @@ export const getEmployerInboxItems = async (employerId: string) => {
     supabase.from('applications').select('id, stage, created_at, student:users!applications_student_id_fkey(full_name), opportunity:opportunities(title)').eq('employer_id', employerId),
     supabase.from('interest').select('id, status, created_at, student:users!interest_student_id_fkey(full_name)').eq('employer_id', employerId),
   ])
-  const items: { id: string; icon: 'application' | 'interest'; text: string; created_at: string }[] = []
+  const items: { id: string; icon: 'application' | 'interest'; variant: 'application' | 'accepted' | 'declined'; name: string; text: string; created_at: string }[] = []
   for (const a of apps || []) {
-    items.push({ id: `app-${a.id}`, icon: 'application', text: `${(a as any).student?.full_name} applied to ${(a as any).opportunity?.title || 'a role'}`, created_at: a.created_at })
+    const name = (a as any).student?.full_name || 'A student'
+    items.push({ id: `app-${a.id}`, icon: 'application', variant: 'application', name, text: `${name} applied to ${(a as any).opportunity?.title || 'a role'}`, created_at: a.created_at })
   }
   for (const i of interest || []) {
-    if (i.status === 'accepted') items.push({ id: `int-${i.id}`, icon: 'interest', text: `${(i as any).student?.full_name}'s organisation accepted your request`, created_at: i.created_at })
-    else if (i.status === 'declined') items.push({ id: `int-${i.id}`, icon: 'interest', text: `${(i as any).student?.full_name}'s organisation declined your request`, created_at: i.created_at })
+    const name = (i as any).student?.full_name || 'A student'
+    if (i.status === 'accepted') items.push({ id: `int-${i.id}`, icon: 'interest', variant: 'accepted', name, text: `${name}'s organisation accepted your request`, created_at: i.created_at })
+    else if (i.status === 'declined') items.push({ id: `int-${i.id}`, icon: 'interest', variant: 'declined', name, text: `${name}'s organisation declined your request`, created_at: i.created_at })
   }
   items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   return { data: items, error: null }

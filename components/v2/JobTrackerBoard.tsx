@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '@/context/AuthContext'
 import {
   getApplicationsForEmployer, getApplicationsForOrganisation, moveApplicationStage,
@@ -221,7 +222,7 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged }: {
     setTimeout(() => setNoteSaved(false), 2500)
   }
 
-  return (
+  return createPortal((
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-edge-subtle">
@@ -302,5 +303,5 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged }: {
         </div>
       </div>
     </div>
-  )
+  ), document.body)
 }

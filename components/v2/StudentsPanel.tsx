@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '@/context/AuthContext'
 import {
   getOrgStudents, getMySubmissions, getGroups, createGroup, setStudentGroup,
@@ -172,7 +173,7 @@ function StudentDetail({ student, groups, onClose, onGroupChanged }: {
     onGroupChanged()
   }
 
-  return (
+  return createPortal((
     <div className="fixed inset-0 z-50 bg-paper overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-paper/95 backdrop-blur border-b border-edge-subtle">
         <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-muted text-ink">
@@ -236,7 +237,7 @@ function StudentDetail({ student, groups, onClose, onGroupChanged }: {
         </div>
       </div>
     </div>
-  )
+  ), document.body)
 }
 
 // Group + date, tap a name to mark, saves the instant it's tapped --
