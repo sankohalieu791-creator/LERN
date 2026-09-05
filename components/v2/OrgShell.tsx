@@ -254,7 +254,14 @@ export default function OrgShell({
           </div>
         </header>
 
-        <main className="flex-1 min-h-0 overflow-y-auto bg-paper px-5 lg:px-10 py-7 pb-8">
+        {/* Feed is built edge-to-edge (Instagram-style cards, full-bleed
+            media) the same way for every role -- it's the exact same
+            FeedPanel component the student app renders. Every other org
+            page assumes the standard px-5/py-7 breathing room this <main>
+            has always given it, so the padding is dropped only for the
+            Feed route rather than globally, which would strip margins
+            from Dashboard/Review/Students/Settings etc. too. */}
+        <main className={`flex-1 min-h-0 overflow-y-auto bg-paper ${pathname.endsWith('/feed') ? '' : 'px-5 lg:px-10 py-7 pb-8'}`}>
           {children}
         </main>
       </div>
