@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NotificationsBell from '@/components/v2/NotificationsBell'
+import Logo from '@/components/v2/Logo'
 import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
 import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search } from 'lucide-react'
@@ -109,7 +110,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
     <div data-theme={dataTheme} className="h-[100dvh] overflow-hidden bg-[var(--app-bg)] flex" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 border-r border-[var(--app-border)] bg-[var(--app-surface)]">
         <div className="h-16 flex items-center px-5 flex-shrink-0">
-          <span className="font-bold text-xl tracking-tight" style={{ color: '#D4551A' }}>LERN</span>
+          <span style={{ color: '#D4551A' }}><Logo size="md" /></span>
         </div>
         <div className="px-4 pb-3">
           <button
@@ -169,7 +170,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
               gated to isActive('/student/feed') above, nothing else
               renders it. */}
           <div className="px-4 py-3 flex items-center justify-between">
-            <span className="font-semibold text-[20px] tracking-tight" style={{ color: '#D4551A' }}>LERN</span>
+            <span style={{ color: '#D4551A' }}><Logo size="md" /></span>
             {/* Bigger and a bit darker than the original #5A5A5A -- same
                 request as the notifications bell right next to it, so
                 they read as a matched pair rather than one standing out

@@ -5,6 +5,7 @@ import ThemeProvider from '@/context/ThemeProvider'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import ServiceWorkerRegistration from '@/components/v2/ServiceWorkerRegistration'
+import SplashScreen from '@/components/v2/SplashScreen'
 
 // v2 rebuild: desktop/laptop-first, paper/ink/orange. Dark mode exists
 // today only inside the institution/provider shell (see
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           only ever shows through a gap -- that's exactly the bug this
           was. text-ink is harmless to keep; it's not a background. */}
       <body className="text-ink">
+        <SplashScreen />
         <AuthProvider>
           <ThemeProvider>
             {children}

@@ -148,7 +148,7 @@ export default function OrgShell({
         <div className={`flex items-center h-16 px-4 flex-shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>
           {/* Plain wordmark, not the chip — matches the student feed's
               top-left header treatment exactly, per explicit request. */}
-          {!collapsed && <span className="text-ink font-bold text-xl tracking-tight">LERN</span>}
+          {!collapsed && <span className="text-ink"><Logo size="md" /></span>}
           <button
             onClick={toggleCollapsed}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -309,7 +309,7 @@ export default function OrgShell({
             style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
             <div className="flex items-center justify-between px-5 pt-4 pb-1 flex-shrink-0">
-              <span className="text-brand font-bold text-lg tracking-tight">LERN</span>
+              <span className="text-brand"><Logo size="md" /></span>
               <button onClick={() => setDrawerOpen(false)} aria-label="Close menu" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition">
                 <X className="w-4 h-4" />
               </button>

@@ -14,6 +14,7 @@ import {
   CheckCircle2, RotateCcw, KeyRound, ArrowLeft, FileText,
 } from 'lucide-react'
 import WorkshopSession from '@/components/v2/WorkshopSession'
+import Logo from '@/components/v2/Logo'
 
 // Student My Work — three tabs, learner-type dependent. Sizes/structure
 // pulled directly from the actual deleted v1 app/courses/page.tsx (git
@@ -353,7 +354,9 @@ function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
           badge in the app. This was the real "completely black, can't
           see it" bug on workshop/course cards in light mode. */}
       <div className={`relative bg-gradient-to-br ${bannerGradient(item.id)} flex items-center justify-center`} style={{ height: imgHeight }}>
-        <span className="text-white/10 font-black text-4xl tracking-tight select-none">LERN</span>
+        <div className="opacity-10 text-white">
+          <Logo size={48} />
+        </div>
 
         <span className="absolute top-2.5 left-2.5 text-[10px] font-bold bg-black/80 text-white px-2.5 py-1 rounded-full uppercase tracking-wide">
           {[item.topic, item.level].filter(Boolean).join(' · ') || item.type}
