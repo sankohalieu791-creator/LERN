@@ -6,7 +6,7 @@ import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
 import DemoRolePicker from '@/components/v2/DemoRolePicker'
 import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
-import { signIn, getUserProfile } from '@/lib/supabase'
+import { signIn, getUserProfile, resendConfirmation } from '@/lib/supabase'
 import { routeForRole } from '@/lib/roleRouting'
 import { useAuth } from '@/context/AuthContext'
 import type { Role } from '@/lib/types'
@@ -26,16 +26,27 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [greeting, setGreeting] = useState<{ name: string; dest: string } | null>(null)
   const [showRolePicker, setShowRolePicker] = useState(false)
+  const [unconfirmed, setUnconfirmed] = useState(false)
+  const [resent, setResent] = useState(false)
   const router = useRouter()
   const { refreshUser } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setUnconfirmed(false)
     setLoading(true)
     const { data, error: signInError } = await signIn(email.trim(), password)
     if (signInError || !data.user) {
       setLoading(false)
+      // Supabase's own wording for this ("Email not confirmed") reads like
+      // a bug report, not something the person can act on — swap it for
+      // the actual next step, with a way to get another link right there.
+      if (signInError?.message?.toLowerCase().includes('email not confirmed')) {
+        setUnconfirmed(true)
+        setError('Confirm your email before logging in — check your inbox for the link we sent when you signed up.')
+        return
+      }
       setError(signInError?.message || 'Could not sign in.')
       return
     }
@@ -72,6 +83,15 @@ export default function LoginPage() {
         <TextField label="Password" type="password" value={password} onChange={setPassword} placeholder="Your password" />
         <PrimaryButton type="submit" loading={loading} disabled={!email || !password}>Log in</PrimaryButton>
       </form>
+      {unconfirmed && (
+        <button
+          type="button"
+          onClick={async () => { setResent(false); const { error } = await resendConfirmation(email.trim()); if (!error) setResent(true) }}
+          className="block w-full text-center text-[13px] font-semibold text-brand hover:underline mt-4"
+        >
+          {resent ? 'Sent again — check your inbox' : 'Resend confirmation email'}
+        </button>
+      )}
       <p className="text-center text-[13px] text-[#8A8373] mt-6">
         New to LERN?{' '}
         <button onClick={() => router.push('/auth/start')} className="text-brand font-semibold hover:underline">

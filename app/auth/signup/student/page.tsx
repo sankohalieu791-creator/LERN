@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
-import { signUp, signIn, redeemJoinCode, recordConsent, getUserProfile, supabase } from '@/lib/supabase'
+import { signUp, signIn, resendConfirmation, redeemJoinCode, recordConsent, getUserProfile, supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { ShieldCheck } from 'lucide-react'
 
@@ -29,6 +29,8 @@ export default function StudentSignupPage() {
   const [step, setStep] = useState<Step>(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
+  const [resent, setResent] = useState(false)
 
   // A1
   const [fullName, setFullName] = useState('')
@@ -72,10 +74,20 @@ export default function StudentSignupPage() {
     if (!isPlausibleDob(dob)) return setError('Enter a valid date of birth.')
 
     setLoading(true)
-    const { error: signUpError } = await signUp(email.trim(), password, {
+    const { data: signUpData, error: signUpError } = await signUp(email.trim(), password, {
       role: 'student', full_name: fullName.trim(), date_of_birth: dob,
-    })
-    if (!signUpError) { setLoading(false); setStep(2); return }
+    }, typeof window !== 'undefined' ? `${window.location.origin}/auth/signup/student` : undefined)
+    if (!signUpError) {
+      setLoading(false)
+      // No session back means the project requires clicking a
+      // confirmation link before this account is real — the point of
+      // that setting existing at all. Clicking the emailed link lands
+      // back on this exact page with a live session, and the
+      // resumeFromSession check on mount picks up from here.
+      if (!signUpData.session) { setAwaitingConfirmation(true); return }
+      setStep(2)
+      return
+    }
 
     // "Already registered" doesn't necessarily mean someone else's email --
     // it's very often the same person coming back to an unfinished signup
@@ -121,6 +133,23 @@ export default function StudentSignupPage() {
   }
 
   if (showGreeting) return <LoginGreeting name={fullName} onDone={() => router.replace('/student')} />
+
+  if (awaitingConfirmation) {
+    return (
+      <AuthShell title="Check your email" subtitle={`We've sent a confirmation link to ${email.trim()}.`}>
+        <div className="bg-white border border-[#E2DDD1] rounded-2xl p-5 mb-6">
+          <p className="text-[14px] text-[#4A453B] leading-relaxed">
+            Click the link in that email to confirm it's really you — then you'll land right back here to carry on. This is what proves the account belongs to whoever owns that inbox, not just whoever typed it in.
+          </p>
+        </div>
+        <SecondaryButton
+          onClick={async () => { setResent(false); const { error } = await resendConfirmation(email.trim()); if (!error) setResent(true) }}
+        >
+          {resent ? 'Sent again' : "Didn't get it? Resend"}
+        </SecondaryButton>
+      </AuthShell>
+    )
+  }
 
   return (
     <AuthShell

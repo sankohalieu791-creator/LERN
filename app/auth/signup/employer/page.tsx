@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
-import { signUp, signIn, recordConsent, supabase } from '@/lib/supabase'
+import { signUp, signIn, resendConfirmation, recordConsent, supabase } from '@/lib/supabase'
+import { employerEmailError } from '@/lib/emailPolicy'
 import { useAuth } from '@/context/AuthContext'
 import { ShieldCheck } from 'lucide-react'
 
@@ -24,16 +25,40 @@ export default function EmployerSignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showGreeting, setShowGreeting] = useState(false)
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
+  const [resent, setResent] = useState(false)
+
+  // Covers landing back here after clicking the emailed confirmation link.
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = await supabase.from('users').select('consented_at, full_name').eq('id', user.id).single()
+      if (!profile) return
+      setFullName(profile.full_name || '')
+      if (!profile.consented_at) setStep(2)
+      else setShowGreeting(true)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleStep1 = async () => {
     setError('')
     if (!fullName.trim()) return setError('Enter your name.')
     if (!email.trim()) return setError('Enter your email.')
+    const domainError = employerEmailError(email.trim())
+    if (domainError) return setError(domainError)
     if (password.length < 8) return setError('Password must be at least 8 characters.')
 
     setLoading(true)
-    const { error: signUpError } = await signUp(email.trim(), password, { role: 'employer', full_name: fullName.trim() })
-    if (!signUpError) { setLoading(false); setStep(2); return }
+    const redirectTo = typeof window !== 'undefined' ? window.location.origin + '/auth/signup/employer' : undefined
+    const { data: signUpData, error: signUpError } = await signUp(email.trim(), password, { role: 'employer', full_name: fullName.trim() }, redirectTo)
+    if (!signUpError) {
+      setLoading(false)
+      if (!signUpData.session) { setAwaitingConfirmation(true); return }
+      setStep(2)
+      return
+    }
 
     if (signUpError.message?.toLowerCase().includes('already registered')) {
       const { data: signInData, error: signInError } = await signIn(email.trim(), password)
@@ -67,6 +92,23 @@ export default function EmployerSignupPage() {
   }
 
   if (showGreeting) return <LoginGreeting name={fullName} onDone={() => router.replace('/employer')} />
+
+  if (awaitingConfirmation) {
+    return (
+      <AuthShell title="Check your email" subtitle={`We've sent a confirmation link to ${email.trim()}.`}>
+        <div className="bg-white border border-[#E2DDD1] rounded-2xl p-5 mb-6">
+          <p className="text-[14px] text-[#4A453B] leading-relaxed">
+            Click the link in that email to confirm it's really you — then you'll land right back here to carry on.
+          </p>
+        </div>
+        <SecondaryButton
+          onClick={async () => { setResent(false); const { error } = await resendConfirmation(email.trim()); if (!error) setResent(true) }}
+        >
+          {resent ? 'Sent again' : "Didn't get it? Resend"}
+        </SecondaryButton>
+      </AuthShell>
+    )
+  }
 
   return (
     <AuthShell

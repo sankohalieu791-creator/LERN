@@ -1,11 +1,12 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
-import { signUp, signIn, createOrganisationAndJoin, recordConsent, generateJoinCode, randomJoinCode, getUserProfile, supabase } from '@/lib/supabase'
+import { signUp, signIn, resendConfirmation, createOrganisationAndJoin, recordConsent, generateJoinCode, randomJoinCode, getUserProfile, supabase } from '@/lib/supabase'
+import { institutionEmailError } from '@/lib/emailPolicy'
 import { useAuth } from '@/context/AuthContext'
 import { ShieldCheck, Copy, Check } from 'lucide-react'
 
@@ -33,19 +34,58 @@ function OrganisationSignupInner() {
   const [generatedCode, setGeneratedCode] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [showGreeting, setShowGreeting] = useState(false)
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
+  const [resent, setResent] = useState(false)
+
+  // Covers landing back here after clicking the emailed confirmation
+  // link — a fresh page load with a brand-new live session, same
+  // pattern as the student wizard's resumeFromSession.
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = await getUserProfile(user.id)
+      if (profile?.organisation_id && (profile.role === 'institution_staff' || profile.role === 'provider_staff')) {
+        router.replace(profile.role === 'institution_staff' ? '/institution' : '/provider')
+        return
+      }
+      if (profile?.role === 'student' && !profile.organisation_id) {
+        setFullName(profile.full_name || '')
+        setEmail(profile.email || '')
+        setOrgName((user.user_metadata?.org_name as string) || '')
+        setStep(2)
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleO1Submit = async () => {
     setError('')
     if (!orgName.trim()) return setError(`Enter your ${orgType === 'institution' ? 'school or college' : 'organisation'}'s name.`)
     if (!fullName.trim()) return setError('Enter your name.')
     if (!email.trim()) return setError('Enter your email.')
+    // Providers are deliberately not gated here — schools/colleges are the
+    // strict case; a training provider's email is optional/lenient.
+    if (orgType === 'institution') {
+      const domainError = institutionEmailError(email.trim())
+      if (domainError) return setError(domainError)
+    }
     if (password.length < 8) return setError('Password must be at least 8 characters.')
 
     setLoading(true)
-    const { error: signUpError } = await signUp(email.trim(), password, { role: 'student', full_name: fullName.trim() })
+    const redirectTo = typeof window !== 'undefined' ? window.location.href.split('?')[0] + `?type=${orgType}` : undefined
+    // org_name rides in the auth user's own metadata, not just React
+    // state — a confirmation-link click is a fresh page load, which
+    // would otherwise lose everything typed on this step.
+    const { data: signUpData, error: signUpError } = await signUp(email.trim(), password, { role: 'student', full_name: fullName.trim(), org_name: orgName.trim() }, redirectTo)
     // role is a placeholder here — create_organisation_and_join (step O1->O3)
     // overwrites it to institution_staff/provider_staff once the org exists.
-    if (!signUpError) { setLoading(false); setStep(2); return }
+    if (!signUpError) {
+      setLoading(false)
+      if (!signUpData.session) { setAwaitingConfirmation(true); return }
+      setStep(2)
+      return
+    }
 
     // Same class of bug as the student wizard: someone coming back to an
     // unfinished org signup with no live session hits "already registered"
@@ -61,6 +101,7 @@ function OrganisationSignupInner() {
         }
         if (profile?.role === 'student' && !profile.organisation_id) {
           setFullName(profile.full_name || fullName)
+          setOrgName((signInData.user.user_metadata?.org_name as string) || orgName)
           setLoading(false)
           setStep(2)
           return
@@ -106,6 +147,23 @@ function OrganisationSignupInner() {
 
   if (showGreeting) {
     return <LoginGreeting name={fullName} onDone={() => router.replace(orgType === 'institution' ? '/institution' : '/provider')} />
+  }
+
+  if (awaitingConfirmation) {
+    return (
+      <AuthShell title="Check your email" subtitle={`We've sent a confirmation link to ${email.trim()}.`}>
+        <div className="bg-white border border-[#E2DDD1] rounded-2xl p-5 mb-6">
+          <p className="text-[14px] text-[#4A453B] leading-relaxed">
+            Click the link in that email to confirm it's really you — then you'll land right back here to carry on setting up {orgName || 'your organisation'}.
+          </p>
+        </div>
+        <SecondaryButton
+          onClick={async () => { setResent(false); const { error } = await resendConfirmation(email.trim()); if (!error) setResent(true) }}
+        >
+          {resent ? 'Sent again' : "Didn't get it? Resend"}
+        </SecondaryButton>
+      </AuthShell>
+    )
   }
 
   return (

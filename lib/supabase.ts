@@ -13,18 +13,46 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 export const signUp = async (
   email: string,
   password: string,
-  meta: { role: 'student' | 'institution_staff' | 'provider_staff' | 'employer'; full_name: string; date_of_birth?: string }
+  meta: { role: 'student' | 'institution_staff' | 'provider_staff' | 'employer'; full_name: string; date_of_birth?: string; org_name?: string },
+  emailRedirectTo?: string
 ) => {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: meta },
+    options: { data: meta, emailRedirectTo },
   })
   return { data, error }
 }
 
 export const signIn = async (email: string, password: string) => {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  return { data, error }
+}
+
+// Sends a fresh confirmation link — used when someone's stuck on
+// "check your email" and it never arrived (spam filter, mistyped
+// address they've since fixed on file, etc). Requires "Confirm email"
+// to actually be turned on for the project (Supabase dashboard —
+// Authentication → Sign In / Providers → Email) for there to be
+// anything to resend in the first place.
+export const resendConfirmation = async (email: string) => {
+  const { error } = await supabase.auth.resend({ type: 'signup', email })
+  return { error }
+}
+
+// "Continue with Google" — requires the Google provider to actually be
+// turned on in the Supabase dashboard (Authentication → Providers →
+// Google) with a real Google Cloud OAuth client ID/secret entered
+// there first; this call alone doesn't create that setup. Once it is
+// on, Supabase handles the whole redirect/callback dance — this just
+// kicks it off. redirectTo lands back on /auth/callback with a live
+// session; that page decides where a first-time vs returning user
+// goes next.
+export const signInWithGoogle = async (redirectTo: string) => {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo },
+  })
   return { data, error }
 }
 
