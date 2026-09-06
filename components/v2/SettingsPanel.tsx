@@ -14,24 +14,19 @@ import {
 } from '@/lib/supabase'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
 import {
-  User, Lock, Sun, Moon, Monitor, Bell, Download, Trash2, Flag,
-  FileText, LogOut, ShieldCheck, Users2, Ticket, KeyRound, Smartphone,
-  Mail, UserX, Cookie, ChevronRight, ChevronLeft, Camera, BadgeCheck,
+  Sun, Moon, Monitor, ShieldCheck, Users2, Ticket,
+  Mail, UserX, ChevronRight, ChevronLeft, Camera, BadgeCheck, LogOut,
 } from 'lucide-react'
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
 
-// Brought up to the same depth as the student app's own Settings, per
-// direct request ("you see how student have alot in there settings
-// for org make the relevant things that they need") -- same
-// underlying account/security/privacy/data machinery every role
-// already shares on the users table (two_step_enabled, cookie_consent,
-// consented_at, notification_prefs, blocked_users), just presented in
-// this shell's own card language rather than the student app's list-
-// row one. The Organisation card stays institution/provider-only --
-// staff rosters, a safeguarding lead and join codes are real concepts
-// there and not for a single-person employer account; an employer
-// gets everything else here in the same style instead of an invented
-// "company profile" that doesn't map to anything in the schema.
+// Rebuilt to the same grouped-row-list structure as the student app's
+// own Settings (Group/Row/ToggleRow, one flowing screen, sub-screens
+// for anything with its own form) instead of this shell's previous
+// stack of bordered Cards -- same request as "bring org up to the same
+// depth as student's settings," applied to the shape of the page
+// itself, not just what's on it. Colours stay this shell's own
+// (--paper/--ink, light-first with dark support) rather than student's
+// --app-* dark-only palette -- the pattern is shared, the theme isn't.
 const NOTIFICATION_LABELS: Record<string, string> = {
   work_submitted: 'Work submitted for review',
   work_verified: 'Work verified',
@@ -39,51 +34,198 @@ const NOTIFICATION_LABELS: Record<string, string> = {
   reports: 'New reports',
 }
 
-function Card({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-surface border border-edge rounded-2xl p-6">
-      <p className="font-bold text-ink text-[15px] mb-4 flex items-center gap-2">
-        <Icon className="w-4 h-4 text-ink-tertiary" /> {title}
-      </p>
-      {children}
-    </div>
-  )
-}
-
-type Screen = null | 'email' | 'blocked' | 'delete' | 'consent'
+type Screen = null | 'email' | 'password' | 'photo' | 'rename' | 'organisation' | 'blocked' | 'report' | 'delete' | 'consent'
 
 export default function SettingsPanel() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const router = useRouter()
   const [screen, setScreen] = useState<Screen>(null)
+  const [org, setOrg] = useState<any>(null)
+  const [busyField, setBusyField] = useState<string | null>(null)
   const isOrgAdmin = user?.role === 'institution_staff' || user?.role === 'provider_staff'
+
+  useEffect(() => {
+    if (user?.organisation_id) {
+      supabase.from('organisations').select('*').eq('id', user.organisation_id).single().then(({ data }) => setOrg(data))
+    }
+  }, [user?.organisation_id])
 
   if (!user) return null
 
+  const prefs = user.notification_prefs || { work_submitted: true, work_verified: true, employer_interest: true, reports: true }
+  const saveNotif = async (key: string, value?: boolean) => {
+    setBusyField(key)
+    await setNotificationPrefs(user.id, { ...prefs, [key]: value ?? !prefs[key] })
+    await refreshUser()
+    setBusyField(null)
+  }
+
+  const saveTheme = async (theme: 'light' | 'dark' | 'system') => {
+    setBusyField('theme')
+    await setThemePreference(user.id, theme)
+    await refreshUser()
+    setBusyField(null)
+  }
+
+  const requestReset = async () => {
+    setBusyField('reset')
+    await sendPasswordResetEmail(user.email)
+    setBusyField(null)
+    alert(`A password reset link has been sent to ${user.email}.`)
+  }
+
+  const toggleTwoStep = async () => {
+    setBusyField('two_step')
+    await updateUserProfile(user.id, { two_step_enabled: !user.two_step_enabled })
+    await refreshUser()
+    setBusyField(null)
+  }
+
+  const requestSignOutEverywhere = async () => {
+    if (!confirm('Sign out of every device you’re signed in on?')) return
+    await signOutEverywhere()
+    router.replace('/auth/login')
+  }
+
+  const toggleAnalytics = async () => {
+    setBusyField('cookies')
+    await setCookieConsent(user.id, !(user.cookie_consent?.analytics ?? false))
+    await refreshUser()
+    setBusyField(null)
+  }
+
+  // ── Sub-screens ──
   if (screen === 'email') return <ChangeEmailScreen currentEmail={user.email} onBack={() => setScreen(null)} />
+  if (screen === 'password') return <ChangePasswordScreen onBack={() => setScreen(null)} />
+  if (screen === 'photo') return <PhotoScreen onBack={() => setScreen(null)} />
+  if (screen === 'rename') return <RenameScreen onBack={() => setScreen(null)} />
+  if (screen === 'organisation') return <OrganisationScreen org={org} onBack={() => setScreen(null)} onChanged={() => { setOrg(null); if (user.organisation_id) supabase.from('organisations').select('*').eq('id', user.organisation_id).single().then(({ data }) => setOrg(data)) }} />
   if (screen === 'blocked') return <BlockedAccountsScreen userId={user.id} onBack={() => setScreen(null)} />
+  if (screen === 'report') return <ReportScreen userId={user.id} organisationId={user.organisation_id || null} onBack={() => setScreen(null)} />
   if (screen === 'delete') return <DeleteAccountScreen email={user.email} onBack={() => setScreen(null)} />
   if (screen === 'consent') return <ConsentScreen consentedAt={user.consented_at} onBack={() => setScreen(null)} onDelete={() => setScreen('delete')} />
 
+  const logoUrl = org?.logo_path ? getAvatarUrl(org.logo_path) : null
+  const avatarUrl = user.avatar_path ? getAvatarUrl(user.avatar_path) : null
+
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
-      {/* For institution/provider staff, the organisation's own identity
-          (name, logo, verified tick) is the thing that actually shows up
-          on course/brief/workshop cards -- it belongs at the top, ahead
-          of the staff member's own personal account settings, not
-          buried below five other cards. */}
-      {isOrgAdmin && <OrganisationCard />}
-      <AccountCard onChangeEmail={() => setScreen('email')} />
-      <SecurityCard onBlockedAccounts={() => setScreen('blocked')} />
-      <ThemeCard />
-      <NotificationsCard />
-      <ReportCard />
-      <DataPrivacyCard onViewConsent={() => setScreen('consent')} onDelete={() => setScreen('delete')} />
-      <LegalCard />
+    <div className="max-w-2xl mx-auto pb-10">
+      <p className="text-[22px] font-bold text-ink mb-5">Settings</p>
+
+      {/* ── Organisation, first -- this identity (name, logo, verified
+          tick) is what actually shows up on course/brief/workshop
+          cards, ahead of the staff member's own personal account. ── */}
+      {isOrgAdmin && (
+        <Group title="Organisation">
+          <Row
+            label={org?.name || 'Your organisation'}
+            onClick={() => setScreen('organisation')}
+            right={
+              <span className="flex items-center gap-2">
+                {org?.verified && <BadgeCheck className="w-4 h-4 flex-shrink-0" style={{ color: '#4a9de0' }} />}
+                {logoUrl ? (
+                  <img src={logoUrl} alt="" className="w-8 h-8 rounded-lg object-cover" />
+                ) : (
+                  <span className="w-8 h-8 rounded-lg bg-accent-bg text-brand font-bold text-[12px] flex items-center justify-center">{org?.name?.[0]?.toUpperCase() || 'O'}</span>
+                )}
+              </span>
+            }
+          />
+          <Row label="Join codes and staff" onClick={() => setScreen('organisation')} />
+        </Group>
+      )}
+
+      {/* ── Account ── */}
+      <Group title="Account">
+        <Row
+          label="Profile photo" onClick={() => setScreen('photo')}
+          right={avatarUrl ? <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" /> : <span className="w-8 h-8 rounded-full bg-accent-bg text-brand font-bold text-[12px] flex items-center justify-center">{user.full_name?.[0]?.toUpperCase() || 'U'}</span>}
+        />
+        <Row label="Full name" value={user.full_name} onClick={() => setScreen('rename')} />
+        <Row label="Email" value={user.email} onClick={() => setScreen('email')} />
+        <Row label="Change password" onClick={() => setScreen('password')} />
+        {user.role === 'employer' && (
+          <Row
+            label="Employer status" noChevron
+            value={user.employer_verified ? undefined : 'Not yet verified'}
+            right={user.employer_verified ? <span className="flex items-center gap-1 text-[12px] font-semibold" style={{ color: '#4a9de0' }}><BadgeCheck className="w-3.5 h-3.5" /> Verified</span> : undefined}
+          />
+        )}
+      </Group>
+
+      {/* ── Security and sign-in ── */}
+      <Group title="Security and sign-in">
+        <Row label="Reset password by email" onClick={requestReset} busy={busyField === 'reset'} />
+        <ToggleRow label="Two-step verification" value={!!user.two_step_enabled} busy={busyField === 'two_step'} onToggle={toggleTwoStep} />
+        <Row label="Sign out of all devices" onClick={requestSignOutEverywhere} danger />
+        <Row label="Blocked accounts" onClick={() => setScreen('blocked')} />
+      </Group>
+
+      {/* ── Notifications ── */}
+      <Group title="Notifications">
+        <ToggleRow label="Push notifications" value={prefs.push_enabled !== false} busy={busyField === 'push_enabled'} onToggle={v => saveNotif('push_enabled', v)} />
+        <ToggleRow label="Email notifications" value={prefs.email_enabled !== false} busy={busyField === 'email_enabled'} onToggle={v => saveNotif('email_enabled', v)} />
+      </Group>
+      <Group>
+        {Object.entries(NOTIFICATION_LABELS).map(([key, label]) => (
+          <ToggleRow key={key} label={label} value={prefs[key] !== false} busy={busyField === key} onToggle={() => saveNotif(key)} />
+        ))}
+      </Group>
+
+      {/* ── Data and privacy ── */}
+      <Group title="Data and privacy">
+        <Row label="Download my data" onClick={async () => {
+          const data = await exportMyData(user.id)
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url; a.download = `lern-my-data-${new Date().toISOString().split('T')[0]}.json`; a.click()
+          URL.revokeObjectURL(url)
+        }} />
+        <Row label="Consent" value="View" onClick={() => setScreen('consent')} />
+        <ToggleRow label="Analytics cookies" hint="Essential cookies are always on" value={!!user.cookie_consent?.analytics} busy={busyField === 'cookies'} onToggle={toggleAnalytics} />
+        <Row label="Delete my account and data" danger onClick={() => setScreen('delete')} />
+      </Group>
+
+      {/* ── Raise a concern ── */}
+      <Group title="Raise a concern">
+        <Row label="Report a problem or something that worries you" onClick={() => setScreen('report')} />
+      </Group>
+
+      {/* ── Appearance ── */}
+      <Group title="Appearance">
+        <div className="px-4 py-3.5">
+          <div className="flex gap-2">
+            {([['light', 'Light', Sun], ['dark', 'Dark', Moon], ['system', 'System', Monitor]] as const).map(([key, label, Icon]) => (
+              <button
+                key={key} onClick={() => saveTheme(key)} disabled={busyField === 'theme'}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold transition ${
+                  (user.theme_preference || 'system') === key ? 'bg-brand text-white' : 'bg-surface-subtle border border-edge text-ink-secondary'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" /> {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Group>
+
+      {/* ── About and legal ── */}
+      <Group title="About and legal">
+        <LinkRow label="Data Protection" href="/legal/privacy" />
+        <LinkRow label="Cookie Policy" href="/legal/cookies" />
+        <LinkRow label="Terms of Service" href="/legal/terms" />
+        <LinkRow label="Public safeguarding summary" href="/legal/safeguarding" />
+        <Row label="App version" value="1.0" noChevron />
+        <a href="mailto:support@lernapp.uk" className="flex items-center justify-between px-4 py-3.5 hover:bg-surface-muted transition">
+          <span className="text-[14px] text-ink">Contact and support</span>
+          <span className="flex items-center gap-1 text-[13px] text-ink-secondary"><Mail className="w-3.5 h-3.5" /> support@lernapp.uk</span>
+        </a>
+      </Group>
 
       <button
         onClick={async () => { await signOut(); router.replace('/auth/login') }}
-        className="flex items-center gap-2 text-[13px] font-semibold text-danger-text hover:underline"
+        className="flex items-center justify-center gap-2 w-full text-[14px] font-semibold text-danger-text py-3.5 mt-2"
       >
         <LogOut className="w-4 h-4" /> Sign out
       </button>
@@ -91,510 +233,65 @@ export default function SettingsPanel() {
   )
 }
 
-function AccountCard({ onChangeEmail }: { onChangeEmail: () => void }) {
-  const { user, refreshUser } = useAuth()
-  const [fullName, setFullName] = useState(user?.full_name || '')
-  const [newPassword, setNewPassword] = useState('')
-  const [savingName, setSavingName] = useState(false)
-  const [savingPassword, setSavingPassword] = useState(false)
-  const [uploadingPhoto, setUploadingPhoto] = useState(false)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-  const photoRef = useRef<HTMLInputElement>(null)
-
-  const saveName = async () => {
-    if (!user || !fullName.trim()) return
-    setSavingName(true); setError(''); setNotice('')
-    const { error: err } = await updateUserProfile(user.id, { full_name: fullName.trim() })
-    setSavingName(false)
-    if (err) return setError(err.message)
-    await refreshUser()
-    setNotice('Name updated.')
-  }
-
-  const savePassword = async () => {
-    if (newPassword.length < 8) return setError('New password must be at least 8 characters.')
-    setSavingPassword(true); setError(''); setNotice('')
-    const { error: err } = await changePassword(newPassword)
-    setSavingPassword(false)
-    if (err) return setError(err.message)
-    setNewPassword('')
-    setNotice('Password changed.')
-  }
-
-  // Personal photo, any org role. For an employer specifically it's
-  // also their equivalent of the institution/provider org logo (no
-  // organisations row of their own to hang one off) -- shows up on
-  // every job/apprenticeship/internship they post automatically,
-  // Discover falls back to it when a posting has no logo of its own.
-  const onPhotoChosen = async (file: File | null) => {
-    if (!file || !user) return
-    setUploadingPhoto(true); setError(''); setNotice('')
-    const { error: err } = await uploadAvatar(user.id, file)
-    setUploadingPhoto(false)
-    if (err) return setError(err.message || 'Photo upload failed.')
-    await refreshUser()
-  }
-  const removePhoto = async () => {
-    if (!user) return
-    setUploadingPhoto(true); setError('')
-    const { error: err } = await removeAvatar(user.id, user.avatar_path)
-    setUploadingPhoto(false)
-    if (err) return setError(err.message)
-    await refreshUser()
-  }
-
+// ── Shared row/group primitives -- org's own tokens (bg-surface/
+// text-ink/border-edge), same structural pattern as the student app's
+// Group/Row/ToggleRow. ──────────────────────────────────────────────
+function Group({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <Card icon={User} title="Account">
-      <ErrorBanner message={error} />
-      {notice && <p className="text-[13px] text-success-text font-semibold mb-3">{notice}</p>}
-
-      {/* Was employer-only -- this whole panel is org-only to begin
-          with (students have their own separate Settings), so there's
-          no reason institution/provider staff couldn't set a personal
-          photo the exact same way. It already had somewhere to show
-          up too: OrgShell's own profile-menu circle in the top bar
-          already renders user.avatar_path for any role when it's set,
-          it just had no upload control feeding it for non-employers. */}
-      <div className="flex items-center gap-3.5 mb-5">
-        <button onClick={() => photoRef.current?.click()} disabled={uploadingPhoto} className="relative flex-shrink-0 disabled:opacity-60" aria-label="Change profile picture">
-          {user?.avatar_path ? (
-            <img src={getAvatarUrl(user.avatar_path) || ''} alt="" className="w-14 h-14 rounded-full object-cover" />
-          ) : (
-            <div className="w-14 h-14 rounded-full bg-accent-bg text-brand font-bold text-[16px] flex items-center justify-center">
-              {user?.full_name?.[0]?.toUpperCase() || 'U'}
-            </div>
-          )}
-          <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-brand flex items-center justify-center border-2 border-surface">
-            <Camera className="w-3 h-3 text-white" />
-          </span>
-        </button>
-        <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={e => onPhotoChosen(e.target.files?.[0] || null)} />
-        <div className="min-w-0">
-          <p className="text-[13px] font-semibold text-ink">{uploadingPhoto ? 'Uploading…' : 'Profile picture'}</p>
-          <p className="text-[12px] text-ink-tertiary leading-relaxed">
-            {user?.role === 'employer' ? 'Shown on the jobs and roles you post.' : 'Shown next to your name across LERN.'}
-          </p>
-          <div className="flex items-center gap-3 mt-1">
-            {user?.avatar_path && (
-              <button onClick={removePhoto} disabled={uploadingPhoto} className="text-[11.5px] font-semibold text-ink-secondary disabled:opacity-40">Remove</button>
-            )}
-            {user?.role === 'employer' && (
-              user.employer_verified ? (
-                <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold" style={{ color: '#4a9de0' }}>
-                  <BadgeCheck className="w-3.5 h-3.5" /> Verified employer
-                </span>
-              ) : (
-                <p className="text-[11px] text-ink-quaternary">Not yet verified by LERN</p>
-              )
-            )}
-          </div>
-        </div>
+    <div className="mb-4">
+      {title && <p className="text-[13px] font-semibold text-ink-secondary mb-2 px-1">{title}</p>}
+      <div className="bg-surface border border-edge rounded-2xl divide-y divide-edge-subtle overflow-hidden">
+        {children}
       </div>
+    </div>
+  )
+}
 
-      <TextField label="Full name" value={fullName} onChange={setFullName} placeholder="Your name" />
-      <SecondaryButton onClick={saveName} disabled={savingName}>{savingName ? "Saving…" : "Save name"}</SecondaryButton>
+function Row({ label, value, onClick, right, noChevron, noChevronValue, danger, busy }: {
+  label: string; value?: string; onClick?: () => void; right?: React.ReactNode
+  noChevron?: boolean; noChevronValue?: boolean; danger?: boolean; busy?: boolean
+}) {
+  const content = (
+    <>
+      <span className={`text-[14px] ${danger ? 'text-danger-text' : 'text-ink'}`}>{busy ? 'Working…' : label}</span>
+      <span className="flex items-center gap-2 flex-shrink-0">
+        {value && <span className="text-[13px] text-ink-secondary truncate max-w-[160px]">{value}</span>}
+        {right}
+        {onClick && !noChevron && !noChevronValue && <ChevronRight className="w-4 h-4 text-ink-tertiary" />}
+      </span>
+    </>
+  )
+  if (!onClick) return <div className="flex items-center justify-between px-4 py-3.5">{content}</div>
+  return (
+    <button onClick={onClick} disabled={busy} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-surface-muted transition text-left disabled:opacity-60">
+      {content}
+    </button>
+  )
+}
 
-      <button onClick={onChangeEmail} className="w-full flex items-center justify-between mt-2 mb-4 py-2 text-left group">
-        <span>
-          <span className="block text-[13px] font-semibold text-ink mb-0.5">Email</span>
-          <span className="text-[14px] text-ink-secondary">{user?.email}</span>
-        </span>
-        <ChevronRight className="w-4 h-4 text-ink-tertiary flex-shrink-0" />
+function ToggleRow({ label, hint, value, onToggle, busy }: { label: string; hint?: string; value: boolean; onToggle: (v: boolean) => void; busy?: boolean }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3.5 gap-3">
+      <div className="min-w-0">
+        <p className="text-[14px] text-ink">{label}</p>
+        {hint && <p className="text-[12px] text-ink-tertiary mt-0.5">{hint}</p>}
+      </div>
+      <button
+        onClick={() => onToggle(!value)} disabled={busy}
+        className={`w-11 h-6 rounded-full transition relative flex-shrink-0 disabled:opacity-50 border ${value ? 'bg-brand border-brand' : 'bg-surface-muted border-edge'}`}
+      >
+        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition ${value ? 'left-[21px]' : 'left-0.5'}`} />
       </button>
-
-      <div className="flex items-center gap-2 mb-1.5">
-        <Lock className="w-3.5 h-3.5 text-ink-tertiary" />
-        <span className="text-[13px] font-semibold text-ink">Change password</span>
-      </div>
-      <TextField label="" value={newPassword} onChange={setNewPassword} type="password" placeholder="New password (min 8 characters)" />
-      <SecondaryButton onClick={savePassword} disabled={savingPassword || !newPassword}>{savingPassword ? "Changing…" : "Change password"}</SecondaryButton>
-    </Card>
+    </div>
   )
 }
 
-function SecurityCard({ onBlockedAccounts }: { onBlockedAccounts: () => void }) {
-  const { user, refreshUser } = useAuth()
-  const [busy, setBusy] = useState<string | null>(null)
-  const [notice, setNotice] = useState('')
-
-  const requestReset = async () => {
-    if (!user) return
-    setBusy('reset')
-    await sendPasswordResetEmail(user.email)
-    setBusy(null)
-    setNotice(`A password reset link has been sent to ${user.email}.`)
-  }
-
-  const toggleTwoStep = async () => {
-    if (!user) return
-    setBusy('two_step')
-    await updateUserProfile(user.id, { two_step_enabled: !user.two_step_enabled })
-    await refreshUser()
-    setBusy(null)
-  }
-
-  const signOutAll = async () => {
-    if (!confirm('Sign out of every device you’re signed in on?')) return
-    setBusy('signout_all')
-    await signOutEverywhere()
-    window.location.href = '/auth/login'
-  }
-
+function LinkRow({ label, href }: { label: string; href: string }) {
   return (
-    <Card icon={KeyRound} title="Security and sign-in">
-      {notice && <p className="text-[13px] text-success-text font-semibold mb-3">{notice}</p>}
-      <div className="space-y-1 -mx-2">
-        <button onClick={requestReset} disabled={busy === 'reset'} className="w-full flex items-center justify-between px-2 py-2.5 rounded-lg hover:bg-surface-muted transition text-left disabled:opacity-60">
-          <span className="text-[13.5px] text-ink">{busy === 'reset' ? 'Sending…' : 'Reset password by email'}</span>
-          <ChevronRight className="w-4 h-4 text-ink-tertiary" />
-        </button>
-        <div className="flex items-center justify-between px-2 py-2.5">
-          <div className="flex items-center gap-2">
-            <Smartphone className="w-3.5 h-3.5 text-ink-tertiary" />
-            <span className="text-[13.5px] text-ink">Two-step verification</span>
-          </div>
-          <button
-            onClick={toggleTwoStep} disabled={busy === 'two_step'}
-            className={`w-11 h-6 rounded-full transition relative flex-shrink-0 disabled:opacity-50 border ${user?.two_step_enabled ? 'bg-brand border-brand' : 'bg-surface-muted border-edge'}`}
-          >
-            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition ${user?.two_step_enabled ? 'left-[21px]' : 'left-0.5'}`} />
-          </button>
-        </div>
-        <button onClick={signOutAll} disabled={busy === 'signout_all'} className="w-full flex items-center justify-between px-2 py-2.5 rounded-lg hover:bg-surface-muted transition text-left disabled:opacity-60">
-          <span className="text-[13.5px] text-danger-text">{busy === 'signout_all' ? 'Signing out…' : 'Sign out of all devices'}</span>
-        </button>
-        <button onClick={onBlockedAccounts} className="w-full flex items-center justify-between px-2 py-2.5 rounded-lg hover:bg-surface-muted transition text-left">
-          <span className="text-[13.5px] text-ink">Blocked accounts</span>
-          <ChevronRight className="w-4 h-4 text-ink-tertiary" />
-        </button>
-      </div>
-    </Card>
-  )
-}
-
-function ThemeCard() {
-  const { user, refreshUser } = useAuth()
-  const [saving, setSaving] = useState(false)
-  const current = user?.theme_preference || 'system'
-
-  const choose = async (theme: 'light' | 'dark' | 'system') => {
-    if (!user) return
-    setSaving(true)
-    await setThemePreference(user.id, theme)
-    await refreshUser()
-    setSaving(false)
-  }
-
-  return (
-    <Card icon={Sun} title="Theme">
-      <div className="flex gap-2">
-        {([['light', 'Light', Sun], ['dark', 'Dark', Moon], ['system', 'System', Monitor]] as const).map(([key, label, Icon]) => (
-          <button
-            key={key} onClick={() => choose(key)} disabled={saving}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold transition ${
-              current === key ? 'bg-brand text-white' : 'bg-surface-subtle border border-edge text-ink-secondary'
-            }`}
-          >
-            <Icon className="w-3.5 h-3.5" /> {label}
-          </button>
-        ))}
-      </div>
-    </Card>
-  )
-}
-
-function NotificationsCard() {
-  const { user, refreshUser } = useAuth()
-  const [saving, setSaving] = useState<string | null>(null)
-  const prefs = user?.notification_prefs || { work_submitted: true, work_verified: true, employer_interest: true, reports: true }
-  const pushOn = prefs.push_enabled !== false
-  const emailOn = prefs.email_enabled !== false
-
-  const toggle = async (key: string, value?: boolean) => {
-    if (!user) return
-    const next = { ...prefs, [key]: value ?? !prefs[key] }
-    setSaving(key)
-    await setNotificationPrefs(user.id, next)
-    await refreshUser()
-    setSaving(null)
-  }
-
-  return (
-    <Card icon={Bell} title="Notifications">
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => toggle('push_enabled', !pushOn)} disabled={saving === 'push_enabled'}
-          className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${pushOn ? 'bg-brand text-white' : 'bg-surface-subtle border border-edge text-ink-secondary'}`}
-        >
-          Push {pushOn ? 'on' : 'off'}
-        </button>
-        <button
-          onClick={() => toggle('email_enabled', !emailOn)} disabled={saving === 'email_enabled'}
-          className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${emailOn ? 'bg-brand text-white' : 'bg-surface-subtle border border-edge text-ink-secondary'}`}
-        >
-          Email {emailOn ? 'on' : 'off'}
-        </button>
-      </div>
-      <div className="space-y-2.5 mb-3 pt-3 border-t border-edge-subtle">
-        {Object.entries(NOTIFICATION_LABELS).map(([key, label]) => (
-          <label key={key} className="flex items-center justify-between">
-            <span className="text-[13px] text-ink">{label}</span>
-            <button
-              onClick={() => toggle(key)} disabled={saving === key}
-              className={`w-10 h-6 rounded-full transition relative flex-shrink-0 ${prefs[key] !== false ? 'bg-brand' : 'bg-edge'}`}
-            >
-              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition ${prefs[key] !== false ? 'left-[18px]' : 'left-0.5'}`} />
-            </button>
-          </label>
-        ))}
-      </div>
-    </Card>
-  )
-}
-
-function ReportCard() {
-  const { user } = useAuth()
-  const [open, setOpen] = useState(false)
-  const [reason, setReason] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [sent, setSent] = useState(false)
-
-  const send = async () => {
-    if (!user) return
-    if (!reason.trim()) return setError('Describe your concern.')
-    setLoading(true); setError('')
-    const { error: err } = await submitReport(user.id, user.organisation_id || null, 'general', reason.trim())
-    setLoading(false)
-    if (err) return setError(err.message)
-    setSent(true); setReason(''); setOpen(false)
-  }
-
-  return (
-    <Card icon={Flag} title="Raise a concern">
-      <p className="text-[13px] text-ink-secondary mb-3">
-        Something wrong with content or a person on LERN? Tell us here — a human reviews every report, never an automated ban.
-        Concerns about an adult at LERN follow the independent safeguarding route, not your organisation.
-      </p>
-      {sent && <p className="text-[13px] text-success-text font-semibold mb-3">Sent — thank you. Someone will follow up.</p>}
-      {!open ? (
-        <SecondaryButton onClick={() => setOpen(true)}>Report a concern</SecondaryButton>
-      ) : (
-        <>
-          <ErrorBanner message={error} />
-          <textarea
-            value={reason} onChange={e => setReason(e.target.value)}
-            placeholder="What happened?" rows={3}
-            className="w-full bg-surface border border-edge rounded-xl px-4 py-3 text-[14px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition mb-3 resize-none"
-          />
-          <PrimaryButton onClick={send} loading={loading}>Send report</PrimaryButton>
-        </>
-      )}
-    </Card>
-  )
-}
-
-function DataPrivacyCard({ onViewConsent, onDelete }: { onViewConsent: () => void; onDelete: () => void }) {
-  const { user, refreshUser } = useAuth()
-  const [downloading, setDownloading] = useState(false)
-  const [busy, setBusy] = useState(false)
-
-  const download = async () => {
-    if (!user) return
-    setDownloading(true)
-    const data = await exportMyData(user.id)
-    setDownloading(false)
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `lern-my-data-${new Date().toISOString().split('T')[0]}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const toggleAnalytics = async () => {
-    if (!user) return
-    setBusy(true)
-    await setCookieConsent(user.id, !(user.cookie_consent?.analytics ?? false))
-    await refreshUser()
-    setBusy(false)
-  }
-
-  return (
-    <Card icon={Download} title="Data and privacy">
-      <p className="text-[13px] text-ink-secondary mb-4">Everything LERN holds about you, and your rights over it under UK GDPR.</p>
-      <div className="flex flex-wrap gap-2 mb-4">
-        <SecondaryButton onClick={download} disabled={downloading}>{downloading ? "Preparing…" : "Download my data"}</SecondaryButton>
-        <SecondaryButton onClick={onViewConsent}>View consent</SecondaryButton>
-      </div>
-      <label className="flex items-center justify-between py-2 border-t border-edge-subtle">
-        <span>
-          <span className="block text-[13px] font-semibold text-ink">Analytics cookies</span>
-          <span className="block text-[12px] text-ink-tertiary">Essential cookies are always on</span>
-        </span>
-        <button
-          onClick={toggleAnalytics} disabled={busy}
-          className={`w-11 h-6 rounded-full transition relative flex-shrink-0 disabled:opacity-50 border ${user?.cookie_consent?.analytics ? 'bg-brand border-brand' : 'bg-surface-muted border-edge'}`}
-        >
-          <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition ${user?.cookie_consent?.analytics ? 'left-[21px]' : 'left-0.5'}`} />
-        </button>
-      </label>
-
-      <div className="mt-4 pt-4 border-t border-edge-subtle">
-        <button onClick={onDelete} className="flex items-center gap-1.5 text-[13px] font-semibold text-danger-text hover:underline">
-          <Trash2 className="w-3.5 h-3.5" /> Delete my account and data
-        </button>
-      </div>
-    </Card>
-  )
-}
-
-function LegalCard() {
-  return (
-    <Card icon={FileText} title="Legal and support">
-      <div className="flex flex-col gap-2.5 mb-4">
-        <Link href="/legal/terms" className="text-[13px] font-semibold text-brand hover:underline">Terms of Service</Link>
-        <Link href="/legal/privacy" className="text-[13px] font-semibold text-brand hover:underline">Data Protection</Link>
-        <Link href="/legal/safeguarding" className="text-[13px] font-semibold text-brand hover:underline">Safeguarding</Link>
-        <Link href="/legal/cookies" className="text-[13px] font-semibold text-brand hover:underline">Cookie Policy</Link>
-      </div>
-      <div className="pt-4 border-t border-edge-subtle flex items-center justify-between">
-        <a href="mailto:support@lernapp.uk" className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-secondary hover:text-brand transition">
-          <Mail className="w-3.5 h-3.5" /> support@lernapp.uk
-        </a>
-        <span className="text-[12px] text-ink-quaternary">App version 1.0</span>
-      </div>
-    </Card>
-  )
-}
-
-function OrganisationCard() {
-  const { user } = useAuth()
-  const [org, setOrg] = useState<any>(null)
-  const [name, setName] = useState('')
-  const [staff, setStaff] = useState<any[]>([])
-  const [savingName, setSavingName] = useState(false)
-  const [savingLead, setSavingLead] = useState(false)
-  const [uploadingLogo, setUploadingLogo] = useState(false)
-  const [notice, setNotice] = useState('')
-  const [error, setError] = useState('')
-  const logoRef = useRef<HTMLInputElement>(null)
-
-  const load = () => {
-    if (!user?.organisation_id) return
-    supabase.from('organisations').select('*').eq('id', user.organisation_id).single().then(({ data }) => {
-      setOrg(data); setName(data?.name || '')
-    })
-    getOrgStaff(user.organisation_id).then(({ data }) => setStaff(data || []))
-  }
-  useEffect(load, [user?.organisation_id])
-
-  const saveName = async () => {
-    if (!org || !name.trim()) return
-    setSavingName(true); setError(''); setNotice('')
-    const { error: err } = await updateOrganisationProfile(org.id, { name: name.trim() })
-    setSavingName(false)
-    if (err) return setError(err.message)
-    setNotice('Organisation name updated.')
-    load()
-  }
-
-  // "A profile picture so it appears proper when they post a course/
-  // brief/workshop" -- the logo shows up wherever a course/brief/
-  // workshop card renders its host row (StudentMyWorkPanel).
-  const onLogoChosen = async (file: File | null) => {
-    if (!file || !user || !org) return
-    setUploadingLogo(true); setError(''); setNotice('')
-    const { path, error: upErr } = await uploadOrgLogo(user.id, file)
-    if (upErr || !path) { setUploadingLogo(false); setError(upErr?.message || 'Logo upload failed.'); return }
-    const { error: err } = await updateOrganisationProfile(org.id, { logo_path: path })
-    setUploadingLogo(false)
-    if (err) return setError(err.message)
-    load()
-  }
-
-  const changeLead = async (leadId: string) => {
-    if (!org) return
-    setSavingLead(true); setError(''); setNotice('')
-    const { error: err } = await updateOrganisationProfile(org.id, { safeguarding_lead_id: leadId })
-    setSavingLead(false)
-    if (err) return setError(err.message)
-    setNotice('Safeguarding lead updated.')
-    load()
-  }
-
-  const logoUrl = org?.logo_path ? getAvatarUrl(org.logo_path) : null
-
-  return (
-    <Card icon={Users2} title="Organisation">
-      <ErrorBanner message={error} />
-      {notice && <p className="text-[13px] text-success-text font-semibold mb-3">{notice}</p>}
-
-      <div className="flex items-center gap-3.5 mb-5">
-        <button onClick={() => logoRef.current?.click()} disabled={uploadingLogo} className="relative flex-shrink-0 disabled:opacity-60" aria-label="Change organisation logo">
-          {logoUrl ? (
-            <img src={logoUrl} alt="" className="w-14 h-14 rounded-2xl object-cover" />
-          ) : (
-            <div className="w-14 h-14 rounded-2xl bg-accent-bg text-brand font-bold text-[16px] flex items-center justify-center">
-              {org?.name?.[0]?.toUpperCase() || 'O'}
-            </div>
-          )}
-          <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-brand flex items-center justify-center border-2 border-surface">
-            <Camera className="w-3 h-3 text-white" />
-          </span>
-        </button>
-        <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={e => onLogoChosen(e.target.files?.[0] || null)} />
-        <div className="min-w-0">
-          <p className="text-[13px] font-semibold text-ink">{uploadingLogo ? 'Uploading…' : 'Organisation logo'}</p>
-          <p className="text-[12px] text-ink-tertiary leading-relaxed">Shown wherever your courses, briefs and workshops appear to students.</p>
-          {/* Verified is platform-granted, not something an org can
-              switch on itself -- shown here as status, not a toggle. */}
-          {org?.verified ? (
-            <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold mt-1" style={{ color: '#4a9de0' }}>
-              <BadgeCheck className="w-3.5 h-3.5" /> Verified organisation
-            </span>
-          ) : (
-            <p className="text-[11px] text-ink-quaternary mt-1">Not yet verified by LERN</p>
-          )}
-        </div>
-      </div>
-
-      <TextField label="Organisation name" value={name} onChange={setName} />
-      <SecondaryButton onClick={saveName} disabled={savingName}>{savingName ? "Saving…" : "Save name"}</SecondaryButton>
-
-      <label className="block mt-4 mb-5">
-        <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ink mb-1.5">
-          <ShieldCheck className="w-3.5 h-3.5" /> Safeguarding lead
-        </span>
-        <select
-          value={org?.safeguarding_lead_id || ''} onChange={e => changeLead(e.target.value)} disabled={savingLead}
-          className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
-        >
-          <option value="" disabled>Choose a staff member…</option>
-          {staff.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-        </select>
-      </label>
-
-      <div className="mb-5">
-        <p className="text-[13px] font-semibold text-ink mb-2">Staff ({staff.length})</p>
-        <div className="space-y-1.5">
-          {staff.map(s => (
-            <div key={s.id} className="flex items-center justify-between text-[13px] px-3 py-2 bg-surface-subtle rounded-lg">
-              <span className="text-ink">{s.full_name}</span>
-              {org?.safeguarding_lead_id === s.id && <span className="text-[11px] font-semibold text-brand">Safeguarding lead</span>}
-            </div>
-          ))}
-        </div>
-        <p className="text-[12px] text-ink-tertiary mt-2">Inviting new staff and removing existing staff isn't built yet — right now only whoever set up the organisation has staff access.</p>
-      </div>
-
-      <div className="pt-4 border-t border-edge-subtle">
-        <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink mb-3"><Ticket className="w-3.5 h-3.5" /> Join codes</p>
-        <JoinCodesPanel />
-      </div>
-    </Card>
+    <Link href={href} className="flex items-center justify-between px-4 py-3.5 hover:bg-surface-muted transition">
+      <span className="text-[14px] text-ink">{label}</span>
+      <ChevronRight className="w-4 h-4 text-ink-tertiary" />
+    </Link>
   )
 }
 
@@ -610,6 +307,112 @@ function ScreenShell({ title, onBack, children }: { title: string; onBack: () =>
         {children}
       </div>
     </div>
+  )
+}
+
+function PhotoScreen({ onBack }: { onBack: () => void }) {
+  const { user, refreshUser } = useAuth()
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const photoRef = useRef<HTMLInputElement>(null)
+  const avatarUrl = user?.avatar_path ? getAvatarUrl(user.avatar_path) : null
+
+  const choose = async (file: File | null) => {
+    if (!file || !user) return
+    setUploading(true); setError('')
+    const { error: err } = await uploadAvatar(user.id, file)
+    setUploading(false)
+    if (err) return setError(err.message || 'Photo upload failed.')
+    await refreshUser()
+  }
+  const remove = async () => {
+    if (!user) return
+    setUploading(true); setError('')
+    const { error: err } = await removeAvatar(user.id, user.avatar_path)
+    setUploading(false)
+    if (err) return setError(err.message)
+    await refreshUser()
+  }
+
+  return (
+    <ScreenShell title="Profile photo" onBack={onBack}>
+      <ErrorBanner message={error} />
+      <p className="text-[13px] text-ink-secondary mb-4">
+        {user?.role === 'employer' ? 'Shown on the jobs and roles you post.' : 'Shown next to your name across LERN.'}
+      </p>
+      <div className="flex items-center gap-3.5">
+        <button onClick={() => photoRef.current?.click()} disabled={uploading} className="relative flex-shrink-0 disabled:opacity-60" aria-label="Change profile picture">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="w-16 h-16 rounded-full object-cover" />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-accent-bg text-brand font-bold text-[18px] flex items-center justify-center">{user?.full_name?.[0]?.toUpperCase() || 'U'}</div>
+          )}
+          <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-brand flex items-center justify-center border-2 border-surface">
+            <Camera className="w-3 h-3 text-white" />
+          </span>
+        </button>
+        <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={e => choose(e.target.files?.[0] || null)} />
+        <div>
+          <p className="text-[13px] font-semibold text-ink">{uploading ? 'Uploading…' : 'Change photo'}</p>
+          {user?.avatar_path && <button onClick={remove} disabled={uploading} className="text-[11.5px] font-semibold text-ink-secondary disabled:opacity-40 mt-0.5">Remove</button>}
+        </div>
+      </div>
+    </ScreenShell>
+  )
+}
+
+function RenameScreen({ onBack }: { onBack: () => void }) {
+  const { user, refreshUser } = useAuth()
+  const [name, setName] = useState(user?.full_name || '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const save = async () => {
+    if (!user || !name.trim()) return
+    setSaving(true); setError('')
+    const { error: err } = await updateUserProfile(user.id, { full_name: name.trim() })
+    setSaving(false)
+    if (err) return setError(err.message)
+    await refreshUser()
+    onBack()
+  }
+
+  return (
+    <ScreenShell title="Full name" onBack={onBack}>
+      <ErrorBanner message={error} />
+      <TextField label="Full name" value={name} onChange={setName} placeholder="Your name" />
+      <PrimaryButton onClick={save} loading={saving} disabled={!name.trim()}>Save</PrimaryButton>
+    </ScreenShell>
+  )
+}
+
+function ChangePasswordScreen({ onBack }: { onBack: () => void }) {
+  const [newPassword, setNewPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+
+  const submit = async () => {
+    if (newPassword.length < 8) return setError('New password must be at least 8 characters.')
+    setSaving(true); setError('')
+    const { error: err } = await changePassword(newPassword)
+    setSaving(false)
+    if (err) return setError(err.message)
+    setDone(true)
+  }
+
+  return (
+    <ScreenShell title="Change password" onBack={onBack}>
+      {done ? (
+        <p className="text-[14px] text-success-text font-semibold">Password changed.</p>
+      ) : (
+        <>
+          <ErrorBanner message={error} />
+          <TextField label="New password" type="password" value={newPassword} onChange={setNewPassword} placeholder="At least 8 characters" />
+          <PrimaryButton onClick={submit} loading={saving} disabled={!newPassword}>Change password</PrimaryButton>
+        </>
+      )}
+    </ScreenShell>
   )
 }
 
@@ -644,6 +447,120 @@ function ChangeEmailScreen({ currentEmail, onBack }: { currentEmail: string; onB
   )
 }
 
+function OrganisationScreen({ org, onBack, onChanged }: { org: any; onBack: () => void; onChanged: () => void }) {
+  const { user } = useAuth()
+  const [name, setName] = useState(org?.name || '')
+  const [staff, setStaff] = useState<any[]>([])
+  const [savingName, setSavingName] = useState(false)
+  const [savingLead, setSavingLead] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const logoRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { setName(org?.name || '') }, [org?.name])
+  useEffect(() => { if (user?.organisation_id) getOrgStaff(user.organisation_id).then(({ data }) => setStaff(data || [])) }, [user?.organisation_id])
+
+  const saveName = async () => {
+    if (!org || !name.trim()) return
+    setSavingName(true); setError(''); setNotice('')
+    const { error: err } = await updateOrganisationProfile(org.id, { name: name.trim() })
+    setSavingName(false)
+    if (err) return setError(err.message)
+    setNotice('Organisation name updated.')
+    onChanged()
+  }
+
+  const onLogoChosen = async (file: File | null) => {
+    if (!file || !user || !org) return
+    setUploadingLogo(true); setError(''); setNotice('')
+    const { path, error: upErr } = await uploadOrgLogo(user.id, file)
+    if (upErr || !path) { setUploadingLogo(false); setError(upErr?.message || 'Logo upload failed.'); return }
+    const { error: err } = await updateOrganisationProfile(org.id, { logo_path: path })
+    setUploadingLogo(false)
+    if (err) return setError(err.message)
+    onChanged()
+  }
+
+  const changeLead = async (leadId: string) => {
+    if (!org) return
+    setSavingLead(true); setError(''); setNotice('')
+    const { error: err } = await updateOrganisationProfile(org.id, { safeguarding_lead_id: leadId })
+    setSavingLead(false)
+    if (err) return setError(err.message)
+    setNotice('Safeguarding lead updated.')
+    onChanged()
+  }
+
+  const logoUrl = org?.logo_path ? getAvatarUrl(org.logo_path) : null
+
+  return (
+    <ScreenShell title="Organisation" onBack={onBack}>
+      <ErrorBanner message={error} />
+      {notice && <p className="text-[13px] text-success-text font-semibold mb-3">{notice}</p>}
+
+      <div className="flex items-center gap-3.5 mb-5">
+        <button onClick={() => logoRef.current?.click()} disabled={uploadingLogo} className="relative flex-shrink-0 disabled:opacity-60" aria-label="Change organisation logo">
+          {logoUrl ? (
+            <img src={logoUrl} alt="" className="w-14 h-14 rounded-2xl object-cover" />
+          ) : (
+            <div className="w-14 h-14 rounded-2xl bg-accent-bg text-brand font-bold text-[16px] flex items-center justify-center">{org?.name?.[0]?.toUpperCase() || 'O'}</div>
+          )}
+          <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-brand flex items-center justify-center border-2 border-surface">
+            <Camera className="w-3 h-3 text-white" />
+          </span>
+        </button>
+        <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={e => onLogoChosen(e.target.files?.[0] || null)} />
+        <div className="min-w-0">
+          <p className="text-[13px] font-semibold text-ink">{uploadingLogo ? 'Uploading…' : 'Organisation logo'}</p>
+          <p className="text-[12px] text-ink-tertiary leading-relaxed">Shown wherever your courses, briefs and workshops appear to students.</p>
+          {org?.verified ? (
+            <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold mt-1" style={{ color: '#4a9de0' }}>
+              <BadgeCheck className="w-3.5 h-3.5" /> Verified organisation
+            </span>
+          ) : (
+            <p className="text-[11px] text-ink-quaternary mt-1">Not yet verified by LERN</p>
+          )}
+        </div>
+      </div>
+
+      <TextField label="Organisation name" value={name} onChange={setName} />
+      <SecondaryButton onClick={saveName} disabled={savingName}>{savingName ? 'Saving…' : 'Save name'}</SecondaryButton>
+
+      <label className="block mt-5 mb-5">
+        <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ink mb-1.5">
+          <ShieldCheck className="w-3.5 h-3.5" /> Safeguarding lead
+        </span>
+        <select
+          value={org?.safeguarding_lead_id || ''} onChange={e => changeLead(e.target.value)} disabled={savingLead}
+          className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+        >
+          <option value="" disabled>Choose a staff member…</option>
+          {staff.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+        </select>
+      </label>
+
+      <div className="mb-5">
+        <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink mb-2"><Users2 className="w-3.5 h-3.5" /> Staff ({staff.length})</p>
+        <div className="space-y-1.5">
+          {staff.map(s => (
+            <div key={s.id} className="flex items-center justify-between text-[13px] px-3 py-2 bg-surface-subtle rounded-lg">
+              <span className="text-ink">{s.full_name}</span>
+              {org?.safeguarding_lead_id === s.id && <span className="text-[11px] font-semibold text-brand">Safeguarding lead</span>}
+            </div>
+          ))}
+        </div>
+        <p className="text-[12px] text-ink-tertiary mt-2">Inviting new staff and removing existing staff isn't built yet — right now only whoever set up the organisation has staff access.</p>
+      </div>
+
+      <div className="pt-4 border-t border-edge-subtle">
+        <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink mb-3"><Ticket className="w-3.5 h-3.5" /> Join codes</p>
+        <JoinCodesPanel />
+      </div>
+    </ScreenShell>
+  )
+}
+
 function BlockedAccountsScreen({ userId, onBack }: { userId: string; onBack: () => void }) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -674,6 +591,40 @@ function BlockedAccountsScreen({ userId, onBack }: { userId: string; onBack: () 
   )
 }
 
+function ReportScreen({ userId, organisationId, onBack }: { userId: string; organisationId: string | null; onBack: () => void }) {
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  const send = async () => {
+    if (!reason.trim()) return setError('Describe what happened.')
+    setLoading(true); setError('')
+    const { error: err } = await submitReport(userId, organisationId, 'general', reason.trim())
+    setLoading(false)
+    if (err) return setError(err.message)
+    setSent(true); setReason('')
+  }
+
+  return (
+    <ScreenShell title="Report a problem" onBack={onBack}>
+      <p className="text-[13px] text-ink-secondary mb-4 leading-relaxed">
+        Something wrong with content or a person on LERN, or something that worries you? Tell us here — a human reviews every report, never an automated ban. Concerns about an adult at LERN follow the independent safeguarding route, not your organisation.
+      </p>
+      {sent && <p className="text-[13px] text-success-text font-semibold mb-3">Sent — thank you. A person will look at this.</p>}
+      <ErrorBanner message={error} />
+      <label className="block mb-4">
+        <span className="block text-[13px] font-semibold text-ink-secondary mb-1.5">What happened?</span>
+        <textarea
+          value={reason} onChange={e => setReason(e.target.value)} rows={4}
+          className="w-full bg-surface border border-edge rounded-xl px-4 py-3 text-[14px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
+        />
+      </label>
+      <PrimaryButton onClick={send} loading={loading}>Send report</PrimaryButton>
+    </ScreenShell>
+  )
+}
+
 function ConsentScreen({ consentedAt, onBack, onDelete }: { consentedAt?: string; onBack: () => void; onDelete: () => void }) {
   return (
     <ScreenShell title="Consent" onBack={onBack}>
@@ -686,7 +637,7 @@ function ConsentScreen({ consentedAt, onBack, onDelete }: { consentedAt?: string
         To withdraw your consent, delete your account — using LERN depends on having agreed to these, so withdrawing means the account itself is deleted.
       </p>
       <button onClick={onDelete} className="flex items-center gap-1.5 text-[13px] font-semibold text-danger-text hover:underline">
-        <Trash2 className="w-3.5 h-3.5" /> Delete my account
+        Delete my account
       </button>
     </ScreenShell>
   )
