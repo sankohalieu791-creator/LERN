@@ -185,18 +185,26 @@ function PoolPicker({ studentId, onClose }: { studentId: string; onClose: () => 
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [saved, setSaved] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => { if (user) getTalentPools(user.id).then(({ data }) => { setPools(data || []); setLoading(false) }) }, [user?.id])
 
+  // Same double-fire race as the earlier Discover save-button bug --
+  // a fast double-tap fired addToTalentPool twice before either had
+  // resolved, adding the same candidate to the pool twice (or hitting
+  // a duplicate insert). The in-flight guard fixes it the same way.
   const save = async (poolId: string) => {
+    if (saving) return
+    setSaving(true)
     await addToTalentPool(poolId, studentId)
     setSaved(poolId)
     setTimeout(onClose, 700)
   }
   const makeAndSave = async () => {
-    if (!name.trim() || !user) return
+    if (!name.trim() || !user || saving) return
+    setSaving(true)
     const { data } = await createTalentPool(user.id, name.trim())
-    if (data) save(data.id)
+    if (data) { setSaving(false); save(data.id) } else setSaving(false)
   }
 
   return (
@@ -206,18 +214,21 @@ function PoolPicker({ studentId, onClose }: { studentId: string; onClose: () => 
       ) : (
         <>
           {pools.map(p => (
-            <button key={p.id} onClick={() => save(p.id)} className="w-full text-left px-2 py-1.5 rounded-lg text-[12.5px] text-ink hover:bg-surface-muted transition flex items-center justify-between">
+            <button
+              key={p.id} onClick={() => save(p.id)} disabled={saving}
+              className="w-full text-left px-2 py-1.5 rounded-lg text-[12.5px] text-ink hover:bg-surface-muted transition flex items-center justify-between disabled:opacity-50"
+            >
               {p.name} {saved === p.id && <Check className="w-3.5 h-3.5 text-success-text" />}
             </button>
           ))}
           {creating ? (
             <div className="flex items-center gap-1 px-1 pt-1">
               <input
-                value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="Pool name"
+                value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="Pool name" disabled={saving}
                 onKeyDown={e => e.key === 'Enter' && makeAndSave()}
-                className="flex-1 bg-surface-subtle border border-edge rounded-md px-2 py-1 text-[12px] text-ink outline-none focus:border-brand"
+                className="flex-1 bg-surface-subtle border border-edge rounded-md px-2 py-1 text-[12px] text-ink outline-none focus:border-brand disabled:opacity-50"
               />
-              <button onClick={makeAndSave} className="text-[11px] font-semibold text-brand px-1.5">Add</button>
+              <button onClick={makeAndSave} disabled={saving} className="text-[11px] font-semibold text-brand px-1.5 disabled:opacity-50">Add</button>
             </div>
           ) : (
             <button onClick={() => setCreating(true)} className="w-full text-left px-2 py-1.5 rounded-lg text-[12.5px] font-semibold text-brand hover:bg-surface-muted transition">

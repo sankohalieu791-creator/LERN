@@ -404,3 +404,18 @@ main {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* A full-screen sheet (PostComposer, AddWinSheet) is portaled straight
+   to document.body so it truly covers everything regardless of DOM
+   nesting -- but the student bottom nav being a genuine sibling means
+   z-index alone should already put it underneath. In practice, mobile
+   WebKit/webview builds can still let it flash into view for a moment
+   around a viewport resize (opening the phone's native camera/gallery
+   picker, the on-screen keyboard appearing) since a resize recomputes
+   `fixed` positioning independently of stacking order. Hiding it
+   outright while any such sheet is open removes the possibility
+   entirely, rather than relying on z-index/opacity to always win the
+   race. */
+body.modal-open #student-bottom-nav {
+  display: none;
+}

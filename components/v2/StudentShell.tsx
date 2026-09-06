@@ -208,6 +208,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
           layout that's already right. Only laptop gets the sidebar
           treatment above. */}
       <nav
+        id="student-bottom-nav"
         className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--app-bg)] border-t border-[var(--app-border)] z-30"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >

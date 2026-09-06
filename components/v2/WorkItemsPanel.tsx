@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { useResolvedTheme } from '@/context/ThemeProvider'
 import {
   getWorkItems, createWorkItem, getGroups, createGroup, getGroupMembers,
   uploadWorkItemAttachment, uploadSubmissionFileFor, submitWorkForStudents, getSignedFileUrl, startWorkItemSession,
@@ -655,19 +656,26 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
       </label>
       <label className="block mb-4">
         <span className="block text-[13px] font-semibold text-ink mb-1.5">Where</span>
-        <div className="flex gap-2 mb-2">
-          {(['online', 'in_person'] as const).map(m => (
-            <button
-              key={m} type="button" onClick={() => setMode(m)}
-              className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${
-                mode === m ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
-              }`}
-            >
-              {m === 'online' ? 'Online' : 'In person'}
-            </button>
-          ))}
-        </div>
-        {mode === 'in_person' ? (
+        {/* Courses (providers only -- institutions never see this type)
+            are live sessions specifically, not a place to post an
+            in-person/self-paced assignment -- that's what a brief or
+            workshop-in-person is for. No toggle here means no way to
+            accidentally create a "course" with no live room at all. */}
+        {type !== 'course' && (
+          <div className="flex gap-2 mb-2">
+            {(['online', 'in_person'] as const).map(m => (
+              <button
+                key={m} type="button" onClick={() => setMode(m)}
+                className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${
+                  mode === m ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
+                }`}
+              >
+                {m === 'online' ? 'Online' : 'In person'}
+              </button>
+            ))}
+          </div>
+        )}
+        {mode === 'in_person' && type !== 'course' ? (
           <input
             value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Room 4B, main campus"
             className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
@@ -739,6 +747,7 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
   const [scheduledFor, setScheduledFor] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const theme = useResolvedTheme()
 
   const handleSubmit = async () => {
     setError('')
@@ -766,8 +775,13 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
     onCreated()
   }
 
+  // data-theme repeated here for the same reason as StudentsPanel's
+  // StudentDetail: this is portaled straight to document.body, which
+  // sits outside OrgShell's own themed root div, so --paper/--ink/etc
+  // would otherwise silently fall back to their light-mode defaults
+  // regardless of the real dark/light toggle.
   return createPortal((
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 sm:p-8">
+    <div data-theme={theme} className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 sm:p-8">
       <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-edge-subtle flex-shrink-0">
           <p className="font-bold text-ink text-[16px]">New brief</p>

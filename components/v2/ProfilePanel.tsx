@@ -475,7 +475,7 @@ function VerifiedWorkDetail({ work, onClose }: { work: any; onClose: () => void 
           </span>
           <h1 className="text-[20px] font-bold leading-snug mb-2">{wi?.title}</h1>
           <p className="text-[12.5px] text-[var(--app-text-secondary)] mb-4">
-            Verified by {wi?.organisations?.name || work.verifier?.full_name || 'a reviewer'} · {new Date(work.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+            Verified by {work.verifier?.full_name || wi?.organisations?.name || 'a reviewer'} · {new Date(work.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
 
           {wi?.criteria && (

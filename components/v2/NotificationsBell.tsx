@@ -79,7 +79,13 @@ export default function NotificationsBell({ size = 'md', iconColor }: { size?: '
       >
         <Bell className={size === 'lg' ? 'w-6 h-6' : 'w-[18px] h-[18px]'} />
         {unread > 0 && (
-          <span className={`absolute rounded-full bg-danger-solid ${size === 'lg' ? 'top-2 right-2 w-2.5 h-2.5' : 'top-1 right-1 w-2 h-2'}`} />
+          <span
+            className={`absolute flex items-center justify-center rounded-full bg-danger-solid text-white font-bold leading-none ${
+              size === 'lg' ? 'top-0.5 right-0.5 min-w-[18px] h-[18px] text-[10px] px-1' : 'top-0 right-0 min-w-[16px] h-4 text-[9px] px-[3px]'
+            }`}
+          >
+            {unread > 99 ? '99+' : unread}
+          </span>
         )}
       </button>
 

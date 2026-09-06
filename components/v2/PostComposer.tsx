@@ -36,6 +36,14 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
   const streamRef = useRef<MediaStream | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // Hides the phone bottom nav for as long as this composer is open --
+  // see the body.modal-open rule in globals.css for why this exists
+  // (a viewport-resize flash, not a plain z-index problem).
+  useEffect(() => {
+    document.body.classList.add('modal-open')
+    return () => document.body.classList.remove('modal-open')
+  }, [])
+
   const isAdult = user?.date_of_birth
     ? (Date.now() - new Date(user.date_of_birth).getTime()) / (1000 * 60 * 60 * 24 * 365.25) >= 18
     : false

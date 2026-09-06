@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '@/context/AuthContext'
+import { useResolvedTheme } from '@/context/ThemeProvider'
 import {
   getOrgStudents, getMySubmissions, getGroups, createGroup, setStudentGroup,
   getAttendanceForSession, markAttendance, getStudentAttendanceSummary,
@@ -166,6 +167,7 @@ function StudentDetail({ student, groups, onClose, onGroupChanged }: {
   const [submissions, setSubmissions] = useState<any[] | null>(null)
   const [attendance, setAttendance] = useState<any>(null)
   const [savingGroup, setSavingGroup] = useState(false)
+  const theme = useResolvedTheme()
 
   useEffect(() => {
     getMySubmissions(student.id).then(({ data }) => setSubmissions(data || []))
@@ -180,8 +182,17 @@ function StudentDetail({ student, groups, onClose, onGroupChanged }: {
     onGroupChanged()
   }
 
+  // data-theme is repeated here even though OrgShell already sets it --
+  // this whole screen is portaled straight to document.body (a full-
+  // screen overlay has to escape OrgShell's own scrolling <main>), which
+  // makes it a SIBLING of OrgShell's themed root div, not a descendant
+  // of it. --paper/--ink and friends only resolve their dark values
+  // under an ancestor actually carrying data-theme="dark", so anything
+  // portaled past that boundary silently fell back to the light
+  // defaults regardless of the real toggle -- "dark mode everywhere
+  // except this one screen" was this, not a one-off styling miss.
   return createPortal((
-    <div className="fixed inset-0 z-50 bg-paper overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div data-theme={theme} className="fixed inset-0 z-50 bg-paper overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-paper/95 backdrop-blur border-b border-edge-subtle">
         <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-muted text-ink">
           <ArrowLeft className="w-5 h-5" />

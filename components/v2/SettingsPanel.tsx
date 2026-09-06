@@ -67,13 +67,18 @@ export default function SettingsPanel() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
+      {/* For institution/provider staff, the organisation's own identity
+          (name, logo, verified tick) is the thing that actually shows up
+          on course/brief/workshop cards -- it belongs at the top, ahead
+          of the staff member's own personal account settings, not
+          buried below five other cards. */}
+      {isOrgAdmin && <OrganisationCard />}
       <AccountCard onChangeEmail={() => setScreen('email')} />
       <SecurityCard onBlockedAccounts={() => setScreen('blocked')} />
       <ThemeCard />
       <NotificationsCard />
       <ReportCard />
       <DataPrivacyCard onViewConsent={() => setScreen('consent')} onDelete={() => setScreen('delete')} />
-      {isOrgAdmin && <OrganisationCard />}
       <LegalCard />
 
       <button

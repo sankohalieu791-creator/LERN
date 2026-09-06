@@ -118,7 +118,7 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
   useEffect(load, [])
 
   return (
-    <div className="pt-3 pb-1">
+    <div className="pt-3 pb-2.5 border-b" style={{ borderColor: 'var(--app-border)' }}>
       <div className="flex gap-3.5 overflow-x-auto px-4 pb-0.5" style={{ scrollbarWidth: 'none' }}>
         <button onClick={() => setAddOpen(true)} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 60 }}>
           <span className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 54, height: 54, border: '3px solid #F26B21' }}>
@@ -188,6 +188,13 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
   const [mediaError, setMediaError] = useState('')
   const [posting, setPosting] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Same fix as PostComposer -- see the body.modal-open rule in
+  // globals.css.
+  useEffect(() => {
+    document.body.classList.add('modal-open')
+    return () => document.body.classList.remove('modal-open')
+  }, [])
 
   // Insta-story-style: photo or a short video, author's choice. Video
   // is capped at 20 seconds -- checked client-side by loading it into
