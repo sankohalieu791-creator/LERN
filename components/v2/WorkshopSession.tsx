@@ -80,7 +80,6 @@ export default function WorkshopSession({
   const cameraRef = useRef<ICameraVideoTrack | null>(null)
   const micRef = useRef<IMicrophoneAudioTrack | null>(null)
   const screenRef = useRef<ILocalVideoTrack | null>(null)
-  const mainStageRef = useRef<HTMLDivElement>(null)
   const presenceRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordedChunksRef = useRef<Blob[]>([])
@@ -102,8 +101,16 @@ export default function WorkshopSession({
   const [micOn, setMicOn] = useState(false)
   const [screenSharing, setScreenSharing] = useState(false)
   const [handRaised, setHandRaised] = useState(false)
-  const [mainUid, setMainUid] = useState<number>(myUid) // whose feed is on the main stage — starts on self, follows the host once known (see effect below)
-  const pickedMainRef = useRef(false) // true once someone (not this component) has chosen who's featured — stops the auto-follow-host effect from overriding a manual pick
+  // Teams' own default is a gallery of equal-sized tiles, not one big
+  // speaker view -- pinnedUid is null in that state. Clicking a tile
+  // (or starting a screen share) features it large instead, same as
+  // Teams' own pin/spotlight; clicking the same tile again returns to
+  // the gallery. tileRefs holds one div per uid currently on screen,
+  // since every tile now plays a real video feed, not just an avatar --
+  // the single old mainStageRef couldn't do that for more than one
+  // person at a time.
+  const [pinnedUid, setPinnedUid] = useState<number | null>(null)
+  const tileRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const [participants, setParticipants] = useState<Record<number, Participant>>({})
   const [qaOpen, setQaOpen] = useState(false)
   const [messages, setMessages] = useState<any[]>([])
@@ -229,34 +236,25 @@ export default function WorkshopSession({
     return () => { supabase.removeChannel(channel) }
   }, [workItemId])
 
-  // Whichever uid is "on stage" gets its video played into the main
-  // element — self and remote share the same mechanism, just a
-  // different track source.
+  // Every visible tile plays its own real video feed into its own div
+  // now (a true gallery, not one main stage + avatar-only thumbnails) --
+  // self's camera/screen track into its own tile, each remote user's
+  // track into theirs. Runs whenever who's on screen or what's playing
+  // changes; re-plays are cheap and idempotent on an Agora track.
   useEffect(() => {
-    if (!mainStageRef.current) return
-    if (mainUid === myUid) {
-      // Camera fills the box edge to edge (crops the square capture to
-      // whatever shape the box is); screen share stays uncropped so
-      // shared text/slides don't get cut off.
-      if (cameraOn && cameraRef.current) cameraRef.current.play(mainStageRef.current, { fit: 'cover' })
-      else if (screenSharing && screenRef.current) screenRef.current.play(mainStageRef.current, { fit: 'contain' })
-    } else {
-      const remote = remoteUsers.find(u => u.uid === mainUid)
-      if (remote?.videoTrack) remote.videoTrack.play(mainStageRef.current, { fit: 'cover' })
+    const selfEl = tileRefs.current.get(myUid)
+    if (selfEl) {
+      // Screen share stays uncropped so shared text/slides don't get
+      // cut off; the camera's square capture fills its tile edge to
+      // edge instead.
+      if (screenSharing && screenRef.current) screenRef.current.play(selfEl, { fit: 'contain' })
+      else if (cameraOn && cameraRef.current) cameraRef.current.play(selfEl, { fit: 'cover' })
     }
-  }, [mainUid, cameraOn, screenSharing, remoteUsers, myUid])
-
-  // Everyone who isn't the host lands on their OWN camera as "main"
-  // by default (mainUid starts at myUid) -- which meant a student
-  // never actually saw the host large unless they clicked the host's
-  // tile themselves. Once presence tells us who the host is, follow
-  // them automatically -- but only until someone (this student) picks
-  // a different tile on purpose.
-  useEffect(() => {
-    if (canEnd || pickedMainRef.current) return
-    const host = Object.values(participants).find(p => p.isHost)
-    if (host && host.uid !== mainUid) setMainUid(host.uid)
-  }, [participants, canEnd, mainUid])
+    for (const ru of remoteUsers) {
+      const el = tileRefs.current.get(ru.uid as number)
+      if (el && ru.videoTrack) ru.videoTrack.play(el, { fit: 'cover' })
+    }
+  }, [cameraOn, screenSharing, remoteUsers, myUid, pinnedUid])
 
   const toggleCamera = async () => {
     if (!clientRef.current) return
@@ -284,7 +282,8 @@ export default function WorkshopSession({
       try {
         cameraRef.current = video
         await clientRef.current.publish([video])
-        if (mainUid === myUid && mainStageRef.current) video.play(mainStageRef.current, { fit: 'cover' })
+        const selfEl = tileRefs.current.get(myUid)
+        if (selfEl) video.play(selfEl, { fit: 'cover' })
         setCameraOn(true)
       } catch (e: any) {
         video.close()
@@ -347,9 +346,9 @@ export default function WorkshopSession({
         const track = Array.isArray(result) ? result[0] : result
         screenRef.current = track
         await clientRef.current.publish([track])
-        pickedMainRef.current = true // don't let the auto-follow-host effect snap this back
-        setMainUid(myUid) // sharing your screen brings you to the main stage
-        if (mainStageRef.current) track.play(mainStageRef.current, { fit: 'contain' })
+        setPinnedUid(myUid) // sharing your screen features it large, same as Teams pinning the shared content automatically
+        const selfEl = tileRefs.current.get(myUid)
+        if (selfEl) track.play(selfEl, { fit: 'contain' })
         setScreenSharing(true)
         track.on('track-ended', async () => {
           // Fires when the browser's own "Stop sharing" bar is used —
@@ -581,54 +580,69 @@ export default function WorkshopSession({
               <p className="text-white font-semibold">{error}</p>
               <button onClick={join} className="text-brand font-semibold text-[13px]">Try again</button>
             </div>
-          ) : (
-            <>
-              {/* Main stage — fills the whole available area (not boxed
-                  down to a small square anymore). The camera capture
-                  itself is still a tight, square-cropped shot (below),
-                  so playing it here with fit:'cover' crops it to fill
-                  this wider rectangle edge to edge, chest-up framing
-                  intact, instead of leaving black bars around a tiny
-                  centered tile. */}
-              <div ref={mainStageRef} className="flex-1 min-h-0 bg-[#221D19] rounded-xl relative overflow-hidden flex items-center justify-center mb-3">
-                {!((mainUid === myUid && (cameraOn || screenSharing)) || remoteUsers.find(u => u.uid === mainUid)?.videoTrack) && (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-xl">
-                      {initials(participants[mainUid]?.name || (mainUid === myUid ? user?.full_name : undefined))}
-                    </div>
-                    <VideoOff className="w-4 h-4 text-[#5A544A]" />
+          ) : (() => {
+            // Teams-style gallery by default -- everyone's tile roughly
+            // equal size, filling the available area, each one playing
+            // that person's real video (not just an avatar-only strip
+            // underneath one big speaker view). Clicking a tile (or
+            // starting a screen share) pins it large instead, with
+            // everyone else moved into a smaller strip alongside --
+            // clicking the pinned tile again returns to the gallery.
+            const visibleTiles = allTiles.slice(0, 12)
+            const overflowCount = allTiles.length - visibleTiles.length
+            const pinned = pinnedUid !== null ? visibleTiles.find(p => p.uid === pinnedUid) : undefined
+            const others = pinned ? visibleTiles.filter(p => p.uid !== pinned.uid) : visibleTiles
+            const hasVideo = (p: Participant) => p.uid === myUid
+              ? (cameraOn || screenSharing)
+              : !!remoteUsers.find(u => u.uid === p.uid)?.videoTrack
+            const setRef = (uid: number) => (el: HTMLDivElement | null) => {
+              if (el) tileRefs.current.set(uid, el); else tileRefs.current.delete(uid)
+            }
+            const gridCols = (n: number) => n <= 1 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4
+
+            return pinned ? (
+              <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-2.5">
+                <VideoTile
+                  participant={pinned} tileRef={setRef(pinned.uid)} hasVideo={hasVideo(pinned)}
+                  isSelf={pinned.uid === myUid} isHostViewer={!!canEnd}
+                  onSelect={() => setPinnedUid(null)}
+                  onMute={() => muteParticipant(pinned.uid)} onKick={() => kickParticipant(pinned.uid)}
+                  className="flex-1 min-h-0"
+                />
+                {others.length > 0 && (
+                  <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto md:w-36 flex-shrink-0">
+                    {others.map(p => (
+                      <VideoTile
+                        key={p.uid} participant={p} tileRef={setRef(p.uid)} hasVideo={hasVideo(p)}
+                        isSelf={p.uid === myUid} isHostViewer={!!canEnd} small
+                        onSelect={() => setPinnedUid(p.uid)}
+                        onMute={() => muteParticipant(p.uid)} onKick={() => kickParticipant(p.uid)}
+                        className="w-28 h-20 md:w-full md:h-24 flex-shrink-0"
+                      />
+                    ))}
                   </div>
                 )}
-                <span className="absolute bottom-3 left-3.5 text-white text-[12px] font-semibold bg-black/40 px-2.5 py-1 rounded-full">
-                  {mainUid === myUid ? 'You' : participants[mainUid]?.name || 'Participant'}
-                </span>
               </div>
-
-              {/* Everyone else — a proper grid (like Zoom/Meet), not a
-                  horizontal-scroll strip. Capped at 10 visible tiles;
-                  a "+N" tile absorbs the rest rather than the row
-                  growing forever. */}
-              <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 flex-shrink-0">
-                {allTiles.slice(0, 10).map(p => (
-                  <ParticipantTile
-                    key={p.uid} participant={p} isMain={p.uid === mainUid} isSelf={p.uid === myUid}
-                    isHostViewer={!!canEnd}
-                    onSelect={() => { pickedMainRef.current = true; setMainUid(p.uid) }}
-                    onMute={() => muteParticipant(p.uid)}
-                    onKick={() => kickParticipant(p.uid)}
+            ) : (
+              <div className="flex-1 min-h-0 grid gap-2.5" style={{ gridTemplateColumns: `repeat(${gridCols(visibleTiles.length)}, minmax(0, 1fr))`, gridAutoRows: '1fr' }}>
+                {visibleTiles.map(p => (
+                  <VideoTile
+                    key={p.uid} participant={p} tileRef={setRef(p.uid)} hasVideo={hasVideo(p)}
+                    isSelf={p.uid === myUid} isHostViewer={!!canEnd}
+                    onSelect={() => setPinnedUid(p.uid)}
+                    onMute={() => muteParticipant(p.uid)} onKick={() => kickParticipant(p.uid)}
+                    className="w-full h-full"
                   />
                 ))}
-                {allTiles.length > 10 && (
-                  <div className="flex flex-col items-center justify-center gap-1.5 rounded-xl py-2.5">
-                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-[11px]">
-                      +{allTiles.length - 10}
-                    </div>
+                {overflowCount > 0 && (
+                  <div className="flex flex-col items-center justify-center gap-1.5 rounded-xl bg-[#1A1613]">
+                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-[11px]">+{overflowCount}</div>
                     <span className="text-[10px] text-[#B8AE9C]">more</span>
                   </div>
                 )}
               </div>
-            </>
-          )}
+            )
+          })()}
         </div>
 
         {qaOpen && (
@@ -743,55 +757,67 @@ function RoomButton({ active, onClick, onIcon: OnIcon, offIcon: OffIcon, disable
   )
 }
 
-// A tile in the "everyone else" grid: tap to bring that person's feed
-// to the main stage, same as before. The host-only kebab (Mute/
-// Remove) is a separate button layered on top, not the same clickable
-// surface -- a button nested inside another button isn't valid HTML,
-// and conflating "pick this tile" with "open a moderation menu" on the
-// exact same tap would make both worse.
-function ParticipantTile({
-  participant: p, isMain, isSelf, isHostViewer, onSelect, onMute, onKick,
+// A real gallery tile: the div registered via tileRef is exactly what
+// the video-playing effect above hands to Agora's track.play() -- it's
+// left empty here and Agora fills it, with the initials-avatar overlay
+// shown only when hasVideo is false. Tapping anywhere on the tile pins
+// it large (see the pinned/gallery split above); the host-only kebab
+// (Mute/Remove) is a separate button layered on top, not the same
+// clickable surface -- a button nested inside another button isn't
+// valid HTML, and conflating "pin this tile" with "open a moderation
+// menu" on the exact same tap would make both worse.
+function VideoTile({
+  participant: p, isSelf, isHostViewer, hasVideo, tileRef, onSelect, onMute, onKick, small, className,
 }: {
-  participant: Participant; isMain: boolean; isSelf: boolean; isHostViewer: boolean
+  participant: Participant; isSelf: boolean; isHostViewer: boolean; hasVideo: boolean
+  tileRef: (el: HTMLDivElement | null) => void
   onSelect: () => void; onMute: () => void; onKick: () => void
+  small?: boolean; className?: string
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   // Only the viewing host gets a menu, and never on their own tile --
   // hosts don't mute or remove themselves through this.
   const showMenu = isHostViewer && !isSelf && !p.isHost
+  const displayName = isSelf ? 'You' : (p.name || 'Participant').split(' ')[0]
 
   return (
-    <div className={`relative flex flex-col items-center gap-1.5 rounded-xl py-2.5 transition ${isMain ? 'bg-white/10 ring-1 ring-white/20' : 'hover:bg-white/5'}`}>
-      <button onClick={onSelect} className="flex flex-col items-center gap-1.5 w-full">
-        <div className="relative">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[12px] shadow-inner">
-            {initials(p.name)}
+    <div className={`relative rounded-xl overflow-hidden bg-[#221D19] ${className || ''}`}>
+      <div ref={tileRef} className="absolute inset-0" />
+      <button onClick={onSelect} className="absolute inset-0 w-full h-full" aria-label={`Feature ${displayName}`}>
+        {!hasVideo && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className={`rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold shadow-inner ${small ? 'w-9 h-9 text-[11px]' : 'w-16 h-16 text-xl'}`}>
+              {initials(p.name)}
+            </div>
           </div>
-          <span className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-[#141110] flex items-center justify-center ${p.muted ? 'bg-[#5A544A]' : 'bg-[#1E7A34]'}`}>
-            {p.muted && <MicOff className="w-2.5 h-2.5 text-white" />}
-          </span>
-          {p.handRaised && (
-            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-brand border-2 border-[#141110] flex items-center justify-center">
-              <Hand className="w-2.5 h-2.5 text-white" />
-            </span>
-          )}
-        </div>
-        <span className="text-[10px] text-[#B8AE9C] truncate w-full text-center px-0.5">{p.isHost ? 'Host' : p.name.split(' ')[0]}</span>
+        )}
       </button>
 
+      <span className={`absolute bottom-2 left-2 text-white font-semibold bg-black/45 px-2 py-0.5 rounded-full truncate max-w-[75%] pointer-events-none ${small ? 'text-[10px]' : 'text-[12px]'}`}>
+        {displayName}{p.isHost && !isSelf ? ' · Host' : ''}
+      </span>
+      <span className={`absolute rounded-full border-2 border-[#141110] flex items-center justify-center pointer-events-none ${p.muted ? 'bg-[#5A544A]' : 'bg-[#1E7A34]'} ${small ? 'top-1.5 right-1.5 w-4 h-4' : 'top-2.5 right-2.5 w-5 h-5'}`}>
+        {p.muted && <MicOff className={small ? 'w-2.5 h-2.5 text-white' : 'w-3 h-3 text-white'} />}
+      </span>
+      {p.handRaised && (
+        <span className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full bg-brand border-2 border-[#141110] flex items-center justify-center pointer-events-none">
+          <Hand className="w-3 h-3 text-white" />
+        </span>
+      )}
+
       {showMenu && (
-        <div className="absolute top-1 right-1">
+        <div className="absolute top-1.5 right-8">
           <button
             onClick={e => { e.stopPropagation(); setMenuOpen(v => !v) }}
             aria-label="Participant options"
-            className="w-5 h-5 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white transition"
+            className="w-6 h-6 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white transition"
           >
-            <MoreVertical className="w-3 h-3" />
+            <MoreVertical className="w-3.5 h-3.5" />
           </button>
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-6 bg-[#221D19] border border-white/10 rounded-lg shadow-xl py-1 w-32 z-20">
+              <div className="absolute right-0 top-7 bg-[#221D19] border border-white/10 rounded-lg shadow-xl py-1 w-32 z-20">
                 <button
                   onClick={() => { setMenuOpen(false); onMute() }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-white hover:bg-white/10 transition"
