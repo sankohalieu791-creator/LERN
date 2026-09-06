@@ -784,7 +784,7 @@ export const getWins = async () => {
   const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
   const { data, error } = await supabase
     .from('wins')
-    .select('*, author:users!wins_author_id_fkey(full_name)')
+    .select('*, author:users!wins_author_id_fkey(full_name, role, presence_status)')
     .eq('hidden', false)
     .gte('created_at', cutoff)
     .order('created_at', { ascending: false })
@@ -1382,6 +1382,19 @@ export const getOrgInterest = async (organisationId: string) => {
   const { data, error } = await supabase
     .from('interest')
     .select('*, employer:users!interest_employer_id_fkey(full_name), student:users!interest_student_id_fkey(id, full_name, date_of_birth)')
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// Employer's own side of the exact same thread — same shape as
+// getOrgInterest deliberately, so both sides of a conversation can
+// share the one thread-view component instead of two near-duplicate
+// implementations drifting apart over time.
+export const getEmployerInterest = async (employerId: string) => {
+  const { data, error } = await supabase
+    .from('interest')
+    .select('*, employer:users!interest_employer_id_fkey(full_name), student:users!interest_student_id_fkey(id, full_name, date_of_birth)')
+    .eq('employer_id', employerId)
     .order('created_at', { ascending: false })
   return { data, error }
 }

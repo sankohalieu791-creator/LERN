@@ -19,6 +19,24 @@ import {
 // 20 sec", Instagram-Story-like (photo or video, author's choice).
 const WIN_VIDEO_MAX_SECONDS = 20
 
+// Same palette OrgShell's own status picker uses, hardcoded rather than
+// its --success-solid/--danger-solid tokens -- FeedPanel is shared
+// between student (--app-* dark tokens) and org (--paper/--ink)
+// contexts, and pulling a colour from the wrong token system here would
+// resolve to whatever that token happens to mean in the other one.
+const PRESENCE_DOT: Record<string, string> = {
+  active: '#1E7A34', busy: '#B3401E', away: '#B3651E', do_not_disturb: '#8B5CF6', offline: '#9CA3AF',
+}
+function StaffPresenceDot({ role, status }: { role?: string; status?: string }) {
+  if (role !== 'institution_staff' && role !== 'provider_staff') return null
+  return (
+    <span
+      className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2"
+      style={{ backgroundColor: PRESENCE_DOT[status || 'offline'], borderColor: 'var(--app-bg)' }}
+    />
+  )
+}
+
 // Build Spec: The Feed (Wins strip, milestone posts) v2.0, 2 September
 // 2026, since revised -- a Wins strip of expiring achievement stories
 // on top (now photo OR short video, Insta-story-style) and edge-to-
@@ -133,10 +151,11 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
           const meta = MILESTONE_BY_KEY[w.milestone_type as MilestoneType]
           return (
             <button key={w.id} onClick={() => setViewing(w)} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 60 }}>
-              <span className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 54, height: 54, border: `3px solid ${meta?.ring || '#0F6E56'}` }}>
+              <span className="relative rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 54, height: 54, border: `3px solid ${meta?.ring || '#0F6E56'}` }}>
                 <span className="w-full h-full rounded-full flex items-center justify-center text-[13px] font-semibold" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
                   {initials(w.author?.full_name)}
                 </span>
+                <StaffPresenceDot role={w.author?.role} status={w.author?.presence_status} />
               </span>
               <span className="text-[11px] truncate w-full text-center" style={{ color: '#5A5A5A' }}>{firstName(w.author?.full_name)}</span>
             </button>
