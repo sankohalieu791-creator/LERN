@@ -4,13 +4,13 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
-import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
-import { signUp, signIn, resendConfirmation, createOrganisationAndJoin, recordConsent, generateJoinCode, randomJoinCode, getUserProfile, supabase } from '@/lib/supabase'
+import { TextField, PrimaryButton, SecondaryButton, ErrorBanner, OrDivider, GoogleButton } from '@/components/v2/Field'
+import { signUp, signIn, signInWithGoogle, resendConfirmation, createOrganisationAndJoin, recordConsent, generateJoinCode, randomJoinCode, getUserProfile, supabase } from '@/lib/supabase'
 import { institutionEmailError } from '@/lib/emailPolicy'
 import { useAuth } from '@/context/AuthContext'
 import { ShieldCheck, Copy, Check } from 'lucide-react'
 
-type Step = 1 | 2 | 3
+type Step = 1 | 2 | 3 | 'orgname'
 type OrgType = 'institution' | 'provider'
 
 function OrganisationSignupInner() {
@@ -36,10 +36,12 @@ function OrganisationSignupInner() {
   const [showGreeting, setShowGreeting] = useState(false)
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
   const [resent, setResent] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
 
   // Covers landing back here after clicking the emailed confirmation
-  // link — a fresh page load with a brand-new live session, same
-  // pattern as the student wizard's resumeFromSession.
+  // link, or right after a Google sign-in -- both are a fresh page
+  // load with a brand-new live session, same pattern as the student
+  // wizard's resumeFromSession.
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -52,12 +54,34 @@ function OrganisationSignupInner() {
       if (profile?.role === 'student' && !profile.organisation_id) {
         setFullName(profile.full_name || '')
         setEmail(profile.email || '')
-        setOrgName((user.user_metadata?.org_name as string) || '')
-        setStep(2)
+        const savedOrgName = (user.user_metadata?.org_name as string) || ''
+        setOrgName(savedOrgName)
+        // org_name only exists in metadata for the email/password path
+        // (set on step 1, before any confirmation link was clicked) --
+        // a Google sign-in never had a step 1 at all, so there's no
+        // name to resume with yet.
+        setStep(savedOrgName ? 2 : 'orgname')
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const handleGoogle = async () => {
+    setGoogleLoading(true)
+    setError('')
+    const { error: oauthError } = await signInWithGoogle(`${window.location.origin}/auth/callback?intent=${orgType}`)
+    if (oauthError) { setGoogleLoading(false); setError(oauthError.message) }
+  }
+
+  const handleOrgNameSubmit = async () => {
+    setError('')
+    if (!orgName.trim()) return setError(`Enter your ${orgType === 'institution' ? 'school or college' : 'organisation'}'s name.`)
+    if (orgType === 'institution') {
+      const domainError = institutionEmailError(email)
+      if (domainError) return setError(domainError)
+    }
+    setStep(2)
+  }
 
   const handleO1Submit = async () => {
     setError('')
@@ -168,15 +192,17 @@ function OrganisationSignupInner() {
 
   return (
     <AuthShell
-      step={step}
+      step={typeof step === 'number' ? step : 1}
       totalSteps={3}
       title={
         step === 1 ? `Set up your ${orgType === 'institution' ? 'school or college' : 'organisation'}`
+        : step === 'orgname' ? `Name your ${orgType === 'institution' ? 'school or college' : 'organisation'}`
         : step === 2 ? 'Safeguarding and data protection'
         : 'You\'re set up'
       }
       subtitle={
         step === 1 ? 'This creates your organisation\'s space on LERN and makes you its first staff member.'
+        : step === 'orgname' ? 'Google already gave us your name and email — this creates your organisation\'s space on LERN.'
         : step === 2 ? 'This is the organisation-facing agreement. It reflects your signed Data Processing Schedule — it doesn\'t replace it.'
         : 'Share this code with your students so they can join.'
       }
@@ -193,6 +219,20 @@ function OrganisationSignupInner() {
           <TextField label="Your email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" />
           <TextField label="Password" type="password" value={password} onChange={setPassword} placeholder="At least 8 characters" hint="Minimum 8 characters." />
           <PrimaryButton onClick={handleO1Submit} loading={loading}>Continue</PrimaryButton>
+          <div className="mt-6">
+            <OrDivider />
+            <GoogleButton onClick={handleGoogle} loading={googleLoading} />
+          </div>
+        </div>
+      )}
+
+      {step === 'orgname' && (
+        <div>
+          <TextField
+            label={orgType === 'institution' ? 'School or college name' : 'Organisation name'}
+            value={orgName} onChange={setOrgName} placeholder="Riverside College" autoFocus
+          />
+          <PrimaryButton onClick={handleOrgNameSubmit}>Continue</PrimaryButton>
         </div>
       )}
 

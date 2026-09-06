@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
 import DemoRolePicker from '@/components/v2/DemoRolePicker'
-import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
-import { signIn, getUserProfile, resendConfirmation } from '@/lib/supabase'
+import { TextField, PrimaryButton, ErrorBanner, OrDivider, GoogleButton } from '@/components/v2/Field'
+import { signIn, signInWithGoogle, getUserProfile, resendConfirmation } from '@/lib/supabase'
 import { routeForRole } from '@/lib/roleRouting'
 import { useAuth } from '@/context/AuthContext'
 import type { Role } from '@/lib/types'
@@ -28,8 +28,18 @@ export default function LoginPage() {
   const [showRolePicker, setShowRolePicker] = useState(false)
   const [unconfirmed, setUnconfirmed] = useState(false)
   const [resent, setResent] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const router = useRouter()
   const { refreshUser } = useAuth()
+
+  const handleGoogle = async () => {
+    setGoogleLoading(true)
+    setError('')
+    const { error: oauthError } = await signInWithGoogle(`${window.location.origin}/auth/callback`)
+    if (oauthError) { setGoogleLoading(false); setError(oauthError.message) }
+    // No further handling on success — signInWithOAuth navigates the
+    // whole page away to Google, there's nothing left to update here.
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -92,6 +102,10 @@ export default function LoginPage() {
           {resent ? 'Sent again — check your inbox' : 'Resend confirmation email'}
         </button>
       )}
+      <div className="mt-6">
+        <OrDivider />
+        <GoogleButton onClick={handleGoogle} loading={googleLoading} />
+      </div>
       <p className="text-center text-[13px] text-[#8A8373] mt-6">
         New to LERN?{' '}
         <button onClick={() => router.push('/auth/start')} className="text-brand font-semibold hover:underline">

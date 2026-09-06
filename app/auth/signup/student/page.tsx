@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
-import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
-import { signUp, signIn, resendConfirmation, redeemJoinCode, recordConsent, getUserProfile, supabase } from '@/lib/supabase'
+import { TextField, PrimaryButton, SecondaryButton, ErrorBanner, OrDivider, GoogleButton } from '@/components/v2/Field'
+import { signUp, signIn, signInWithGoogle, resendConfirmation, redeemJoinCode, recordConsent, updateUserProfile, getUserProfile, supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { ShieldCheck } from 'lucide-react'
 
-type Step = 1 | 2 | 3
+type Step = 1 | 2 | 3 | 'dob'
 
 const MIN_AGE = 5
 const MAX_AGE = 100
@@ -31,6 +31,7 @@ export default function StudentSignupPage() {
   const [error, setError] = useState('')
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
   const [resent, setResent] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
 
   // A1
   const [fullName, setFullName] = useState('')
@@ -52,9 +53,35 @@ export default function StudentSignupPage() {
     setFullName(profile.full_name || '')
     setEmail(profile.email || '')
     setDob(profile.date_of_birth || '')
-    if (!profile.consented_at) setStep(3)
+    // A Google sign-in never collects a date of birth on the way in --
+    // Google doesn't have one to give us -- so that's the one thing
+    // still missing for a brand-new account arriving this way, even
+    // though name/email/password (or lack of a password entirely) are
+    // already settled.
+    if (!profile.date_of_birth) setStep('dob')
+    else if (!profile.consented_at) setStep(3)
     else router.replace('/student')
     return true
+  }
+
+  const handleGoogle = async () => {
+    setGoogleLoading(true)
+    setError('')
+    const { error: oauthError } = await signInWithGoogle(`${window.location.origin}/auth/callback?intent=student`)
+    if (oauthError) { setGoogleLoading(false); setError(oauthError.message) }
+  }
+
+  const handleDobSubmit = async () => {
+    setError('')
+    if (!isPlausibleDob(dob)) return setError('Enter a valid date of birth.')
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { error: updateError } = await updateUserProfile(user.id, { date_of_birth: dob })
+      if (updateError) { setLoading(false); setError(updateError.message); return }
+    }
+    setLoading(false)
+    setStep(2)
   }
 
   // Covers a returning visitor who still has this browser's session live.
@@ -153,15 +180,17 @@ export default function StudentSignupPage() {
 
   return (
     <AuthShell
-      step={step}
+      step={typeof step === 'number' ? step : 1}
       totalSteps={3}
       title={
         step === 1 ? 'Create your account'
+        : step === 'dob' ? 'One more thing'
         : step === 2 ? 'Join your organisation'
         : 'Keeping you safe'
       }
       subtitle={
         step === 1 ? 'Your date of birth drives every age-based rule on LERN — it’s never shown publicly.'
+        : step === 'dob' ? 'Google doesn\'t share this with us — your date of birth drives every age-based rule on LERN, and it\'s never shown publicly.'
         : step === 2 ? 'Enter the code your school, college or training provider gave you — or skip this and add it later. Without one you can look around, but you can\'t post, submit work, or be seen by anyone.'
         : undefined
       }
@@ -175,6 +204,17 @@ export default function StudentSignupPage() {
           <TextField label="Password" type="password" value={password} onChange={setPassword} placeholder="At least 8 characters" hint="Minimum 8 characters." />
           <TextField label="Date of birth" type="date" value={dob} onChange={setDob} />
           <PrimaryButton onClick={handleA1Submit} loading={loading}>Continue</PrimaryButton>
+          <div className="mt-6">
+            <OrDivider />
+            <GoogleButton onClick={handleGoogle} loading={googleLoading} />
+          </div>
+        </div>
+      )}
+
+      {step === 'dob' && (
+        <div>
+          <TextField label="Date of birth" type="date" value={dob} onChange={setDob} autoFocus />
+          <PrimaryButton onClick={handleDobSubmit} loading={loading}>Continue</PrimaryButton>
         </div>
       )}
 
