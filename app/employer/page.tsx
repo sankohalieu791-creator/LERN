@@ -9,7 +9,7 @@ export default function EmployerRootPage() {
   const router = useRouter()
   useEffect(() => {
     if (loading) return
-    router.replace(user?.is_guest ? '/employer/shared' : '/employer/discover')
+    router.replace((user?.is_guest || user?.guest_invite_id) ? '/employer/shared' : '/employer/discover')
   }, [loading, user, router])
   return null
 }

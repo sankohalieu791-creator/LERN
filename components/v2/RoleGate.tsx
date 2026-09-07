@@ -30,7 +30,7 @@ export default function RoleGate({ allow, children }: { allow: Role; children: R
   // A guest employer never goes through the independent-employer
   // wizard at all -- their consent is recorded straight off the claim
   // page (see /guest/confirm) -- so they're never routed there.
-  const incomplete = (allow === 'student' || (allow === 'employer' && !user?.is_guest)) && !!user && !user.consented_at
+  const incomplete = (allow === 'student' || (allow === 'employer' && !user?.is_guest && !user?.guest_invite_id)) && !!user && !user.consented_at
   const wizardRoute = allow === 'employer' ? '/auth/signup/employer' : '/auth/signup/student'
 
   useEffect(() => {
