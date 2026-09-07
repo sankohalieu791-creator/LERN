@@ -5,29 +5,46 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner, OrDivider, GoogleButton } from '@/components/v2/Field'
-import { signUp, signIn, signInWithGoogle, resendConfirmation, createOrganisationAndJoin, recordConsent, generateJoinCode, randomJoinCode, getUserProfile, supabase } from '@/lib/supabase'
+import {
+  signUp, signIn, signInWithGoogle, resendConfirmation, createOrganisationAndJoin,
+  redeemStaffJoinCode, recordConsent, generateJoinCode, randomJoinCode, getUserProfile, supabase,
+} from '@/lib/supabase'
 import { institutionEmailError } from '@/lib/emailPolicy'
 import { useAuth } from '@/context/AuthContext'
 import { ShieldCheck, Copy, Check } from 'lucide-react'
 
+type Mode = 'create' | 'join'
 type Step = 1 | 2 | 3 | 'orgname'
 type OrgType = 'institution' | 'provider'
 
+// Google Classroom/Teams both offer exactly this choice up front:
+// create a new class/team, or join an existing one with a code --
+// same shape here, since "how does a second teacher actually get
+// onto the account" had no answer before this (create_organisation_
+// and_join could only ever make a BRAND NEW organisation; nothing let
+// someone join the one that already exists as staff, the way a
+// student already could).
 function OrganisationSignupInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { refreshUser } = useAuth()
   const orgType: OrgType = searchParams.get('type') === 'provider' ? 'provider' : 'institution'
 
+  const [mode, setMode] = useState<Mode>('create')
   const [step, setStep] = useState<Step>(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // O1
+  // O1 (create)
   const [orgName, setOrgName] = useState('')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [leadName, setLeadName] = useState('')
+  const [leadEmail, setLeadEmail] = useState('')
+
+  // Join-existing-org path
+  const [joinCode, setJoinCode] = useState('')
 
   // O3
   const [orgId, setOrgId] = useState<string | null>(null)
@@ -55,7 +72,10 @@ function OrganisationSignupInner() {
         setFullName(profile.full_name || '')
         setEmail(profile.email || '')
         const savedOrgName = (user.user_metadata?.org_name as string) || ''
+        const savedMode = (user.user_metadata?.signup_mode as string) || 'create'
+        setMode(savedMode === 'join' ? 'join' : 'create')
         setOrgName(savedOrgName)
+        if (savedMode === 'join') { setStep(2); return }
         // org_name only exists in metadata for the email/password path
         // (set on step 1, before any confirmation link was clicked) --
         // a Google sign-in never had a step 1 at all, so there's no
@@ -85,7 +105,8 @@ function OrganisationSignupInner() {
 
   const handleO1Submit = async () => {
     setError('')
-    if (!orgName.trim()) return setError(`Enter your ${orgType === 'institution' ? 'school or college' : 'organisation'}'s name.`)
+    if (mode === 'create' && !orgName.trim()) return setError(`Enter your ${orgType === 'institution' ? 'school or college' : 'organisation'}'s name.`)
+    if (mode === 'join' && !joinCode.trim()) return setError('Enter the staff join code your organisation gave you.')
     if (!fullName.trim()) return setError('Enter your name.')
     if (!email.trim()) return setError('Enter your email.')
     // Providers are deliberately not gated here — schools/colleges are the
@@ -98,12 +119,15 @@ function OrganisationSignupInner() {
 
     setLoading(true)
     const redirectTo = typeof window !== 'undefined' ? window.location.href.split('?')[0] + `?type=${orgType}` : undefined
-    // org_name rides in the auth user's own metadata, not just React
-    // state — a confirmation-link click is a fresh page load, which
-    // would otherwise lose everything typed on this step.
-    const { data: signUpData, error: signUpError } = await signUp(email.trim(), password, { role: 'student', full_name: fullName.trim(), org_name: orgName.trim() }, redirectTo)
-    // role is a placeholder here — create_organisation_and_join (step O1->O3)
-    // overwrites it to institution_staff/provider_staff once the org exists.
+    // org_name/signup_mode ride in the auth user's own metadata, not
+    // just React state — a confirmation-link click is a fresh page
+    // load, which would otherwise lose everything typed on this step.
+    const { data: signUpData, error: signUpError } = await signUp(email.trim(), password, {
+      role: 'student', full_name: fullName.trim(), org_name: mode === 'create' ? orgName.trim() : undefined, signup_mode: mode,
+    } as any, redirectTo)
+    // role is a placeholder here — create_organisation_and_join or
+    // redeem_staff_join_code (step 1->2) overwrites it once the org
+    // relationship is actually established.
     if (!signUpError) {
       setLoading(false)
       if (!signUpData.session) { setAwaitingConfirmation(true); return }
@@ -146,7 +170,19 @@ function OrganisationSignupInner() {
     }
     setError('')
     setLoading(true)
-    const { data: newOrgId, error: orgError } = await createOrganisationAndJoin(orgName.trim(), orgType, fullName.trim())
+
+    if (mode === 'join') {
+      const { error: joinError } = await redeemStaffJoinCode(joinCode.trim())
+      if (joinError) { setLoading(false); return setError(joinError.message) }
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) await recordConsent(user.id)
+      await refreshUser()
+      setLoading(false)
+      setShowGreeting(true)
+      return
+    }
+
+    const { data: newOrgId, error: orgError } = await createOrganisationAndJoin(orgName.trim(), orgType, fullName.trim(), leadName.trim(), leadEmail.trim())
     if (orgError || !newOrgId) { setLoading(false); return setError(orgError?.message || 'Could not create your organisation.') }
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -178,7 +214,7 @@ function OrganisationSignupInner() {
       <AuthShell title="Check your email" subtitle={`We've sent a confirmation link to ${email.trim()}.`}>
         <div className="bg-white border border-[#E2DDD1] rounded-2xl p-5 mb-6">
           <p className="text-[14px] text-[#4A453B] leading-relaxed">
-            Click the link in that email to confirm it's really you — then you'll land right back here to carry on setting up {orgName || 'your organisation'}.
+            Click the link in that email to confirm it's really you — then you'll land right back here to carry on{mode === 'create' ? ` setting up ${orgName || 'your organisation'}` : ''}.
           </p>
         </div>
         <SecondaryButton
@@ -193,31 +229,70 @@ function OrganisationSignupInner() {
   return (
     <AuthShell
       step={typeof step === 'number' ? step : 1}
-      totalSteps={3}
+      totalSteps={mode === 'join' ? 2 : 3}
       title={
-        step === 1 ? `Set up your ${orgType === 'institution' ? 'school or college' : 'organisation'}`
-        : step === 'orgname' ? `Name your ${orgType === 'institution' ? 'school or college' : 'organisation'}`
+        step === 'orgname' ? `Name your ${orgType === 'institution' ? 'school or college' : 'organisation'}`
         : step === 2 ? 'Safeguarding and data protection'
-        : 'You\'re set up'
+        : step === 3 ? 'You\'re set up'
+        : mode === 'join' ? 'Join your organisation'
+        : `Set up your ${orgType === 'institution' ? 'school or college' : 'organisation'}`
       }
       subtitle={
-        step === 1 ? 'This creates your organisation\'s space on LERN and makes you its first staff member.'
-        : step === 'orgname' ? 'Google already gave us your name and email — this creates your organisation\'s space on LERN.'
+        step === 'orgname' ? 'Google already gave us your name and email — this creates your organisation\'s space on LERN.'
         : step === 2 ? 'This is the organisation-facing agreement. It reflects your signed Data Processing Schedule — it doesn\'t replace it.'
-        : 'Share this code with your students so they can join.'
+        : step === 3 ? 'Share this code with your students so they can join.'
+        : mode === 'join' ? 'Enter the staff code your organisation gave you — you\'ll join with staff access, not as a student.'
+        : 'This creates your organisation\'s space on LERN and makes you its first staff member.'
       }
     >
       <ErrorBanner message={error} />
 
       {step === 1 && (
         <div>
-          <TextField
-            label={orgType === 'institution' ? 'School or college name' : 'Organisation name'}
-            value={orgName} onChange={setOrgName} placeholder="Riverside College" autoFocus
-          />
-          <TextField label="Your full name" value={fullName} onChange={setFullName} placeholder="J. Ahmed" hint="You'll be named as the safeguarding lead — the person who sees the review logs. This can be reassigned later." />
+          {/* Same choice Google Classroom/Teams both put up front. */}
+          <div className="flex gap-2 mb-6">
+            {(['create', 'join'] as const).map(m => (
+              <button
+                key={m} type="button" onClick={() => { setMode(m); setError('') }}
+                className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${
+                  mode === m ? 'bg-ink text-paper' : 'bg-white border border-[#E2DDD1] text-[#6B6558]'
+                }`}
+              >
+                {m === 'create' ? 'Set up a new one' : 'Join an existing one'}
+              </button>
+            ))}
+          </div>
+
+          {mode === 'create' && (
+            <TextField
+              label={orgType === 'institution' ? 'School or college name' : 'Organisation name'}
+              value={orgName} onChange={setOrgName} placeholder="Riverside College" autoFocus
+            />
+          )}
+          {mode === 'join' && (
+            <TextField
+              label="Staff join code" value={joinCode} onChange={v => setJoinCode(v.toUpperCase())}
+              placeholder="e.g. STAFF1" autoFocus
+              hint="Ask whoever set up your organisation's LERN account for this."
+            />
+          )}
+          <TextField label="Your full name" value={fullName} onChange={setFullName} placeholder="J. Ahmed" hint={mode === 'create' ? "You'll be named as the safeguarding lead by default — the person who sees the review logs. This can be reassigned later." : undefined} />
           <TextField label="Your email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" />
           <TextField label="Password" type="password" value={password} onChange={setPassword} placeholder="At least 8 characters" hint="Minimum 8 characters." />
+
+          {mode === 'create' && (
+            <>
+              <div className="border-t border-[#E2DDD1] my-5 pt-5">
+                <p className="text-[13px] font-semibold text-ink mb-1">Who's your safeguarding lead? (optional)</p>
+                <p className="text-[12.5px] text-[#8A8373] mb-3 leading-relaxed">
+                  If that's someone other than you, tell us their name and email now — the moment they sign up or join with a staff code using this exact email, LERN recognises them as the lead automatically. Leave this blank and you'll be the lead by default.
+                </p>
+                <TextField label="Safeguarding lead's name" value={leadName} onChange={setLeadName} placeholder="e.g. Priya Sharma" />
+                <TextField label="Safeguarding lead's email" type="email" value={leadEmail} onChange={setLeadEmail} placeholder="lead@yourschool.ac.uk" />
+              </div>
+            </>
+          )}
+
           <PrimaryButton onClick={handleO1Submit} loading={loading}>Continue</PrimaryButton>
           <div className="mt-6">
             <OrDivider />
@@ -272,7 +347,7 @@ function OrganisationSignupInner() {
             </button>
           </div>
           <p className="text-[14px] text-[#6B6558] mb-6 leading-relaxed">
-            Students enter this code when they sign up to join {orgName}. You can generate more codes, set expiry dates, or revoke this one from your dashboard.
+            Students enter this code when they sign up to join {orgName}. Bringing on another teacher or tutor? Generate a separate staff join code from Settings instead — you can do that any time.
           </p>
           <PrimaryButton onClick={() => setShowGreeting(true)}>
             Continue

@@ -9,7 +9,7 @@ import { Copy, Check, Ban } from 'lucide-react'
 
 const CODE_PATTERN = /^[A-Z0-9]{4,6}$/
 
-export default function JoinCodesPanel() {
+export default function JoinCodesPanel({ roleType = 'student' }: { roleType?: 'student' | 'staff' }) {
   const { user } = useAuth()
   const [codes, setCodes] = useState<JoinCode[]>([])
   const [newCode, setNewCode] = useState('')
@@ -19,12 +19,12 @@ export default function JoinCodesPanel() {
 
   const load = () => {
     if (!user?.organisation_id) return
-    listJoinCodes(user.organisation_id).then(({ data, error: err }) => {
+    listJoinCodes(user.organisation_id, roleType).then(({ data, error: err }) => {
       if (err) return setError(err.message)
       setCodes(data || [])
     })
   }
-  useEffect(load, [user?.organisation_id])
+  useEffect(load, [user?.organisation_id, roleType])
 
   const handleGenerate = async () => {
     setError('')
@@ -32,7 +32,7 @@ export default function JoinCodesPanel() {
     const code = newCode.trim().toUpperCase()
     if (!CODE_PATTERN.test(code)) { setError('Codes are 4–6 letters or numbers.'); return }
     setGenerating(true)
-    const { data, error: err } = await generateJoinCode(user.organisation_id, user.id, code)
+    const { data, error: err } = await generateJoinCode(user.organisation_id, user.id, code, undefined, roleType)
     setGenerating(false)
     if (err) return setError(err.message)
     if (data) { setCodes(prev => [data as JoinCode, ...prev]); setNewCode('') }
@@ -54,8 +54,12 @@ export default function JoinCodesPanel() {
   return (
     <div>
       <ErrorBanner message={error} />
-      <p className="font-bold text-ink text-[15px] mb-1.5">Join codes</p>
-      <p className="text-[13px] text-ink-tertiary mb-4">Pick your own code — 4 to 6 letters or numbers. It stays active for 2 weeks, then you'll need a new one.</p>
+      <p className="font-bold text-ink text-[15px] mb-1.5">{roleType === 'staff' ? 'Staff join codes' : 'Student join codes'}</p>
+      <p className="text-[13px] text-ink-tertiary mb-4">
+        {roleType === 'staff'
+          ? "Share this with another teacher or tutor to bring them onto your organisation's account — they enter it when they sign up, and join with staff access, not as a student."
+          : 'Pick your own code — 4 to 6 letters or numbers.'} It stays active for 2 weeks, then you'll need a new one.
+      </p>
 
       <div className="flex gap-2 mb-5">
         <input

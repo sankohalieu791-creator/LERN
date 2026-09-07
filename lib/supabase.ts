@@ -78,10 +78,27 @@ export const redeemJoinCode = async (code: string) => {
 // Screen O1/O3 — self-serve organisation sign-up: creates the org, makes
 // the calling user its staff member (institution_staff/provider_staff
 // depending on type), and names them safeguarding lead by default.
-export const createOrganisationAndJoin = async (name: string, type: 'institution' | 'provider', fullName: string) => {
+export const createOrganisationAndJoin = async (
+  name: string, type: 'institution' | 'provider', fullName: string,
+  safeguardingLeadName?: string, safeguardingLeadEmail?: string,
+) => {
   const { data, error } = await supabase.rpc('create_organisation_and_join', {
     p_name: name, p_type: type, p_full_name: fullName,
+    p_safeguarding_lead_name: safeguardingLeadName || null,
+    p_safeguarding_lead_email: safeguardingLeadEmail || null,
   })
+  return { data: data as string | null, error }
+}
+
+// The staff counterpart to redeemJoinCode -- same shape, but for a
+// role_type='staff' code: sets role (institution_staff/provider_staff,
+// read off the organisation's own type) and organisation_id, not just
+// organisation_id. Also picks up safeguarding lead automatically if
+// this is the pre-designated person and nobody holds the role yet
+// (see the migration) -- nothing client-side decides that, the RPC
+// checks it server-side against the org's own record.
+export const redeemStaffJoinCode = async (code: string) => {
+  const { data, error } = await supabase.rpc('redeem_staff_join_code', { p_code: code.trim() })
   return { data: data as string | null, error }
 }
 
@@ -116,12 +133,15 @@ export const randomJoinCode = () =>
 // whiteboard. Defaults to a 2-week expiry unless the caller overrides
 // it. A collision surfaces as a clear error rather than silently
 // generating something else — the whole point is the code is theirs.
-export const generateJoinCode = async (organisationId: string, createdBy: string, code: string, expiresAt?: string | null) => {
+export const generateJoinCode = async (
+  organisationId: string, createdBy: string, code: string, expiresAt?: string | null,
+  roleType: 'student' | 'staff' = 'student',
+) => {
   const normalized = code.trim().toUpperCase()
   const defaultExpiry = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
   const { data, error } = await supabase
     .from('join_codes')
-    .insert([{ organisation_id: organisationId, code: normalized, created_by: createdBy, expires_at: expiresAt !== undefined ? expiresAt : defaultExpiry }])
+    .insert([{ organisation_id: organisationId, code: normalized, created_by: createdBy, expires_at: expiresAt !== undefined ? expiresAt : defaultExpiry, role_type: roleType }])
     .select()
     .single()
   if (error && (error as any).message?.includes('duplicate')) {
@@ -130,11 +150,12 @@ export const generateJoinCode = async (organisationId: string, createdBy: string
   return { data, error }
 }
 
-export const listJoinCodes = async (organisationId: string) => {
+export const listJoinCodes = async (organisationId: string, roleType: 'student' | 'staff' = 'student') => {
   const { data, error } = await supabase
     .from('join_codes')
     .select('*')
     .eq('organisation_id', organisationId)
+    .eq('role_type', roleType)
     .order('created_at', { ascending: false })
   return { data, error }
 }

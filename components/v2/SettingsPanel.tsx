@@ -550,12 +550,17 @@ function OrganisationScreen({ org, onBack, onChanged }: { org: any; onBack: () =
             </div>
           ))}
         </div>
-        <p className="text-[12px] text-ink-tertiary mt-2">Inviting new staff and removing existing staff isn't built yet — right now only whoever set up the organisation has staff access.</p>
+        <p className="text-[12px] text-ink-tertiary mt-2">Removing a staff member's access isn't built yet — for now, contact us if someone needs to be removed.</p>
+      </div>
+
+      <div className="pt-4 border-t border-edge-subtle mb-6">
+        <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink mb-3"><Ticket className="w-3.5 h-3.5" /> Staff join codes</p>
+        <JoinCodesPanel roleType="staff" />
       </div>
 
       <div className="pt-4 border-t border-edge-subtle">
-        <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink mb-3"><Ticket className="w-3.5 h-3.5" /> Join codes</p>
-        <JoinCodesPanel />
+        <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink mb-3"><Ticket className="w-3.5 h-3.5" /> Student join codes</p>
+        <JoinCodesPanel roleType="student" />
       </div>
     </ScreenShell>
   )

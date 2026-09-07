@@ -100,6 +100,7 @@ export interface JoinCode {
   used_count: number
   created_by?: string
   created_at: string
+  role_type: 'student' | 'staff'
 }
 
 export interface WorkItem {
