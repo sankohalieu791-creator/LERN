@@ -85,6 +85,17 @@ export const createOrganisationAndJoin = async (name: string, type: 'institution
   return { data: data as string | null, error }
 }
 
+// Same purpose as createOrganisationAndJoin, for the one case that
+// doesn't need an organisation created: a Google sign-in carries no
+// role metadata the way email/password signUp() does, so a brand-new
+// employer account arriving via OAuth needs its default role='student'
+// corrected once, right after signup — the RPC itself only allows this
+// on the caller's own still-mid-signup row (see the migration).
+export const claimEmployerRole = async () => {
+  const { error } = await supabase.rpc('claim_employer_role')
+  return { error }
+}
+
 // Screens A3/O2 — active, non-pre-ticked consent.
 export const recordConsent = async (userId: string) => {
   const { error } = await supabase

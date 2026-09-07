@@ -92,6 +92,10 @@ export async function POST(req: NextRequest) {
       subject: `The session has started — join now${workTitle ? `: ${workTitle}` : ''}`,
       body: `Hi ${first},\n\n${workTitle ? `"${workTitle}"` : 'Your session'} has started.\n\nJoin now: ${APP_URL}`,
     },
+    welcome: {
+      subject: 'Thank you for choosing LERN',
+      body: `Hi ${first},\n\nThank you for choosing LERN — your account is ready. Verified work, safely.\n\nGet started: ${APP_URL}`,
+    },
   }
 
   const { subject, body } = copy[notification.type] || { subject: 'LERN notification', body: `Hi ${first},\n\nYou have a new notification on LERN.\n\n${APP_URL}` }

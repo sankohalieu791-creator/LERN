@@ -39,6 +39,8 @@ function CallbackInner() {
         router.replace(`/auth/signup/organisation?type=${intent}`)
       } else if (intent === 'student') {
         router.replace('/auth/signup/student')
+      } else if (intent === 'employer') {
+        router.replace('/auth/signup/employer')
       } else {
         // Plain "Continue with Google" from the login page, with no
         // account behind it yet -- send them to pick which kind of
