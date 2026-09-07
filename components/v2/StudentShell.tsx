@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NotificationsBell from '@/components/v2/NotificationsBell'
 import Logo from '@/components/v2/Logo'
 import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
-import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search } from 'lucide-react'
+import { signOut } from '@/lib/supabase'
+import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search, ChevronLeft, ChevronRight, LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 const DESKTOP_NAV: { href: string; label: string; icon: LucideIcon }[] = [
@@ -40,6 +41,14 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   const pathname = usePathname()
   const router = useRouter()
   const { user } = useAuth()
+  const [collapsed, setCollapsed] = useState(false)
+  // Feed is deliberately edge-to-edge (Instagram-style cards, full-
+  // bleed media) -- everything else on a wide laptop screen was just
+  // stretching to fill whatever width was available, which reads as
+  // an emptier, less considered "work environment" the wider the
+  // window gets. A capped content width fixes that everywhere except
+  // Feed, which keeps its own full-bleed treatment untouched.
+  const isFeed = pathname.endsWith('/feed')
   const pref = user?.theme_preference
   const dataTheme = pref === 'light' ? 'light' : pref === 'dark' ? 'dark' : undefined
   const resolvedTheme = useResolvedTheme()
@@ -108,37 +117,58 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   // page content itself.
   return (
     <div data-theme={dataTheme} className="h-[100dvh] overflow-hidden bg-[var(--app-bg)] flex" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 border-r border-[var(--app-border)] bg-[var(--app-surface)]">
-        <div className="h-16 flex items-center px-5 flex-shrink-0">
-          <span style={{ color: '#D4551A' }}><Logo size="md" /></span>
-        </div>
-        <div className="px-4 pb-3">
+      <aside className={`hidden lg:flex flex-col flex-shrink-0 border-r border-[var(--app-border)] bg-[var(--app-surface)] transition-[width] duration-150 ${collapsed ? 'w-[72px]' : 'w-64'}`}>
+        <div className={`h-16 flex items-center flex-shrink-0 ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
+          {!collapsed && <span style={{ color: '#D4551A' }}><Logo size="md" /></span>}
           <button
-            onClick={onPlus}
+            onClick={() => setCollapsed(v => !v)}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 transition"
+            style={{ color: 'var(--app-text-tertiary)' }}
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+        </div>
+        <div className={collapsed ? 'px-2.5 pb-3' : 'px-4 pb-3'}>
+          <button
+            onClick={onPlus} aria-label="New post"
             className="w-full flex items-center justify-center gap-2 text-white font-semibold text-[14px] py-2.5 rounded-xl hover:opacity-90 active:scale-[0.99] transition"
             style={{ backgroundColor: '#F26B21' }}
           >
-            <Plus className="w-4 h-4" /> New post
+            <Plus className="w-4 h-4 flex-shrink-0" /> {!collapsed && 'New post'}
           </button>
         </div>
-        <nav className="flex-1 px-3 space-y-1">
+        <nav className={`flex-1 space-y-1 ${collapsed ? 'px-2.5' : 'px-3'}`}>
           {DESKTOP_NAV.map(item => {
             const active = isActive(item.href)
             return (
               <Link
-                key={item.href} href={item.href}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-semibold transition"
+                key={item.href} href={item.href} title={collapsed ? item.label : undefined}
+                className={`flex items-center gap-3 py-2.5 rounded-xl text-[14px] font-semibold transition ${collapsed ? 'justify-center px-0' : 'px-3'}`}
                 style={{
                   backgroundColor: active ? 'var(--app-overlay-2)' : 'transparent',
                   color: active ? 'var(--app-text)' : 'var(--app-text-secondary)',
                 }}
               >
                 <item.icon className="w-[18px] h-[18px] flex-shrink-0" />
-                {item.label}
+                {!collapsed && item.label}
               </Link>
             )
           })}
         </nav>
+        {/* Reachable straight from the sidebar now, not just buried in
+            Settings -- an org account has always had this same
+            one-tap sign out, students didn't. */}
+        <div className={`flex-shrink-0 py-3 border-t border-[var(--app-border)] ${collapsed ? 'px-2.5' : 'px-3'}`}>
+          <button
+            onClick={async () => { await signOut(); router.replace('/auth/login') }}
+            title={collapsed ? 'Sign out' : undefined}
+            className={`w-full flex items-center gap-3 py-2.5 rounded-xl text-[14px] font-semibold transition hover:bg-[var(--app-overlay-1)] ${collapsed ? 'justify-center px-0' : 'px-3'}`}
+            style={{ color: '#E04A4A' }}
+          >
+            <LogOut className="w-[18px] h-[18px] flex-shrink-0" /> {!collapsed && 'Sign out'}
+          </button>
+        </div>
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
@@ -202,7 +232,9 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
           WHOLE app (body, which has no dark background of its own) rather
           than just its immediate parent. Painting main itself removes any
           chance of that white flash showing mid-scroll. */}
-      <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[var(--app-bg)] pb-[calc(60px+env(safe-area-inset-bottom))] lg:pb-0">{children}</main>
+      <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[var(--app-bg)] pb-[calc(60px+env(safe-area-inset-bottom))] lg:pb-0">
+        {isFeed ? children : <div className="lg:max-w-3xl lg:mx-auto">{children}</div>}
+      </main>
 
       {/* Phone-only bottom nav, "+" and all -- untouched, this is the
           layout that's already right. Only laptop gets the sidebar

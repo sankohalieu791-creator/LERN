@@ -48,7 +48,7 @@ export default function SplashScreen() {
           logoVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
         }`}
       >
-        <Logo size={54} />
+        <Logo size={66} />
       </div>
     </div>
   )

@@ -33,7 +33,20 @@ export default function NotificationsBell({ size = 'md', iconColor }: { size?: '
 
   const refreshCount = () => {
     if (!user) return
-    getUnreadNotificationCount(user.id).then(({ count }) => setUnread(count))
+    getUnreadNotificationCount(user.id).then(({ count }) => {
+      setUnread(count)
+      // The Badging API puts the count on the home-screen app icon
+      // itself -- "I can see it without being in the app" -- on
+      // whatever installed PWA context supports it (Android Chrome,
+      // desktop; iOS 16.4+ once added to the home screen). Silently
+      // does nothing where it isn't supported, never throws.
+      if ('setAppBadge' in navigator) {
+        try {
+          if (count > 0) (navigator as any).setAppBadge(count)
+          else (navigator as any).clearAppBadge?.()
+        } catch {}
+      }
+    })
   }
   useEffect(refreshCount, [user?.id])
   useEffect(() => {

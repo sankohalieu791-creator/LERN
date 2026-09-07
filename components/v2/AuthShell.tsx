@@ -22,7 +22,7 @@ export default function AuthShell({
     // still missing it.
     <div className="min-h-screen bg-paper flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <header className="flex-shrink-0 px-10 py-7">
-        <Logo />
+        <Logo size="lg" />
       </header>
 
       <main className="flex-1 flex items-start justify-center px-6 pb-20">
@@ -40,8 +40,8 @@ export default function AuthShell({
             </div>
           )}
 
-          <h1 className="text-3xl font-bold text-ink mb-2 leading-tight">{title}</h1>
-          {subtitle && <p className="text-[#6B6558] text-[15px] leading-relaxed mb-8">{subtitle}</p>}
+          <h1 className="text-3xl font-bold text-ink mb-2 leading-tight text-center">{title}</h1>
+          {subtitle && <p className="text-[#6B6558] text-[15px] leading-relaxed mb-8 text-center">{subtitle}</p>}
           {!subtitle && <div className="mb-8" />}
 
           {children}

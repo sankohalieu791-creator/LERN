@@ -76,6 +76,20 @@ export default function OrgShell({
   const [reviewCount, setReviewCount] = useState(0)
   const [interestCount, setInterestCount] = useState(0)
 
+  // Keeps the same lern-theme cookie StudentShell writes in sync for
+  // org accounts too -- the org layouts (institution/provider/employer)
+  // are 'use client' (they need hooks like useAuth), so they can't
+  // export generateViewport() themselves the way app/student/layout.tsx
+  // does; a server-component wrapper around each reads this cookie
+  // instead. Without it those routes were still on the root layout's
+  // static, always-light viewport.themeColor regardless of the org's
+  // actual dark/light toggle -- the phone's own status bar/address bar
+  // colour never matched the page, on every org route, the exact same
+  // "black thing" bug class already fixed for students.
+  useEffect(() => {
+    document.cookie = `lern-theme=${theme}; path=/; max-age=31536000; samesite=lax`
+  }, [theme])
+
   useEffect(() => { setCollapsed(!!user?.sidebar_collapsed) }, [user?.sidebar_collapsed])
   useEffect(() => {
     if (!user?.organisation_id) return

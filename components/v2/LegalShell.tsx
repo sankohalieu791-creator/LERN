@@ -1,22 +1,29 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import Logo from '@/components/v2/Logo'
 import { ArrowLeft } from 'lucide-react'
 
 // Reachable from settings and sign-up without being logged in — no
 // RoleGate, no shell chrome tied to a role.
+//
+// Used to show the full LERN logo up here, same as AuthShell's header.
+// That was wrong for how this screen actually gets reached in
+// practice: nearly every visit is a tap from a plain settings list
+// (Data Protection / Cookie Policy / Terms), which has no logo of its
+// own at all -- jumping into a page that suddenly does felt like the
+// whole app had reloaded ("it's like a reset, then the logo comes
+// up"), even though it was just a normal in-app navigation the whole
+// time. Every other settings sub-screen (ScreenShell, both the
+// student and org versions) is just a back arrow and a title, no
+// logo -- this now matches that same, lighter pattern instead of
+// standing out as its own separate "app" moment.
 export default function LegalShell({ title, children }: { title: string; children: React.ReactNode }) {
   const router = useRouter()
   return (
-    // paddingTop: env(safe-area-inset-top) -- missing entirely before,
-    // so on a standalone PWA the header sat right at the true top edge
-    // of the screen, under the status bar overlay ("the logo is all
-    // the way up"). Every other full-screen shell in the app already
-    // does this; this one just never had it.
+    // paddingTop: env(safe-area-inset-top) -- so on a standalone PWA
+    // the header sits clear of the status bar overlay.
     <div className="min-h-screen bg-paper" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <header className="flex items-center justify-between px-6 lg:px-10 py-6">
-        <Logo />
+      <header className="flex items-center px-6 lg:px-10 py-6">
         {/* router.back() -- not a hardcoded href="/". That sent a
             logged-in student who tapped this from Settings out to the
             marketing root, which then redirects them back into the

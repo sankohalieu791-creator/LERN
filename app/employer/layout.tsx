@@ -1,34 +1,23 @@
-'use client'
+import type { Viewport } from 'next'
+import { cookies } from 'next/headers'
+import EmployerLayoutClient from '@/components/v2/EmployerLayoutClient'
 
-import RoleGate from '@/components/v2/RoleGate'
-import OrgShell from '@/components/v2/OrgShell'
-import GuestEmployerShell from '@/components/v2/GuestEmployerShell'
-import { employerSections, employerPhoneItems } from '@/lib/orgNav'
-import { useAuth } from '@/context/AuthContext'
-
-function EmployerShellSwitch({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth()
-  // guest_invite_id is the fallback signal, not just is_guest -- the
-  // trigger that sets is_guest only does so if the invite was still
-  // unclaimed at the exact moment the account was created. A guest
-  // invite link that gets opened more than once (very possible while
-  // testing, or a stale/resent email opened after an earlier click
-  // already claimed it) can land with is_guest false but
-  // guest_invite_id still correctly pointing at the original invite --
-  // that's still a guest, not a real employer, and belongs in the
-  // scoped shell either way.
-  if (user?.is_guest || user?.guest_invite_id) return <GuestEmployerShell>{children}</GuestEmployerShell>
-  return (
-    <OrgShell sections={employerSections} phoneItems={employerPhoneItems}>
-      {children}
-    </OrgShell>
-  )
+// Same fix as app/student/layout.tsx and app/institution/layout.tsx --
+// see OrgShell's own lern-theme cookie-sync effect for the full story.
+// A guest employer's GuestEmployerShell doesn't toggle dark mode, so
+// the light value here is the right fallback for that case too.
+export async function generateViewport(): Promise<Viewport> {
+  const theme = cookies().get('lern-theme')?.value
+  return {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: 'cover',
+    themeColor: theme === 'dark' ? '#131110' : '#FFFDF9',
+  }
 }
 
 export default function EmployerLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <RoleGate allow="employer">
-      <EmployerShellSwitch>{children}</EmployerShellSwitch>
-    </RoleGate>
-  )
+  return <EmployerLayoutClient>{children}</EmployerLayoutClient>
 }

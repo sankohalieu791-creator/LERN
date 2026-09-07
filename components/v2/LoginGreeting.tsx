@@ -20,7 +20,9 @@ export default function LoginGreeting({ name, onDone }: { name?: string; onDone:
   return (
     <div className="min-h-screen bg-paper flex items-center justify-center px-6">
       <div className="text-center animate-fadeIn">
-        <Logo />
+        <div className="flex justify-center">
+          <Logo size={40} />
+        </div>
         <p className="mt-6 text-[26px] font-bold text-ink">Good {timeWord}, {first}.</p>
         <p className="mt-1.5 text-[14px] text-[#8A8373]">{subline}</p>
       </div>
