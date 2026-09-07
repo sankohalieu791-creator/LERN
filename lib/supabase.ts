@@ -1635,20 +1635,36 @@ export const removeFromTalentPool = async (memberRowId: string) => {
 export const getEmployerPartners = async (employerId: string) => {
   const { data, error } = await supabase
     .from('applications')
-    .select('organisation_id, stage, organisation:organisations(id, name, type)')
+    .select('organisation_id, stage')
     .eq('employer_id', employerId)
     .not('organisation_id', 'is', null)
   if (error || !data) return { data: null, error }
+
   const byOrg = new Map<string, { id: string; name: string; type: string; reached: number; hired: number }>()
   for (const row of data as any[]) {
-    const org = row.organisation
-    if (!org) continue
-    if (!byOrg.has(org.id)) byOrg.set(org.id, { id: org.id, name: org.name, type: org.type, reached: 0, hired: 0 })
-    const entry = byOrg.get(org.id)!
+    const id = row.organisation_id
+    if (!byOrg.has(id)) byOrg.set(id, { id, name: '', type: '', reached: 0, hired: 0 })
+    const entry = byOrg.get(id)!
     entry.reached++
     if (row.stage === 'hired') entry.hired++
   }
-  return { data: Array.from(byOrg.values()).sort((a, b) => b.reached - a.reached), error: null }
+  if (byOrg.size === 0) return { data: [], error: null }
+
+  // organisations itself has no SELECT policy an employer can ever
+  // match (only its own staff/members/safeguarding lead) — and it
+  // shouldn't, since a full row includes things like a pending
+  // safeguarding lead's email. organisations_public is a narrow,
+  // RLS-bypassing view exposing just id/name/type, which is all an
+  // employer is meant to ever see of a partner organisation.
+  const { data: orgs } = await supabase
+    .from('organisations_public')
+    .select('id, name, type')
+    .in('id', Array.from(byOrg.keys()))
+  for (const org of orgs || []) {
+    const entry = byOrg.get(org.id)
+    if (entry) { entry.name = org.name; entry.type = org.type }
+  }
+  return { data: Array.from(byOrg.values()).filter(e => e.name).sort((a, b) => b.reached - a.reached), error: null }
 }
 
 // ── Employer side (Part 3): Inbox ──────────────────────────────────
