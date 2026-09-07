@@ -180,65 +180,83 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   }
 
   return (
-    <div>
-      <button onClick={onBack} className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
+    // -mx-5 breaks the thread out of OrgShell's page padding on phone, so
+    // it reads as a real Gmail-style full-screen conversation rather than
+    // a small card floating in the middle of the screen; lg:mx-0 hands
+    // that padding straight back on desktop, where the card layout below
+    // was never the complaint.
+    <div className="-mx-5 lg:mx-0 -mb-8 lg:mb-0">
+      {/* Mobile: a sticky Gmail-style app bar. Desktop: the plain text link. */}
+      <div className="sticky top-0 z-10 flex items-center gap-3 bg-paper border-b border-edge px-4 py-3 lg:hidden">
+        <button onClick={onBack} className="text-ink-secondary flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
+        <div className="min-w-0">
+          <p className="font-bold text-ink text-[14px] truncate">{item.employer?.full_name || 'An employer'}</p>
+          <p className="text-[12px] text-ink-tertiary truncate">Interested in {firstName}{item.opportunity_label ? ` · ${item.opportunity_label}` : ''}</p>
+        </div>
+      </div>
+      <button onClick={onBack} className="hidden lg:flex items-center gap-1.5 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
         <ArrowLeft className="w-3.5 h-3.5" /> Back to requests
       </button>
 
-      {/* The safeguarding banner -- deliberately prominent, not decoration.
-          It reassures the school and trains staff to do the right thing. */}
-      <div className="flex items-start gap-2.5 rounded-xl px-4 py-3.5 mb-4" style={{ backgroundColor: '#E1F5EE' }}>
-        <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#0F6E56' }} />
-        <p className="text-[13px] leading-relaxed" style={{ color: '#0F6E56' }}>
-          {adult
-            ? <>{firstName} isn't part of this conversation, but can see it happening — your safeguarding lead can see this thread too.</>
-            : <>{firstName} is not part of this conversation. You reply on their behalf. Your safeguarding lead can see this thread.</>}
-        </p>
-      </div>
-
-      <div className="bg-surface border border-edge rounded-xl p-5 mb-4">
-        <div className="flex items-center gap-2.5 mb-1">
-          <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold text-[12px]" style={{ backgroundColor: '#185FA5' }}>
-            {initials(item.employer?.full_name)}
-          </div>
-          <div>
-            <p className="font-bold text-ink text-[14px]">{item.employer?.full_name || 'An employer'}</p>
-            <p className="text-[12px] text-ink-tertiary">Interested in {firstName}{item.opportunity_label ? ` · ${item.opportunity_label}` : ''}</p>
-          </div>
+      <div className="px-4 pt-4 lg:px-0 lg:pt-0">
+        {/* The safeguarding banner -- deliberately prominent, not decoration.
+            It reassures the school and trains staff to do the right thing. */}
+        <div className="flex items-start gap-2.5 rounded-xl px-4 py-3.5 mb-4" style={{ backgroundColor: '#E1F5EE' }}>
+          <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#0F6E56' }} />
+          <p className="text-[13px] leading-relaxed" style={{ color: '#0F6E56' }}>
+            {adult
+              ? <>{firstName} isn't part of this conversation, but can see it happening — your safeguarding lead can see this thread too.</>
+              : <>{firstName} is not part of this conversation. You reply on their behalf. Your safeguarding lead can see this thread.</>}
+          </p>
         </div>
 
-        <div className="space-y-2.5 mt-4">
-          {item.message && <ChatBubble fromEmployer body={item.message} />}
-          {messages.map(m => <ChatBubble key={m.id} fromEmployer={m.sender_role === 'employer'} body={m.body} />)}
-        </div>
-
-        {item.status !== 'declined' && (
-          <div className="mt-4">
-            <textarea
-              value={reply} onChange={e => setReply(e.target.value)}
-              placeholder="Reply on the student's behalf — never share personal contact details."
-              rows={3}
-              className="w-full bg-surface-subtle border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
-            />
-            <div className="flex items-center gap-2 mt-2.5">
-              <button
-                onClick={() => send(item.status === 'pending')}
-                disabled={sending || !reply.trim()}
-                className="flex items-center gap-1.5 bg-brand text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:bg-brand-hover transition disabled:opacity-40"
-              >
-                <Send className="w-3.5 h-3.5" /> {item.status === 'pending' ? 'Accept and reply' : 'Reply'}
-              </button>
-              {item.status === 'pending' && (
-                <button onClick={decline} className="flex items-center gap-1.5 bg-surface border border-edge text-ink-secondary text-[13px] font-semibold px-4 py-2 rounded-lg hover:border-danger-text hover:text-danger-text transition">
-                  <Ban className="w-3.5 h-3.5" /> Decline
-                </button>
-              )}
+        <div className="bg-transparent lg:bg-surface border-0 lg:border lg:border-edge rounded-xl lg:p-5 mb-4">
+          <div className="hidden lg:flex items-center gap-2.5 mb-1">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold text-[12px]" style={{ backgroundColor: '#185FA5' }}>
+              {initials(item.employer?.full_name)}
+            </div>
+            <div>
+              <p className="font-bold text-ink text-[14px]">{item.employer?.full_name || 'An employer'}</p>
+              <p className="text-[12px] text-ink-tertiary">Interested in {firstName}{item.opportunity_label ? ` · ${item.opportunity_label}` : ''}</p>
             </div>
           </div>
-        )}
+
+          <div className="space-y-2.5 lg:mt-4">
+            {item.message && <ChatBubble fromEmployer body={item.message} />}
+            {messages.map(m => <ChatBubble key={m.id} fromEmployer={m.sender_role === 'employer'} body={m.body} />)}
+          </div>
+        </div>
       </div>
 
-      <p className="flex items-center gap-1.5 text-[12px] text-ink-quaternary">
+      {item.status !== 'declined' && (
+        // Gmail's own reply bar sits pinned near the bottom of the thread,
+        // not scrolled away inline with the messages -- sticky here does
+        // the same on phone; on desktop it just sits in normal flow.
+        <div className="sticky bottom-0 lg:static bg-paper lg:bg-transparent border-t border-edge lg:border-0 px-4 lg:px-0 py-3 lg:py-0 lg:mt-0">
+          <textarea
+            value={reply} onChange={e => setReply(e.target.value)}
+            placeholder="Reply on the student's behalf — never share personal contact details."
+            rows={2}
+            className="w-full bg-surface-subtle border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
+          />
+          <div className="flex items-center gap-2 mt-2.5">
+            <button
+              onClick={() => send(item.status === 'pending')}
+              disabled={sending || !reply.trim()}
+              className="flex items-center gap-1.5 bg-brand text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:bg-brand-hover transition disabled:opacity-40"
+            >
+              <Send className="w-3.5 h-3.5" /> {item.status === 'pending' ? 'Accept and reply' : 'Reply'}
+            </button>
+            {item.status === 'pending' && (
+              <button onClick={decline} className="flex items-center gap-1.5 bg-surface border border-edge text-ink-secondary text-[13px] font-semibold px-4 py-2 rounded-lg hover:border-danger-text hover:text-danger-text transition">
+                <Ban className="w-3.5 h-3.5" /> Decline
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <p className="hidden lg:flex items-center gap-1.5 text-[12px] text-ink-quaternary">
         <Lock className="w-3 h-3" /> Logged for safeguarding
       </p>
     </div>
