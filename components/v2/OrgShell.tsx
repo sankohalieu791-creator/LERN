@@ -88,6 +88,14 @@ export default function OrgShell({
   // "black thing" bug class already fixed for students.
   useEffect(() => {
     document.cookie = `lern-theme=${theme}; path=/; max-age=31536000; samesite=lax`
+    // Body's own background is normally invisible (every real screen
+    // paints its own full-bleed one over it) -- but a stray gap, like a
+    // portaled dialog briefly rendering past the phone's real bottom
+    // edge, exposes it. It only ever tracks the OS's prefers-color-
+    // scheme, so it can flatly disagree with the theme actually on
+    // screen; this keeps it honest. See globals.css for why this is a
+    // separate attribute from data-theme, not the same one.
+    document.documentElement.setAttribute('data-body-theme', theme)
   }, [theme])
 
   useEffect(() => { setCollapsed(!!user?.sidebar_collapsed) }, [user?.sidebar_collapsed])

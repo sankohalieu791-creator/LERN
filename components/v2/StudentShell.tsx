@@ -66,6 +66,10 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   // on every navigation, since the static export re-asserts itself).
   useEffect(() => {
     document.cookie = `lern-theme=${resolvedTheme}; path=/; max-age=31536000; samesite=lax`
+    // See OrgShell's identical line -- body's own background only ever
+    // tracks the OS's prefers-color-scheme, which can disagree with the
+    // theme actually resolved and on screen right now.
+    document.documentElement.setAttribute('data-body-theme', resolvedTheme)
   }, [resolvedTheme])
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
   // The real v1 Feed page has its own header (LERN + search + bell);

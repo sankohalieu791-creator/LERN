@@ -782,7 +782,15 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
   // regardless of the real dark/light toggle.
   return createPortal((
     <div data-theme={theme} className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 sm:p-8">
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+      {/* dvh, not vh -- vh is fixed to mobile Safari's LARGEST viewport
+          (chrome collapsed); the moment the address bar is showing, or a
+          focused input pulls the keyboard up, the real visible height is
+          shorter than that, and this max-h no longer bounds the card to
+          the actual screen -- the card can render past the real bottom
+          edge, and whatever's behind it (document.body) shows through
+          as a solid block. Same class of bug already fixed on OrgShell's
+          own root box, just never applied to this portaled dialog. */}
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92dvh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-edge-subtle flex-shrink-0">
           <p className="font-bold text-ink text-[16px]">New brief</p>
           <button onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-tertiary transition">

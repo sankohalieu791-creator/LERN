@@ -653,7 +653,7 @@ export default function WorkshopSession({
           // to the bottom, capped height with its own scroll, rounded
           // top corners -- the main stage stays full-width behind it.
           <div
-            className="fixed md:static inset-x-0 bottom-0 md:inset-auto max-h-[65vh] md:max-h-none w-full md:w-72 flex-shrink-0 border-t md:border-t-0 md:border-l border-white/10 bg-[#141110] md:bg-transparent rounded-t-2xl md:rounded-none flex flex-col z-10"
+            className="fixed md:static inset-x-0 bottom-0 md:inset-auto max-h-[65dvh] md:max-h-none w-full md:w-72 flex-shrink-0 border-t md:border-t-0 md:border-l border-white/10 bg-[#141110] md:bg-transparent rounded-t-2xl md:rounded-none flex flex-col z-10"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
             <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">

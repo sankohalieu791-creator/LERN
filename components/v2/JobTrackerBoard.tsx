@@ -224,7 +224,11 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged }: {
 
   return createPortal((
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      {/* dvh not vh -- same viewport-mismatch fix as WorkItemsPanel's
+          create-brief dialog: vh is pinned to the largest possible
+          viewport, so this could render past the real visible bottom
+          edge on phone and let body's own background show through. */}
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md max-h-[85dvh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-edge-subtle">
           <div>
             <p className="text-[14px] font-medium text-ink">{app.student?.full_name} — {app.opportunity?.title || 'Direct interest'}</p>
