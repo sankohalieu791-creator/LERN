@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import Logo from '@/components/v2/Logo'
 
 // Shared layout for every auth/onboarding screen: desktop/laptop-first
@@ -20,7 +21,18 @@ export default function AuthShell({
     // edge, under the status bar ("the LERN is a bit up"). Every other
     // shell in the app has had this same fix today; this one was
     // still missing it.
-    <div className="min-h-screen bg-paper flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    //
+    // A flat white page read as cold/unfinished next to everything
+    // else in this app that already has real warmth to it -- a soft
+    // gradient using the SAME peach/cream tokens the rest of the app's
+    // accent surfaces already use (--paper into --accent-bg), not new
+    // colours invented for this one screen. Instagram-adjacent without
+    // borrowing anything literal: gentle, not saturated, still reads
+    // as this app's own paper/ink/orange identity.
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ paddingTop: 'env(safe-area-inset-top)', background: 'linear-gradient(160deg, var(--paper) 0%, var(--paper) 45%, var(--accent-bg) 100%)' }}
+    >
       <header className="flex-shrink-0 px-10 py-7">
         <Logo size="lg" />
       </header>
@@ -47,6 +59,13 @@ export default function AuthShell({
           {children}
         </div>
       </main>
+
+      {/* Bottom-left, per direct request -- so it's reachable from
+          every sign-up/login screen without hunting for it. */}
+      <footer className="flex-shrink-0 px-6 pb-6 flex items-center gap-4">
+        <Link href="/legal/privacy" className="text-[12.5px] font-medium text-[#8A8373] hover:text-ink transition">Privacy</Link>
+        <Link href="/legal/terms" className="text-[12.5px] font-medium text-[#8A8373] hover:text-ink transition">Terms</Link>
+      </footer>
     </div>
   )
 }
