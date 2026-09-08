@@ -150,6 +150,19 @@ export default function JobTrackerBoard({ viewer, employerId, organisationId }: 
           app={openApp} viewer={viewer} actorId={user?.id || ''}
           onClose={() => setOpenApp(null)}
           onChanged={() => { load(); setOpenApp(null) }}
+          onNoteSaved={(note) => {
+            // Patches the one card in place instead of a full reload --
+            // a stage move already closes the dialog (onChanged above),
+            // but saving a note shouldn't: you want to see it land while
+            // still looking at it. Without this, the parent's own apps
+            // list never learned about the new note, so closing and
+            // reopening the same card (or just glancing at its pencil
+            // icon in the column) showed it as if the save never
+            // happened -- the textarea only looked right because it was
+            // reading its own local state, not what the board actually
+            // knew.
+            setApps(prev => prev.map(a => a.id === openApp.id ? { ...a, private_note: note } : a))
+          }}
         />
       )}
     </div>
@@ -187,8 +200,9 @@ function AppCard({ app, onClick }: { app: any; onClick: () => void }) {
   )
 }
 
-function ApplicationDetail({ app, viewer, actorId, onClose, onChanged }: {
+function ApplicationDetail({ app, viewer, actorId, onClose, onChanged, onNoteSaved }: {
   app: any; viewer: 'org' | 'employer'; actorId: string; onClose: () => void; onChanged: () => void
+  onNoteSaved: (note: string) => void
 }) {
   const [activity, setActivity] = useState<any[]>([])
   const [note, setNote] = useState(app.private_note || '')
@@ -218,6 +232,7 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged }: {
     const { error } = await setApplicationPrivateNote(app.id, note.trim())
     setSavingNote(false)
     if (error) { setNoteError(error.message || "Couldn't save — try again."); return }
+    onNoteSaved(note.trim())
     setNoteSaved(true)
     setTimeout(() => setNoteSaved(false), 2500)
   }
