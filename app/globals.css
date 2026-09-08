@@ -437,3 +437,14 @@ main {
 body.modal-open #student-bottom-nav {
   display: none;
 }
+
+/* A real text field being focused, tracked in JS (see OrgShell's and
+   StudentShell's identical focusin/focusout effects) -- covers a phone
+   whose browser doesn't honour interactive-widget=resizes-content
+   (app/layout.tsx's own viewport), where the keyboard opening left
+   fixed bottom UI sized against the pre-keyboard viewport and free to
+   float up over whatever was just tapped into. */
+body.keyboard-open #student-bottom-nav,
+body.keyboard-open #org-fab {
+  display: none;
+}

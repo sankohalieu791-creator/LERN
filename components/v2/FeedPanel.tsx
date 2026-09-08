@@ -233,7 +233,14 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
   const pickMedia = (f: File | null) => {
     if (!f) return
     setMediaError('')
-    const video = f.type.startsWith('video/')
+    // Some devices hand back an empty f.type for a video file (seen on
+    // certain Android pickers) -- f.type.startsWith('video/') alone
+    // silently misfiled that as a photo, which then tried to upload a
+    // video through the IMAGE path and either failed outright or (if
+    // the extension happened to slip past validation) posted with no
+    // playable media at all. Extension is the fallback, not the
+    // primary check -- a real MIME type is trusted first.
+    const video = f.type.startsWith('video/') || (!f.type && /\.(mp4|mov|webm|m4v|3gp)$/i.test(f.name))
     if (!video) {
       setFile(f); setIsVideo(false); setPreviewUrl(URL.createObjectURL(f))
       return

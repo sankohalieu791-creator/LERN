@@ -71,6 +71,26 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
     // theme actually resolved and on screen right now.
     document.documentElement.setAttribute('data-body-theme', resolvedTheme)
   }, [resolvedTheme])
+
+  // See OrgShell's identical effect -- interactive-widget=resizes-
+  // content isn't honoured by every phone, so this hides the bottom
+  // nav outright the moment a real text field is focused, independent
+  // of whether the browser actually shrank the layout viewport for the
+  // keyboard or not.
+  useEffect(() => {
+    const isTextInput = (el: EventTarget | null) =>
+      el instanceof HTMLElement && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+    const onFocusIn = (e: FocusEvent) => { if (isTextInput(e.target)) document.body.classList.add('keyboard-open') }
+    const onFocusOut = (e: FocusEvent) => { if (isTextInput(e.target)) document.body.classList.remove('keyboard-open') }
+    document.addEventListener('focusin', onFocusIn)
+    document.addEventListener('focusout', onFocusOut)
+    return () => {
+      document.removeEventListener('focusin', onFocusIn)
+      document.removeEventListener('focusout', onFocusOut)
+      document.body.classList.remove('keyboard-open')
+    }
+  }, [])
+
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
   // The real v1 Feed page has its own header (LERN + search + bell);
   // Courses/Workshops (app/courses/page.tsx) has none at all -- its

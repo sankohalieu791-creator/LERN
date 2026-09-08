@@ -25,13 +25,18 @@ export default function AuthShell({
     // A flat white page read as cold/unfinished next to everything
     // else in this app that already has real warmth to it -- a soft
     // gradient using the SAME peach/cream tokens the rest of the app's
-    // accent surfaces already use (--paper into --accent-bg), not new
-    // colours invented for this one screen. Instagram-adjacent without
-    // borrowing anything literal: gentle, not saturated, still reads
-    // as this app's own paper/ink/orange identity.
+    // accent surfaces already use, not new colours invented for this
+    // one screen. First pass held the colour back until 45% down the
+    // page, past where a normal-height form actually sits, so it was
+    // never actually visible without scrolling -- "still white."
+    // --accent-bg-soft (a deeper peach than --accent-bg) now shows
+    // immediately at the top where the logo and form both live, fading
+    // to --paper further down. Instagram-adjacent without borrowing
+    // anything literal: warm, not saturated, still this app's own
+    // paper/ink/orange identity.
     <div
       className="min-h-screen flex flex-col"
-      style={{ paddingTop: 'env(safe-area-inset-top)', background: 'linear-gradient(160deg, var(--paper) 0%, var(--paper) 45%, var(--accent-bg) 100%)' }}
+      style={{ paddingTop: 'env(safe-area-inset-top)', background: 'linear-gradient(180deg, var(--accent-bg-soft) 0%, var(--accent-bg) 30%, var(--paper) 75%)' }}
     >
       <header className="flex-shrink-0 px-10 py-7">
         <Logo size="lg" />

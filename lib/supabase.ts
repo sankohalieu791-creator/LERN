@@ -759,9 +759,22 @@ export const uploadPostImage = async (userId: string, file: File) => {
   return { path: error ? null : path, error }
 }
 
+const VIDEO_EXT_MIME: Record<string, string> = {
+  mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', m4v: 'video/x-m4v', '3gp': 'video/3gpp',
+}
 export const uploadPostVideo = async (userId: string, file: File | Blob, ext: string = 'webm') => {
   const path = `${userId}/${Date.now()}.${ext}`
-  const { error } = await supabase.storage.from('post-videos').upload(path, file, { contentType: file.type || 'video/webm' })
+  // file.type was used alone before, defaulting to video/webm whenever
+  // it came through empty (seen on some devices/pickers) -- for an
+  // actual .mov/.mp4 with no MIME type, that declared a content-type
+  // that didn't match the real bytes. The bucket's own allowlist check
+  // passed either way (video/webm is allowed), so the upload silently
+  // "succeeded" with mislabeled video that a browser can fail to
+  // decode when played back — exactly "I posted it, it just shows the
+  // colour, no video." ext (from the actual filename) is the more
+  // reliable source of truth here, not a MIME type the OS never set.
+  const contentType = file.type || VIDEO_EXT_MIME[ext.toLowerCase()] || 'video/webm'
+  const { error } = await supabase.storage.from('post-videos').upload(path, file, { contentType })
   return { path: error ? null : path, error }
 }
 

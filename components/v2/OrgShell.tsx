@@ -99,6 +99,31 @@ export default function OrgShell({
   }, [theme])
 
   useEffect(() => { setCollapsed(!!user?.sidebar_collapsed) }, [user?.sidebar_collapsed])
+
+  // interactive-widget=resizes-content (see layout.tsx's own viewport)
+  // asks the browser to shrink the layout viewport itself when the
+  // keyboard opens, so fixed elements resize along with it -- but that
+  // property is new enough that not every phone actually honours it.
+  // This is the same fix with no dependency on browser support at all:
+  // while any text field on the page is genuinely focused, hide the
+  // fixed "+" FAB outright rather than trust it'll reposition itself
+  // correctly. Real focus tracking (focusin/focusout bubble to
+  // document), not a guess based on viewport size changing, which can
+  // also fire from address-bar show/hide with nothing to do with a
+  // keyboard at all.
+  useEffect(() => {
+    const isTextInput = (el: EventTarget | null) =>
+      el instanceof HTMLElement && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+    const onFocusIn = (e: FocusEvent) => { if (isTextInput(e.target)) document.body.classList.add('keyboard-open') }
+    const onFocusOut = (e: FocusEvent) => { if (isTextInput(e.target)) document.body.classList.remove('keyboard-open') }
+    document.addEventListener('focusin', onFocusIn)
+    document.addEventListener('focusout', onFocusOut)
+    return () => {
+      document.removeEventListener('focusin', onFocusIn)
+      document.removeEventListener('focusout', onFocusOut)
+      document.body.classList.remove('keyboard-open')
+    }
+  }, [])
   useEffect(() => {
     if (!user?.organisation_id) return
     supabase.from('organisations').select('name, logo_path').eq('id', user.organisation_id).single()
@@ -312,6 +337,7 @@ export default function OrgShell({
           safe-area-inset-bottom so it never sits under a phone's own
           home-indicator/gesture bar. ── */}
       <button
+        id="org-fab"
         onClick={() => setComposerOpen(true)}
         aria-label="New post"
         className="lg:hidden fixed right-5 z-20 w-14 h-14 rounded-full bg-brand text-white shadow-lg flex items-center justify-center active:scale-95 transition"
