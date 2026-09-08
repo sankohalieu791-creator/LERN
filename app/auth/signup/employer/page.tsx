@@ -130,7 +130,12 @@ export default function EmployerSignupPage() {
           </p>
         </div>
         <SecondaryButton
-          onClick={async () => { setResent(false); const { error } = await resendConfirmation(email.trim()); if (!error) setResent(true) }}
+          onClick={async () => {
+            setResent(false)
+            const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/auth/signup/employer` : undefined
+            const { error } = await resendConfirmation(email.trim(), redirectTo)
+            if (!error) setResent(true)
+          }}
         >
           {resent ? 'Sent again' : "Didn't get it? Resend"}
         </SecondaryButton>

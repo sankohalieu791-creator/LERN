@@ -35,8 +35,15 @@ export const signIn = async (email: string, password: string) => {
 // to actually be turned on for the project (Supabase dashboard —
 // Authentication → Sign In / Providers → Email) for there to be
 // anything to resend in the first place.
-export const resendConfirmation = async (email: string) => {
-  const { error } = await supabase.auth.resend({ type: 'signup', email })
+// Without emailRedirectTo this fell back to the project's default Site
+// URL rather than the specific page (and, for organisation signup, the
+// ?type= query param) the original signUp() call asked for -- so a
+// resent confirmation link could land a provider back on the
+// institution flow, or drop anyone past the point their in-progress
+// signup was actually at. Every caller now passes exactly the same
+// redirectTo it used for the original signUp().
+export const resendConfirmation = async (email: string, emailRedirectTo?: string) => {
+  const { error } = await supabase.auth.resend({ type: 'signup', email, options: emailRedirectTo ? { emailRedirectTo } : undefined })
   return { error }
 }
 
