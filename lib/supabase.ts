@@ -185,11 +185,16 @@ export const getWorkItems = async (organisationId: string) => {
 }
 
 // Dashboard's "Previous courses/workshops" — an ended session moves
-// here instead of staying in the live Workshops/Courses list.
+// here instead of staying in the live Workshops/Courses list. Recording
+// embedded directly (one query, not N) -- this card existed already
+// but never actually surfaced the recording, which was the entire
+// point of "record the session" in the first place: once it ended, the
+// only place that recording still showed up was the now-invisible
+// original card, i.e. it read as having vanished outright.
 export const getEndedWorkItems = async (organisationId: string) => {
   const { data, error } = await supabase
     .from('work_items')
-    .select('id, type, title, ended_at')
+    .select('id, type, title, ended_at, work_item_recordings(id, status, file_list, started_at)')
     .eq('organisation_id', organisationId)
     .in('type', ['workshop', 'course'])
     .not('ended_at', 'is', null)
@@ -1316,7 +1321,7 @@ export const getDiscoverWork = async (filters?: { type?: string; q?: string }) =
       verifier:users!verifications_verified_by_fkey(full_name),
       submissions!inner(
         id, content, student_id,
-        student:users!submissions_student_id_fkey(id, full_name),
+        student:users!submissions_student_id_fkey(id, full_name, avatar_path, bio, interest_tags),
         work_items!inner(id, title, description, type)
       )
     `)
