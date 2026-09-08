@@ -233,13 +233,22 @@ export default function OrgShell({
               <button
                 onClick={() => setProfileOpen(v => !v)}
                 aria-label="Profile menu"
-                className="relative w-10 h-10 flex items-center justify-center rounded-full bg-accent-bg text-brand font-bold text-[14px] ml-1 overflow-hidden"
+                className="relative w-10 h-10 flex items-center justify-center rounded-full bg-accent-bg text-brand font-bold text-[14px] ml-1"
               >
-                {user?.avatar_path ? (
-                  <img src={getAvatarUrl(user.avatar_path) || ''} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  user?.full_name?.[0]?.toUpperCase() || <UserIcon className="w-[18px] h-[18px]" />
-                )}
+                {/* overflow-hidden used to live on the button itself, which
+                    clipped the presence dot below -- invisible with a plain
+                    initial (nothing there to clip against), but the moment
+                    a real photo filled the whole circle it clipped the dot
+                    's corner right along with it. Moved onto this inner
+                    span so only the avatar content clips, not the dot
+                    sitting outside it. */}
+                <span className="absolute inset-0 rounded-full overflow-hidden flex items-center justify-center">
+                  {user?.avatar_path ? (
+                    <img src={getAvatarUrl(user.avatar_path) || ''} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    user?.full_name?.[0]?.toUpperCase() || <UserIcon className="w-[18px] h-[18px]" />
+                  )}
+                </span>
                 <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface ${PRESENCE_DOT[user?.presence_status || 'active']}`} />
               </button>
               {profileOpen && (
