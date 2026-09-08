@@ -1147,6 +1147,60 @@ export const removePost = async (postId: string, reviewerId: string) => {
   return { error }
 }
 
+// ── Admin: DBS status and session log (Build Spec v1.0, 8 Sep 2026) ──
+// LERN's OWN adults who deliver live sessions -- NOT institution
+// staff, who are DBS-checked by their institution. Everything here is
+// gated by is_lern_admin() at the RLS layer; the client-side check in
+// SettingsPanel is only ever about whether to render the entry point,
+// never the real security boundary.
+export const getLernDeliveryAdults = async () => {
+  const { data, error } = await supabase.from('lern_delivery_adults').select('*').order('created_at')
+  return { data, error }
+}
+
+export const getLernAdultFrequency = async (adultId: string) => {
+  const { data, error } = await supabase.rpc('lern_adult_frequency', { p_adult_id: adultId }).single()
+  return { data, error }
+}
+
+export const addLernDeliveryAdult = async (fields: {
+  full_name: string; role_label: string; delivers_to_minors: boolean; user_id?: string
+}) => {
+  const { data, error } = await supabase.from('lern_delivery_adults').insert([fields]).select().single()
+  return { data, error }
+}
+
+export const updateLernDeliveryAdult = async (id: string, fields: Partial<{
+  dbs_checked: boolean; dbs_checked_at: string | null; delivers_to_minors: boolean; active: boolean
+}>) => {
+  const { error } = await supabase.from('lern_delivery_adults').update(fields).eq('id', id)
+  return { error }
+}
+
+// Newest first -- an evidence log reads naturally most-recent-on-top,
+// and it's what "Export" should produce too.
+export const getLernSessionLog = async (limit = 200) => {
+  const { data, error } = await supabase
+    .from('lern_session_log')
+    .select('*, adult:lern_delivery_adults(full_name)')
+    .order('session_date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  return { data, error }
+}
+
+// Cancellation is its own new row, never an edit to the original --
+// the DB's append-only trigger would reject an UPDATE/DELETE outright
+// regardless, this is just the intended path to the same end.
+export const recordLernSessionCancellation = async (originalLogId: string, adultId: string, sessionTitle: string, mode: 'online' | 'in_person') => {
+  const { error } = await supabase.from('lern_session_log').insert([{
+    adult_id: adultId, session_title: `${sessionTitle} (cancelled)`, mode,
+    delivered_to_minors: false, session_date: new Date().toISOString().split('T')[0],
+    is_cancellation: true, cancelled_log_id: originalLogId,
+  }])
+  return { error }
+}
+
 // ── In-app notifications ─────────────────────────────────────────
 export const getMyNotifications = async (userId: string) => {
   const { data, error } = await supabase

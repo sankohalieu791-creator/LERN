@@ -233,3 +233,41 @@ export interface AppNotification {
   read: boolean
   created_at: string
 }
+
+// Build Spec: DBS status and session log (admin) v1.0, 8 Sep 2026 --
+// LERN's own adults who deliver live sessions, not institution staff.
+export interface LernDeliveryAdult {
+  id: string
+  user_id?: string
+  full_name: string
+  role_label: string
+  avatar_path?: string
+  delivers_to_minors: boolean
+  dbs_checked: boolean
+  dbs_checked_at?: string
+  active: boolean
+  created_at: string
+}
+
+export interface LernAdultFrequency {
+  days_in_30: number
+  is_weekly: boolean
+  has_overnight: boolean
+  is_regulated: boolean
+}
+
+export interface LernSessionLogEntry {
+  id: string
+  adult_id: string
+  work_item_id?: string
+  session_title: string
+  mode: 'online' | 'in_person'
+  delivered_to_minors: boolean
+  session_date: string
+  starts_at?: string
+  ends_at?: string
+  is_cancellation: boolean
+  cancelled_log_id?: string
+  created_at: string
+  adult?: { full_name: string }
+}
