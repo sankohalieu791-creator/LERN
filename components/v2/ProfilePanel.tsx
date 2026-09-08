@@ -142,7 +142,16 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
             Edit profile. ── */}
         <div className="flex flex-col items-center text-center pt-1">
           <Avatar path={profile.avatar_path} name={profile.full_name} size={88} textSize={30} variant="solid" />
-          <p className="text-[19px] font-bold mt-3.5 tracking-tight">{profile.full_name}</p>
+          {/* The Feed's own post card already shows this exact tick next
+              to a verified author's name (same "at least one live
+              verified piece of work" rule, via getVerifiedAuthorIds) --
+              it was never carried over to the profile's own header, so
+              seeing yourself verified on Feed but not on your own
+              profile read as a contradiction. */}
+          <p className="flex items-center justify-center gap-1 text-[19px] font-bold mt-3.5 tracking-tight">
+            {profile.full_name}
+            {verified.length > 0 && <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#0F6E56' }} />}
+          </p>
           {profile.username && <p className="text-[13px] text-[var(--app-text-secondary)] mt-0.5">@{profile.username}</p>}
           {title && <p className="text-[12.5px] font-medium mt-1" style={{ color: '#D4551A' }}>{title}</p>}
           {profile.bio && (

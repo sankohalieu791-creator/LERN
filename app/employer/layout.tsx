@@ -15,6 +15,7 @@ export async function generateViewport(): Promise<Viewport> {
     userScalable: false,
     viewportFit: 'cover',
     themeColor: theme === 'dark' ? '#131110' : '#FFFDF9',
+    interactiveWidget: 'resizes-content',
   }
 }
 

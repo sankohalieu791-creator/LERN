@@ -31,6 +31,11 @@ export async function generateViewport(): Promise<Viewport> {
     userScalable: false,
     viewportFit: 'cover',
     themeColor: theme === 'light' ? '#fafafa' : '#0f0f0f',
+    // See the root layout's own comment -- without this, the keyboard
+    // opening left the bottom nav sized against the pre-keyboard
+    // viewport, so it could float up over whatever was just tapped
+    // into instead of staying out of the way.
+    interactiveWidget: 'resizes-content',
   }
 }
 

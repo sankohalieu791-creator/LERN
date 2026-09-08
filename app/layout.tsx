@@ -38,6 +38,15 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: 'cover',
   themeColor: '#FFFDF9',
+  // Without this, the on-screen keyboard opening only shrinks the
+  // VISUAL viewport, not the layout one -- fixed-positioned bottom UI
+  // (the student bottom nav, any dvh-capped dialog) keeps sizing
+  // itself against the old, taller layout viewport and can end up
+  // floating up into view over whatever's being typed into, instead of
+  // staying pinned below the keyboard or hidden. This makes the layout
+  // viewport itself shrink with the keyboard, which is what "the nav
+  // comes up when I tap a text box" actually needed.
+  interactiveWidget: 'resizes-content',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

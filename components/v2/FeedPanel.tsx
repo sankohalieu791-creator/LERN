@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
   getFeed, setPostReaction, getSignedFileUrl,
-  reportPost, getVerifiedAuthorIds,
+  reportPost, getVerifiedAuthorIds, getAvatarUrl,
   getWins, createWin, reportWin, uploadPostImage, uploadPostVideo,
 } from '@/lib/supabase'
 import type { ReactionType } from '@/lib/types'
@@ -158,8 +158,12 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
           return (
             <button key={w.id} onClick={() => setViewing(w)} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 60 }}>
               <span className="relative rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 54, height: 54, border: `3px solid ${meta?.ring || '#0F6E56'}` }}>
-                <span className="w-full h-full rounded-full flex items-center justify-center text-[13px] font-semibold" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
-                  {initials(w.author?.full_name)}
+                <span className="w-full h-full rounded-full overflow-hidden flex items-center justify-center text-[13px] font-semibold" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+                  {w.author?.avatar_path ? (
+                    <img src={getAvatarUrl(w.author.avatar_path) || ''} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    initials(w.author?.full_name)
+                  )}
                 </span>
                 <StaffPresenceDot role={w.author?.role} status={w.author?.presence_status} />
               </span>
@@ -254,11 +258,18 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
     let image_path: string | undefined
     let video_path: string | undefined
     if (file && isVideo) {
-      const { path } = await uploadPostVideo(userId, file, file.name.split('.').pop() || 'mp4')
-      video_path = path || undefined
+      // Was discarding this error before -- an upload the storage
+      // bucket rejected (e.g. a .mov from an iPhone camera before the
+      // bucket allowed that MIME type) silently posted as text-only
+      // with the fallback gradient standing in for a video that was
+      // never actually there.
+      const { path, error: upErr } = await uploadPostVideo(userId, file, file.name.split('.').pop() || 'mp4')
+      if (upErr || !path) { setPosting(false); setMediaError("Couldn't upload that video — try a different one."); return }
+      video_path = path
     } else if (file) {
-      const { path } = await uploadPostImage(userId, file)
-      image_path = path || undefined
+      const { path, error: upErr } = await uploadPostImage(userId, file)
+      if (upErr || !path) { setPosting(false); setMediaError("Couldn't upload that photo — try a different one."); return }
+      image_path = path
     }
     // Was discarding the error and closing the sheet unconditionally
     // before -- a failed post (network, RLS, anything) silently threw
@@ -479,9 +490,17 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
           onClick={() => router.push(post.author_id === user?.id ? '/student/profile' : `/student/profile/${post.author_id}`)}
           className="flex-1 min-w-0 flex items-center gap-2.5 text-left"
         >
-          <span className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
-            {initials(post.author_name)}
-          </span>
+          {/* posts_feed never selected the author's avatar_path at all
+              before -- there was no real photo to render here regardless
+              of whether the author had one set, so this always fell
+              back to initials. */}
+          {post.author_avatar_path ? (
+            <img src={getAvatarUrl(post.author_avatar_path) || ''} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <span className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+              {initials(post.author_name)}
+            </span>
+          )}
           <div className="min-w-0">
             <p className="flex items-center gap-1 text-[13px] font-semibold text-[var(--app-text)] truncate">
               {post.author_name}

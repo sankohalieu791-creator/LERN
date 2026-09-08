@@ -350,13 +350,9 @@ function WorkItemCard({ item, onChanged, summary }: { item: any; onChanged: () =
               Scheduled {item.scheduled_for && new Date(item.scheduled_for).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
-          {item.closed_at ? (
+          {item.closed_at && (
             <span className="text-[11px] font-semibold uppercase tracking-wide text-danger-text bg-danger-bg px-2 py-0.5 rounded-full">
               Revoked
-            </span>
-          ) : (
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary bg-surface-muted px-2 py-0.5 rounded-full">
-              {item.visibility}
             </span>
           )}
           {confirmingRevoke ? (
@@ -608,7 +604,6 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
   const [description, setDescription] = useState('')
   const [criteria, setCriteria] = useState('')
   const [deadline, setDeadline] = useState('')
-  const [visibility, setVisibility] = useState<'public' | 'private'>('private')
   const [mode, setMode] = useState<'online' | 'in_person'>('online')
   const [location, setLocation] = useState('')
   const [startsAt, setStartsAt] = useState('')
@@ -623,9 +618,14 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
     if (!user?.organisation_id) return setError("Your account isn't linked to an organisation yet — try refreshing the page.")
 
     setLoading(true)
+    // Removed the private/public choice per direct request -- every
+    // student in the org already had to join with a code to be here at
+    // all, so the "private = join code only" distinction never actually
+    // meant anything extra; public (visible to the whole org) is the
+    // only behaviour that ever made sense as a default.
     const { error: createError } = await createWorkItem(user.organisation_id, user.id, {
       type, title: title.trim(), topic: topic.trim() || undefined, description: description.trim() || undefined,
-      criteria: criteria.trim(), visibility, deadline: deadline || null,
+      criteria: criteria.trim(), visibility: 'public', deadline: deadline || null,
       mode, location: mode === 'in_person' ? location.trim() : undefined,
       starts_at: mode === 'online' && startsAt ? new Date(startsAt).toISOString() : null,
     })
@@ -692,30 +692,6 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
           </>
         )}
       </label>
-      <label className="block mb-5">
-        <span className="block text-[13px] font-semibold text-ink mb-1.5">Visibility</span>
-        {/* "Private — join code only" inside a half-width flex-1 button
-            next to "Public" wrapped onto two lines on a phone-width
-            screen, stretching that whole row taller than the button
-            beside it -- short label in the button, same as the
-            brief form's own visibility toggle, explanation as a
-            hint underneath instead. */}
-        <div className="flex gap-2">
-          {(['private', 'public'] as const).map(v => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setVisibility(v)}
-              className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold capitalize transition ${
-                visibility === v ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
-              }`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-        {visibility === 'private' && <p className="text-[11px] text-ink-tertiary mt-1.5">Only students with a join code can see this.</p>}
-      </label>
       <PrimaryButton onClick={handleSubmit} loading={loading}>Create</PrimaryButton>
     </div>
   )
@@ -741,7 +717,6 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
   const [criteria, setCriteria] = useState('')
   const [deadline, setDeadline] = useState('')
   const [groupId, setGroupId] = useState('')
-  const [visibility, setVisibility] = useState<'public' | 'private'>('private')
   const [files, setFiles] = useState<File[]>([])
   const [publishChoice, setPublishChoice] = useState<PublishChoice>('posted')
   const [scheduledFor, setScheduledFor] = useState('')
@@ -759,9 +734,12 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
     if (!user?.organisation_id) return setError("Your account isn't linked to an organisation yet — try refreshing the page.")
 
     setLoading(true)
+    // Removed the private/public choice per direct request -- every
+    // student in the org already had to join with a code to be here at
+    // all, so it's always public (visible to the whole org) now.
     const { data: workItem, error: createError } = await createWorkItem(user.organisation_id, user.id, {
       type: 'brief', title: title.trim(), topic: topic.trim() || undefined, assignment: assignment.trim(),
-      criteria: criteria.trim(), deadline: deadline || null, group_id: groupId || null, visibility,
+      criteria: criteria.trim(), deadline: deadline || null, group_id: groupId || null, visibility: 'public',
       publish_state: publishChoice,
       scheduled_for: publishChoice === 'scheduled' ? new Date(scheduledFor).toISOString() : null,
     })
@@ -837,21 +815,6 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
               />
             </label>
             <GroupPicker organisationId={user?.organisation_id} value={groupId} onChange={setGroupId} />
-            <label className="block">
-              <span className="block text-[13px] font-semibold text-ink mb-1.5">Visibility</span>
-              <div className="flex gap-2">
-                {(['private', 'public'] as const).map(v => (
-                  <button
-                    key={v} type="button" onClick={() => setVisibility(v)}
-                    className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold capitalize transition ${
-                      visibility === v ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'
-                    }`}
-                  >
-                    {v === 'private' ? 'Private' : 'Public'}
-                  </button>
-                ))}
-              </div>
-            </label>
             <label className="block">
               <span className="block text-[13px] font-semibold text-ink mb-1.5">When</span>
               <div className="flex flex-col gap-1.5">
@@ -937,7 +900,7 @@ function UploadExistingWorkForm({ onCreated }: { onCreated: () => void }) {
 
     const { data: workItem, error: createError } = await createWorkItem(user.organisation_id, user.id, {
       type: 'brief', title: title.trim(), topic: topic.trim() || undefined,
-      criteria: criteria.trim(), group_id: groupId, visibility: 'private',
+      criteria: criteria.trim(), group_id: groupId, visibility: 'public',
     })
     if (createError || !workItem) { setLoading(false); return setError(createError?.message || 'Could not create the brief.') }
 

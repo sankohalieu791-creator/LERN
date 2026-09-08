@@ -823,7 +823,7 @@ export const getWins = async () => {
   const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
   const { data, error } = await supabase
     .from('wins')
-    .select('*, author:users!wins_author_id_fkey(full_name, role, presence_status)')
+    .select('*, author:users!wins_author_id_fkey(full_name, role, presence_status, avatar_path)')
     .eq('hidden', false)
     .gte('created_at', cutoff)
     .order('created_at', { ascending: false })
