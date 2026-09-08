@@ -53,6 +53,7 @@ export default function TalentPoolsPanel() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
+  const [createError, setCreateError] = useState('')
   const [openPool, setOpenPool] = useState<any | null>(null)
 
   const load = () => {
@@ -73,7 +74,12 @@ export default function TalentPoolsPanel() {
 
   const submit = async () => {
     if (!name.trim() || !user) return
-    await createTalentPool(user.id, name.trim())
+    setCreateError('')
+    // Was closing the form and reloading regardless of the result
+    // before -- a failed create just silently closed with the pool
+    // never having existed, and nothing said why.
+    const { error } = await createTalentPool(user.id, name.trim())
+    if (error) { setCreateError("Couldn't create that pool — try again."); return }
     setName(''); setCreating(false); load()
   }
 
@@ -90,13 +96,16 @@ export default function TalentPoolsPanel() {
       <p className="text-[13px] text-ink-tertiary mb-5">Named lists for candidates you want to come back to.</p>
 
       {creating && (
-        <div className="flex items-center gap-2 mb-5">
-          <input
-            value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="e.g. Design 2026"
-            onKeyDown={e => e.key === 'Enter' && submit()}
-            className="flex-1 bg-surface border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
-          />
-          <button onClick={submit} disabled={!name.trim()} className="bg-brand text-white text-[13px] font-semibold px-4 py-2.5 rounded-lg disabled:opacity-40">Create</button>
+        <div className="mb-5">
+          <div className="flex items-center gap-2">
+            <input
+              value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="e.g. Design 2026"
+              onKeyDown={e => e.key === 'Enter' && submit()}
+              className="flex-1 bg-surface border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+            />
+            <button onClick={submit} disabled={!name.trim()} className="bg-brand text-white text-[13px] font-semibold px-4 py-2.5 rounded-lg disabled:opacity-40">Create</button>
+          </div>
+          {createError && <p className="text-[12px] text-danger-text mt-2">{createError}</p>}
         </div>
       )}
 
@@ -162,7 +171,12 @@ function PoolDetail({ pool, onBack }: { pool: any; onBack: () => void }) {
 
   const remove = async () => {
     if (!confirm(`Delete "${pool.name}"? This removes the list, not the candidates themselves.`)) return
-    await deleteTalentPool(pool.id)
+    // Was navigating back unconditionally before -- a failed delete
+    // left the pool exactly as it was, but the user was already told
+    // (by being sent back to the list) that it was gone; it would only
+    // reappear once that list happened to reload.
+    const { error } = await deleteTalentPool(pool.id)
+    if (error) { alert("Couldn't delete that pool — try again."); return }
     onBack()
   }
 

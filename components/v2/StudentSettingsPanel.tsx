@@ -82,14 +82,20 @@ export default function StudentSettingsPanel() {
 
   const requestReset = async () => {
     setBusyField('reset')
-    await sendPasswordResetEmail(user.email)
+    const { error } = await sendPasswordResetEmail(user.email)
     setBusyField(null)
-    alert(`A password reset link has been sent to ${user.email}.`)
+    // Was unconditional before -- a failed send (rate limit, bad email
+    // on the account, network) still told the user it had gone out.
+    alert(error ? `Couldn't send the reset link — ${error.message}` : `A password reset link has been sent to ${user.email}.`)
   }
 
   const requestSignOutEverywhere = async () => {
     if (!confirm('Sign out of every device you’re signed in on?')) return
-    await signOutEverywhere()
+    const { error } = await signOutEverywhere()
+    // A failed global sign-out still redirected this device to login as
+    // if it had worked, silently leaving every OTHER device signed in --
+    // the one thing this button exists to guarantee.
+    if (error) { alert(`Couldn't sign out everywhere — ${error.message}`); return }
     router.replace('/auth/login')
   }
 
@@ -97,9 +103,12 @@ export default function StudentSettingsPanel() {
     if (!user.organisation_id) return
     if (!confirm('Start a deletion request? Your school will be notified so the right adult can help.')) return
     setBusyField('minorDelete')
-    await requestMinorAccountDeletion(user.id, user.organisation_id)
+    const { error } = await requestMinorAccountDeletion(user.id, user.organisation_id)
     setBusyField(null)
-    alert('Your request has been sent to your school. They’ll be in touch to help with the next steps.')
+    // Was unconditional before -- a failed request (e.g. one already
+    // pending) told the young person it had reached their school when
+    // it hadn't.
+    alert(error ? `Couldn't send that request — ${error.message}` : 'Your request has been sent to your school. They’ll be in touch to help with the next steps.')
   }
 
   // ── Sub-screens ──

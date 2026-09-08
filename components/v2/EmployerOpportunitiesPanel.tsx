@@ -55,8 +55,16 @@ export default function EmployerOpportunitiesPanel() {
   }
 
   const handleDelete = async (id: string) => {
+    const removed = items.find(i => i.id === id)
     setItems(prev => prev.filter(i => i.id !== id)) // optimistic
-    await deleteOpportunity(id)
+    // Was discarding the result before -- a failed delete left the
+    // posting removed from this list forever while it was still fully
+    // live and gathering applications, with nothing ever putting it back.
+    const { error } = await deleteOpportunity(id)
+    if (error && removed) {
+      setItems(prev => prev.some(i => i.id === id) ? prev : [...prev, removed])
+      alert("Couldn't delete that posting — try again.")
+    }
   }
 
   return (

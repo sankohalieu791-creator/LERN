@@ -62,6 +62,8 @@ export default function StudentDiscoverPanel() {
   const [opportunities, setOpportunities] = useState<any[]>([])
   const [applicationByOpp, setApplicationByOpp] = useState<Record<string, string>>({})
   const [applying, setApplying] = useState<string | null>(null)
+  const [respondingId, setRespondingId] = useState<string | null>(null)
+  const [respondError, setRespondError] = useState<string | null>(null)
   const [interest, setInterest] = useState<any[]>([])
   const [applications, setApplications] = useState<any[]>([])
   const [stageByOpp, setStageByOpp] = useState<Record<string, ApplicationStage>>({})
@@ -91,8 +93,17 @@ export default function StudentDiscoverPanel() {
       already ? next.delete(opportunityId) : next.add(opportunityId)
       return next
     })
-    if (already) await unsaveOpportunity(user.id, opportunityId)
-    else await saveOpportunity(user.id, opportunityId)
+    // Was discarding the result before -- a failed save/unsave left the
+    // bookmark showing the opposite of its real, saved state until
+    // something else happened to reload the page.
+    const { error } = already ? await unsaveOpportunity(user.id, opportunityId) : await saveOpportunity(user.id, opportunityId)
+    if (error) {
+      setSavedIds(prev => {
+        const next = new Set(prev)
+        already ? next.add(opportunityId) : next.delete(opportunityId)
+        return next
+      })
+    }
     setSavingIds(prev => { const next = new Set(prev); next.delete(opportunityId); return next })
   }
 
@@ -133,7 +144,16 @@ export default function StudentDiscoverPanel() {
   useEffect(() => { const t = setTimeout(load, 300); return () => clearTimeout(t) }, [search])
 
   const respond = async (id: string, status: 'accepted' | 'declined') => {
-    await respondToInterest(id, status)
+    if (respondingId) return
+    setRespondingId(id); setRespondError(null)
+    // Was discarding the error and flipping local state unconditionally
+    // before -- a failed accept/decline showed "Accepted"/"Declined" as
+    // if it had gone through when the employer's side hadn't changed at
+    // all, and a fast double-tap could fire this twice before either
+    // resolved.
+    const { error } = await respondToInterest(id, status)
+    setRespondingId(null)
+    if (error) { setRespondError(id); return }
     setInterest(prev => prev.map(i => i.id === id ? { ...i, status } : i))
   }
 
@@ -243,13 +263,16 @@ export default function StudentDiscoverPanel() {
                   actually after before they accept or decline. */}
               {i.message && <p className="text-[var(--app-text-body)] text-sm leading-snug mb-3">{i.message}</p>}
               {i.status === 'pending' ? (
-                <div className="flex gap-2">
-                  <button onClick={() => respond(i.id, 'accepted')} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white">
-                    <Check className="w-4 h-4" /> Accept
-                  </button>
-                  <button onClick={() => respond(i.id, 'declined')} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-[#252525] text-[#ccc] border border-[var(--app-border)]">
-                    <Ban className="w-4 h-4" /> Decline
-                  </button>
+                <div>
+                  <div className="flex gap-2">
+                    <button onClick={() => respond(i.id, 'accepted')} disabled={respondingId === i.id} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white disabled:opacity-50">
+                      <Check className="w-4 h-4" /> {respondingId === i.id ? '…' : 'Accept'}
+                    </button>
+                    <button onClick={() => respond(i.id, 'declined')} disabled={respondingId === i.id} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-[#252525] text-[#ccc] border border-[var(--app-border)] disabled:opacity-50">
+                      <Ban className="w-4 h-4" /> {respondingId === i.id ? '…' : 'Decline'}
+                    </button>
+                  </div>
+                  {respondError === i.id && <p className="text-[12px] text-[#e04a4a] mt-2">Couldn't send that — try again.</p>}
                 </div>
               ) : (
                 <span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-full ${

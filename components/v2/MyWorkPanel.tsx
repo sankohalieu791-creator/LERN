@@ -203,8 +203,13 @@ function SubmissionHistoryRow({ submission }: { submission: any }) {
   const toggleVisibility = async () => {
     if (!verification || submission.status !== 'verified') return
     setBusy(true)
-    await setShareVisibility(verification.id, verification.visibility === 'public' ? 'organisation' : 'public')
+    // Was discarding the error and reloading unconditionally before --
+    // a failed toggle (RLS, network, the DB's own under-18 guard) just
+    // silently reloaded to the SAME unchanged state with no explanation
+    // at all, reading as "I tapped it and nothing happened."
+    const { error } = await setShareVisibility(verification.id, verification.visibility === 'public' ? 'organisation' : 'public')
     setBusy(false)
+    if (error) { alert(error.message || "Couldn't change that — try again."); return }
     window.location.reload() // simplest way to reflect the new visibility right now
   }
 

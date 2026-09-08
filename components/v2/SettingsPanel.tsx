@@ -69,9 +69,11 @@ export default function SettingsPanel() {
 
   const requestReset = async () => {
     setBusyField('reset')
-    await sendPasswordResetEmail(user.email)
+    const { error } = await sendPasswordResetEmail(user.email)
     setBusyField(null)
-    alert(`A password reset link has been sent to ${user.email}.`)
+    // Was unconditional before -- a failed send (rate limit, bad email
+    // on the account, network) still told the user it had gone out.
+    alert(error ? `Couldn't send the reset link — ${error.message}` : `A password reset link has been sent to ${user.email}.`)
   }
 
   const toggleTwoStep = async () => {
@@ -83,7 +85,11 @@ export default function SettingsPanel() {
 
   const requestSignOutEverywhere = async () => {
     if (!confirm('Sign out of every device you’re signed in on?')) return
-    await signOutEverywhere()
+    const { error } = await signOutEverywhere()
+    // A failed global sign-out still redirected this device to login as
+    // if it had worked, silently leaving every OTHER device signed in --
+    // the one thing this button exists to guarantee.
+    if (error) { alert(`Couldn't sign out everywhere — ${error.message}`); return }
     router.replace('/auth/login')
   }
 

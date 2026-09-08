@@ -497,7 +497,12 @@ export default function WorkshopSession({
 
   const send = async () => {
     if (!draft.trim() || !user) return
-    await sendWorkshopMessage(workItemId, user.id, 'question', draft.trim())
+    const text = draft.trim()
+    // Was clearing the draft unconditionally before -- a failed send
+    // (a live call is exactly where a dropped connection is likely)
+    // silently threw the question away with nothing to show for it.
+    const { error } = await sendWorkshopMessage(workItemId, user.id, 'question', text)
+    if (error) { setActionError("Couldn't send that — try again."); return }
     setDraft('')
   }
 

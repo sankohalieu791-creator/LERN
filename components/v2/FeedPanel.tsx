@@ -250,7 +250,7 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
 
   const submit = async () => {
     if (!type) return
-    setPosting(true)
+    setPosting(true); setMediaError('')
     let image_path: string | undefined
     let video_path: string | undefined
     if (file && isVideo) {
@@ -260,8 +260,13 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
       const { path } = await uploadPostImage(userId, file)
       image_path = path || undefined
     }
-    await createWin(userId, organisationId, { milestone_type: type, content: content.trim() || undefined, image_path, video_path })
+    // Was discarding the error and closing the sheet unconditionally
+    // before -- a failed post (network, RLS, anything) silently threw
+    // away everything just typed/picked, with the sheet closing exactly
+    // as if it had actually gone up.
+    const { error } = await createWin(userId, organisationId, { milestone_type: type, content: content.trim() || undefined, image_path, video_path })
     setPosting(false)
+    if (error) { setMediaError("Couldn't post that — try again."); return }
     onAdded()
   }
 

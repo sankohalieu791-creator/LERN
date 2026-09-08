@@ -563,11 +563,17 @@ export function EditProfileScreen({ profile, onDone, onClose }: { profile: any; 
       if (checkErr) { setSaving(false); return setError(checkErr.message) }
       if (!available) { setSaving(false); return setError('That username is taken — try another.') }
     }
-    await Promise.all([
+    // Was discarding both results before -- a failed save (network,
+    // RLS, anything) still closed the sheet via onDone() as if the
+    // name/bio/tags had actually changed, with nothing telling the
+    // user their edit never landed.
+    const [{ error: profileErr }, { error: bioErr }] = await Promise.all([
       updateUserProfile(profile.id, { full_name: name.trim(), username: cleanUsername || null }),
       updateProfileBioTags(profile.id, bio.trim(), tags.split(',').map((t: string) => t.trim()).filter(Boolean)),
     ])
     setSaving(false)
+    const saveError = profileErr || bioErr
+    if (saveError) { setError(saveError.message || "Couldn't save — try again."); return }
     onDone()
   }
 
@@ -654,12 +660,16 @@ function AddExperienceForm({ profileId, onAdded }: { profileId: string; onAdded:
   const [title, setTitle] = useState('')
   const [organisation, setOrganisation] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   const submit = async () => {
     if (!title.trim()) return
-    setSaving(true)
-    await addExperienceEntry(profileId, { title: title.trim(), organisation: organisation.trim() || undefined })
+    setSaving(true); setError('')
+    // Was discarding the error and closing the form regardless before --
+    // a failed save silently threw away what was just typed.
+    const { error: err } = await addExperienceEntry(profileId, { title: title.trim(), organisation: organisation.trim() || undefined })
     setSaving(false)
+    if (err) { setError("Couldn't save — try again."); return }
     onAdded()
   }
 
@@ -667,6 +677,7 @@ function AddExperienceForm({ profileId, onAdded }: { profileId: string; onAdded:
     <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl p-3.5 space-y-2">
       <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Saturday job at a local print shop" className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition" />
       <input value={organisation} onChange={e => setOrganisation(e.target.value)} placeholder="Where (optional)" className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition" />
+      {error && <p className="text-[12px] text-danger-text">{error}</p>}
       <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
         {saving ? 'Saving…' : 'Save'}
       </button>
@@ -679,18 +690,22 @@ function AddQualForm({ profileId, onAdded }: { profileId: string; onAdded: () =>
   const [issuer, setIssuer] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const submit = async () => {
     if (!title.trim()) return
-    setSaving(true)
+    setSaving(true); setError('')
     let file_path: string | undefined
     if (file) {
       const { path } = await uploadSelfQualificationFile(profileId, file)
       if (path) file_path = path
     }
-    await addSelfQualification(profileId, { title: title.trim(), issuer: issuer.trim() || undefined, file_path })
+    // Was discarding the error and closing the form regardless before --
+    // a failed save silently threw away what was just typed/attached.
+    const { error: err } = await addSelfQualification(profileId, { title: title.trim(), issuer: issuer.trim() || undefined, file_path })
     setSaving(false)
+    if (err) { setError("Couldn't save — try again."); return }
     onAdded()
   }
 
@@ -702,6 +717,7 @@ function AddQualForm({ profileId, onAdded }: { profileId: string; onAdded: () =>
         {file ? file.name : 'Attach a file (optional)'}
       </button>
       <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
+      {error && <p className="text-[12px] text-danger-text">{error}</p>}
       <div>
         <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
           {saving ? 'Saving…' : 'Save'}

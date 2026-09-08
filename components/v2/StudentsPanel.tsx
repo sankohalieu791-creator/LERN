@@ -150,7 +150,15 @@ export default function StudentsPanel() {
         <StudentDetail
           student={detailStudent} groups={groups}
           onClose={() => setDetailStudent(null)}
-          onGroupChanged={load}
+          onGroupChanged={(groupId) => {
+            load()
+            // load() only refreshes the background `students` list --
+            // detailStudent is its own separate piece of state, so the
+            // dropdown in the still-open detail screen kept showing the
+            // OLD group after a successful save, as if it hadn't taken,
+            // until this screen was closed and reopened.
+            setDetailStudent((prev: any) => prev ? { ...prev, group_id: groupId } : prev)
+          }}
         />
       )}
     </div>
@@ -162,11 +170,12 @@ export default function StudentsPanel() {
 // convention every other detail screen in this app uses (a sticky
 // back-button header over one scrolling page).
 function StudentDetail({ student, groups, onClose, onGroupChanged }: {
-  student: any; groups: Group[]; onClose: () => void; onGroupChanged: () => void
+  student: any; groups: Group[]; onClose: () => void; onGroupChanged: (groupId: string) => void
 }) {
   const [submissions, setSubmissions] = useState<any[] | null>(null)
   const [attendance, setAttendance] = useState<any>(null)
   const [savingGroup, setSavingGroup] = useState(false)
+  const [groupError, setGroupError] = useState('')
   const theme = useResolvedTheme()
 
   useEffect(() => {
@@ -176,10 +185,13 @@ function StudentDetail({ student, groups, onClose, onGroupChanged }: {
 
   const changeGroup = async (groupId: string) => {
     if (!groupId) return
-    setSavingGroup(true)
-    await setStudentGroup(student.id, groupId)
+    setSavingGroup(true); setGroupError('')
+    // Was firing onGroupChanged unconditionally before -- a failed save
+    // still showed the newly-picked group as if it had taken.
+    const { error } = await setStudentGroup(student.id, groupId)
     setSavingGroup(false)
-    onGroupChanged()
+    if (error) { setGroupError(error.message || "Couldn't move them — try again."); return }
+    onGroupChanged(groupId)
   }
 
   // data-theme is repeated here even though OrgShell already sets it --
@@ -219,6 +231,7 @@ function StudentDetail({ student, groups, onClose, onGroupChanged }: {
             <option value="" disabled>No group</option>
             {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
+          {groupError && <p className="text-[12px] text-danger-text mt-2">{groupError}</p>}
         </div>
 
         <div className="bg-surface border border-edge rounded-2xl p-5 mb-4">
@@ -471,7 +484,14 @@ function GuestInvitePanel({ students }: { students: any[] }) {
   }
 
   const handleRevoke = async (id: string) => {
-    await revokeGuestInvite(id)
+    setError('')
+    // Was discarding the error and unconditionally marking it revoked
+    // before -- a failed revoke still showed the link as dead in this
+    // list while it kept working perfectly fine for whoever holds it,
+    // which is exactly backwards for a button whose whole job is
+    // cutting off access.
+    const { error: err } = await revokeGuestInvite(id)
+    if (err) { setError("Couldn't revoke that link — try again."); return }
     setInvites(prev => prev.map(i => i.id === id ? { ...i, revoked_at: new Date().toISOString() } : i))
   }
 

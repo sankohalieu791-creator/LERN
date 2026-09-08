@@ -40,8 +40,15 @@ export default function InterestReceivedPanel() {
   useEffect(load, [user?.organisation_id])
 
   const respond = async (id: string, status: 'accepted' | 'declined') => {
-    await respondToInterest(id, status)
+    // Was discarding the error and updating local state unconditionally
+    // before -- a failed accept/decline still flipped the badge to
+    // "Accepted"/"Declined" as if it had gone through, when the
+    // employer's side never actually changed. This gates real contact
+    // with an employer, so a false "accepted" is not a cosmetic bug.
+    const { error } = await respondToInterest(id, status)
+    if (error) return { error }
     setItems(prev => prev.map(i => i.id === id ? { ...i, status } : i))
+    return { error: null }
   }
 
   const open = items.find(i => i.id === openId) || null
@@ -152,11 +159,12 @@ export default function InterestReceivedPanel() {
   )
 }
 
-function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => void; onRespond: (id: string, status: 'accepted' | 'declined') => void }) {
+function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => void; onRespond: (id: string, status: 'accepted' | 'declined') => Promise<{ error: any }> }) {
   const { user } = useAuth()
   const [messages, setMessages] = useState<any[]>([])
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState('')
 
   const load = () => { getInterestMessages(item.id).then(({ data }) => setMessages(data || [])) }
   useEffect(load, [item.id])
@@ -166,8 +174,14 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
 
   const send = async (alsoAccept: boolean) => {
     if (!reply.trim() || !user) return
-    setSending(true)
-    if (alsoAccept && item.status === 'pending') await onRespond(item.id, 'accepted')
+    setSending(true); setSendError('')
+    if (alsoAccept && item.status === 'pending') {
+      // Was pressing on to send the message even if the accept itself
+      // failed -- the employer would then get a reply on a request that
+      // your own side still shows as pending, never actually accepted.
+      const { error } = await onRespond(item.id, 'accepted')
+      if (error) { setSending(false); setSendError("Couldn't accept — try again."); return }
+    }
     await sendInterestMessage(item.id, user.id, 'org', reply.trim())
     setReply('')
     await load()
@@ -175,7 +189,12 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   }
 
   const decline = async () => {
-    await onRespond(item.id, 'declined')
+    setSendError('')
+    const { error } = await onRespond(item.id, 'declined')
+    // Was closing the thread even when the decline itself failed to
+    // save -- the request would sit permanently un-respondable, still
+    // "pending" underneath with no way back into it.
+    if (error) { setSendError("Couldn't decline — try again."); return }
     await closeInterestThread(item.id)
   }
 
@@ -253,6 +272,7 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
               </button>
             )}
           </div>
+          {sendError && <p className="text-[12px] text-danger-text mt-2">{sendError}</p>}
         </div>
       )}
 

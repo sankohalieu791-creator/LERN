@@ -186,6 +186,7 @@ function PoolPicker({ studentId, onClose }: { studentId: string; onClose: () => 
   const [name, setName] = useState('')
   const [saved, setSaved] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => { if (user) getTalentPools(user.id).then(({ data }) => { setPools(data || []); setLoading(false) }) }, [user?.id])
 
@@ -195,16 +196,25 @@ function PoolPicker({ studentId, onClose }: { studentId: string; onClose: () => 
   // a duplicate insert). The in-flight guard fixes it the same way.
   const save = async (poolId: string) => {
     if (saving) return
-    setSaving(true)
-    await addToTalentPool(poolId, studentId)
+    setSaving(true); setError('')
+    // Was discarding the error before -- a failed add still showed the
+    // checkmark and closed the picker as if the candidate had actually
+    // been saved to that pool.
+    const { error: err } = await addToTalentPool(poolId, studentId)
+    setSaving(false)
+    if (err) { setError("Couldn't save — try again."); return }
     setSaved(poolId)
     setTimeout(onClose, 700)
   }
   const makeAndSave = async () => {
     if (!name.trim() || !user || saving) return
-    setSaving(true)
-    const { data } = await createTalentPool(user.id, name.trim())
-    if (data) { setSaving(false); save(data.id) } else setSaving(false)
+    setSaving(true); setError('')
+    const { data, error: err } = await createTalentPool(user.id, name.trim())
+    setSaving(false)
+    // Was silently doing nothing on failure before -- the button just
+    // stopped spinning with no indication the pool was never created.
+    if (err || !data) { setError("Couldn't create that pool — try again."); return }
+    save(data.id)
   }
 
   return (
@@ -235,6 +245,7 @@ function PoolPicker({ studentId, onClose }: { studentId: string; onClose: () => 
               + New pool
             </button>
           )}
+          {error && <p className="text-[11.5px] text-danger-text px-2 pt-1.5">{error}</p>}
         </>
       )}
     </div>
