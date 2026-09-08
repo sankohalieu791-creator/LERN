@@ -210,6 +210,7 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged, onNoteSav
   const [savingNote, setSavingNote] = useState(false)
   const [noteSaved, setNoteSaved] = useState(false)
   const [noteError, setNoteError] = useState('')
+  const [notProgressingReason, setNotProgressingReason] = useState<string | null>(null)
 
   useEffect(() => { getApplicationActivity(app.id).then(({ data }) => setActivity(data || [])) }, [app.id])
 
@@ -217,10 +218,17 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged, onNoteSav
   const isMinor = a !== null && a < 18
   const pill = PILL[app.stage as ApplicationStage]
 
-  const move = async (stage: ApplicationStage) => {
+  const move = async (stage: ApplicationStage, reason?: string) => {
+    // "Not progressing" on its own said nothing about why -- routes
+    // through a quick reason prompt instead of moving immediately, so
+    // it actually answers "how would I know if I have not progressing"
+    // the next time anyone (employer or org) looks at this candidate's
+    // activity log.
+    if (stage === 'not_progressing' && notProgressingReason === null) { setNotProgressingReason(''); return }
     setMoving(true)
-    await moveApplicationStage(app.id, stage, actorId)
+    await moveApplicationStage(app.id, stage, actorId, reason)
     setMoving(false)
+    setNotProgressingReason(null)
     onChanged()
   }
   const saveNote = async () => {
@@ -268,6 +276,23 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged, onNoteSav
                   </button>
                 ))}
               </div>
+              {notProgressingReason !== null && (
+                <div className="mt-2.5 pt-2.5 border-t border-edge-subtle">
+                  <p className="text-[12px] text-ink-tertiary mb-1.5">Why aren't they progressing? (optional, but shows up in the activity log for you and the school/provider to see)</p>
+                  <textarea
+                    value={notProgressingReason} onChange={e => setNotProgressingReason(e.target.value)} autoFocus
+                    placeholder="e.g. Went with a candidate with more relevant experience"
+                    rows={2}
+                    className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
+                  />
+                  <div className="flex items-center gap-2 mt-2">
+                    <button onClick={() => move('not_progressing', notProgressingReason)} disabled={moving} className="text-[12px] font-semibold bg-brand text-white px-3 py-1.5 rounded-lg disabled:opacity-40">
+                      {moving ? 'Saving…' : 'Confirm'}
+                    </button>
+                    <button onClick={() => setNotProgressingReason(null)} className="text-[12px] font-semibold text-ink-tertiary px-2">Cancel</button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -209,7 +209,12 @@ export default function OrgShell({
             >
               <Menu className="w-5 h-5" />
             </button>
-            <Logo size="sm" />
+            {/* No colour wrapper here before -- currentColor had
+                nothing to inherit but the browser's plain black
+                default, invisible against a dark-mode header. The
+                laptop sidebar's own wordmark right above already gets
+                text-ink; this one just never did. */}
+            <span className="text-ink"><Logo size="sm" /></span>
           </div>
           <div className="hidden lg:flex items-center gap-2 min-w-0">
             {identityLogoUrl && <img src={identityLogoUrl} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />}

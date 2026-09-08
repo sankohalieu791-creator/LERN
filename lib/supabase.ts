@@ -1613,13 +1613,21 @@ const STAGE_LABEL: Record<ApplicationStage, string> = {
 // stages; they own stage changes... The ORGANISATION does not move
 // cards"), enforced by RLS (applications: employer manage own is the
 // only UPDATE-of-stage-shaped policy an employer's own auth.uid() can hit).
-export const moveApplicationStage = async (applicationId: string, stage: ApplicationStage, actorId: string) => {
+// reason is optional and only really meant for not_progressing --
+// "Not progressing" on its own answered nothing about WHY, and the
+// activity log is exactly where that already surfaces on both the
+// employer's and the org's view of this same candidate, so this
+// reuses it rather than adding a whole new field/section for one stage.
+export const moveApplicationStage = async (applicationId: string, stage: ApplicationStage, actorId: string, reason?: string) => {
   const { data, error } = await supabase
     .from('applications')
     .update({ stage, stage_updated_at: new Date().toISOString() })
     .eq('id', applicationId)
     .select().single()
-  if (data) await logApplicationActivity(applicationId, actorId, `moved_to_${stage}`, `Moved to ${STAGE_LABEL[stage]}`)
+  if (data) {
+    const detail = reason?.trim() ? `Moved to ${STAGE_LABEL[stage]} — ${reason.trim()}` : `Moved to ${STAGE_LABEL[stage]}`
+    await logApplicationActivity(applicationId, actorId, `moved_to_${stage}`, detail)
+  }
   return { data, error }
 }
 
