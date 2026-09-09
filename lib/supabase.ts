@@ -318,7 +318,7 @@ export const getWorkItemAttachments = async (workItemId: string) => {
 
 // Both submission-files and work-item-attachments are private buckets --
 // a signed URL is the only way to actually view/download an object.
-export const getSignedFileUrl = async (bucket: 'submission-files' | 'work-item-attachments' | 'post-images' | 'post-videos' | 'session-recordings' | 'self-qualifications', path: string) => {
+export const getSignedFileUrl = async (bucket: 'submission-files' | 'work-item-attachments' | 'post-images' | 'post-videos' | 'session-recordings' | 'self-qualifications' | 'interest-message-files', path: string) => {
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600)
   return { url: data?.signedUrl ?? null, error }
 }
@@ -1525,13 +1525,28 @@ export const getInterestMessages = async (interestId: string) => {
 
 export const sendInterestMessage = async (
   interestId: string, senderId: string, senderRole: 'employer' | 'org', body: string,
+  attachment?: { path: string; name: string; type: string; size: number },
 ) => {
   const { data, error } = await supabase
     .from('interest_messages')
-    .insert([{ interest_id: interestId, sender_id: senderId, sender_role: senderRole, body }])
+    .insert([{
+      interest_id: interestId, sender_id: senderId, sender_role: senderRole, body,
+      file_path: attachment?.path, file_name: attachment?.name, file_type: attachment?.type, file_size_bytes: attachment?.size,
+    }])
     .select()
     .single()
   return { data, error }
+}
+
+// The "+" next to the reply box on both Interest Received (org) and
+// Inbox (employer) -- camera/photo/video/document, one shared bucket,
+// scoped by interestId in the path (mirrors interest_messages' own RLS
+// exactly: the employer on this thread, or org staff of the student's
+// organisation).
+export const uploadInterestMessageFile = async (interestId: string, file: File) => {
+  const path = `${interestId}/${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from('interest-message-files').upload(path, file, { contentType: file.type || undefined })
+  return { path: error ? null : path, error }
 }
 
 // Org can close the thread at any time, independent of accept/decline

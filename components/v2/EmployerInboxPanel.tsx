@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getEmployerInterest, getEmployerInboxItems, getInterestMessages, sendInterestMessage } from '@/lib/supabase'
-import { Send, Inbox as InboxIcon, ArrowLeft, Shield, Lock, Check } from 'lucide-react'
+import {
+  getEmployerInterest, getEmployerInboxItems, getInterestMessages, sendInterestMessage,
+  uploadInterestMessageFile, getSignedFileUrl,
+} from '@/lib/supabase'
+import { Send, Inbox as InboxIcon, ArrowLeft, Shield, Lock, Check, Plus, Paperclip, X } from 'lucide-react'
 
 function initials(name?: string) {
   if (!name) return '?'
@@ -141,6 +144,8 @@ function EmployerThread({ item, onBack }: { item: any; onBack: () => void }) {
   const [messages, setMessages] = useState<any[]>([])
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState('')
+  const [attachFile, setAttachFile] = useState<File | null>(null)
 
   const load = () => { getInterestMessages(item.id).then(({ data }) => setMessages(data || [])) }
   useEffect(load, [item.id])
@@ -150,12 +155,19 @@ function EmployerThread({ item, onBack }: { item: any; onBack: () => void }) {
   const status = STATUS_META[item.status] || STATUS_META.pending
 
   const send = async () => {
-    if (!reply.trim() || !user) return
-    setSending(true)
-    await sendInterestMessage(item.id, user.id, 'employer', reply.trim())
-    setReply('')
-    await load()
+    if ((!reply.trim() && !attachFile) || !user) return
+    setSending(true); setSendError('')
+    let attachment: { path: string; name: string; type: string; size: number } | undefined
+    if (attachFile) {
+      const { path, error: upErr } = await uploadInterestMessageFile(item.id, attachFile)
+      if (upErr || !path) { setSending(false); setSendError("Couldn't attach that file — try again."); return }
+      attachment = { path, name: attachFile.name, type: attachFile.type, size: attachFile.size }
+    }
+    const { error: sendErr } = await sendInterestMessage(item.id, user.id, 'employer', reply.trim(), attachment)
     setSending(false)
+    if (sendErr) { setSendError("Couldn't send — try again."); return }
+    setReply(''); setAttachFile(null)
+    await load()
   }
 
   return (
@@ -188,8 +200,8 @@ function EmployerThread({ item, onBack }: { item: any; onBack: () => void }) {
         </div>
 
         <div className="space-y-2.5 mt-4">
-          {item.message && <ChatBubble fromOrg={false} body={item.message} />}
-          {messages.map(m => <ChatBubble key={m.id} fromOrg={m.sender_role === 'org'} body={m.body} />)}
+          {item.message && <ChatBubble fromOrg={false} message={{ body: item.message }} />}
+          {messages.map(m => <ChatBubble key={m.id} fromOrg={m.sender_role === 'org'} message={m} />)}
           {messages.length === 0 && !item.message && (
             <p className="text-[13px] text-ink-tertiary text-center py-6">No messages yet — say why you're interested.</p>
           )}
@@ -197,19 +209,37 @@ function EmployerThread({ item, onBack }: { item: any; onBack: () => void }) {
 
         {item.status !== 'declined' && (
           <div className="mt-4">
-            <textarea
-              value={reply} onChange={e => setReply(e.target.value)}
-              placeholder="Write a message — it goes to the student's organisation, never to the student directly."
-              rows={3}
-              className="w-full bg-surface-subtle border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
-            />
+            {attachFile && (
+              <div className="flex items-center gap-2 bg-surface-subtle border border-edge rounded-lg px-3 py-2 mb-2">
+                <Paperclip className="w-3.5 h-3.5 text-ink-tertiary flex-shrink-0" />
+                <span className="text-[12.5px] text-ink truncate flex-1">{attachFile.name}</span>
+                <button onClick={() => setAttachFile(null)} aria-label="Remove attachment" className="text-ink-tertiary hover:text-danger-text transition flex-shrink-0"><X className="w-3.5 h-3.5" /></button>
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <label className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg border border-edge text-ink-tertiary hover:border-brand hover:text-brand transition cursor-pointer" aria-label="Attach a file">
+                <Plus className="w-4 h-4" />
+                <input
+                  type="file" className="hidden"
+                  accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx"
+                  onChange={e => setAttachFile(e.target.files?.[0] || null)}
+                />
+              </label>
+              <textarea
+                value={reply} onChange={e => setReply(e.target.value)}
+                placeholder="Write a message — it goes to the student's organisation, never to the student directly."
+                rows={3}
+                className="flex-1 bg-surface-subtle border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
+              />
+            </div>
             <button
               onClick={send}
-              disabled={sending || !reply.trim()}
+              disabled={sending || (!reply.trim() && !attachFile)}
               className="flex items-center gap-1.5 bg-brand text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:bg-brand-hover transition disabled:opacity-40 mt-2.5"
             >
               <Send className="w-3.5 h-3.5" /> {sending ? 'Sending…' : 'Send'}
             </button>
+            {sendError && <p className="text-[12px] text-danger-text mt-2">{sendError}</p>}
           </div>
         )}
         {item.status === 'declined' && (
@@ -226,14 +256,34 @@ function EmployerThread({ item, onBack }: { item: any; onBack: () => void }) {
   )
 }
 
-function ChatBubble({ fromOrg, body }: { fromOrg: boolean; body: string }) {
+function ChatBubble({ fromOrg, message }: { fromOrg: boolean; message: { body?: string; file_path?: string; file_name?: string; file_type?: string } }) {
   return (
     <div className={`flex ${fromOrg ? 'justify-start' : 'justify-end'}`}>
       <div className={`max-w-[80%] rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
         fromOrg ? 'bg-surface-muted text-ink-secondary' : 'bg-accent-bg text-ink'
       }`}>
-        {body}
+        {message.body && <p className={message.file_path ? 'mb-2' : ''}>{message.body}</p>}
+        {message.file_path && <MessageAttachment path={message.file_path} name={message.file_name} type={message.file_type} />}
       </div>
     </div>
+  )
+}
+
+// A document opens in a new tab (the browser's own PDF/Office viewer);
+// an image/video gets a real inline preview instead of forcing a
+// download just to see what was sent.
+function MessageAttachment({ path, name, type }: { path: string; name?: string; type?: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => { getSignedFileUrl('interest-message-files', path).then(({ url }) => setUrl(url)) }, [path])
+  const isImage = type?.startsWith('image/')
+  const isVideo = type?.startsWith('video/')
+
+  if (!url) return <p className="text-[12px] text-ink-tertiary">Loading attachment…</p>
+  if (isImage) return <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={name || 'Attachment'} className="rounded-lg max-h-48 max-w-full object-cover" /></a>
+  if (isVideo) return <video src={url} controls className="rounded-lg max-h-48 max-w-full" />
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[12.5px] font-semibold underline">
+      <Paperclip className="w-3.5 h-3.5 flex-shrink-0" /> {name || 'Attachment'}
+    </a>
   )
 }

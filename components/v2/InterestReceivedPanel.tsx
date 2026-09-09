@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getOrgInterest, respondToInterest, getInterestMessages, sendInterestMessage, closeInterestThread,
+  uploadInterestMessageFile, getSignedFileUrl,
 } from '@/lib/supabase'
-import { Check, Ban, Shield, Lock, Send, ArrowLeft } from 'lucide-react'
+import { Check, Ban, Shield, Lock, Send, ArrowLeft, Plus, Paperclip, X } from 'lucide-react'
 
 function age(dob?: string) {
   if (!dob) return null
@@ -165,6 +166,7 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState('')
+  const [attachFile, setAttachFile] = useState<File | null>(null)
 
   const load = () => { getInterestMessages(item.id).then(({ data }) => setMessages(data || [])) }
   useEffect(load, [item.id])
@@ -173,7 +175,7 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   const firstName = (item.student?.full_name || 'This student').split(' ')[0]
 
   const send = async (alsoAccept: boolean) => {
-    if (!reply.trim() || !user) return
+    if ((!reply.trim() && !attachFile) || !user) return
     setSending(true); setSendError('')
     if (alsoAccept && item.status === 'pending') {
       // Was pressing on to send the message even if the accept itself
@@ -182,10 +184,17 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
       const { error } = await onRespond(item.id, 'accepted')
       if (error) { setSending(false); setSendError("Couldn't accept — try again."); return }
     }
-    await sendInterestMessage(item.id, user.id, 'org', reply.trim())
-    setReply('')
-    await load()
+    let attachment: { path: string; name: string; type: string; size: number } | undefined
+    if (attachFile) {
+      const { path, error: upErr } = await uploadInterestMessageFile(item.id, attachFile)
+      if (upErr || !path) { setSending(false); setSendError("Couldn't attach that file — try again."); return }
+      attachment = { path, name: attachFile.name, type: attachFile.type, size: attachFile.size }
+    }
+    const { error: sendErr } = await sendInterestMessage(item.id, user.id, 'org', reply.trim(), attachment)
     setSending(false)
+    if (sendErr) { setSendError("Couldn't send — try again."); return }
+    setReply(''); setAttachFile(null)
+    await load()
   }
 
   const decline = async () => {
@@ -241,8 +250,8 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
           </div>
 
           <div className="space-y-2.5 lg:mt-4">
-            {item.message && <ChatBubble fromEmployer body={item.message} />}
-            {messages.map(m => <ChatBubble key={m.id} fromEmployer={m.sender_role === 'employer'} body={m.body} />)}
+            {item.message && <ChatBubble fromEmployer message={{ body: item.message }} />}
+            {messages.map(m => <ChatBubble key={m.id} fromEmployer={m.sender_role === 'employer'} message={m} />)}
           </div>
         </div>
       </div>
@@ -252,19 +261,36 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
         // not scrolled away inline with the messages -- sticky here does
         // the same on phone; on desktop it just sits in normal flow.
         <div className="sticky bottom-0 lg:static bg-paper lg:bg-transparent border-t border-edge lg:border-0 px-4 lg:px-0 py-3 lg:py-0 lg:mt-0">
-          <textarea
-            value={reply} onChange={e => setReply(e.target.value)}
-            placeholder="Reply on the student's behalf — never share personal contact details."
-            rows={2}
-            className="w-full bg-surface-subtle border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
-          />
+          {attachFile && (
+            <div className="flex items-center gap-2 bg-surface-subtle border border-edge rounded-lg px-3 py-2 mb-2">
+              <Paperclip className="w-3.5 h-3.5 text-ink-tertiary flex-shrink-0" />
+              <span className="text-[12.5px] text-ink truncate flex-1">{attachFile.name}</span>
+              <button onClick={() => setAttachFile(null)} aria-label="Remove attachment" className="text-ink-tertiary hover:text-danger-text transition flex-shrink-0"><X className="w-3.5 h-3.5" /></button>
+            </div>
+          )}
+          <div className="flex items-end gap-2">
+            <label className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg border border-edge text-ink-tertiary hover:border-brand hover:text-brand transition cursor-pointer" aria-label="Attach a file">
+              <Plus className="w-4 h-4" />
+              <input
+                type="file" className="hidden"
+                accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx"
+                onChange={e => setAttachFile(e.target.files?.[0] || null)}
+              />
+            </label>
+            <textarea
+              value={reply} onChange={e => setReply(e.target.value)}
+              placeholder="Reply on the student's behalf — never share personal contact details."
+              rows={2}
+              className="flex-1 bg-surface-subtle border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
+            />
+          </div>
           <div className="flex items-center gap-2 mt-2.5">
             <button
               onClick={() => send(item.status === 'pending')}
-              disabled={sending || !reply.trim()}
+              disabled={sending || (!reply.trim() && !attachFile)}
               className="flex items-center gap-1.5 bg-brand text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:bg-brand-hover transition disabled:opacity-40"
             >
-              <Send className="w-3.5 h-3.5" /> {item.status === 'pending' ? 'Accept and reply' : 'Reply'}
+              <Send className="w-3.5 h-3.5" /> {sending ? 'Sending…' : item.status === 'pending' ? 'Accept and reply' : 'Reply'}
             </button>
             {item.status === 'pending' && (
               <button onClick={decline} className="flex items-center gap-1.5 bg-surface border border-edge text-ink-secondary text-[13px] font-semibold px-4 py-2 rounded-lg hover:border-danger-text hover:text-danger-text transition">
@@ -283,14 +309,34 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   )
 }
 
-function ChatBubble({ fromEmployer, body }: { fromEmployer: boolean; body: string }) {
+function ChatBubble({ fromEmployer, message }: { fromEmployer: boolean; message: { body?: string; file_path?: string; file_name?: string; file_type?: string } }) {
   return (
     <div className={`flex ${fromEmployer ? 'justify-start' : 'justify-end'}`}>
       <div className={`max-w-[80%] rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
         fromEmployer ? 'bg-surface-muted text-ink-secondary' : 'bg-accent-bg text-ink'
       }`}>
-        {body}
+        {message.body && <p className={message.file_path ? 'mb-2' : ''}>{message.body}</p>}
+        {message.file_path && <MessageAttachment path={message.file_path} name={message.file_name} type={message.file_type} />}
       </div>
     </div>
+  )
+}
+
+// A document opens in a new tab (the browser's own PDF/Office viewer);
+// an image/video gets a real inline preview instead of forcing a
+// download just to see what was sent.
+function MessageAttachment({ path, name, type }: { path: string; name?: string; type?: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => { getSignedFileUrl('interest-message-files', path).then(({ url }) => setUrl(url)) }, [path])
+  const isImage = type?.startsWith('image/')
+  const isVideo = type?.startsWith('video/')
+
+  if (!url) return <p className="text-[12px] text-ink-tertiary">Loading attachment…</p>
+  if (isImage) return <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={name || 'Attachment'} className="rounded-lg max-h-48 max-w-full object-cover" /></a>
+  if (isVideo) return <video src={url} controls className="rounded-lg max-h-48 max-w-full" />
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[12.5px] font-semibold underline">
+      <Paperclip className="w-3.5 h-3.5 flex-shrink-0" /> {name || 'Attachment'}
+    </a>
   )
 }
