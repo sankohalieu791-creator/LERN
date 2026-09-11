@@ -225,7 +225,11 @@ export default function StudentSignupPage() {
 
       {step === 2 && (
         <div>
-          <TextField label="Join code" value={code} onChange={v => setCode(v.toUpperCase())} placeholder="e.g. 7K3P9XQZ" autoFocus />
+          {/* Was "7K3P9XQZ" -- 8 characters, when real codes are 4-6
+              (JoinCodesPanel's own CODE_PATTERN). A student typing a
+              code that length, following this example, would never
+              match the real format. */}
+          <TextField label="Join code" value={code} onChange={v => setCode(v.toUpperCase())} placeholder="e.g. 7K3P9X" autoFocus />
           <PrimaryButton onClick={handleA2Submit} loading={loading}>Continue</PrimaryButton>
           <button
             onClick={() => { setError(''); setCode(''); setStep(3) }}

@@ -510,10 +510,10 @@ function WorkItemDetail({
 
           <div className="flex items-center gap-4 text-ink-tertiary text-xs mb-4">
             {item.type === 'brief' || item.type === 'assignment' ? (
-              item.deadline && <span className="flex items-center gap-1"><CalendarClock className="w-3 h-3" /> Due {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              item.deadline && !isNaN(new Date(item.deadline).getTime()) && <span className="flex items-center gap-1"><CalendarClock className="w-3 h-3" /> Due {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
             ) : (
               <>
-                {item.starts_at && <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Starts {new Date(item.starts_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{item.duration_label ? ` · ${item.duration_label}` : ''}</span>}
+                {item.starts_at && !isNaN(new Date(item.starts_at).getTime()) && <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Starts {new Date(item.starts_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{item.duration_label ? ` · ${item.duration_label}` : ''}</span>}
                 {memberCount !== null && <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {memberCount} joined</span>}
               </>
             )}

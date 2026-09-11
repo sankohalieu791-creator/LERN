@@ -28,6 +28,17 @@ const PERSONA_EMAIL: Record<Role, string> = {
 }
 
 export async function POST(req: NextRequest) {
+  // Kill switch, per Michael's Sep-10 review: a single public
+  // credential that can switch into the student/safeguarding-lead/
+  // provider/verified-employer accounts is fine for an internal demo,
+  // but must not exist once a real Leyton student is on the database
+  // -- anyone with the shared login could reach a real young person's
+  // account. Off unless DEMO_LOGIN_ENABLED is explicitly set to
+  // 'true' in the deployment's own env vars, which it is not by
+  // default -- flip it on deliberately, per occasion, not left running.
+  if (process.env.DEMO_LOGIN_ENABLED !== 'true') {
+    return NextResponse.json({ error: 'Demo login is currently disabled.' }, { status: 403 })
+  }
   const auth = req.headers.get('authorization') || ''
   const accessToken = auth.startsWith('Bearer ') ? auth.slice(7) : ''
   if (!accessToken) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 })

@@ -90,7 +90,11 @@ export default function EmployerInboxPanel() {
               <div className="bg-surface border border-edge rounded-2xl divide-y divide-edge-subtle overflow-hidden">
                 {threads.map(t => {
                   const status = STATUS_META[t.status] || STATUS_META.pending
-                  const firstName = (t.student?.full_name || 'A student').split(' ')[0]
+                  // .split(' ')[0] was being applied to the FALLBACK
+                  // phrase too whenever student data was missing,
+                  // truncating "A student" down to just "A" -- the
+                  // split has to happen only on a real name.
+                  const firstName = t.student?.full_name?.split(' ')[0] || 'A student'
                   return (
                     <button key={t.id} onClick={() => setOpenId(t.id)} className="w-full flex items-center gap-3.5 px-4 py-4 text-left hover:bg-surface-subtle transition">
                       <span className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 text-white font-bold text-[13px]" style={{ backgroundColor: '#185FA5' }}>
@@ -151,7 +155,10 @@ function EmployerThread({ item, onBack }: { item: any; onBack: () => void }) {
   useEffect(load, [item.id])
 
   const adult = isAdult(item.student?.date_of_birth)
-  const firstName = (item.student?.full_name || 'This student').split(' ')[0]
+  // Same fix as the thread-list version above -- splitting the
+  // fallback phrase itself turned "This student" into a bare "This",
+  // which is exactly Michael's "placeholder text" finding.
+  const firstName = item.student?.full_name?.split(' ')[0] || 'This student'
   const status = STATUS_META[item.status] || STATUS_META.pending
 
   const send = async () => {

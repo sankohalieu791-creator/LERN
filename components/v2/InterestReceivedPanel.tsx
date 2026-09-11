@@ -107,7 +107,10 @@ export default function InterestReceivedPanel() {
               {items.map(i => {
                 const adult = isAdult(i.student?.date_of_birth)
                 const studentAge = age(i.student?.date_of_birth)
-                const firstName = (i.student?.full_name || 'A student').split(' ')[0]
+                // .split(' ')[0] was being applied to the fallback
+                // phrase too, truncating "A student" down to "A"
+                // whenever student data was missing.
+                const firstName = i.student?.full_name?.split(' ')[0] || 'A student'
                 const lastInitial = (i.student?.full_name || '').split(' ')[1]?.[0]
                 return (
                   <div key={i.id} className="bg-surface border border-edge rounded-xl px-5 py-4">
@@ -172,7 +175,10 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   useEffect(load, [item.id])
 
   const adult = isAdult(item.student?.date_of_birth)
-  const firstName = (item.student?.full_name || 'This student').split(' ')[0]
+  // Same fix as the list view above -- "This student" was being
+  // truncated to a bare "This" whenever student data was missing,
+  // exactly Michael's "placeholder text" finding.
+  const firstName = item.student?.full_name?.split(' ')[0] || 'This student'
 
   const send = async (alsoAccept: boolean) => {
     if ((!reply.trim() && !attachFile) || !user) return

@@ -9,7 +9,7 @@ import {
   addSelfQualification, deleteSelfQualification, uploadSelfQualificationFile, getSignedFileUrl, deletePost,
   updateProfileBioTags, getExperienceEntries, addExperienceEntry, deleteExperienceEntry,
   getSavedOpportunities, unsaveOpportunity, updateUserProfile, uploadAvatar, removeAvatar, getAvatarUrl,
-  isUsernameAvailable, getMyOrganisationInfo,
+  isUsernameAvailable, getMyOrganisationInfo, getUserProfile,
 } from '@/lib/supabase'
 import {
   FolderCheck, Briefcase, Grid3x3, Settings as SettingsIcon, Plus, X, Trash2, Play,
@@ -73,7 +73,14 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
 
   const load = () => {
     if (!profileId) return
+    // profile used to stay pinned to its initial useState(authUser)
+    // value whenever isOwn was false -- viewing someone else's profile
+    // never actually fetched THEIR name/avatar/bio, so the header kept
+    // showing the viewer's own identity while everything below
+    // (verified work, posts) was correctly the other person's. Real
+    // fetch now runs on every load, own profile or not.
     if (isOwn) setProfile(authUser)
+    else getUserProfile(profileId).then(({ data }) => setProfile(data || null))
     getFollowCounts(profileId).then(setCounts)
     getVerifiedWorkForProfile(profileId).then(({ data }) => { setVerified(data || []); setLoading(false) })
     getSelfQualifications(profileId).then(({ data }) => setQuals(data || []))

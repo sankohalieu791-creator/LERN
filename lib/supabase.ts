@@ -1898,6 +1898,19 @@ export const getGuestInviteInfo = async (token: string) => {
   return { data: res.ok ? data : null, error: res.ok ? null : data }
 }
 
+// Once claimed: the guest's own header needs the inviting
+// organisation's name and shared student name(s) ("Shared by St
+// Mary's") -- no RLS policy lets a guest read the organisation row
+// directly, so this goes through a service-role route too, just
+// authenticated this time. See app/api/guest/context/route.ts.
+export const getGuestContext = async () => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) return { data: null, error: { message: 'Not signed in.' } }
+  const res = await fetch('/api/guest/context', { headers: { Authorization: `Bearer ${session.access_token}` } })
+  const data = await res.json()
+  return { data: res.ok ? data : null, error: res.ok ? null : data }
+}
+
 // Magic-link sign-in, not a password — "click it and get a guest
 // pass" is the whole point; guest_invite_id in metadata is what lets
 // handle_new_user() punch through the founder allowlist, but only

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import AuthShell from '@/components/v2/AuthShell'
 import { TextField, PrimaryButton, ErrorBanner } from '@/components/v2/Field'
 import { getGuestInviteInfo, claimGuestInvite } from '@/lib/supabase'
@@ -98,7 +99,12 @@ export default function GuestClaimPage({ params }: { params: { token: string } }
 
       <label className="flex items-start gap-2.5 mb-5 cursor-pointer">
         <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} className="mt-0.5" />
-        <span className="text-[13px] text-[#4A453B]">I accept these terms.</span>
+        <span className="text-[13px] text-[#4A453B]">
+          I accept the{' '}
+          <Link href="/legal/guest-terms" target="_blank" className="text-brand font-semibold hover:underline" onClick={e => e.stopPropagation()}>
+            terms for this link
+          </Link>.
+        </span>
       </label>
 
       <PrimaryButton onClick={handleSubmit} loading={submitting}>Continue</PrimaryButton>

@@ -376,7 +376,13 @@ function WorkItemCard({ item, onChanged, summary }: { item: any; onChanged: () =
       {(item.assignment || item.description) && <p className="text-[13px] text-ink-secondary mb-2 whitespace-pre-wrap">{item.assignment || item.description}</p>}
       <p className="text-[12px] text-ink-tertiary mb-2"><span className="font-semibold">Criteria:</span> {item.criteria}</p>
       <div className="flex items-center gap-3.5 flex-wrap text-[12px] text-ink-tertiary">
-        {item.deadline && (
+        {/* item.deadline being truthy doesn't guarantee it PARSES --
+            a workshop/course (which shouldn't really carry a deadline
+            at all, that's a briefs concept) showing "Due Invalid Date"
+            was exactly this: a non-empty but unparseable value still
+            passing the truthy check, then Date's own "Invalid Date"
+            string rendering as if it were a real one. */}
+        {item.deadline && !isNaN(new Date(item.deadline).getTime()) && (
           <span className="flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Due {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
         )}
         <span className="flex items-center gap-1"><Users2 className="w-3.5 h-3.5" /> {item.groups?.name || 'Whole organisation'}</span>

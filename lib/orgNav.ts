@@ -52,8 +52,15 @@ export const providerPhoneItems: [NavItem, NavItem, NavItem] = [
 // and both halves of the UI: create/view/delete pools here, save a
 // candidate into one from the bookmark button on Discover) before
 // relinking it, not just re-added blind.
+// Feed removed per the Michael Sep-10 review: an employer, guest or
+// vetted, has no organisation of their own to scope a feed to, and the
+// underlying posts_feed RLS treated "not hidden" as visible to
+// literally any authenticated role regardless of org -- an employer
+// (or a guest link) landing here saw every organisation's posts, which
+// is exactly the "guest link opens the full feed" bug he found.
+// Discover (verified public work, individually vetted per row) is the
+// only browsing surface an employer is meant to have at all.
 export const employerSections: NavItem[] = [
-  { key: 'feed',          label: 'Feed',         icon: Home,            href: '/employer/feed' },
   { key: 'discover',      label: 'Discover',     icon: Search,          href: '/employer/discover' },
   { key: 'jobs',          label: 'Jobs',         icon: Megaphone,       href: '/employer/opportunities' },
   { key: 'candidates',    label: 'Candidates',   icon: Briefcase,       href: '/employer/candidates' },
@@ -64,7 +71,7 @@ export const employerSections: NavItem[] = [
 ]
 
 export const employerPhoneItems: [NavItem, NavItem, NavItem] = [
-  employerSections[1], // Discover
-  employerSections[3], // Candidates
-  employerSections[7], // Dashboard
+  employerSections[0], // Discover
+  employerSections[2], // Candidates
+  employerSections[6], // Dashboard
 ]

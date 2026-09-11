@@ -1,6 +1,7 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { signOut } from '@/lib/supabase'
 import Logo from '@/components/v2/Logo'
@@ -10,9 +11,23 @@ import { LogOut } from 'lucide-react'
 // Opportunities, nothing to navigate to. This is the whole point of
 // "guest, not a customer": one screen, exactly what was shared, and a
 // way to leave.
+//
+// Michael's Sep-10 review found this shell rendered whatever route a
+// guest actually landed on (this was only ever true by omission -- it
+// never restricted which page could render inside it), so a guest
+// typing /employer/feed or any other employer URL by hand got the real
+// page underneath, no different from a real account. This effect is
+// the actual hard block: any path other than /employer/shared bounces
+// straight back, independent of the nav simply not linking anywhere
+// else.
 export default function GuestEmployerShell({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
+
+  useEffect(() => {
+    if (pathname !== '/employer/shared') router.replace('/employer/shared')
+  }, [pathname, router])
 
   const handleSignOut = async () => {
     await signOut()

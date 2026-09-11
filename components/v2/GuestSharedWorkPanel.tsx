@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getGuestSharedWork, getMyInterest, expressInterest, getStudentsAdultStatus } from '@/lib/supabase'
-import { BadgeCheck, Send, Check, Clock, ShieldCheck, Building2 } from 'lucide-react'
+import { getGuestSharedWork, getMyInterest, expressInterest, getStudentsAdultStatus, getGuestContext } from '@/lib/supabase'
+import { BadgeCheck, Send, Check, Clock, ShieldCheck, Building2, Eye } from 'lucide-react'
 
 const TYPE_LABEL: Record<string, string> = { brief: 'Brief', course: 'Course', workshop: 'Workshop' }
 
@@ -24,6 +24,7 @@ export default function GuestSharedWorkPanel() {
   const [interestByStudent, setInterestByStudent] = useState<Record<string, string>>({})
   const [adultByStudent, setAdultByStudent] = useState<Record<string, boolean>>({})
   const [sending, setSending] = useState<string | null>(null)
+  const [context, setContext] = useState<{ organisationName: string | null; studentNames: string[] } | null>(null)
 
   useEffect(() => {
     getGuestSharedWork().then(({ data }) => {
@@ -32,6 +33,7 @@ export default function GuestSharedWorkPanel() {
       const ids = Array.from(new Set((data || []).map((v: any) => v.submissions?.student?.id).filter(Boolean)))
       if (ids.length) getStudentsAdultStatus(ids).then(setAdultByStudent)
     })
+    getGuestContext().then(({ data }) => setContext(data))
   }, [])
 
   useEffect(() => {
@@ -51,11 +53,29 @@ export default function GuestSharedWorkPanel() {
     if (!error) setInterestByStudent(prev => ({ ...prev, [studentId]: 'pending' }))
   }
 
+  const studentHeading = context?.studentNames.length
+    ? context.studentNames.length === 1 ? context.studentNames[0] : context.studentNames.join(', ')
+    : null
+
   return (
     <div className="space-y-5 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-bold text-ink mb-1">Shared with you</h1>
-        <p className="text-ink-tertiary text-[14px]">Interest is always routed through the organisation — you're never given direct contact details.</p>
+        <h1 className="text-2xl font-bold text-ink mb-1">
+          {studentHeading ? `${studentHeading} — Verified work shared with you` : 'Verified work shared with you'}
+        </h1>
+        <p className="text-ink-tertiary text-[14px]">
+          {context?.organisationName ? `Shared by ${context.organisationName}. ` : ''}
+          Interest is always routed through the organisation — you're never given direct contact details.
+        </p>
+      </div>
+
+      {/* Required wording, verbatim -- this is a single scoped page, not
+          a logged-in account view, and it needs to say so plainly. */}
+      <div className="flex items-start gap-2.5 rounded-xl px-4 py-3.5" style={{ backgroundColor: '#E1F5EE' }}>
+        <Eye className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#0F6E56' }} />
+        <p className="text-[13px] leading-relaxed" style={{ color: '#0F6E56' }}>
+          You are viewing shared work only. You cannot see any other students or content on LERN.
+        </p>
       </div>
 
       {loading ? (
