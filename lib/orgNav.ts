@@ -1,4 +1,4 @@
-import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase, Search, Megaphone, HeartHandshake, Inbox, Building2, Bookmark } from 'lucide-react'
+import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase, Search, Megaphone, HeartHandshake, Inbox, Building2, Bookmark, GraduationCap } from 'lucide-react'
 import type { NavItem } from '@/components/v2/OrgShell'
 
 // Institutions and providers are the SAME shell now -- one org layout,
@@ -10,8 +10,10 @@ import type { NavItem } from '@/components/v2/OrgShell'
 // StudentsPanel), Workshops, Interest received, Job tracking,
 // Dashboard -- is identical for both, generated from the same array
 // so the two navs structurally can't drift apart again the way
-// providerSections missing Students did before this.
-function buildOrgSections(kind: 'institution' | 'provider'): NavItem[] {
+// providerSections missing Students did before this. extraBeforeDashboard
+// is for a section that belongs to one kind only (Bootcamp Evidence,
+// provider-only) without forking the whole list.
+function buildOrgSections(kind: 'institution' | 'provider', extraBeforeDashboard: NavItem[] = []): NavItem[] {
   const base = `/${kind}`
   const workSection: NavItem = kind === 'institution'
     ? { key: 'briefs', label: 'Briefs', icon: FileText, href: `${base}/briefs` }
@@ -25,6 +27,7 @@ function buildOrgSections(kind: 'institution' | 'provider'): NavItem[] {
     { key: 'workshops', label: 'Workshops', icon: Presentation,    href: `${base}/workshops` },
     { key: 'interest',  label: 'Interest received', icon: HeartHandshake, href: `${base}/interest` },
     { key: 'jobs',      label: 'Job tracking', icon: Briefcase,    href: `${base}/jobs` },
+    ...extraBeforeDashboard,
     { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: `${base}/dashboard` },
   ]
 }
@@ -36,11 +39,16 @@ export const institutionPhoneItems: [NavItem, NavItem, NavItem] = [
   institutionSections[7], // Dashboard
 ]
 
-export const providerSections: NavItem[] = buildOrgSections('provider')
+// Bootcamp Evidence -- Charles Booth-call selling feature, provider
+// only. Its own sidebar item per spec, not folded into Dashboard or
+// Students.
+export const providerSections: NavItem[] = buildOrgSections('provider', [
+  { key: 'bootcamp-evidence', label: 'Bootcamp Evidence', icon: GraduationCap, href: '/provider/bootcamp-evidence' },
+])
 export const providerPhoneItems: [NavItem, NavItem, NavItem] = [
   providerSections[0], // Feed
   providerSections[3], // Courses
-  providerSections[7], // Dashboard
+  providerSections[8], // Dashboard
 ]
 
 // Independent employer sidebar -- corrected per direct feedback: Briefs

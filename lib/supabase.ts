@@ -615,6 +615,74 @@ export const getStudentAttendanceSummary = async (studentId: string) => {
   return { data: { total, present, late, absent: total - present - late, percentPresent: total ? Math.round(((present + late) / total) * 100) : null }, error: null }
 }
 
+// ── Bootcamp Evidence (training providers) ─────────────────────────
+// Charles Booth-call selling feature, built from data LERN already
+// collects -- no new schema, no external integration. One record per
+// learner against the three funding milestones a bootcamp provider has
+// to evidence: attendance (the common 10-day threshold), course
+// completion, and reaching interview stage in job tracking. This is
+// NOT on any official DfE evidence list -- it supports a provider's
+// own evidence process; the panel says so explicitly, this function
+// just supplies the numbers.
+const ATTENDANCE_THRESHOLD_DAYS = 10
+
+export const getBootcampEvidence = async (organisationId: string) => {
+  const { data: students, error } = await supabase
+    .from('users')
+    .select('id, full_name')
+    .eq('organisation_id', organisationId)
+    .eq('role', 'student')
+    .order('full_name')
+  if (error || !students) return { data: null, error }
+  if (students.length === 0) return { data: [], error: null }
+  const ids = students.map(s => s.id)
+
+  const [{ data: attendance }, { data: courseVerifications }, { data: applications }] = await Promise.all([
+    supabase.from('attendance_records').select('student_id, session_date, status').in('student_id', ids),
+    supabase
+      .from('verifications')
+      .select('verified_at, submissions!inner(student_id, work_items!inner(type, organisation_id, title))')
+      .eq('submissions.work_items.organisation_id', organisationId)
+      .eq('submissions.work_items.type', 'course')
+      .is('revoked_at', null),
+    supabase
+      .from('applications')
+      .select('student_id, stage, created_at, employer:users!applications_employer_id_fkey(full_name)')
+      .eq('organisation_id', organisationId)
+      .in('stage', ['interview', 'offer', 'hired']),
+  ])
+
+  const data = students.map(s => {
+    // Distinct DAYS, not rows -- two sessions marked present on the
+    // same date is one day of attendance, not two, for a threshold
+    // that's counting days.
+    const attendedDates = new Set(
+      (attendance || [])
+        .filter((a: any) => a.student_id === s.id && (a.status === 'present' || a.status === 'late'))
+        .map((a: any) => a.session_date)
+    )
+    const courseRow: any = ((courseVerifications || []) as any[]).find((v: any) => v.submissions?.student_id === s.id)
+    const interviewRows = ((applications || []) as any[])
+      .filter((a: any) => a.student_id === s.id)
+      .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    const interviewRow = interviewRows[0]
+
+    return {
+      student_id: s.id,
+      full_name: s.full_name,
+      attendance_days: attendedDates.size,
+      attendance_threshold: ATTENDANCE_THRESHOLD_DAYS,
+      attendance_met: attendedDates.size >= ATTENDANCE_THRESHOLD_DAYS,
+      course_title: courseRow?.submissions?.work_items?.title || null,
+      course_completed_at: courseRow?.verified_at || null,
+      interview_stage: interviewRow?.stage || null,
+      interview_employer: interviewRow?.employer?.full_name || null,
+      interview_at: interviewRow?.created_at || null,
+    }
+  })
+  return { data, error: null }
+}
+
 // Sidebar collapsed/expanded state — remembered server-side per the org
 // layout spec, not browser-only (localStorage), so it follows the user
 // across devices/logins.

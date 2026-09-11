@@ -4,9 +4,36 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getTalentPools, createTalentPool, deleteTalentPool, getTalentPoolMembers, removeFromTalentPool,
-  getTalentPoolPreviewMembers, getAvatarUrl,
+  getTalentPoolPreviewMembers, getAvatarUrl, getMyInterest, expressInterest, sendInterestMessage,
 } from '@/lib/supabase'
-import { Bookmark, Plus, X, Trash2, ChevronLeft, UserCheck, Users } from 'lucide-react'
+import { Bookmark, Plus, X, Trash2, ChevronLeft, UserCheck, Users, Send, Clock } from 'lucide-react'
+
+// Talent pools rebuild -- Charles Booth-call selling feature. The
+// save-into-a-list mechanic and the name both stay; new is an
+// automated cadence attached to each saved candidate instead of
+// leaving it a static list. Stage is computed straight off how long
+// they've been saved (member.created_at) -- no new schema needed for
+// that half. What genuinely needs a scheduled backend job (actually
+// firing on its own, weekly, unattended) isn't built yet -- pending DB
+// access to add the state a cron job needs to know what's already
+// been sent. "Send now" here is the honest interim: one tap sends the
+// stage-appropriate message right now, through the exact same
+// employer<->organisation channel Discover's own "Express interest"
+// already uses, rather than pretending it already runs unattended.
+const CADENCE_STAGES = [
+  { week: 1, label: 'Profile prompt', message: "We saved your profile to one of our talent pools — worth keeping it up to date with your latest verified work, we check back regularly." },
+  { week: 2, label: 'Workshop invite', message: "We run workshops other candidates like you have found useful — keep an eye on your school/provider for upcoming sessions worth joining." },
+  { week: 3, label: 'Check-in', message: "Just checking in — still keen to hear from you if anything's changed on your end. No pressure either way." },
+] as const
+
+function cadenceStage(createdAt: string) {
+  const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24))
+  const week = Math.floor(days / 7) + 1
+  const stage = CADENCE_STAGES[Math.min(week, CADENCE_STAGES.length) - 1]
+  const daysIntoWeek = days % 7
+  const daysUntilNext = week < CADENCE_STAGES.length ? 7 - daysIntoWeek : null
+  return { ...stage, week, daysUntilNext }
+}
 
 function initials(name?: string) {
   if (!name) return '?'
@@ -163,8 +190,10 @@ export default function TalentPoolsPanel() {
 }
 
 function PoolDetail({ pool, onBack }: { pool: any; onBack: () => void }) {
+  const { user } = useAuth()
   const [members, setMembers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [messaging, setMessaging] = useState<{ studentId: string; name: string; defaultMessage: string } | null>(null)
 
   const load = () => { setLoading(true); getTalentPoolMembers(pool.id).then(({ data }) => { setMembers(data || []); setLoading(false) }) }
   useEffect(load, [pool.id])
@@ -204,21 +233,98 @@ function PoolDetail({ pool, onBack }: { pool: any; onBack: () => void }) {
         </div>
       ) : (
         <div className="bg-surface border border-edge rounded-2xl divide-y divide-edge-subtle overflow-hidden">
-          {members.map(m => (
-            <div key={m.id} className="flex items-center gap-3 px-4 py-3.5">
-              <CandidateAvatar person={m.student || {}} size={40} />
-              <p className="text-[14px] font-semibold text-ink flex-1 min-w-0 truncate">{m.student?.full_name}</p>
-              <button
-                onClick={async () => { await removeFromTalentPool(m.id); load() }}
-                aria-label="Remove from pool"
-                className="w-8 h-8 flex items-center justify-center rounded-full text-ink-tertiary hover:text-danger-text hover:bg-surface-muted transition flex-shrink-0"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
+          {members.map(m => {
+            const cadence = cadenceStage(m.created_at)
+            return (
+              <div key={m.id} className="flex items-center gap-3 px-4 py-3.5">
+                <CandidateAvatar person={m.student || {}} size={40} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[14px] font-semibold text-ink truncate">{m.student?.full_name}</p>
+                  <p className="flex items-center gap-1 text-[11.5px] text-ink-tertiary mt-0.5">
+                    <Clock className="w-3 h-3 flex-shrink-0" />
+                    Week {cadence.week} · Next: {cadence.label}
+                    {cadence.daysUntilNext !== null && cadence.daysUntilNext > 0 && ` in ${cadence.daysUntilNext}d`}
+                  </p>
+                </div>
+                {m.student && (
+                  <button
+                    onClick={() => setMessaging({ studentId: m.student.id, name: m.student.full_name || 'this candidate', defaultMessage: cadence.message })}
+                    className="flex items-center gap-1.5 text-[12px] font-semibold text-brand hover:underline flex-shrink-0"
+                  >
+                    <Send className="w-3.5 h-3.5" /> Send now
+                  </button>
+                )}
+                <button
+                  onClick={async () => { await removeFromTalentPool(m.id); load() }}
+                  aria-label="Remove from pool"
+                  className="w-8 h-8 flex items-center justify-center rounded-full text-ink-tertiary hover:text-danger-text hover:bg-surface-muted transition flex-shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
+
+      {messaging && user && (
+        <CadenceMessageComposer
+          employerId={user.id}
+          studentId={messaging.studentId}
+          studentName={messaging.name}
+          defaultMessage={messaging.defaultMessage}
+          onClose={() => setMessaging(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// Routes through the exact same interest/interest_messages channel
+// Discover's own "Express interest" and the org's Interest Received
+// already use -- reuses an existing thread if one's already open with
+// this candidate, starts a new one otherwise. Never a new, separate
+// messaging surface.
+function CadenceMessageComposer({ employerId, studentId, studentName, defaultMessage, onClose }: {
+  employerId: string; studentId: string; studentName: string; defaultMessage: string; onClose: () => void
+}) {
+  const [message, setMessage] = useState(defaultMessage)
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+
+  const send = async () => {
+    if (!message.trim()) return
+    setSending(true); setError('')
+    const { data: existing } = await getMyInterest(employerId)
+    const thread = (existing || []).find((i: any) => i.student_id === studentId)
+    const { error: err } = thread
+      ? await sendInterestMessage(thread.id, employerId, 'employer', message.trim())
+      : await expressInterest(employerId, studentId, { message: message.trim(), opportunity_label: 'Talent pool follow-up' })
+    setSending(false)
+    if (err) { setError("Couldn't send — try again."); return }
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
+        <p className="font-bold text-ink text-[15px] mb-1">Send to {studentName}'s organisation</p>
+        <p className="text-[13px] text-ink-tertiary mb-4">This goes through their school/provider, same as every other message — never straight to the candidate.</p>
+        <textarea
+          value={message} onChange={e => setMessage(e.target.value)} autoFocus rows={4}
+          className="w-full bg-surface-subtle border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition resize-none mb-2"
+        />
+        {error && <p className="text-[12px] text-danger-text mb-2">{error}</p>}
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2.5 rounded-lg text-[13px] font-semibold text-ink-secondary hover:bg-surface-muted transition">Cancel</button>
+          <button
+            onClick={send} disabled={sending || !message.trim()}
+            className="bg-brand text-white text-[13px] font-semibold px-4 py-2.5 rounded-lg hover:bg-brand-hover transition disabled:opacity-40"
+          >
+            {sending ? 'Sending…' : 'Send'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
