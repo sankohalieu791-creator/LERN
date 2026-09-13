@@ -3,22 +3,24 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { getGuestProfiles, getMyInterest, expressInterest, getStudentsAdultStatus, getGuestContext, getAvatarUrl } from '@/lib/supabase'
-import { BadgeCheck, Send, Check, Clock, ShieldCheck, Building2, Eye, Briefcase, FolderCheck } from 'lucide-react'
+import { BadgeCheck, Send, Check, Clock, ShieldCheck, Building2, Eye, Briefcase } from 'lucide-react'
 
 const TYPE_LABEL: Record<string, string> = { brief: 'Brief', course: 'Course', workshop: 'Workshop' }
 
 // Build Spec follow-up (14 Sep): "when a link or institution has been
 // invited they only see the profile of the student where they see
-// verified work and experience, not post or saved jobs." The previous
-// version of this screen was a flat grid of one card per verified
-// item, which read like a feed of posts, not a profile. This groups
-// by student instead -- one profile block each, matching the shape of
-// CandidateProfileModal (EmployerDiscoverPanel's full-employer view of
-// a candidate): avatar/name header, self-declared experience and
-// qualifications strips, then the list of verified work underneath.
-// There is still nothing to browse beyond what was explicitly shared
-// -- getGuestProfiles() is scoped server-side to exactly this guest's
-// guest_invite_shares rows, never a general employer-style query.
+// verified work and experience, not post or saved jobs." Taken
+// literally -- exactly those two things. An earlier cut of this also
+// showed bio and self-declared qualifications, copied wholesale from
+// CandidateProfileModal (the full-employer Discover view); on a real
+// account with any of those filled in, that reads as "the whole
+// account", not a scoped profile -- removed both, here and in
+// app/api/guest/profiles/route.ts which no longer even fetches them.
+// One profile block per shared student: avatar/name header, an
+// Experience strip, then the list of verified work. Still nothing to
+// browse beyond what was explicitly shared -- getGuestProfiles() is
+// scoped server-side to exactly this guest's guest_invite_shares rows,
+// never a general employer-style query.
 export default function GuestSharedWorkPanel() {
   const { user } = useAuth()
   const [profiles, setProfiles] = useState<any[]>([])
@@ -108,13 +110,13 @@ export default function GuestSharedWorkPanel() {
 }
 
 function StudentProfileCard({ profile, status, adult, sending, onExpressInterest }: {
-  profile: { student: { id: string; full_name: string; avatar_path?: string; bio?: string }; verifications: any[]; experience: any[]; qualifications: any[] }
+  profile: { student: { id: string; full_name: string; avatar_path?: string }; verifications: any[]; experience: any[] }
   status?: string
   adult: boolean
   sending: boolean
   onExpressInterest: () => void
 }) {
-  const { student, verifications, experience, qualifications } = profile
+  const { student, verifications, experience } = profile
 
   return (
     <div className="bg-surface border border-edge rounded-2xl p-5">
@@ -160,30 +162,14 @@ function StudentProfileCard({ profile, status, adult, sending, onExpressInterest
         </div>
       </div>
 
-      {student.bio && <p className="text-[13px] text-ink-secondary leading-relaxed mb-3">{student.bio}</p>}
-
-      {(experience.length > 0 || qualifications.length > 0) && (
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          {experience.length > 0 && (
-            <div className="bg-surface-subtle rounded-xl p-3">
-              <p className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2"><Briefcase className="w-3 h-3" /> Experience</p>
-              <div className="space-y-1.5">
-                {experience.slice(0, 4).map((e: any) => (
-                  <p key={e.id} className="text-[12.5px] text-ink truncate">{e.title}{e.organisation ? ` · ${e.organisation}` : ''}</p>
-                ))}
-              </div>
-            </div>
-          )}
-          {qualifications.length > 0 && (
-            <div className="bg-surface-subtle rounded-xl p-3">
-              <p className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2"><FolderCheck className="w-3 h-3" /> Qualifications</p>
-              <div className="space-y-1.5">
-                {qualifications.slice(0, 4).map((q: any) => (
-                  <p key={q.id} className="text-[12.5px] text-ink truncate">{q.title}{q.issuer ? ` · ${q.issuer}` : ''}</p>
-                ))}
-              </div>
-            </div>
-          )}
+      {experience.length > 0 && (
+        <div className="bg-surface-subtle rounded-xl p-3 mb-4">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2"><Briefcase className="w-3 h-3" /> Experience</p>
+          <div className="space-y-1.5">
+            {experience.slice(0, 4).map((e: any) => (
+              <p key={e.id} className="text-[12.5px] text-ink truncate">{e.title}{e.organisation ? ` · ${e.organisation}` : ''}</p>
+            ))}
+          </div>
         </div>
       )}
 
