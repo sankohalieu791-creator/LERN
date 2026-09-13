@@ -2,24 +2,26 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getGuestSharedWork, getMyInterest, expressInterest, getStudentsAdultStatus, getGuestContext } from '@/lib/supabase'
-import { BadgeCheck, Send, Check, Clock, ShieldCheck, Building2, Eye } from 'lucide-react'
+import { getGuestProfiles, getMyInterest, expressInterest, getStudentsAdultStatus, getGuestContext, getAvatarUrl } from '@/lib/supabase'
+import { BadgeCheck, Send, Check, Clock, ShieldCheck, Building2, Eye, Briefcase, FolderCheck } from 'lucide-react'
 
 const TYPE_LABEL: Record<string, string> = { brief: 'Brief', course: 'Course', workshop: 'Workshop' }
 
-// A guest sees exactly what the organisation shared — RLS enforces
-// this, not this component; there's no filter/search here on purpose,
-// because there's nothing to filter down from. Unlike the public
-// Discover feed (where a minor's work can never appear at all — DB
-// enforced), a guest CAN be shown an under-18 student's work here,
-// since the organisation explicitly chose to share it. That's exactly
-// why this is the one employer-facing screen that needs the age-aware
-// CTA: same underlying expressInterest() call either way (it always
-// routes through the organisation first, never straight to the
-// student), just labelled honestly for what actually happens next.
+// Build Spec follow-up (14 Sep): "when a link or institution has been
+// invited they only see the profile of the student where they see
+// verified work and experience, not post or saved jobs." The previous
+// version of this screen was a flat grid of one card per verified
+// item, which read like a feed of posts, not a profile. This groups
+// by student instead -- one profile block each, matching the shape of
+// CandidateProfileModal (EmployerDiscoverPanel's full-employer view of
+// a candidate): avatar/name header, self-declared experience and
+// qualifications strips, then the list of verified work underneath.
+// There is still nothing to browse beyond what was explicitly shared
+// -- getGuestProfiles() is scoped server-side to exactly this guest's
+// guest_invite_shares rows, never a general employer-style query.
 export default function GuestSharedWorkPanel() {
   const { user } = useAuth()
-  const [items, setItems] = useState<any[]>([])
+  const [profiles, setProfiles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [interestByStudent, setInterestByStudent] = useState<Record<string, string>>({})
   const [adultByStudent, setAdultByStudent] = useState<Record<string, boolean>>({})
@@ -27,10 +29,10 @@ export default function GuestSharedWorkPanel() {
   const [context, setContext] = useState<{ organisationName: string | null; studentNames: string[] } | null>(null)
 
   useEffect(() => {
-    getGuestSharedWork().then(({ data }) => {
-      setItems(data || [])
+    getGuestProfiles().then(({ data }) => {
+      setProfiles(data || [])
       setLoading(false)
-      const ids = Array.from(new Set((data || []).map((v: any) => v.submissions?.student?.id).filter(Boolean)))
+      const ids = Array.from(new Set((data || []).map((p: any) => p.student?.id).filter(Boolean))) as string[]
       if (ids.length) getStudentsAdultStatus(ids).then(setAdultByStudent)
     })
     getGuestContext().then(({ data }) => setContext(data))
@@ -61,7 +63,7 @@ export default function GuestSharedWorkPanel() {
     <div className="space-y-5 max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold text-ink mb-1">
-          {studentHeading ? `${studentHeading} — Verified work shared with you` : 'Verified work shared with you'}
+          {studentHeading ? `${studentHeading} — Verified profile shared with you` : 'Verified profile shared with you'}
         </h1>
         <p className="text-ink-tertiary text-[14px]">
           {context?.organisationName ? `Shared by ${context.organisationName}. ` : ''}
@@ -80,7 +82,7 @@ export default function GuestSharedWorkPanel() {
 
       {loading ? (
         <p className="text-ink-tertiary text-[14px]">Loading…</p>
-      ) : items.length === 0 ? (
+      ) : profiles.length === 0 ? (
         <div className="bg-surface border border-edge rounded-2xl p-10 flex flex-col items-center text-center">
           <div className="w-12 h-12 rounded-full bg-accent-bg flex items-center justify-center mb-3">
             <ShieldCheck className="w-5 h-5 text-brand" />
@@ -89,61 +91,121 @@ export default function GuestSharedWorkPanel() {
           <p className="text-ink-tertiary text-[14px]">Ask the organisation that invited you — they may not have finished sharing anything with this link yet.</p>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 gap-4">
-          {items.map(v => {
-            const sub = v.submissions
-            const wi = sub?.work_items
-            const student = sub?.student
-            const status = student ? interestByStudent[student.id] : undefined
-            return (
-              <div key={v.id} className="bg-surface border border-edge rounded-2xl p-5 flex flex-col">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide">{TYPE_LABEL[wi?.type] || wi?.type}</span>
-                  <span className="flex items-center gap-1 text-[12px] font-semibold text-success-text flex-shrink-0">
-                    <BadgeCheck className="w-3.5 h-3.5" /> Verified
-                  </span>
-                </div>
-                <p className="font-bold text-ink text-[15px] mb-1">{wi?.title}</p>
-                {wi?.description && <p className="text-[13px] text-ink-tertiary mb-3 line-clamp-2">{wi.description}</p>}
-                {sub?.content && <p className="text-[13px] text-ink-secondary mb-3 line-clamp-3 bg-surface-subtle rounded-lg p-2.5">{sub.content}</p>}
+        <div className="space-y-5">
+          {profiles.map(p => (
+            <StudentProfileCard
+              key={p.student.id} profile={p}
+              status={interestByStudent[p.student.id]}
+              adult={adultByStudent[p.student.id] === true}
+              sending={sending === p.student.id}
+              onExpressInterest={() => handleExpress(p.student.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
-                <div className="mt-auto pt-3 border-t border-edge-subtle flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-ink truncate">{student?.full_name || 'Student'}</p>
-                    <p className="text-[11px] text-ink-tertiary truncate">
-                      Verified by {v.verifier?.full_name || 'a reviewer'} · {new Date(v.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </p>
-                  </div>
-                  {student && (() => {
-                    // Unknown age defaults to treated-as-under-18, same
-                    // safety-first convention used everywhere else in
-                    // this app that gates on age.
-                    const adult = adultByStudent[student.id] === true
-                    return status === 'pending' ? (
-                      <span className="flex items-center gap-1 text-[12px] font-semibold text-warning-text flex-shrink-0">
-                        <Clock className="w-3.5 h-3.5" /> {adult ? 'Pending' : 'Routed to their organisation'}
-                      </span>
-                    ) : status === 'accepted' ? (
-                      <span className="flex items-center gap-1 text-[12px] font-semibold text-success-text flex-shrink-0"><Check className="w-3.5 h-3.5" /> Accepted</span>
-                    ) : status === 'declined' ? (
-                      <span className="text-[12px] font-semibold text-ink-tertiary flex-shrink-0">Declined</span>
-                    ) : adult ? (
-                      <button
-                        onClick={() => handleExpress(student.id)} disabled={sending === student.id}
-                        className="flex items-center gap-1.5 bg-brand text-white text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 transition disabled:opacity-50 flex-shrink-0"
-                      >
-                        <Send className="w-3.5 h-3.5" /> {sending === student.id ? 'Sending…' : 'Place your offer'}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleExpress(student.id)} disabled={sending === student.id}
-                        className="flex items-center gap-1.5 bg-surface border border-edge text-ink-secondary text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:border-brand hover:text-brand transition disabled:opacity-50 flex-shrink-0"
-                      >
-                        <Building2 className="w-3.5 h-3.5" /> {sending === student.id ? 'Sending…' : 'Contact their institution/provider'}
-                      </button>
-                    )
-                  })()}
+function StudentProfileCard({ profile, status, adult, sending, onExpressInterest }: {
+  profile: { student: { id: string; full_name: string; avatar_path?: string; bio?: string }; verifications: any[]; experience: any[]; qualifications: any[] }
+  status?: string
+  adult: boolean
+  sending: boolean
+  onExpressInterest: () => void
+}) {
+  const { student, verifications, experience, qualifications } = profile
+
+  return (
+    <div className="bg-surface border border-edge rounded-2xl p-5">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-center gap-3 min-w-0">
+          {student.avatar_path ? (
+            <img src={getAvatarUrl(student.avatar_path) || ''} alt="" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <span className="w-12 h-12 rounded-full flex items-center justify-center text-[15px] font-bold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+              {(student.full_name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()}
+            </span>
+          )}
+          <div className="min-w-0">
+            <p className="font-bold text-ink text-[16px] truncate">{student.full_name}</p>
+            <p className="flex items-center gap-1 text-[12px] font-semibold text-success-text">
+              <BadgeCheck className="w-3.5 h-3.5" /> {verifications.length} verified {verifications.length === 1 ? 'piece' : 'pieces'} of work
+            </p>
+          </div>
+        </div>
+
+        <div className="flex-shrink-0">
+          {status === 'pending' ? (
+            <span className="flex items-center gap-1 text-[12px] font-semibold text-warning-text"><Clock className="w-3.5 h-3.5" /> {adult ? 'Pending' : 'Routed to their organisation'}</span>
+          ) : status === 'accepted' ? (
+            <span className="flex items-center gap-1 text-[12px] font-semibold text-success-text"><Check className="w-3.5 h-3.5" /> Accepted</span>
+          ) : status === 'declined' ? (
+            <span className="text-[12px] font-semibold text-ink-tertiary">Declined</span>
+          ) : adult ? (
+            <button
+              onClick={onExpressInterest} disabled={sending}
+              className="flex items-center gap-1.5 bg-brand text-white text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 transition disabled:opacity-50"
+            >
+              <Send className="w-3.5 h-3.5" /> {sending ? 'Sending…' : 'Place your offer'}
+            </button>
+          ) : (
+            <button
+              onClick={onExpressInterest} disabled={sending}
+              className="flex items-center gap-1.5 bg-surface border border-edge text-ink-secondary text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:border-brand hover:text-brand transition disabled:opacity-50"
+            >
+              <Building2 className="w-3.5 h-3.5" /> {sending ? 'Sending…' : 'Contact their institution/provider'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {student.bio && <p className="text-[13px] text-ink-secondary leading-relaxed mb-3">{student.bio}</p>}
+
+      {(experience.length > 0 || qualifications.length > 0) && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {experience.length > 0 && (
+            <div className="bg-surface-subtle rounded-xl p-3">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2"><Briefcase className="w-3 h-3" /> Experience</p>
+              <div className="space-y-1.5">
+                {experience.slice(0, 4).map((e: any) => (
+                  <p key={e.id} className="text-[12.5px] text-ink truncate">{e.title}{e.organisation ? ` · ${e.organisation}` : ''}</p>
+                ))}
+              </div>
+            </div>
+          )}
+          {qualifications.length > 0 && (
+            <div className="bg-surface-subtle rounded-xl p-3">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2"><FolderCheck className="w-3 h-3" /> Qualifications</p>
+              <div className="space-y-1.5">
+                {qualifications.slice(0, 4).map((q: any) => (
+                  <p key={q.id} className="text-[12.5px] text-ink truncate">{q.title}{q.issuer ? ` · ${q.issuer}` : ''}</p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2">Verified work</p>
+      {verifications.length === 0 ? (
+        <p className="text-[13px] text-ink-tertiary">Nothing verified yet.</p>
+      ) : (
+        <div className="space-y-2.5">
+          {verifications.map((v: any) => {
+            const wi = v.submissions?.work_items
+            return (
+              <div key={v.id} className="bg-surface-subtle rounded-xl p-3">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <span className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide">{TYPE_LABEL[wi?.type] || wi?.type}</span>
+                  {wi?.organisations?.name && <span className="text-[11px] text-ink-tertiary flex-shrink-0">{wi.organisations.name}</span>}
                 </div>
+                <p className="text-[13px] font-semibold text-ink">{wi?.title}</p>
+                {wi?.description && <p className="text-[12.5px] text-ink-tertiary line-clamp-2 mb-1">{wi.description}</p>}
+                {v.submissions?.content && <p className="text-[12.5px] text-ink-secondary line-clamp-2">{v.submissions.content}</p>}
+                <p className="text-[11px] text-ink-tertiary mt-1.5">
+                  Verified by {v.verifier?.full_name || 'a reviewer'} · {new Date(v.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
               </div>
             )
           })}

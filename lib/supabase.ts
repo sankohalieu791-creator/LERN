@@ -1985,6 +1985,18 @@ export const getGuestContext = async () => {
   return { data: res.ok ? data : null, error: res.ok ? null : data }
 }
 
+// One profile-shaped object per shared student -- verified work +
+// self-declared experience/qualifications, nothing else. See
+// app/api/guest/profiles/route.ts for why this can't just be RLS'd
+// the way getGuestSharedWork() is.
+export const getGuestProfiles = async () => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) return { data: [] as any[], error: { message: 'Not signed in.' } }
+  const res = await fetch('/api/guest/profiles', { headers: { Authorization: `Bearer ${session.access_token}` } })
+  const data = await res.json()
+  return { data: res.ok ? (data.students || []) : [], error: res.ok ? null : data }
+}
+
 // Magic-link sign-in, not a password — "click it and get a guest
 // pass" is the whole point; guest_invite_id in metadata is what lets
 // handle_new_user() punch through the founder allowlist, but only
@@ -1999,27 +2011,6 @@ export const claimGuestInvite = async (inviteId: string, fullName: string, email
     },
   })
   return { error }
-}
-
-// Guest's own scoped view once signed in — RLS (guest_can_see_*)
-// already narrows this to exactly what was shared, so no extra
-// filtering needed here beyond what an independent employer's
-// Discover query does for the public case.
-export const getGuestSharedWork = async () => {
-  const { data, error } = await supabase
-    .from('verifications')
-    .select(`
-      id, verified_at, submission_id,
-      verifier:users!verifications_verified_by_fkey(full_name),
-      submissions!inner(
-        id, content, student_id,
-        student:users!submissions_student_id_fkey(id, full_name),
-        work_items!inner(id, title, description, type)
-      )
-    `)
-    .is('revoked_at', null)
-    .order('verified_at', { ascending: false })
-  return { data, error }
 }
 
 // ── Demo gateway (public "try LERN" login — see app/api/demo-switch) ──
