@@ -129,6 +129,10 @@ export interface WorkItem {
   closed_at?: string
   criteria: string
   visibility: 'public' | 'private'
+  // Briefs only -- "Yes, portfolio work" (default) vs "No, records
+  // only". Read by handle_review_decision to set the resulting
+  // verification's visibility once this brief's work is verified.
+  portfolio_work?: boolean
   level?: 'beginner' | 'intermediate' | 'advanced'
   duration_label?: string
   publish_state?: 'draft' | 'scheduled' | 'posted'
@@ -180,6 +184,10 @@ export interface Submission {
   file_size_bytes?: number
   moderation_status: ModerationStatus
   flagged_reason?: string
+  // "WHAT GOOD LOOKS LIKE"'s self-check tick-list -- which criterion
+  // lines (parsed from work_items.criteria, one per line) the student
+  // has ticked off. A self-check, not a submission gate.
+  checked_criteria?: string[]
   status: SubmissionStatus
   submitted_at: string
   users?: User

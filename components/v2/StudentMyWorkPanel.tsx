@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getVisibleWorkItems, getMySubmissions, getMyOrgType, getWorkItemMemberCount,
   submitWork, uploadSubmissionFile, getSignedFileUrl, redeemJoinCode,
-  markWorkItemStarted, getMyStartedWorkItemIds, getAvatarUrl,
+  markWorkItemStarted, getMyStartedWorkItemIds, getAvatarUrl, getSubmissionAttachments,
 } from '@/lib/supabase'
 import type { WorkItem } from '@/lib/types'
 import {
@@ -429,7 +429,11 @@ function WorkItemDetail({
 }: { item: WorkItem; latest: any; allSubs: any[]; onClose: () => void; onChanged: () => void }) {
   const { user } = useAuth()
   const [content, setContent] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
+  // Resuming a returned submission picks up where the self-check was
+  // left, rather than resetting every tick -- checked_criteria is
+  // exactly what latest already carries for that case.
+  const [checkedCriteria, setCheckedCriteria] = useState<Set<string>>(new Set(latest?.checked_criteria || []))
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [inSession, setInSession] = useState(false)
@@ -437,6 +441,17 @@ function WorkItemDetail({
   const fileRef = useRef<HTMLInputElement>(null)
   const hostName = (item as any).users?.full_name
   const canSubmit = (item.type === 'brief' || item.type === 'assignment') && (!latest || latest.status === 'returned')
+  // My Work: Brief-Completion Screen spec -- "WHAT GOOD LOOKS LIKE...
+  // the same underlying data as the brief's verification criteria",
+  // one tickable line per line of text (the Create-brief form's own
+  // hint asks tutors to write it that way).
+  const criteriaList = (item.criteria || '').split('\n').map(c => c.trim()).filter(Boolean)
+  const doneCount = criteriaList.filter(c => checkedCriteria.has(c)).length
+  const toggleCriterion = (c: string) => setCheckedCriteria(prev => {
+    const next = new Set(prev)
+    next.has(c) ? next.delete(c) : next.add(c)
+    return next
+  })
 
   useEffect(() => {
     if (item.type === 'course' || item.type === 'workshop') getWorkItemMemberCount(item.id).then(setMemberCount)
@@ -454,19 +469,24 @@ function WorkItemDetail({
 
   const handleSubmit = async () => {
     setError('')
-    if (!content.trim() && !file) return setError('Write, link, or attach your work before submitting.')
+    // Brief-Completion Screen spec: "enabled once at least one file is
+    // attached and the thinking field is filled in" -- both required,
+    // not either/or. EXPLAIN YOUR THINKING is "the single most
+    // important addition... do not make this optional or skippable."
+    if (files.length === 0) return setError('Attach at least one file before submitting.')
+    if (!content.trim()) return setError('Explain your thinking before submitting — this is what employers actually want to hear.')
     if (!user) return
     setLoading(true)
-    let fileInfo: { path: string; type: string; size: number } | undefined
-    if (file) {
-      const { path, error: uploadError } = await uploadSubmissionFile(user.id, file)
-      if (uploadError || !path) { setLoading(false); return setError(uploadError?.message || 'File upload failed.') }
-      fileInfo = { path, type: file.type, size: file.size }
+    const uploaded: { path: string; name: string; type: string; size: number }[] = []
+    for (const f of files) {
+      const { path, error: uploadError } = await uploadSubmissionFile(user.id, f)
+      if (uploadError || !path) { setLoading(false); return setError(uploadError?.message || `"${f.name}" failed to upload.`) }
+      uploaded.push({ path, name: f.name, type: f.type, size: f.size })
     }
-    const { error: submitError } = await submitWork(user.id, item.id, content.trim(), fileInfo)
+    const { error: submitError } = await submitWork(user.id, item.id, content.trim(), uploaded, Array.from(checkedCriteria))
     setLoading(false)
     if (submitError) return setError(submitError.message)
-    setContent(''); setFile(null)
+    setContent(''); setFiles([]); setCheckedCriteria(new Set())
     onChanged()
   }
 
@@ -496,7 +516,28 @@ function WorkItemDetail({
           boundary, not what's inside it. */}
       <div className="py-4">
         <div className="bg-surface border-y border-edge p-5">
-          <h1 className="text-2xl font-bold text-ink leading-snug mb-3">{item.title}</h1>
+          {/* Header row: status pill left, due date right -- Brief-
+              Completion Screen spec. Only meaningful for submittable
+              types; course/workshop keep their own join-focused header
+              below unchanged. */}
+          {canSubmit && (() => {
+            const overdue = !latest && item.deadline && !isNaN(new Date(item.deadline).getTime()) && new Date(item.deadline) < new Date()
+            const statusKey = latest ? latest.status : overdue ? 'overdue' : 'new'
+            const spec = SPEC_STATUS[statusKey] || SPEC_STATUS.new
+            return (
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-semibold px-[10px] py-[3px] rounded-full" style={{ backgroundColor: spec.bg, color: spec.text }}>{spec.label}</span>
+                {item.deadline && !isNaN(new Date(item.deadline).getTime()) && (
+                  <span className="text-ink-tertiary text-xs">{overdue ? 'Was due' : 'Due'} {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                )}
+              </div>
+            )
+          })()}
+
+          <h1 className="text-2xl font-bold text-ink leading-snug mb-2">{item.title}</h1>
+          {canSubmit && (
+            <p className="text-ink-tertiary text-xs mb-3">Set by {hostName || 'your tutor'} · {TYPE_LABEL[item.type] || item.type}</p>
+          )}
 
           <div className="flex items-center gap-2 mb-4">
             <OrgHostAvatar hostName={hostName} org={(item as any).organisations} />
@@ -509,24 +550,61 @@ function WorkItemDetail({
           {item.description && <p className="text-ink-secondary text-sm leading-snug mb-4">{item.description}</p>}
 
           <div className="flex items-center gap-4 text-ink-tertiary text-xs mb-4">
-            {item.type === 'brief' || item.type === 'assignment' ? (
-              item.deadline && !isNaN(new Date(item.deadline).getTime()) && <span className="flex items-center gap-1"><CalendarClock className="w-3 h-3" /> Due {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-            ) : (
+            {item.type === 'workshop' || item.type === 'course' ? (
               <>
                 {item.starts_at && !isNaN(new Date(item.starts_at).getTime()) && <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Starts {new Date(item.starts_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{item.duration_label ? ` · ${item.duration_label}` : ''}</span>}
                 {memberCount !== null && <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {memberCount} joined</span>}
               </>
-            )}
+            ) : null}
           </div>
 
-          <label className="block mb-1.5">
-            <span className="block text-[13px] font-semibold text-ink">
-              {item.type === 'assignment' ? 'Assignment' : 'Criteria'}
-            </span>
-          </label>
-          <div className="bg-surface-subtle border border-edge rounded-xl px-4 py-3 mb-4">
-            <p className="text-sm text-ink-body leading-relaxed">{item.assignment || item.criteria}</p>
-          </div>
+          {canSubmit ? (
+            <>
+              {/* THE BRIEF -- not "Instructions": real context, who
+                  it's for and why it matters, written by the tutor. */}
+              <p className="text-[12px] font-semibold text-ink-tertiary uppercase tracking-wide mb-1.5">The brief</p>
+              <div className="bg-surface-subtle border border-edge rounded-xl px-4 py-3 mb-5">
+                <p className="text-sm text-ink-body leading-relaxed whitespace-pre-wrap">{item.assignment || item.criteria}</p>
+              </div>
+
+              {/* WHAT GOOD LOOKS LIKE -- the criteria as a self-check
+                  tick-list, one line of work_items.criteria per
+                  checkbox. A self-check, not a submission gate. */}
+              {criteriaList.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-[12px] font-semibold text-ink-tertiary uppercase tracking-wide mb-1.5">What good looks like</p>
+                  <div className="bg-surface-subtle border border-edge rounded-xl px-4 py-3 space-y-2">
+                    {criteriaList.map(c => (
+                      <label key={c} className="flex items-start gap-2.5 cursor-pointer">
+                        <input
+                          type="checkbox" checked={checkedCriteria.has(c)} onChange={() => toggleCriterion(c)}
+                          className="mt-0.5 flex-shrink-0"
+                        />
+                        <span className={`text-sm leading-relaxed ${checkedCriteria.has(c) ? 'text-ink-tertiary line-through' : 'text-ink-body'}`}>{c}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2.5 mt-2.5">
+                    <div className="flex-1 h-1.5 rounded-full bg-surface-muted overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${(doneCount / criteriaList.length) * 100}%`, backgroundColor: '#D4551A' }} />
+                    </div>
+                    <span className="text-[11px] text-ink-tertiary flex-shrink-0">{doneCount} of {criteriaList.length} done</span>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <label className="block mb-1.5">
+                <span className="block text-[13px] font-semibold text-ink">
+                  {item.type === 'assignment' ? 'Assignment' : 'Criteria'}
+                </span>
+              </label>
+              <div className="bg-surface-subtle border border-edge rounded-xl px-4 py-3 mb-4">
+                <p className="text-sm text-ink-body leading-relaxed">{item.assignment || item.criteria}</p>
+              </div>
+            </>
+          )}
 
           {(item.type === 'workshop' || item.type === 'course') && (
             <div className="mb-4">
@@ -555,23 +633,66 @@ function WorkItemDetail({
 
           {canSubmit && (
             <div className="border-t border-edge-subtle pt-4">
+              {error && <p className="text-xs text-danger-text mb-3">{error}</p>}
+
+              {/* YOUR WORK -- multi-file, no cap on count. Each file
+                  gets its own remove button; "+ Add another file" stays
+                  visible once one is attached, matching the spec's
+                  "not a single attach-once slot." */}
               <label className="block mb-1.5">
-                <span className="block text-[13px] font-semibold text-ink">Your submission</span>
+                <span className="block text-[13px] font-semibold text-ink">Your work</span>
               </label>
-              {error && <p className="text-xs text-danger-text mb-2">{error}</p>}
+              {files.length > 0 && (
+                <div className="space-y-1.5 mb-2">
+                  {files.map((f, i) => (
+                    <div key={`${f.name}-${i}`} className="flex items-center justify-between gap-2 bg-surface-subtle border border-edge rounded-lg px-3 py-2">
+                      <span className="flex items-center gap-1.5 text-xs text-ink-body truncate">
+                        <Paperclip className="w-3.5 h-3.5 flex-shrink-0 text-ink-tertiary" /> <span className="truncate">{f.name}</span>
+                      </span>
+                      <button type="button" onClick={() => setFiles(prev => prev.filter((_, idx) => idx !== i))} className="text-ink-tertiary hover:text-danger-text flex-shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button" onClick={() => fileRef.current?.click()}
+                className="flex items-center gap-1.5 text-xs font-semibold text-brand border border-dashed border-edge rounded-lg px-3 py-2 mb-4 w-full justify-center hover:bg-surface-subtle transition"
+              >
+                <Paperclip className="w-3.5 h-3.5" /> {files.length > 0 ? 'Add another file' : 'Attach your work'}
+              </button>
+              <input
+                ref={fileRef} type="file" multiple className="hidden"
+                onChange={e => { const picked = Array.from(e.target.files || []); if (picked.length) setFiles(prev => [...prev, ...picked]); e.target.value = '' }}
+              />
+
+              {/* EXPLAIN YOUR THINKING -- required, not "optional
+                  notes". Spec: "the single most important addition...
+                  a couple of sentences on the choices you made and
+                  why, not a full essay." */}
+              <label className="block mb-1.5">
+                <span className="block text-[13px] font-semibold text-ink">Explain your thinking</span>
+                <span className="block text-xs text-ink-tertiary mt-0.5">A couple of sentences on the choices you made and why — this is what employers actually read.</span>
+              </label>
               <textarea
                 value={content} onChange={e => setContent(e.target.value)}
-                placeholder="Paste a link, or write your work here."
-                rows={5}
-                className="w-full bg-surface-subtle border border-edge rounded-xl px-4 py-3 text-sm text-ink placeholder-ink-quaternary outline-none focus:border-brand focus:bg-surface transition mb-3 resize-none"
+                placeholder="I chose... because... The trickiest part was..."
+                rows={4}
+                className="w-full bg-surface-subtle border border-edge rounded-xl px-4 py-3 text-sm text-ink placeholder-ink-quaternary outline-none focus:border-brand focus:bg-surface transition mb-4 resize-none"
               />
-              <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 text-xs font-semibold text-ink-secondary mb-4">
-                <Paperclip className="w-3.5 h-3.5" /> {file ? file.name : 'Attach a file (optional)'}
-                {file && <span onClick={e => { e.stopPropagation(); setFile(null) }} className="hover:text-danger-text"><X className="w-3.5 h-3.5" /></span>}
-              </button>
-              <input ref={fileRef} type="file" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
-              <button onClick={handleSubmit} disabled={loading} className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold text-sm py-3 rounded-2xl disabled:opacity-60">
-                {loading ? 'Submitting…' : latest?.status === 'returned' ? 'Resubmit' : 'Submit work'}
+
+              <p className="text-xs text-ink-tertiary bg-[#E6F1FB] rounded-lg px-3 py-2.5 mb-4">
+                {item.portfolio_work === false
+                  ? 'This is verified for your school’s records — it won’t appear on your public profile.'
+                  : 'Once verified, this joins your profile — employers can see real, verified work, not just a grade.'}
+              </p>
+
+              <button
+                onClick={handleSubmit} disabled={loading || files.length === 0 || !content.trim()}
+                className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold text-sm py-3 rounded-2xl disabled:opacity-60"
+              >
+                {loading ? 'Submitting…' : latest?.status === 'returned' ? 'Resubmit for review' : 'Submit for review'}
               </button>
             </div>
           )}
@@ -583,11 +704,17 @@ function WorkItemDetail({
 
 function SubmissionRow({ submission }: { submission: any }) {
   const status = STATUS[submission.status]
-  const [fileUrl, setFileUrl] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<{ file_path: string; file_name: string }[]>([])
+  const [urls, setUrls] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    if (submission.file_path) getSignedFileUrl('submission-files', submission.file_path).then(({ url }) => setFileUrl(url))
-  }, [submission.file_path])
+    getSubmissionAttachments(submission.id).then(async ({ data: rows }) => {
+      const list = rows && rows.length ? rows : (submission.file_path ? [{ file_path: submission.file_path, file_name: submission.file_path.split('/').pop() }] : [])
+      setAttachments(list as any)
+      const entries = await Promise.all(list.map(async (a: any) => [a.file_path, (await getSignedFileUrl('submission-files', a.file_path)).url] as const))
+      setUrls(Object.fromEntries(entries.filter(([, url]) => url)))
+    })
+  }, [submission.id, submission.file_path])
 
   return (
     <div className="bg-surface-subtle border border-edge-subtle rounded-xl p-3.5">
@@ -596,11 +723,11 @@ function SubmissionRow({ submission }: { submission: any }) {
         <span className="text-[11px] text-ink-tertiary">{new Date(submission.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
       </div>
       {submission.content && <p className="text-sm text-ink-body whitespace-pre-wrap mb-1 leading-snug">{submission.content}</p>}
-      {submission.file_path && (
-        <a href={fileUrl || '#'} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs font-semibold text-[#4a9de0] hover:underline mb-1">
-          <Paperclip className="w-3 h-3" /> {submission.file_path.split('/').pop()}
+      {attachments.map(a => (
+        <a key={a.file_path} href={urls[a.file_path] || '#'} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs font-semibold text-[#4a9de0] hover:underline mb-1">
+          <Paperclip className="w-3 h-3" /> {a.file_name}
         </a>
-      )}
+      ))}
       {submission.status === 'verified' && (
         <div className="mt-2 pt-2 border-t border-[var(--app-border)] flex items-center gap-1.5 text-[11px] text-[#4ade80]">
           <CheckCircle2 className="w-3.5 h-3.5" /> Verified {submission.verifications?.[0]?.verified_at ? new Date(submission.verifications[0].verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
@@ -640,7 +767,7 @@ function JoinCodePrompt({ onJoined }: { onJoined: () => Promise<void> }) {
         </p>
         {error && <p className="text-xs text-[#e04a4a] mb-3">{error}</p>}
         <input
-          value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="e.g. 7K3P9XQZ"
+          value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="e.g. 7K3P9X"
           className="w-full bg-[var(--app-bg)] border border-[var(--app-border)] rounded-xl px-4 py-3 text-sm text-[var(--app-text)] placeholder-[#666] text-center tracking-widest font-bold outline-none focus:border-[var(--app-overlay-4)] mb-3"
         />
         <button onClick={handleJoin} disabled={loading} style={{ backgroundColor: 'var(--app-invert-bg)', color: 'var(--app-invert-text)' }} className="w-full font-bold text-sm py-3 rounded-xl disabled:opacity-60">

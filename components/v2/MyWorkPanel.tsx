@@ -86,13 +86,13 @@ function WorkItemCard({
     if (!content.trim() && !file) return setError('Write, link, or attach your work before submitting.')
     if (!user) return
     setLoading(true)
-    let fileInfo: { path: string; type: string; size: number } | undefined
+    let fileInfo: { path: string; name: string; type: string; size: number } | undefined
     if (file) {
       const { path, error: uploadError } = await uploadSubmissionFile(user.id, file)
       if (uploadError || !path) { setLoading(false); return setError(uploadError?.message || 'File upload failed.') }
-      fileInfo = { path, type: file.type, size: file.size }
+      fileInfo = { path, name: file.name, type: file.type, size: file.size }
     }
-    const { error: submitError } = await submitWork(user.id, item.id, content.trim(), fileInfo)
+    const { error: submitError } = await submitWork(user.id, item.id, content.trim(), fileInfo ? [fileInfo] : undefined)
     setLoading(false)
     if (submitError) return setError(submitError.message)
     setContent(''); setFile(null)

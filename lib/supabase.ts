@@ -235,6 +235,12 @@ export const createWorkItem = async (
   fields: {
     type: 'brief' | 'course' | 'workshop'; title: string; description?: string; criteria: string
     visibility?: 'public' | 'private'; topic?: string; assignment?: string; deadline?: string | null; group_id?: string | null
+    // Briefs only -- "Yes, portfolio work" (default) vs "No, records
+    // only". Controls what visibility a verification gets once this
+    // brief's work is verified (handle_review_decision reads it
+    // straight off the row); courses/workshops never pass this, so
+    // they stay the column default (true), unaffected.
+    portfolio_work?: boolean
     mode?: 'online' | 'in_person'; location?: string; starts_at?: string | null
     // Briefs only, Classroom-shaped: post immediately, hold as a draft
     // only staff can see, or publish automatically once scheduled_for
@@ -410,17 +416,38 @@ export const uploadSubmissionFile = async (studentId: string, file: File) => {
   return { path: error ? null : path, error }
 }
 
+// files[0] also populates the legacy single-file columns for backward
+// compatibility with every existing read path (Discover, profile,
+// review) that only ever looks at submission.file_path -- the full
+// list lives in submission_attachments regardless of count.
 export const submitWork = async (
-  studentId: string, workItemId: string, content: string, file?: { path: string; type: string; size: number }
+  studentId: string, workItemId: string, content: string,
+  files?: { path: string; name: string; type: string; size: number }[],
+  checkedCriteria?: string[],
 ) => {
+  const first = files?.[0]
   const { data, error } = await supabase
     .from('submissions')
     .insert([{
       student_id: studentId, work_item_id: workItemId, content: content || null,
-      ...(file ? { file_path: file.path, file_type: file.type, file_size_bytes: file.size } : {}),
+      checked_criteria: checkedCriteria || [],
+      ...(first ? { file_path: first.path, file_type: first.type, file_size_bytes: first.size } : {}),
     }])
     .select()
     .single()
+  if (error || !data) return { data, error }
+
+  if (files && files.length > 0) {
+    const { error: attachError } = await supabase.from('submission_attachments').insert(
+      files.map(f => ({ submission_id: (data as any).id, file_path: f.path, file_name: f.name, file_type: f.type, file_size_bytes: f.size }))
+    )
+    if (attachError) return { data, error: attachError }
+  }
+  return { data, error: null }
+}
+
+export const getSubmissionAttachments = async (submissionId: string) => {
+  const { data, error } = await supabase.from('submission_attachments').select('*').eq('submission_id', submissionId).order('created_at')
   return { data, error }
 }
 

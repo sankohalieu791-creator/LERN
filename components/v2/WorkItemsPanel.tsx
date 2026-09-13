@@ -723,6 +723,7 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
   const [criteria, setCriteria] = useState('')
   const [deadline, setDeadline] = useState('')
   const [groupId, setGroupId] = useState('')
+  const [portfolioWork, setPortfolioWork] = useState(true)
   const [files, setFiles] = useState<File[]>([])
   const [publishChoice, setPublishChoice] = useState<PublishChoice>('posted')
   const [scheduledFor, setScheduledFor] = useState('')
@@ -746,6 +747,7 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
     const { data: workItem, error: createError } = await createWorkItem(user.organisation_id, user.id, {
       type: 'brief', title: title.trim(), topic: topic.trim() || undefined, assignment: assignment.trim(),
       criteria: criteria.trim(), deadline: deadline || null, group_id: groupId || null, visibility: 'public',
+      portfolio_work: portfolioWork,
       publish_state: publishChoice,
       scheduled_for: publishChoice === 'scheduled' ? new Date(scheduledFor).toISOString() : null,
     })
@@ -792,12 +794,18 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
             />
             <label className="block mb-4">
               <span className="block text-[13px] font-semibold text-ink mb-1.5">Instructions — what the student has to do</span>
+              {/* My Work: Brief-Completion Screen spec -- "THE BRIEF...
+                  should describe who the work is for and why it
+                  matters, not just what to produce." The placeholder
+                  models that directly, since it's the one place a
+                  tutor sees before writing their own. */}
               <textarea
                 value={assignment} onChange={e => setAssignment(e.target.value)}
-                placeholder="Write the full instructions here — as much room as you need."
+                placeholder={'e.g. Our local community centre needs a poster for their open day — they\'ve asked us to help since they don\'t have a design budget. Design something that would actually make someone want to go...'}
                 rows={10}
                 className="w-full bg-surface-subtle border border-edge rounded-xl px-4 py-3 text-[14px] text-ink placeholder-ink-quaternary outline-none focus:border-brand focus:bg-surface transition resize-none leading-relaxed"
               />
+              <p className="text-[12px] text-ink-tertiary mt-1.5">Give it real context — who this is for and why it matters, not just the task. That's what makes it feel like real work.</p>
             </label>
             <label className="block mb-1.5">
               <span className="block text-[13px] font-semibold text-ink mb-1.5">Attachments (optional)</span>
@@ -808,11 +816,46 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
           {/* ── Sidebar: everything that governs the brief ── */}
           <div className="px-5 py-5 bg-surface-subtle/60 space-y-5">
             <TextField label="Topic" value={topic} onChange={setTopic} placeholder="e.g. Graphic Design" hint="Groups briefs together, like a Classroom topic." />
-            <TextField
-              label="Criteria — what makes it a verify" value={criteria} onChange={setCriteria}
-              placeholder="e.g. Original, scalable to 16px, with a one-paragraph rationale"
-              hint="Visible to the student too. LERN's replacement for a rubric — not a mark out of ten."
-            />
+            <label className="block mb-4">
+              <span className="block text-[13px] font-semibold text-ink mb-1.5">Criteria — what makes it a verify</span>
+              {/* One line per criterion -- My Work's own "WHAT GOOD
+                  LOOKS LIKE" parses this same text into a tickable
+                  checklist for the student, one checkbox per line. */}
+              <textarea
+                value={criteria} onChange={e => setCriteria(e.target.value)}
+                placeholder={'One per line, e.g.:\nOriginal — not a template\nScalable to 16px\nA one-paragraph rationale included'}
+                rows={4}
+                className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
+              />
+              <p className="text-[12px] text-ink-tertiary mt-1.5">Visible to the student too, as a tickable checklist — LERN's replacement for a rubric, not a mark out of ten.</p>
+            </label>
+            <div className="rounded-lg px-3 py-2.5" style={{ backgroundColor: '#E6F1FB' }}>
+              <p className="text-[12px] leading-relaxed" style={{ color: '#0C447C' }}>
+                This isn't extra work — tag what you're already running: enterprise days, real projects, employer challenges.
+              </p>
+            </div>
+            <label className="block">
+              <span className="block text-[13px] font-semibold text-ink mb-1.5">Once verified</span>
+              <div className="flex gap-2">
+                <button
+                  type="button" onClick={() => setPortfolioWork(true)}
+                  className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${portfolioWork ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'}`}
+                >
+                  Portfolio work
+                </button>
+                <button
+                  type="button" onClick={() => setPortfolioWork(false)}
+                  className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition ${!portfolioWork ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'}`}
+                >
+                  Records only
+                </button>
+              </div>
+              <p className="text-[12px] text-ink-tertiary mt-1.5">
+                {portfolioWork
+                  ? 'Flows to the student\'s profile once verified, where employers can see it (still never for an under-18 — that stays organisation-only regardless).'
+                  : 'Still verified and tracked, but stays private to your organisation — never shown on the student\'s profile.'}
+              </p>
+            </label>
             <label className="block">
               <span className="block text-[13px] font-semibold text-ink mb-1.5">Deadline (optional)</span>
               <input
