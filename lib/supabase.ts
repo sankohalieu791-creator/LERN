@@ -702,6 +702,23 @@ export const getUserProfile = async (userId: string) => {
   return { data, error }
 }
 
+// Viewing SOMEONE ELSE's profile (e.g. tapping a name in Feed) --
+// deliberately a narrow, explicit column list, never getUserProfile's
+// select('*'). RLS ("users: same org student read") controls which
+// ROWS a student can reach at all; this controls which COLUMNS, same
+// defence-in-depth already used elsewhere (Discover's own query never
+// selects email/date_of_birth either) -- a same-org peer should never
+// see another student's email or date of birth just because the row
+// itself became reachable.
+export const getPublicStudentProfile = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, full_name, username, avatar_path, bio, interest_tags, organisation_id, role')
+    .eq('id', userId)
+    .single()
+  return { data, error }
+}
+
 export const updateUserProfile = async (userId: string, updates: any) => {
   const { data, error } = await supabase
     .from('users')
@@ -1239,8 +1256,11 @@ export const removePost = async (postId: string, reviewerId: string) => {
 // gated by is_lern_admin() at the RLS layer; the client-side check in
 // SettingsPanel is only ever about whether to render the entry point,
 // never the real security boundary.
+// active=true only -- deactivating (rather than deleting) is how a
+// test/demo entry gets taken off this real safeguarding page without
+// needing to touch its append-only session_log history.
 export const getLernDeliveryAdults = async () => {
-  const { data, error } = await supabase.from('lern_delivery_adults').select('*').order('created_at')
+  const { data, error } = await supabase.from('lern_delivery_adults').select('*').eq('active', true).order('created_at')
   return { data, error }
 }
 

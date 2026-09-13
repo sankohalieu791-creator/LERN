@@ -9,7 +9,7 @@ import {
   addSelfQualification, deleteSelfQualification, uploadSelfQualificationFile, getSignedFileUrl, deletePost,
   updateProfileBioTags, getExperienceEntries, addExperienceEntry, deleteExperienceEntry,
   getSavedOpportunities, unsaveOpportunity, updateUserProfile, uploadAvatar, removeAvatar, getAvatarUrl,
-  isUsernameAvailable, getMyOrganisationInfo, getUserProfile,
+  isUsernameAvailable, getMyOrganisationInfo, getPublicStudentProfile,
 } from '@/lib/supabase'
 import {
   FolderCheck, Briefcase, Grid3x3, Settings as SettingsIcon, Plus, X, Trash2, Play,
@@ -80,7 +80,7 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
     // (verified work, posts) was correctly the other person's. Real
     // fetch now runs on every load, own profile or not.
     if (isOwn) setProfile(authUser)
-    else getUserProfile(profileId).then(({ data }) => setProfile(data || null))
+    else getPublicStudentProfile(profileId).then(({ data }) => setProfile(data || null))
     getFollowCounts(profileId).then(setCounts)
     getVerifiedWorkForProfile(profileId).then(({ data }) => { setVerified(data || []); setLoading(false) })
     getSelfQualifications(profileId).then(({ data }) => setQuals(data || []))
