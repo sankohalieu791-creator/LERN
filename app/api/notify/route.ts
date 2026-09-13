@@ -49,7 +49,8 @@ export async function POST(req: NextRequest) {
       users!notifications_user_id_fkey(email, full_name, notification_prefs),
       submissions(id, work_items(title)),
       work_items(title),
-      reports(reason)
+      reports(reason),
+      applications(stage, student:users!applications_student_id_fkey(full_name), opportunity:opportunities(title))
     `)
     .eq('id', notification_id)
     .single()
@@ -66,6 +67,11 @@ export async function POST(req: NextRequest) {
 
   const workTitle = (notification as any).submissions?.work_items?.title || (notification as any).work_items?.title
   const first = recipient.full_name?.split(' ')[0] || 'there'
+  const application = (notification as any).applications
+  const STAGE_LABEL: Record<string, string> = {
+    applied: 'Applied', reviewing: 'Reviewing', shortlisted: 'Shortlisted', interview: 'Interview',
+    offer: 'Offer', hired: 'Hired', not_progressing: 'Not progressing',
+  }
 
   const copy: Record<string, { subject: string; body: string }> = {
     submission_received: {
@@ -95,6 +101,10 @@ export async function POST(req: NextRequest) {
     welcome: {
       subject: 'Thank you for choosing LERN',
       body: `Hi ${first},\n\nThank you for choosing LERN — your account is ready. Verified work, safely.\n\nGet started: ${APP_URL}`,
+    },
+    application_stage_changed: {
+      subject: `An employer moved a candidate to ${STAGE_LABEL[application?.stage] || 'a new stage'}`,
+      body: `Hi ${first},\n\n${application?.student?.full_name || 'A student'}'s application${application?.opportunity?.title ? ` for "${application.opportunity.title}"` : ''} has moved to ${STAGE_LABEL[application?.stage] || 'a new stage'}.\n\nSee it: ${APP_URL}`,
     },
   }
 

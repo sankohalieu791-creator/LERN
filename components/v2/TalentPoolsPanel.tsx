@@ -242,8 +242,7 @@ function PoolDetail({ pool, onBack }: { pool: any; onBack: () => void }) {
                   <p className="text-[14px] font-semibold text-ink truncate">{m.student?.full_name}</p>
                   <p className="flex items-center gap-1 text-[11.5px] text-ink-tertiary mt-0.5">
                     <Clock className="w-3 h-3 flex-shrink-0" />
-                    Week {cadence.week} · Next: {cadence.label}
-                    {cadence.daysUntilNext !== null && cadence.daysUntilNext > 0 && ` in ${cadence.daysUntilNext}d`}
+                    Week {cadence.week} · Suggested next: {cadence.label}
                   </p>
                 </div>
                 {m.student && (

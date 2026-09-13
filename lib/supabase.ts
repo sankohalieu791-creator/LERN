@@ -1297,7 +1297,7 @@ export const recordLernSessionCancellation = async (originalLogId: string, adult
 export const getMyNotifications = async (userId: string) => {
   const { data, error } = await supabase
     .from('notifications')
-    .select('id, type, read, created_at, submissions(work_items(title)), work_items(title)')
+    .select('id, type, read, created_at, submissions(work_items(title)), work_items(title), applications(stage, student:users!applications_student_id_fkey(full_name))')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(30)
@@ -1481,12 +1481,33 @@ export const deleteOpportunity = async (id: string) => {
   return { error }
 }
 
+// "Manage" beyond post/delete: edit a live posting's own details, or
+// close it (filled/withdrawn) without destroying it or orphaning any
+// application's opportunity_id -- a delete did both of those.
+export const updateOpportunity = async (id: string, fields: {
+  title?: string; description?: string; type?: 'job' | 'apprenticeship' | 'internship'
+  salary?: string; requirements?: string; location?: string
+}) => {
+  const { data, error } = await supabase.from('opportunities').update(fields).eq('id', id).select().single()
+  return { data, error }
+}
+export const closeOpportunity = async (id: string) => {
+  const { error } = await supabase.from('opportunities').update({ closed_at: new Date().toISOString() }).eq('id', id)
+  return { error }
+}
+export const reopenOpportunity = async (id: string) => {
+  const { error } = await supabase.from('opportunities').update({ closed_at: null }).eq('id', id)
+  return { error }
+}
+
 // Student-facing browse (all employers' postings — the table is
-// public-read by design already).
+// public-read by design already). Closed postings are excluded --
+// nothing left for a student to apply to once an employer has closed it.
 export const getAllOpportunities = async () => {
   const { data, error } = await supabase
     .from('opportunities')
     .select('*')
+    .is('closed_at', null)
     .order('created_at', { ascending: false })
     .limit(50)
   return { data, error }
@@ -1498,6 +1519,7 @@ export const getOpportunities = async (type?: 'job' | 'apprenticeship' | 'intern
   let query = supabase
     .from('opportunities')
     .select('*, employer:users!opportunities_employer_id_fkey(full_name, avatar_path, employer_verified)')
+    .is('closed_at', null)
     .order('created_at', { ascending: false })
     .limit(50)
   if (type) query = query.eq('type', type)

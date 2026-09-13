@@ -13,6 +13,12 @@ const TYPE_META: Record<string, { label: string; icon: any }> = {
   report: { label: 'A concern was reported', icon: Flag },
   session_started: { label: 'The session has started — join now', icon: Video },
   welcome: { label: 'Thank you for choosing LERN', icon: Sparkles },
+  application_stage_changed: { label: 'An employer moved a candidate', icon: Briefcase },
+}
+
+const STAGE_LABEL: Record<string, string> = {
+  applied: 'Applied', reviewing: 'Reviewing', shortlisted: 'Shortlisted', interview: 'Interview',
+  offer: 'Offer', hired: 'Hired', not_progressing: 'Not progressing',
 }
 
 function timeAgo(dateStr: string) {
@@ -120,7 +126,9 @@ export default function NotificationsBell({ size = 'md', iconColor }: { size?: '
               {items.map(n => {
                 const meta = TYPE_META[n.type] || { label: 'Notification', icon: Bell }
                 const Icon = meta.icon
-                const title = n.submissions?.work_items?.title || n.work_items?.title
+                const title = n.type === 'application_stage_changed'
+                  ? [n.applications?.student?.full_name, n.applications?.stage ? `→ ${STAGE_LABEL[n.applications.stage] || n.applications.stage}` : null].filter(Boolean).join(' ')
+                  : n.submissions?.work_items?.title || n.work_items?.title
                 return (
                   <button
                     key={n.id} onClick={() => openOne(n.id, n.read)}

@@ -239,13 +239,14 @@ export interface Interest {
   created_at: string
 }
 
-export type NotificationType = 'submission_received' | 'work_returned' | 'work_verified' | 'work_revoked'
+export type NotificationType = 'submission_received' | 'work_returned' | 'work_verified' | 'work_revoked' | 'application_stage_changed'
 
 export interface AppNotification {
   id: string
   user_id: string
   type: NotificationType
   submission_id?: string
+  application_id?: string
   read: boolean
   created_at: string
 }

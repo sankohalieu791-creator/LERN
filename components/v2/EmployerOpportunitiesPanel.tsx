@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getMyOpportunities, createOpportunity, deleteOpportunity, getAvatarUrl } from '@/lib/supabase'
-import { Plus, Trash2, Megaphone } from 'lucide-react'
+import { getMyOpportunities, createOpportunity, updateOpportunity, closeOpportunity, reopenOpportunity, deleteOpportunity, getAvatarUrl } from '@/lib/supabase'
+import { Plus, Trash2, Megaphone, Pencil, Lock, RotateCcw } from 'lucide-react'
 
 type OppType = 'job' | 'apprenticeship' | 'internship'
 const TYPE_LABEL: Record<OppType, string> = { job: 'Job', apprenticeship: 'Apprenticeship', internship: 'Internship' }
@@ -13,6 +13,7 @@ export default function EmployerOpportunitiesPanel() {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [type, setType] = useState<OppType>('job')
   const [description, setDescription] = useState('')
@@ -28,17 +29,25 @@ export default function EmployerOpportunitiesPanel() {
   useEffect(load, [user])
 
   const reset = () => {
-    setTitle(''); setDescription(''); setRequirements(''); setSalary(''); setLocation(''); setType('job'); setShowForm(false)
+    setTitle(''); setDescription(''); setRequirements(''); setSalary(''); setLocation(''); setType('job'); setShowForm(false); setEditingId(null)
   }
 
-  const handleCreate = async () => {
+  const startEdit = (o: any) => {
+    setEditingId(o.id)
+    setTitle(o.title || ''); setType(o.type || 'job'); setDescription(o.description || '')
+    setRequirements(o.requirements || ''); setSalary(o.salary || ''); setLocation(o.location || '')
+    setShowForm(true)
+  }
+
+  const handleSave = async () => {
     if (!user || !title.trim()) return
     setSaving(true)
-    const { error } = await createOpportunity(user.id, {
+    const fields = {
       title: title.trim(), type, description: description.trim() || undefined,
       requirements: requirements.trim() || undefined, salary: salary.trim() || undefined,
       location: location.trim() || undefined,
-    })
+    }
+    const { error } = editingId ? await updateOpportunity(editingId, fields) : await createOpportunity(user.id, fields)
     setSaving(false)
     if (!error) { reset(); load() }
   }
@@ -54,6 +63,12 @@ export default function EmployerOpportunitiesPanel() {
       setItems(prev => prev.some(i => i.id === id) ? prev : [...prev, removed])
       alert("Couldn't delete that posting — try again.")
     }
+  }
+
+  const handleToggleClosed = async (o: any) => {
+    setItems(prev => prev.map(i => i.id === o.id ? { ...i, closed_at: o.closed_at ? null : new Date().toISOString() } : i)) // optimistic
+    const { error } = o.closed_at ? await reopenOpportunity(o.id) : await closeOpportunity(o.id)
+    if (error) load() // revert by refetching real state
   }
 
   return (
@@ -75,6 +90,7 @@ export default function EmployerOpportunitiesPanel() {
 
       {showForm && (
         <div className="bg-surface border border-edge rounded-2xl p-5 space-y-3">
+          <p className="text-[13px] font-semibold text-ink-secondary">{editingId ? 'Edit posting' : 'New posting'}</p>
           <input
             value={title} onChange={e => setTitle(e.target.value)} placeholder="Title — e.g. Junior Video Editor" autoFocus
             className="w-full bg-surface border border-edge rounded-lg px-3.5 py-2.5 text-[14px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
@@ -112,8 +128,8 @@ export default function EmployerOpportunitiesPanel() {
           />
 
           <div className="flex gap-2">
-            <button onClick={handleCreate} disabled={!title.trim() || saving} className="px-4 py-2 rounded-lg bg-brand text-white text-[13px] font-semibold disabled:opacity-40">
-              {saving ? 'Posting…' : 'Post'}
+            <button onClick={handleSave} disabled={!title.trim() || saving} className="px-4 py-2 rounded-lg bg-brand text-white text-[13px] font-semibold disabled:opacity-40">
+              {saving ? 'Saving…' : editingId ? 'Save changes' : 'Post'}
             </button>
             <button onClick={reset} className="px-4 py-2 rounded-lg text-ink-secondary text-[13px] font-semibold hover:bg-surface-muted transition">
               Cancel
@@ -135,7 +151,7 @@ export default function EmployerOpportunitiesPanel() {
       ) : (
         <div className="space-y-2.5">
           {items.map(o => (
-            <div key={o.id} className="bg-surface border border-edge rounded-2xl p-5 flex items-start gap-4">
+            <div key={o.id} className={`bg-surface border border-edge rounded-2xl p-5 flex items-start gap-4 ${o.closed_at ? 'opacity-60' : ''}`}>
               {/* No separate per-posting logo any more -- your own
                   profile picture (Settings) is the identity every
                   posting shows, same as every other card in the app. */}
@@ -146,6 +162,7 @@ export default function EmployerOpportunitiesPanel() {
                 <div className="flex items-center gap-2 mb-0.5">
                   <p className="font-bold text-ink text-[15px] truncate">{o.title}</p>
                   {o.type && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface-muted text-ink-tertiary flex-shrink-0">{TYPE_LABEL[o.type as OppType] || o.type}</span>}
+                  {o.closed_at && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface-muted text-ink-tertiary flex-shrink-0">Closed</span>}
                 </div>
                 <p className="text-[12px] text-ink-tertiary">
                   {[o.salary, o.location].filter(Boolean).join(' · ')}
@@ -154,9 +171,17 @@ export default function EmployerOpportunitiesPanel() {
                 {o.requirements && <p className="text-[12.5px] text-ink-tertiary mt-1"><span className="font-semibold">Looking for: </span>{o.requirements}</p>}
                 <p className="text-[11px] text-ink-quaternary mt-2">Posted {new Date(o.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
               </div>
-              <button onClick={() => handleDelete(o.id)} aria-label="Delete" className="text-ink-tertiary hover:text-danger-text transition flex-shrink-0">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button onClick={() => startEdit(o)} aria-label="Edit" className="text-ink-tertiary hover:text-brand transition p-1">
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button onClick={() => handleToggleClosed(o)} aria-label={o.closed_at ? 'Reopen' : 'Close'} className="text-ink-tertiary hover:text-brand transition p-1">
+                  {o.closed_at ? <RotateCcw className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                </button>
+                <button onClick={() => handleDelete(o.id)} aria-label="Delete" className="text-ink-tertiary hover:text-danger-text transition p-1">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
