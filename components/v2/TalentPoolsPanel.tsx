@@ -6,7 +6,7 @@ import {
   getTalentPools, createTalentPool, deleteTalentPool, getTalentPoolMembers, removeFromTalentPool,
   getTalentPoolPreviewMembers, getAvatarUrl, getMyInterest, expressInterest, sendInterestMessage,
 } from '@/lib/supabase'
-import { Bookmark, Plus, X, Trash2, ChevronLeft, UserCheck, Users, Send, Clock } from 'lucide-react'
+import { Bookmark, Plus, X, Trash2, ChevronLeft, UserCheck, Users, Send, Sparkles, AlertCircle, Check } from 'lucide-react'
 
 // Talent pools rebuild -- Charles Booth-call selling feature. The
 // save-into-a-list mechanic and the name both stay; new is an
@@ -29,10 +29,15 @@ const CADENCE_STAGES = [
 function cadenceStage(createdAt: string) {
   const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24))
   const week = Math.floor(days / 7) + 1
-  const stage = CADENCE_STAGES[Math.min(week, CADENCE_STAGES.length) - 1]
+  const stageIndex = Math.min(week, CADENCE_STAGES.length) - 1
+  const stage = CADENCE_STAGES[stageIndex]
   const daysIntoWeek = days % 7
   const daysUntilNext = week < CADENCE_STAGES.length ? 7 - daysIntoWeek : null
-  return { ...stage, week, daysUntilNext }
+  // "Just landed on this stage" -- the closest honest signal to "due"
+  // without a persisted has-this-actually-been-sent record. Not a
+  // claim that it WAS sent, just that this is a fresh window to do it.
+  const justEntered = daysIntoWeek <= 1
+  return { ...stage, week, stageIndex, daysUntilNext, justEntered, daysSaved: days }
 }
 
 function initials(name?: string) {
@@ -112,6 +117,8 @@ export default function TalentPoolsPanel() {
 
   if (openPool) return <PoolDetail pool={openPool} onBack={() => { setOpenPool(null); load() }} />
 
+  const totalCandidates = pools.reduce((sum, p) => sum + (p.talent_pool_members?.[0]?.count ?? 0), 0)
+
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
@@ -120,7 +127,16 @@ export default function TalentPoolsPanel() {
           {creating ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />} New pool
         </button>
       </div>
-      <p className="text-[13px] text-ink-tertiary mb-5">Named lists for candidates you want to come back to.</p>
+      <p className="text-[13px] text-ink-tertiary mb-4">Named lists for candidates you want to come back to — kept warm automatically, not just saved and forgotten.</p>
+
+      {!loading && pools.length > 0 && (
+        <div className="flex items-start gap-2.5 rounded-xl px-4 py-3.5 mb-5" style={{ backgroundColor: '#FCEEE4' }}>
+          <Sparkles className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#D4551A' }} />
+          <p className="text-[13px] leading-relaxed" style={{ color: '#8C4315' }}>
+            <span className="font-semibold">{pools.length} pool{pools.length === 1 ? '' : 's'} · {totalCandidates} candidate{totalCandidates === 1 ? '' : 's'}</span> on an automated weekly cadence — a profile prompt, a workshop invite, then regular check-ins, so nobody sits saved and forgotten.
+          </p>
+        </div>
+      )}
 
       {creating && (
         <div className="mb-5">
@@ -224,7 +240,7 @@ function PoolDetail({ pool, onBack }: { pool: any; onBack: () => void }) {
 
       {loading ? (
         <div className="space-y-2">
-          {[0, 1].map(i => <div key={i} className="h-16 rounded-xl bg-surface animate-pulse" />)}
+          {[0, 1].map(i => <div key={i} className="h-20 rounded-xl bg-surface animate-pulse" />)}
         </div>
       ) : members.length === 0 ? (
         <div className="text-center py-16 bg-surface border border-edge-subtle rounded-2xl">
@@ -232,38 +248,92 @@ function PoolDetail({ pool, onBack }: { pool: any; onBack: () => void }) {
           <p className="text-[13px] text-ink-tertiary">Nobody saved here yet — bookmark a candidate from Discover.</p>
         </div>
       ) : (
-        <div className="bg-surface border border-edge rounded-2xl divide-y divide-edge-subtle overflow-hidden">
-          {members.map(m => {
-            const cadence = cadenceStage(m.created_at)
-            return (
-              <div key={m.id} className="flex items-center gap-3 px-4 py-3.5">
-                <CandidateAvatar person={m.student || {}} size={40} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[14px] font-semibold text-ink truncate">{m.student?.full_name}</p>
-                  <p className="flex items-center gap-1 text-[11.5px] text-ink-tertiary mt-0.5">
-                    <Clock className="w-3 h-3 flex-shrink-0" />
-                    Week {cadence.week} · Next: {cadence.label}
-                    {cadence.daysUntilNext !== null && cadence.daysUntilNext > 0 && ` in ${cadence.daysUntilNext}d`}
-                  </p>
+        <div className="space-y-2.5">
+          {members
+            // Freshest-entered stage first -- the candidates it's
+            // actually most worth opening this list for right now,
+            // not just insertion order.
+            .map(m => ({ m, cadence: cadenceStage(m.created_at) }))
+            .sort((a, b) => (a.cadence.justEntered === b.cadence.justEntered ? 0 : a.cadence.justEntered ? -1 : 1))
+            .map(({ m, cadence }) => {
+              const bio = m.student?.bio?.trim()
+              return (
+                <div key={m.id} className="bg-surface border border-edge rounded-2xl px-4 py-3.5">
+                  <div className="flex items-center gap-3">
+                    <CandidateAvatar person={m.student || {}} size={40} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] font-semibold text-ink truncate">{m.student?.full_name}</p>
+                      <p className="text-[11.5px] text-ink-tertiary mt-0.5">Saved {cadence.daysSaved === 0 ? 'today' : `${cadence.daysSaved}d ago`}</p>
+                    </div>
+                    {cadence.justEntered && (
+                      <span className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#FCEEE4', color: '#D4551A' }}>
+                        <Sparkles className="w-3 h-3" /> New stage
+                      </span>
+                    )}
+                    {m.student && (
+                      <button
+                        onClick={() => setMessaging({ studentId: m.student.id, name: m.student.full_name || 'this candidate', defaultMessage: cadence.message })}
+                        className="flex items-center gap-1.5 text-[12px] font-semibold text-brand hover:underline flex-shrink-0"
+                      >
+                        <Send className="w-3.5 h-3.5" /> Send now
+                      </button>
+                    )}
+                    <button
+                      onClick={async () => { await removeFromTalentPool(m.id); load() }}
+                      aria-label="Remove from pool"
+                      className="w-8 h-8 flex items-center justify-center rounded-full text-ink-tertiary hover:text-danger-text hover:bg-surface-muted transition flex-shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* The actual cadence tracker -- three segments, filled
+                      up to the current stage, so this reads as a real
+                      running process rather than a bare "Week 2" label. */}
+                  <div className="flex items-center gap-1.5 mt-3 pl-[52px]">
+                    {CADENCE_STAGES.map((stage, idx) => (
+                      <div key={stage.week} className="flex items-center gap-1.5 flex-1">
+                        <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                          <span
+                            className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                            style={
+                              idx < cadence.stageIndex
+                                ? { backgroundColor: '#0F6E56' }
+                                : idx === cadence.stageIndex
+                                ? { backgroundColor: '#D4551A' }
+                                : { backgroundColor: 'var(--surface-muted)' }
+                            }
+                          >
+                            {idx < cadence.stageIndex ? <Check className="w-3 h-3 text-white" /> : (
+                              <span className={`text-[10px] font-bold ${idx === cadence.stageIndex ? 'text-white' : 'text-ink-quaternary'}`}>{idx + 1}</span>
+                            )}
+                          </span>
+                        </div>
+                        {idx < CADENCE_STAGES.length - 1 && (
+                          <span className="h-[2px] flex-1 rounded-full" style={{ backgroundColor: idx < cadence.stageIndex ? '#0F6E56' : 'var(--surface-muted)' }} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between pl-[52px] mt-1.5">
+                    <p className="text-[11.5px] font-semibold" style={{ color: '#D4551A' }}>
+                      Week {cadence.week} · {cadence.label}
+                      {cadence.daysUntilNext !== null && cadence.daysUntilNext > 0 && (
+                        <span className="text-ink-tertiary font-normal"> · next stage in {cadence.daysUntilNext}d</span>
+                      )}
+                    </p>
+                  </div>
+
+                  {bio ? (
+                    <p className="text-[12px] text-ink-tertiary mt-2 pl-[52px] line-clamp-1">"{bio}"</p>
+                  ) : (
+                    <p className="flex items-center gap-1 text-[11.5px] mt-2 pl-[52px]" style={{ color: '#854F0B' }}>
+                      <AlertCircle className="w-3 h-3 flex-shrink-0" /> No bio on their profile yet — good candidate for the profile-prompt stage.
+                    </p>
+                  )}
                 </div>
-                {m.student && (
-                  <button
-                    onClick={() => setMessaging({ studentId: m.student.id, name: m.student.full_name || 'this candidate', defaultMessage: cadence.message })}
-                    className="flex items-center gap-1.5 text-[12px] font-semibold text-brand hover:underline flex-shrink-0"
-                  >
-                    <Send className="w-3.5 h-3.5" /> Send now
-                  </button>
-                )}
-                <button
-                  onClick={async () => { await removeFromTalentPool(m.id); load() }}
-                  aria-label="Remove from pool"
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-ink-tertiary hover:text-danger-text hover:bg-surface-muted transition flex-shrink-0"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )
-          })}
+              )
+            })}
         </div>
       )}
 
