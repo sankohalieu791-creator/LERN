@@ -13,13 +13,14 @@ import {
   uploadAvatar, removeAvatar,
   getLernDeliveryAdults, getLernAdultFrequency, addLernDeliveryAdult, updateLernDeliveryAdult,
   getLernSessionLog, recordLernSessionCancellation,
+  getPendingEmployerVerifications, approveEmployerVerification, rejectEmployerVerification,
 } from '@/lib/supabase'
 import type { LernDeliveryAdult, LernAdultFrequency, LernSessionLogEntry } from '@/lib/types'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
 import {
   Sun, Moon, Monitor, ShieldCheck, Users2, Ticket,
   Mail, UserX, ChevronRight, ChevronLeft, Camera, BadgeCheck, LogOut,
-  Lock, AlertTriangle, Download, Plus, Ban,
+  Lock, AlertTriangle, Download, Plus, Ban, Check, Building2, Globe,
 } from 'lucide-react'
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
 
@@ -46,7 +47,7 @@ const NOTIFICATION_LABELS: Record<string, string> = {
   reports: 'New reports',
 }
 
-type Screen = null | 'email' | 'password' | 'photo' | 'rename' | 'organisation' | 'blocked' | 'report' | 'delete' | 'consent' | 'admin-safeguarding'
+type Screen = null | 'email' | 'password' | 'photo' | 'rename' | 'organisation' | 'blocked' | 'report' | 'delete' | 'consent' | 'admin-safeguarding' | 'admin-employer-verification'
 
 export default function SettingsPanel() {
   const { user, refreshUser } = useAuth()
@@ -123,6 +124,7 @@ export default function SettingsPanel() {
   if (screen === 'delete') return <DeleteAccountScreen email={user.email} onBack={() => setScreen(null)} />
   if (screen === 'consent') return <ConsentScreen consentedAt={user.consented_at} onBack={() => setScreen(null)} onDelete={() => setScreen('delete')} />
   if (screen === 'admin-safeguarding') return <AdminSafeguardingScreen onBack={() => setScreen(null)} />
+  if (screen === 'admin-employer-verification') return <AdminEmployerVerificationScreen onBack={() => setScreen(null)} />
 
   const logoUrl = org?.logo_path ? getAvatarUrl(org.logo_path) : null
   const avatarUrl = user.avatar_path ? getAvatarUrl(user.avatar_path) : null
@@ -235,6 +237,7 @@ export default function SettingsPanel() {
       {user.email?.toLowerCase() === LERN_ADMIN_EMAIL && (
         <Group title="Admin">
           <Row label="Session delivery & safeguarding" onClick={() => setScreen('admin-safeguarding')} />
+          <Row label="Employer verification" onClick={() => setScreen('admin-employer-verification')} />
         </Group>
       )}
 
@@ -976,6 +979,118 @@ function AddAdultForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
         </button>
         <button onClick={onCancel} className="text-[13px] font-semibold text-ink-tertiary px-2">Cancel</button>
       </div>
+    </div>
+  )
+}
+
+// ── Admin: employer verification ────────────────────────────────────
+// The vetting gate itself (Michael's Sep-10 review) -- an independent
+// employer sits behind PendingEmployerVerification until approved
+// here. Guarded by is_lern_admin() inside each RPC (see the
+// employer_vetting_gate migration), the same trust model as the DBS
+// panel above; this screen is only ever the entry point, never the
+// real boundary.
+function AdminEmployerVerificationScreen({ onBack }: { onBack: () => void }) {
+  const [rows, setRows] = useState<any[] | null>(null)
+  const [error, setError] = useState('')
+  const [rejecting, setRejecting] = useState<string | null>(null)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const load = () => { getPendingEmployerVerifications().then(({ data, error: err }) => { setRows(data || []); if (err) setError(err.message) }) }
+  useEffect(load, [])
+
+  const approve = async (id: string) => {
+    setBusy(id); setError('')
+    const { error: err } = await approveEmployerVerification(id)
+    setBusy(null)
+    if (err) { setError("Couldn't approve — try again."); return }
+    load()
+  }
+
+  const reject = async (id: string) => {
+    if (!reason.trim()) { setError('Give a reason — it\'s shown to the employer.'); return }
+    setBusy(id); setError('')
+    const { error: err } = await rejectEmployerVerification(id, reason.trim())
+    setBusy(null)
+    if (err) { setError("Couldn't reject — try again."); return }
+    setRejecting(null); setReason('')
+    load()
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto pb-10">
+      <button onClick={onBack} className="flex items-center gap-1 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
+        <ChevronLeft className="w-4 h-4" /> Back to Settings
+      </button>
+      <p className="text-[22px] font-bold text-ink mb-1">Employer verification</p>
+      <p className="text-[14px] text-ink-tertiary mb-5">
+        Every independent employer account sits behind this until approved — Companies House, domain, and website checked by hand, in the early stage. Guest/invited employers never appear here; they're scoped a completely different way.
+      </p>
+
+      <ErrorBanner message={error} />
+
+      {rows === null ? (
+        <p className="text-[14px] text-ink-tertiary">Loading…</p>
+      ) : rows.length === 0 ? (
+        <div className="bg-surface border border-edge rounded-2xl px-5 py-10 text-center">
+          <p className="text-[14px] font-semibold text-ink mb-1">Nothing pending</p>
+          <p className="text-[13px] text-ink-tertiary">New independent employer sign-ups will show up here.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {rows.map(r => (
+            <div key={r.id} className="bg-surface border border-edge rounded-2xl px-5 py-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-bold text-ink text-[15px] truncate">{r.full_name}</p>
+                  <p className="text-[13px] text-ink-tertiary truncate">{r.email}</p>
+                </div>
+                <p className="text-[11px] text-ink-quaternary flex-shrink-0">
+                  {r.employer_verification_requested_at ? `Requested ${new Date(r.employer_verification_requested_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : `Signed up ${new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3 pt-3 border-t border-edge-subtle text-[13px] text-ink-secondary">
+                <span className="flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 flex-shrink-0 text-ink-tertiary" />
+                  {r.employer_website || <span className="text-ink-quaternary italic">No website given</span>}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 flex-shrink-0 text-ink-tertiary" />
+                  {r.employer_company_number ? `Companies House ${r.employer_company_number}` : <span className="text-ink-quaternary italic">No company number given</span>}
+                </span>
+              </div>
+
+              {rejecting === r.id ? (
+                <div className="mt-3 pt-3 border-t border-edge-subtle">
+                  <textarea
+                    value={reason} onChange={e => setReason(e.target.value)} autoFocus rows={2}
+                    placeholder="Why isn't this approved? Shown to the employer."
+                    className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
+                  />
+                  <div className="flex items-center gap-2 mt-2">
+                    <button onClick={() => reject(r.id)} disabled={busy === r.id} className="text-[12px] font-semibold bg-danger-solid text-white px-3 py-1.5 rounded-lg disabled:opacity-40">
+                      {busy === r.id ? 'Rejecting…' : 'Confirm reject'}
+                    </button>
+                    <button onClick={() => { setRejecting(null); setReason('') }} className="text-[12px] font-semibold text-ink-tertiary px-2">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-edge-subtle">
+                  <button
+                    onClick={() => approve(r.id)} disabled={busy === r.id}
+                    className="flex items-center gap-1.5 bg-brand text-white text-[12.5px] font-semibold px-3.5 py-2 rounded-lg disabled:opacity-40"
+                  >
+                    <Check className="w-3.5 h-3.5" /> {busy === r.id ? 'Approving…' : 'Approve'}
+                  </button>
+                  <button onClick={() => setRejecting(r.id)} className="text-[12.5px] font-semibold text-danger-text hover:underline">Reject</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

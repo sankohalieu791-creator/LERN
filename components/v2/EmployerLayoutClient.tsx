@@ -3,6 +3,7 @@
 import RoleGate from '@/components/v2/RoleGate'
 import OrgShell from '@/components/v2/OrgShell'
 import GuestEmployerShell from '@/components/v2/GuestEmployerShell'
+import PendingEmployerVerification from '@/components/v2/PendingEmployerVerification'
 import { employerSections, employerPhoneItems } from '@/lib/orgNav'
 import { useAuth } from '@/context/AuthContext'
 
@@ -18,6 +19,14 @@ function EmployerShellSwitch({ children }: { children: React.ReactNode }) {
   // that's still a guest, not a real employer, and belongs in the
   // scoped shell either way.
   if (user?.is_guest || user?.guest_invite_id) return <GuestEmployerShell>{children}</GuestEmployerShell>
+
+  // Employer vetting gate (Michael's Sep-10 review) -- an independent
+  // employer sees a pending-verification screen, not full access,
+  // until employer_verified is set true by an admin. Only applies here
+  // (never guests, handled above) -- once vetted this branch never
+  // fires again for this account.
+  if (!user?.employer_verified) return <PendingEmployerVerification />
+
   return (
     <OrgShell sections={employerSections} phoneItems={employerPhoneItems}>
       {children}

@@ -120,6 +120,33 @@ export const claimEmployerRole = async () => {
   return { error }
 }
 
+// ── Employer vetting gate (Michael's Sep-10 review) ─────────────────
+// employer_verified (defaults false) is the actual gate an independent
+// employer sits behind until approved -- guest/invited employers never
+// touch any of this, they're scoped a completely separate way
+// (GuestEmployerShell). "Approved by an institution or the founder in
+// the early stage" -- this is the founder half, gated by is_lern_admin()
+// inside each RPC, same trust model as the DBS/session-log panel.
+export const submitEmployerVerification = async (companyNumber: string, website: string) => {
+  const { error } = await supabase.rpc('submit_employer_verification', { p_company_number: companyNumber, p_website: website })
+  return { error }
+}
+
+export const getPendingEmployerVerifications = async () => {
+  const { data, error } = await supabase.rpc('get_pending_employer_verifications')
+  return { data, error }
+}
+
+export const approveEmployerVerification = async (employerId: string) => {
+  const { error } = await supabase.rpc('approve_employer_verification', { p_employer_id: employerId })
+  return { error }
+}
+
+export const rejectEmployerVerification = async (employerId: string, reason: string) => {
+  const { error } = await supabase.rpc('reject_employer_verification', { p_employer_id: employerId, p_reason: reason })
+  return { error }
+}
+
 // Screens A3/O2 — active, non-pre-ticked consent.
 export const recordConsent = async (userId: string) => {
   const { error } = await supabase

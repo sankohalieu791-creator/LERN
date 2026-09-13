@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner, OrDivider, GoogleButton } from '@/components/v2/Field'
-import { signUp, signIn, signInWithGoogle, claimEmployerRole, resendConfirmation, recordConsent, supabase } from '@/lib/supabase'
+import { signUp, signIn, signInWithGoogle, claimEmployerRole, resendConfirmation, recordConsent, submitEmployerVerification, supabase } from '@/lib/supabase'
 import { employerEmailError } from '@/lib/emailPolicy'
 import { useAuth } from '@/context/AuthContext'
-import { ShieldCheck } from 'lucide-react'
+import { ShieldCheck, ClipboardCheck } from 'lucide-react'
 
-type Step = 1 | 2
+type Step = 1 | 2 | 3
 
 // Employers are invite-only during the founder-testing phase — the
 // access-lock allowlist enforced in handle_new_user() is the real gate;
@@ -24,6 +24,8 @@ export default function EmployerSignupPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [companyNumber, setCompanyNumber] = useState('')
+  const [website, setWebsite] = useState('')
   const [showGreeting, setShowGreeting] = useState(false)
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
   const [resent, setResent] = useState(false)
@@ -40,7 +42,7 @@ export default function EmployerSignupPage() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data: profile } = await supabase.from('users').select('consented_at, full_name, role').eq('id', user.id).single()
+      const { data: profile } = await supabase.from('users').select('consented_at, full_name, role, employer_verification_requested_at').eq('id', user.id).single()
       if (!profile) return
       // A Google sign-in skips the domain check handleStep1 does for
       // email/password, since Google supplies the email directly --
@@ -57,7 +59,8 @@ export default function EmployerSignupPage() {
         await claimEmployerRole()
       }
       setFullName(profile.full_name || '')
-      if (!profile.consented_at) setStep(2)
+      if (!profile.employer_verification_requested_at) setStep(2)
+      else if (!profile.consented_at) setStep(3)
       else setShowGreeting(true)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,9 +96,10 @@ export default function EmployerSignupPage() {
       if (!signInError && signInData?.user) {
         const { data: { user: authUser } } = await supabase.auth.getUser()
         if (authUser) {
-          const { data: profile } = await supabase.from('users').select('consented_at').eq('id', authUser.id).single()
+          const { data: profile } = await supabase.from('users').select('consented_at, employer_verification_requested_at').eq('id', authUser.id).single()
           setLoading(false)
-          if (profile && !profile.consented_at) { setStep(2); return }
+          if (profile && !profile.employer_verification_requested_at) { setStep(2); return }
+          if (profile && !profile.consented_at) { setStep(3); return }
           setShowGreeting(true)
           return
         }
@@ -106,6 +110,16 @@ export default function EmployerSignupPage() {
 
     setLoading(false)
     setError(signUpError.message)
+  }
+
+  const handleCompanyDetails = async () => {
+    setError('')
+    if (!website.trim()) return setError("Enter your company's website — it's how we check you're a real business.")
+    setLoading(true)
+    const { error: err } = await submitEmployerVerification(companyNumber.trim(), website.trim())
+    setLoading(false)
+    if (err) return setError("Couldn't save that — try again.")
+    setStep(3)
   }
 
   const handleConsent = async (accepted: boolean) => {
@@ -145,9 +159,13 @@ export default function EmployerSignupPage() {
 
   return (
     <AuthShell
-      step={step} totalSteps={2}
-      title={step === 1 ? 'Create your employer account' : 'How LERN protects young people'}
-      subtitle={step === 1 ? 'Browse verified work, set briefs, and track interest — all routed through the organisation.' : undefined}
+      step={step} totalSteps={3}
+      title={step === 1 ? 'Create your employer account' : step === 2 ? 'Tell us about your company' : 'How LERN protects young people'}
+      subtitle={
+        step === 1 ? 'Browse verified work, set briefs, and track interest — all routed through the organisation.'
+        : step === 2 ? "Every independent employer account is checked before it gets full access — this is what we check."
+        : undefined
+      }
     >
       <ErrorBanner message={error} />
 
@@ -165,6 +183,23 @@ export default function EmployerSignupPage() {
       )}
 
       {step === 2 && (
+        <div>
+          <div className="bg-white border border-[#E2DDD1] rounded-2xl p-5 mb-6">
+            <div className="flex items-center gap-2.5 mb-3">
+              <ClipboardCheck className="w-5 h-5 text-brand flex-shrink-0" />
+              <p className="font-bold text-ink text-[15px]">Why we ask</p>
+            </div>
+            <p className="text-[14px] text-[#4A453B] leading-relaxed">
+              We check every independent employer is a real, legitimate business before granting full access to Discover and candidates — a Companies House registration, your domain, and your website. You'll see a "pending verification" screen until this is confirmed, usually quick during working hours.
+            </p>
+          </div>
+          <TextField label="Companies House number (optional)" value={companyNumber} onChange={setCompanyNumber} placeholder="e.g. 12345678" hint="If you're a registered company — helps us verify faster." />
+          <TextField label="Company website" value={website} onChange={setWebsite} placeholder="https://yourcompany.com" />
+          <PrimaryButton onClick={handleCompanyDetails} loading={loading}>Continue</PrimaryButton>
+        </div>
+      )}
+
+      {step === 3 && (
         <div>
           <div className="bg-white border border-[#E2DDD1] rounded-2xl p-5 mb-6">
             <div className="flex items-center gap-2.5 mb-3">

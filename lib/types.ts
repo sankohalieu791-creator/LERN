@@ -43,6 +43,14 @@ export interface User {
   // have no organisations row to hang a verified flag off of. Same
   // posture: platform-granted, no client call sets it.
   employer_verified?: boolean
+  // The employer vetting gate (Michael's Sep-10 review) -- set at
+  // signup (submit_employer_verification), reviewed by an admin
+  // (approve/reject_employer_verification). Only ever meaningful while
+  // employer_verified is still false; irrelevant once approved.
+  employer_company_number?: string
+  employer_website?: string
+  employer_verification_requested_at?: string
+  employer_rejected_reason?: string
   // Privacy — only ever meaningfully settable for an 18+ account; an
   // under-18's row stays at these safe defaults (public_profile false)
   // and Settings never renders a control to change them.
