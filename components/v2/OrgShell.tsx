@@ -259,10 +259,20 @@ export default function OrgShell({
             >
               <Settings className="w-5 h-5" />
             </button>
-            <div className="relative">
+            <div className="relative flex items-center gap-1.5">
+              {/* Colour alone ("just green") isn't a status -- the dot
+                  on the avatar below stays as a compact always-there
+                  indicator, but the actual word only fits without
+                  crowding the header on wider screens (same lg-only
+                  allowance identityName above already gets). */}
+              <span className="hidden lg:flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-tertiary">
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${PRESENCE_DOT[user?.presence_status || 'active']}`} />
+                {PRESENCE_LABEL[user?.presence_status || 'active']}
+              </span>
               <button
                 onClick={() => setProfileOpen(v => !v)}
-                aria-label="Profile menu"
+                aria-label={`Profile menu — status: ${PRESENCE_LABEL[user?.presence_status || 'active']}`}
+                title={`Status: ${PRESENCE_LABEL[user?.presence_status || 'active']}`}
                 className="relative w-10 h-10 flex items-center justify-center rounded-full bg-accent-bg text-brand font-bold text-[14px] ml-1"
               >
                 {/* overflow-hidden used to live on the button itself, which
