@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { supabase, recordConsent, getUserProfile } from '@/lib/supabase'
+import { supabase, recordConsent, getUserProfile, signOut } from '@/lib/supabase'
 import AuthShell from '@/components/v2/AuthShell'
 
 // Where the guest's magic link actually lands. This used to depend on
@@ -38,7 +38,20 @@ export default function GuestConfirmPage() {
         return
       }
       const { data: profile } = await getUserProfile(authUser.id)
-      if (profile && !profile.consented_at) await recordConsent(authUser.id)
+      // Defense in depth alongside the check in claimGuestInvite(): if
+      // this session somehow isn't the scoped guest account the link
+      // was meant to create (role isn't employer, or there's no
+      // guest_invite_id at all), this is someone's real, unrelated
+      // account -- sign straight back out rather than silently
+      // forwarding into RoleGate, which would otherwise just bounce
+      // them into whatever that account's actual role is with no
+      // explanation (exactly "I keep seeing the student layout").
+      if (!profile || profile.role !== 'employer' || !profile.guest_invite_id) {
+        await signOut()
+        setError("This link signed in an existing LERN account, not a new guest pass — that shouldn't be possible any more, but as a safety check we've signed it straight back out. Ask whoever invited you for a fresh link, using an email that isn't already registered on LERN.")
+        return
+      }
+      if (!profile.consented_at) await recordConsent(authUser.id)
       await refreshUser()
       router.replace('/employer')
     })()

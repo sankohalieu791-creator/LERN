@@ -2061,7 +2061,24 @@ export const getGuestProfiles = async () => {
 // handle_new_user() punch through the founder allowlist, but only
 // because it re-validates that id server-side against a real,
 // unclaimed, unrevoked row before trusting it.
+// Urgent fix (14 Sep): a magic link to an email that already has a
+// LERN account just signs that person into their real, existing
+// account — the guest_invite_id/role metadata below only ever applies
+// to a genuinely NEW auth user. Checking first, and refusing outright,
+// is what actually prevents "claimed the guest link, landed in a
+// stranger's — or my own other — real account." See
+// app/api/guest/check-email for the full story.
 export const claimGuestInvite = async (inviteId: string, fullName: string, email: string) => {
+  const checkRes = await fetch('/api/guest/check-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  const check = await checkRes.json().catch(() => ({}))
+  if (check.exists) {
+    return { error: { message: 'This email already has a LERN account — guest links need a different email address that isn\'t already registered.' } }
+  }
+
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
