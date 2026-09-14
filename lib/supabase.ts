@@ -127,9 +127,19 @@ export const claimEmployerRole = async () => {
 // (GuestEmployerShell). "Approved by an institution or the founder in
 // the early stage" -- this is the founder half, gated by is_lern_admin()
 // inside each RPC, same trust model as the DBS/session-log panel.
+// Runs the two automatic checks (Companies House, email domain) server
+// side the instant this is submitted -- see app/api/employer/verify-submit
+// for why that can't be a plain Postgres RPC.
 export const submitEmployerVerification = async (companyNumber: string, website: string) => {
-  const { error } = await supabase.rpc('submit_employer_verification', { p_company_number: companyNumber, p_website: website })
-  return { error }
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) return { error: { message: 'Not signed in.' } }
+  const res = await fetch('/api/employer/verify-submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ companyNumber, website }),
+  })
+  const body = await res.json().catch(() => ({}))
+  return { error: res.ok ? null : { message: body.error || "Couldn't save that — try again." } }
 }
 
 export const getPendingEmployerVerifications = async () => {
@@ -137,6 +147,9 @@ export const getPendingEmployerVerifications = async () => {
   return { data, error }
 }
 
+// approve_employer_verification RAISEs if any of the five checks
+// hasn't genuinely passed -- that exception's message is the reason
+// shown to the admin, not a generic failure.
 export const approveEmployerVerification = async (employerId: string) => {
   const { error } = await supabase.rpc('approve_employer_verification', { p_employer_id: employerId })
   return { error }
@@ -144,6 +157,30 @@ export const approveEmployerVerification = async (employerId: string) => {
 
 export const rejectEmployerVerification = async (employerId: string, reason: string) => {
   const { error } = await supabase.rpc('reject_employer_verification', { p_employer_id: employerId, p_reason: reason })
+  return { error }
+}
+
+// The gate's other available action alongside Reject: stays open,
+// asks the applicant for whatever is missing (e.g. proof of role).
+export const requestMoreEmployerInfo = async (employerId: string, message: string) => {
+  const { error } = await supabase.rpc('request_more_employer_info', { p_employer_id: employerId, p_message: message })
+  return { error }
+}
+
+export const setEmployerManualCheck = async (employerId: string, check: 'website' | 'officer', value: boolean) => {
+  const { error } = await supabase.rpc('set_employer_manual_check', { p_employer_id: employerId, p_check: check, p_value: value })
+  return { error }
+}
+
+export const setEmployerCheck5Notes = async (employerId: string, notes: string) => {
+  const { error } = await supabase.rpc('set_employer_check5_notes', { p_employer_id: employerId, p_notes: notes })
+  return { error }
+}
+
+// The applicant's own reply once an admin has requested more info --
+// flips them back to Pending for another look.
+export const submitMoreEmployerInfo = async (message: string) => {
+  const { error } = await supabase.rpc('submit_more_employer_info', { p_message: message })
   return { error }
 }
 

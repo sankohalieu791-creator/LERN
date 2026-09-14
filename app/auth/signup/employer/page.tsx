@@ -114,6 +114,7 @@ export default function EmployerSignupPage() {
 
   const handleCompanyDetails = async () => {
     setError('')
+    if (!companyNumber.trim()) return setError('Enter your Companies House number — we check it automatically before anything else.')
     if (!website.trim()) return setError("Enter your company's website — it's how we check you're a real business.")
     setLoading(true)
     const { error: err } = await submitEmployerVerification(companyNumber.trim(), website.trim())
@@ -193,7 +194,7 @@ export default function EmployerSignupPage() {
               We check every independent employer is a real, legitimate business before granting full access to Discover and candidates — a Companies House registration, your domain, and your website. You'll see a "pending verification" screen until this is confirmed, usually quick during working hours.
             </p>
           </div>
-          <TextField label="Companies House number (optional)" value={companyNumber} onChange={setCompanyNumber} placeholder="e.g. 12345678" hint="If you're a registered company — helps us verify faster." />
+          <TextField label="Companies House number" value={companyNumber} onChange={setCompanyNumber} placeholder="e.g. 12345678" hint="We check this against Companies House the moment you continue." />
           <TextField label="Company website" value={website} onChange={setWebsite} placeholder="https://yourcompany.com" />
           <PrimaryButton onClick={handleCompanyDetails} loading={loading}>Continue</PrimaryButton>
         </div>

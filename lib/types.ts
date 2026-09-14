@@ -51,6 +51,19 @@ export interface User {
   employer_website?: string
   employer_verification_requested_at?: string
   employer_rejected_reason?: string
+  // Employer Vetting Gate v1.0 -- the five named checks, stored so
+  // approve_employer_verification() can enforce zero-tolerance itself
+  // rather than trusting whatever the admin UI happens to show.
+  employer_verification_status?: 'pending' | 'approved' | 'rejected' | 'more_info_requested'
+  employer_check_ch?: 'pass' | 'fail' | 'not_configured'
+  employer_check_ch_detail?: string
+  employer_ch_officers?: string[]
+  employer_check_email_domain?: 'pass' | 'fail'
+  employer_check_website_confirmed?: boolean
+  employer_check_officer_confirmed?: boolean
+  employer_check5_notes?: string
+  employer_more_info_message?: string
+  employer_more_info_response?: string
   // Privacy — only ever meaningfully settable for an 18+ account; an
   // under-18's row stays at these safe defaults (public_profile false)
   // and Settings never renders a control to change them.

@@ -14,6 +14,7 @@ import {
   getLernDeliveryAdults, getLernAdultFrequency, addLernDeliveryAdult, updateLernDeliveryAdult,
   getLernSessionLog, recordLernSessionCancellation,
   getPendingEmployerVerifications, approveEmployerVerification, rejectEmployerVerification,
+  requestMoreEmployerInfo, setEmployerManualCheck, setEmployerCheck5Notes,
 } from '@/lib/supabase'
 import type { LernDeliveryAdult, LernAdultFrequency, LernSessionLogEntry } from '@/lib/types'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
@@ -21,6 +22,7 @@ import {
   Sun, Moon, Monitor, ShieldCheck, Users2, Ticket,
   Mail, UserX, ChevronRight, ChevronLeft, Camera, BadgeCheck, LogOut,
   Lock, AlertTriangle, Download, Plus, Ban, Check, Building2, Globe,
+  XCircle, HelpCircle, MessageCircle, UserCheck,
 } from 'lucide-react'
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
 
@@ -990,33 +992,195 @@ function AddAdultForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
 // employer_vetting_gate migration), the same trust model as the DBS
 // panel above; this screen is only ever the entry point, never the
 // real boundary.
+// Build Spec: Employer Vetting Gate v1.0 -- "zero tolerance... never
+// overridden to grant access anyway". This shows the two automatic
+// checks as they actually ran (not editable), lets the admin record
+// the two manual ones (3: website, 4: officer match) plus free-text
+// judgement (5), and only enables Approve once every one of them is a
+// genuine pass -- approveEmployerVerification() enforces the same rule
+// server-side regardless of what this button is doing, so this is
+// belt-and-braces, not the only line of defence.
+function CheckBadge({ state }: { state: 'pass' | 'fail' | 'not_configured' | undefined }) {
+  if (state === 'pass') return <span className="flex items-center gap-1 text-[11.5px] font-semibold text-success-text"><Check className="w-3.5 h-3.5" /> Pass</span>
+  if (state === 'fail') return <span className="flex items-center gap-1 text-[11.5px] font-semibold text-danger-text"><XCircle className="w-3.5 h-3.5" /> Fail</span>
+  return <span className="flex items-center gap-1 text-[11.5px] font-semibold text-ink-tertiary"><HelpCircle className="w-3.5 h-3.5" /> Not configured</span>
+}
+
+function EmployerVerificationRow({ r, onChanged }: { r: any; onChanged: () => void }) {
+  const [rejecting, setRejecting] = useState(false)
+  const [askingInfo, setAskingInfo] = useState(false)
+  const [reason, setReason] = useState('')
+  const [infoMessage, setInfoMessage] = useState('')
+  const [notes, setNotes] = useState(r.employer_check5_notes || '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const chPass = r.employer_check_ch === 'pass'
+  const emailPass = r.employer_check_email_domain === 'pass'
+  const canApprove = chPass && emailPass && r.employer_check_website_confirmed && r.employer_check_officer_confirmed
+
+  const toggleCheck = async (check: 'website' | 'officer', value: boolean) => {
+    await setEmployerManualCheck(r.id, check, value)
+    onChanged()
+  }
+
+  const saveNotes = async () => {
+    await setEmployerCheck5Notes(r.id, notes)
+    onChanged()
+  }
+
+  const approve = async () => {
+    setBusy(true); setError('')
+    const { error: err } = await approveEmployerVerification(r.id)
+    setBusy(false)
+    if (err) { setError(err.message || "Couldn't approve — try again."); return }
+    onChanged()
+  }
+
+  const reject = async () => {
+    if (!reason.trim()) { setError("Give a reason — it's shown to the employer."); return }
+    setBusy(true); setError('')
+    const { error: err } = await rejectEmployerVerification(r.id, reason.trim())
+    setBusy(false)
+    if (err) { setError("Couldn't reject — try again."); return }
+    setRejecting(false); setReason(''); onChanged()
+  }
+
+  const requestInfo = async () => {
+    if (!infoMessage.trim()) { setError('Say what you still need — shown to the employer.'); return }
+    setBusy(true); setError('')
+    const { error: err } = await requestMoreEmployerInfo(r.id, infoMessage.trim())
+    setBusy(false)
+    if (err) { setError("Couldn't send — try again."); return }
+    setAskingInfo(false); setInfoMessage(''); onChanged()
+  }
+
+  return (
+    <div className="bg-surface border border-edge rounded-2xl px-5 py-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-bold text-ink text-[15px] truncate">{r.full_name}</p>
+          <p className="text-[13px] text-ink-tertiary truncate">{r.email}</p>
+        </div>
+        <p className="text-[11px] text-ink-quaternary flex-shrink-0">
+          {r.employer_verification_requested_at ? `Requested ${new Date(r.employer_verification_requested_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : `Signed up ${new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+        </p>
+      </div>
+
+      {r.employer_verification_status === 'more_info_requested' && (
+        <p className="mt-2 text-[12px] font-semibold text-warning-text">Waiting on the employer's reply{r.employer_more_info_response ? ' — replied:' : ''}</p>
+      )}
+      {r.employer_more_info_response && (
+        <p className="text-[13px] text-ink-secondary bg-surface-subtle rounded-lg px-3 py-2 mt-1">{r.employer_more_info_response}</p>
+      )}
+
+      <div className="mt-3 pt-3 border-t border-edge-subtle space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 text-[13px] text-ink-secondary min-w-0">
+            <Building2 className="w-3.5 h-3.5 flex-shrink-0 text-ink-tertiary" />
+            <span className="truncate">1. Companies House {r.employer_company_number ? `(${r.employer_company_number})` : ''}</span>
+          </span>
+          <CheckBadge state={r.employer_check_ch} />
+        </div>
+        {r.employer_check_ch_detail && <p className="text-[11.5px] text-ink-tertiary pl-5">{r.employer_check_ch_detail}</p>}
+        {r.employer_ch_officers?.length > 0 && (
+          <p className="text-[11.5px] text-ink-tertiary pl-5">Officers on file: {r.employer_ch_officers.join(', ')}</p>
+        )}
+
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 text-[13px] text-ink-secondary min-w-0">
+            <Mail className="w-3.5 h-3.5 flex-shrink-0 text-ink-tertiary" />
+            <span className="truncate">2. Email domain matches {r.employer_website || 'website'}</span>
+          </span>
+          <CheckBadge state={r.employer_check_email_domain} />
+        </div>
+
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 text-[13px] text-ink-secondary min-w-0">
+            <Globe className="w-3.5 h-3.5 flex-shrink-0 text-ink-tertiary" />
+            {r.employer_website ? (
+              <a href={r.employer_website.startsWith('http') ? r.employer_website : `https://${r.employer_website}`} target="_blank" rel="noreferrer" className="truncate hover:underline">3. {r.employer_website}</a>
+            ) : <span className="truncate text-ink-quaternary italic">3. No website given</span>}
+          </span>
+          <label className="flex items-center gap-1.5 text-[11.5px] font-semibold text-ink-secondary cursor-pointer flex-shrink-0">
+            <input type="checkbox" checked={!!r.employer_check_website_confirmed} onChange={e => toggleCheck('website', e.target.checked)} /> Confirmed real
+          </label>
+        </div>
+
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 text-[13px] text-ink-secondary min-w-0">
+            <UserCheck className="w-3.5 h-3.5 flex-shrink-0 text-ink-tertiary" />
+            <span className="truncate">4. Signer is a named officer</span>
+          </span>
+          <label className="flex items-center gap-1.5 text-[11.5px] font-semibold text-ink-secondary cursor-pointer flex-shrink-0">
+            <input type="checkbox" checked={!!r.employer_check_officer_confirmed} onChange={e => toggleCheck('officer', e.target.checked)} /> Matches
+          </label>
+        </div>
+
+        <div>
+          <p className="flex items-center gap-1.5 text-[13px] text-ink-secondary mb-1"><HelpCircle className="w-3.5 h-3.5 text-ink-tertiary" /> 5. Judgement call (optional)</p>
+          <textarea
+            value={notes} onChange={e => setNotes(e.target.value)} onBlur={saveNotes} rows={2}
+            placeholder="Anything the first four checks didn't resolve cleanly…"
+            className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2 text-[12.5px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
+          />
+        </div>
+      </div>
+
+      {error && <p className="text-[12.5px] text-danger-text mt-3">{error}</p>}
+
+      {rejecting ? (
+        <div className="mt-3 pt-3 border-t border-edge-subtle">
+          <textarea
+            value={reason} onChange={e => setReason(e.target.value)} autoFocus rows={2}
+            placeholder="Why isn't this approved? Shown to the employer."
+            className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
+          />
+          <div className="flex items-center gap-2 mt-2">
+            <button onClick={reject} disabled={busy} className="text-[12px] font-semibold bg-danger-solid text-white px-3 py-1.5 rounded-lg disabled:opacity-40">
+              {busy ? 'Rejecting…' : 'Confirm reject'}
+            </button>
+            <button onClick={() => { setRejecting(false); setReason('') }} className="text-[12px] font-semibold text-ink-tertiary px-2">Cancel</button>
+          </div>
+        </div>
+      ) : askingInfo ? (
+        <div className="mt-3 pt-3 border-t border-edge-subtle">
+          <textarea
+            value={infoMessage} onChange={e => setInfoMessage(e.target.value)} autoFocus rows={2}
+            placeholder="What's missing? Shown to the employer, e.g. proof of their role at the company."
+            className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
+          />
+          <div className="flex items-center gap-2 mt-2">
+            <button onClick={requestInfo} disabled={busy} className="text-[12px] font-semibold bg-brand text-white px-3 py-1.5 rounded-lg disabled:opacity-40">
+              {busy ? 'Sending…' : 'Send request'}
+            </button>
+            <button onClick={() => { setAskingInfo(false); setInfoMessage('') }} className="text-[12px] font-semibold text-ink-tertiary px-2">Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-edge-subtle">
+          <button
+            onClick={approve} disabled={busy || !canApprove} title={!canApprove ? 'All five checks must pass first' : undefined}
+            className="flex items-center gap-1.5 bg-brand text-white text-[12.5px] font-semibold px-3.5 py-2 rounded-lg disabled:opacity-40"
+          >
+            <Check className="w-3.5 h-3.5" /> {busy ? 'Approving…' : 'Approve'}
+          </button>
+          <button onClick={() => setAskingInfo(true)} className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-secondary hover:text-brand transition">
+            <MessageCircle className="w-3.5 h-3.5" /> Request more info
+          </button>
+          <button onClick={() => setRejecting(true)} className="text-[12.5px] font-semibold text-danger-text hover:underline">Reject</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AdminEmployerVerificationScreen({ onBack }: { onBack: () => void }) {
   const [rows, setRows] = useState<any[] | null>(null)
   const [error, setError] = useState('')
-  const [rejecting, setRejecting] = useState<string | null>(null)
-  const [reason, setReason] = useState('')
-  const [busy, setBusy] = useState<string | null>(null)
 
   const load = () => { getPendingEmployerVerifications().then(({ data, error: err }) => { setRows(data || []); if (err) setError(err.message) }) }
   useEffect(load, [])
-
-  const approve = async (id: string) => {
-    setBusy(id); setError('')
-    const { error: err } = await approveEmployerVerification(id)
-    setBusy(null)
-    if (err) { setError("Couldn't approve — try again."); return }
-    load()
-  }
-
-  const reject = async (id: string) => {
-    if (!reason.trim()) { setError('Give a reason — it\'s shown to the employer.'); return }
-    setBusy(id); setError('')
-    const { error: err } = await rejectEmployerVerification(id, reason.trim())
-    setBusy(null)
-    if (err) { setError("Couldn't reject — try again."); return }
-    setRejecting(null); setReason('')
-    load()
-  }
 
   return (
     <div className="max-w-2xl mx-auto pb-10">
@@ -1025,7 +1189,7 @@ function AdminEmployerVerificationScreen({ onBack }: { onBack: () => void }) {
       </button>
       <p className="text-[22px] font-bold text-ink mb-1">Employer verification</p>
       <p className="text-[14px] text-ink-tertiary mb-5">
-        Every independent employer account sits behind this until approved — Companies House, domain, and website checked by hand, in the early stage. Guest/invited employers never appear here; they're scoped a completely different way.
+        Every independent employer account sits behind this until all five checks pass — no partial pass, ever. Guest/invited employers never appear here; they're scoped a completely different way.
       </p>
 
       <ErrorBanner message={error} />
@@ -1039,56 +1203,7 @@ function AdminEmployerVerificationScreen({ onBack }: { onBack: () => void }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {rows.map(r => (
-            <div key={r.id} className="bg-surface border border-edge rounded-2xl px-5 py-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-bold text-ink text-[15px] truncate">{r.full_name}</p>
-                  <p className="text-[13px] text-ink-tertiary truncate">{r.email}</p>
-                </div>
-                <p className="text-[11px] text-ink-quaternary flex-shrink-0">
-                  {r.employer_verification_requested_at ? `Requested ${new Date(r.employer_verification_requested_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : `Signed up ${new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3 pt-3 border-t border-edge-subtle text-[13px] text-ink-secondary">
-                <span className="flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5 flex-shrink-0 text-ink-tertiary" />
-                  {r.employer_website || <span className="text-ink-quaternary italic">No website given</span>}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 flex-shrink-0 text-ink-tertiary" />
-                  {r.employer_company_number ? `Companies House ${r.employer_company_number}` : <span className="text-ink-quaternary italic">No company number given</span>}
-                </span>
-              </div>
-
-              {rejecting === r.id ? (
-                <div className="mt-3 pt-3 border-t border-edge-subtle">
-                  <textarea
-                    value={reason} onChange={e => setReason(e.target.value)} autoFocus rows={2}
-                    placeholder="Why isn't this approved? Shown to the employer."
-                    className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
-                  />
-                  <div className="flex items-center gap-2 mt-2">
-                    <button onClick={() => reject(r.id)} disabled={busy === r.id} className="text-[12px] font-semibold bg-danger-solid text-white px-3 py-1.5 rounded-lg disabled:opacity-40">
-                      {busy === r.id ? 'Rejecting…' : 'Confirm reject'}
-                    </button>
-                    <button onClick={() => { setRejecting(null); setReason('') }} className="text-[12px] font-semibold text-ink-tertiary px-2">Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-edge-subtle">
-                  <button
-                    onClick={() => approve(r.id)} disabled={busy === r.id}
-                    className="flex items-center gap-1.5 bg-brand text-white text-[12.5px] font-semibold px-3.5 py-2 rounded-lg disabled:opacity-40"
-                  >
-                    <Check className="w-3.5 h-3.5" /> {busy === r.id ? 'Approving…' : 'Approve'}
-                  </button>
-                  <button onClick={() => setRejecting(r.id)} className="text-[12.5px] font-semibold text-danger-text hover:underline">Reject</button>
-                </div>
-              )}
-            </div>
-          ))}
+          {rows.map(r => <EmployerVerificationRow key={r.id} r={r} onChanged={load} />)}
         </div>
       )}
     </div>
