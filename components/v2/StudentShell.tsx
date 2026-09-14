@@ -68,8 +68,14 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
     document.cookie = `lern-theme=${resolvedTheme}; path=/; max-age=31536000; samesite=lax`
     // See OrgShell's identical line -- body's own background only ever
     // tracks the OS's prefers-color-scheme, which can disagree with the
-    // theme actually resolved and on screen right now.
-    document.documentElement.setAttribute('data-body-theme', resolvedTheme)
+    // theme actually resolved and on screen right now. 'student-' prefixed
+    // here (not the plain 'dark'/'light' OrgShell uses) because this
+    // shell's real colours (--app-bg: #0f0f0f/#fafafa) are a genuinely
+    // different palette from --paper (#131110/#F7F3EA) -- one shared
+    // body fallback can't exactly match both, so each shell gets its
+    // own attribute value and its own exact-matching CSS rule instead
+    // of body guessing at a single compromise colour for either.
+    document.documentElement.setAttribute('data-body-theme', `student-${resolvedTheme}`)
   }, [resolvedTheme])
 
   // See OrgShell's identical effect -- interactive-widget=resizes-
