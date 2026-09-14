@@ -214,25 +214,31 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   }
 
   return (
-    // -mx-5 breaks the thread out of OrgShell's page padding on phone, so
-    // it reads as a real Gmail-style full-screen conversation rather than
-    // a small card floating in the middle of the screen; lg:mx-0 hands
-    // that padding straight back on desktop, where the card layout below
-    // was never the complaint.
-    <div className="-mx-5 lg:mx-0 -mb-8 lg:mb-0">
+    // A real messaging app's composer is ALWAYS glued to the bottom of
+    // the panel, whether the conversation is one message or fifty --
+    // that only happens with a bounded-height flex column (header,
+    // flex-1 scrolling messages, composer as the last child), not
+    // "sticky", which has no effect once the whole thread is shorter
+    // than the viewport (nothing to scroll, so nothing to stick) --
+    // exactly why a short conversation left the composer stranded
+    // wherever the last message happened to end, nowhere near the
+    // bottom of the screen. Fixed full-screen on phone (same as every
+    // other full-screen mobile view in this app); reverts to the plain
+    // in-page card on desktop, where this was never the complaint.
+    <div className="fixed inset-0 z-40 flex flex-col bg-paper lg:static lg:z-auto lg:flex lg:flex-col lg:bg-transparent">
       {/* Mobile: a sticky Gmail-style app bar. Desktop: the plain text link. */}
-      <div className="sticky top-0 z-10 flex items-center gap-3 bg-paper border-b border-edge px-4 py-3 lg:hidden">
+      <div className="flex-shrink-0 flex items-center gap-3 bg-paper border-b border-edge px-4 py-3 lg:hidden" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}>
         <button onClick={onBack} className="text-ink-secondary flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
         <div className="min-w-0">
           <p className="font-bold text-ink text-[14px] truncate">{item.employer?.full_name || 'An employer'}</p>
           <p className="text-[12px] text-ink-tertiary truncate">Interested in {firstName}{item.opportunity_label ? ` · ${item.opportunity_label}` : ''}</p>
         </div>
       </div>
-      <button onClick={onBack} className="hidden lg:flex items-center gap-1.5 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
+      <button onClick={onBack} className="hidden lg:flex items-center gap-1.5 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4 flex-shrink-0">
         <ArrowLeft className="w-3.5 h-3.5" /> Back to requests
       </button>
 
-      <div className="px-4 pt-4 lg:px-0 lg:pt-0">
+      <div className="flex-1 overflow-y-auto px-4 pt-4 lg:flex-none lg:overflow-visible lg:px-0 lg:pt-0">
         {/* The safeguarding banner -- deliberately prominent, not decoration.
             It reassures the school and trains staff to do the right thing. */}
         <div className="flex items-start gap-2.5 rounded-xl px-4 py-3.5 mb-4" style={{ backgroundColor: '#E1F5EE' }}>
@@ -263,10 +269,7 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
       </div>
 
       {item.status !== 'declined' && (
-        // Gmail's own reply bar sits pinned near the bottom of the thread,
-        // not scrolled away inline with the messages -- sticky here does
-        // the same on phone; on desktop it just sits in normal flow.
-        <div className="sticky bottom-0 lg:static bg-paper lg:bg-transparent border-t border-edge lg:border-0 px-4 lg:px-0 py-3 lg:py-0 lg:mt-0">
+        <div className="flex-shrink-0 bg-paper lg:bg-transparent border-t border-edge lg:border-0 px-4 lg:px-0 py-3 lg:py-0 lg:mt-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}>
           {attachFile && (
             <div className="flex items-center gap-2 bg-surface-subtle border border-edge rounded-lg px-3 py-2 mb-2">
               <Paperclip className="w-3.5 h-3.5 text-ink-tertiary flex-shrink-0" />

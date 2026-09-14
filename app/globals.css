@@ -93,7 +93,16 @@ html[data-body-theme="light"] body {
    borders, secondary text, status colors) is the --token below,
    referenced as e.g. bg-[var(--surface)]. */
 :root {
-  --paper: #FFFDF9;
+  /* Was #FFFDF9 -- technically off-white but reads as flat bright
+     white on a laptop screen, especially once most of the visible
+     page is filled with it. Gmail's own canvas (Material 3's "surface"
+     token, #F8F9FA) is deliberately a shade further from pure white
+     than that, precisely so --surface's still-white cards read as a
+     distinct, "lifted" layer on top of it instead of just more white.
+     Same principle, kept in this app's own warm family rather than
+     importing Gmail's cool gray outright. --surface stays #FFFFFF —
+     the contrast between the two is the actual fix, not a flat dim. */
+  --paper: #F7F3EA;
   --ink: #1A1A1A;
   --surface: #FFFFFF;
   --surface-subtle: #FBF9F4;
