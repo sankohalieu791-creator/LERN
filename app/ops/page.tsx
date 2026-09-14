@@ -20,7 +20,7 @@ export default function OpsOverviewPage() {
   }, [])
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-3xl mx-auto">
       <p className="text-[22px] font-bold text-ink mb-1">Overview</p>
       <p className="text-[14px] text-ink-tertiary mb-6">LERN's own internal tool. Not visible to any school, college, provider, employer or student.</p>
 

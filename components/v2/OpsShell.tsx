@@ -3,8 +3,9 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { signOut } from '@/lib/supabase'
+import { useResolvedTheme } from '@/context/ThemeProvider'
 import Logo from '@/components/v2/Logo'
-import { LayoutDashboard, Building2, Flag, ShieldAlert, ClipboardList, ScrollText, LogOut } from 'lucide-react'
+import { LayoutDashboard, Building2, Flag, ShieldAlert, ClipboardList, ScrollText, Settings, LogOut } from 'lucide-react'
 
 const NAV = [
   { href: '/ops', label: 'Overview', icon: LayoutDashboard },
@@ -13,15 +14,21 @@ const NAV = [
   { href: '/ops/concerns', label: 'Safeguarding concerns', icon: ShieldAlert },
   { href: '/ops/dbs', label: 'DBS & sessions', icon: ClipboardList },
   { href: '/ops/audit', label: 'Audit log', icon: ScrollText },
+  { href: '/ops/settings', label: 'Settings', icon: Settings },
 ]
 
 // Build Spec: Internal Ops Tool v1.0 -- one plain admin shell, no
 // customer-facing chrome (no OrgShell reuse), so this can never be
 // mistaken for a product surface. Every link here is only ever reached
-// past OpsGate (allow ops_admin only).
+// past OpsGate (allow ops_admin only). data-theme here is the same
+// mechanism OrgShell/StudentShell each apply on their own root --
+// without it this shell would always render the light :root tokens
+// regardless of the account's theme_preference (see ThemeProvider's
+// own comment on why that's not automatic).
 export default function OpsShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
+  const theme = useResolvedTheme()
 
   const handleSignOut = async () => {
     await signOut()
@@ -29,7 +36,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-paper flex">
+    <div data-theme={theme} className="min-h-screen bg-paper flex">
       <aside className="w-60 flex-shrink-0 border-r border-edge-subtle flex flex-col py-5 px-3">
         <div className="px-2 mb-6"><Logo size="sm" /></div>
         <nav className="flex-1 space-y-1">

@@ -51,7 +51,7 @@ export default function OpsDbsPage() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl mx-auto">
       <p className="text-[22px] font-bold text-ink mb-4">DBS & session tracking</p>
 
       <div className="flex items-start gap-2.5 rounded-xl px-4 py-3.5 mb-5" style={{ backgroundColor: '#E6F1FB' }}>

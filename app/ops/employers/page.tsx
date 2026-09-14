@@ -178,7 +178,7 @@ export default function OpsEmployersPage() {
   useEffect(load, [])
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl mx-auto">
       <p className="text-[22px] font-bold text-ink mb-1">Employer verification</p>
       <p className="text-[14px] text-ink-tertiary mb-5">Zero tolerance — every application sits here until all five checks pass. No partial-pass approval, ever.</p>
 

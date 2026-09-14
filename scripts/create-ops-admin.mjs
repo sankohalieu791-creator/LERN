@@ -15,7 +15,7 @@ const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE
 // hardcoded here on purpose -- it's a real access-control credential,
 // not a demo one -- pass it via env if this ever needs to run again
 // (e.g. to reset it): OPS_ADMIN_PASSWORD=... node scripts/create-ops-admin.mjs
-const EMAIL = 'isLern@opstool.co.uk'
+const EMAIL = 'Lern@opstool.co.uk'
 const PASSWORD = process.env.OPS_ADMIN_PASSWORD
 if (!PASSWORD) { console.error('Set OPS_ADMIN_PASSWORD in the environment before running this.'); process.exit(1) }
 

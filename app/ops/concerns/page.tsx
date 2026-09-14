@@ -116,7 +116,7 @@ export default function OpsConcernsPage() {
   useEffect(load, [])
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-1">
         <p className="text-[22px] font-bold text-ink">Safeguarding concerns</p>
         <button onClick={() => setCreating(true)} className="flex items-center gap-1.5 bg-brand text-white text-[13px] font-semibold px-3.5 py-2 rounded-xl"><Plus className="w-4 h-4" /> Log concern</button>

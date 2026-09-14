@@ -68,7 +68,7 @@ export default function OpsReportsPage() {
   useEffect(load, [])
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl mx-auto">
       <p className="text-[22px] font-bold text-ink mb-1">Content reports</p>
       <p className="text-[14px] text-ink-tertiary mb-5">Auto-hidden the moment they're reported. A person always makes the decision.</p>
 
