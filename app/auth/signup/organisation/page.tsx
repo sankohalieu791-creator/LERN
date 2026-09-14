@@ -128,7 +128,17 @@ function OrganisationSignupInner() {
     // role is a placeholder here — create_organisation_and_join or
     // redeem_staff_join_code (step 1->2) overwrites it once the org
     // relationship is actually established.
-    if (!signUpError) {
+
+    // Supabase's own email-enumeration protection: signing up with an
+    // email that already exists and is already confirmed doesn't
+    // error, it returns success with session: null and an EMPTY
+    // identities array (a brand-new account's has one entry) --
+    // otherwise indistinguishable from "click the confirmation link",
+    // except no email is ever actually sent for an already-confirmed
+    // account, so that screen could never resolve.
+    const looksLikeExistingAccount = !signUpError && (signUpData?.user as any)?.identities?.length === 0
+
+    if (!signUpError && !looksLikeExistingAccount) {
       setLoading(false)
       if (!signUpData.session) { setAwaitingConfirmation(true); return }
       setStep(2)
@@ -139,7 +149,7 @@ function OrganisationSignupInner() {
     // unfinished org signup with no live session hits "already registered"
     // on step 1 with no way forward. Try signing them in with what they
     // just typed and resume from wherever they actually got to.
-    if (signUpError.message?.toLowerCase().includes('already registered')) {
+    if (looksLikeExistingAccount || signUpError?.message?.toLowerCase().includes('already registered')) {
       const { data: signInData, error: signInError } = await signIn(email.trim(), password)
       if (!signInError && signInData?.user) {
         const { data: profile } = await getUserProfile(signInData.user.id)
@@ -160,7 +170,7 @@ function OrganisationSignupInner() {
     }
 
     setLoading(false)
-    setError(signUpError.message)
+    setError(signUpError?.message || 'Something went wrong — try again.')
   }
 
   const handleAgreement = async (accepted: boolean) => {

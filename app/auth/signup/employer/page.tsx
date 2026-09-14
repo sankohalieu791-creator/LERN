@@ -84,14 +84,25 @@ export default function EmployerSignupPage() {
     setLoading(true)
     const redirectTo = typeof window !== 'undefined' ? window.location.origin + '/auth/signup/employer' : undefined
     const { data: signUpData, error: signUpError } = await signUp(email.trim(), password, { role: 'employer', full_name: fullName.trim() }, redirectTo)
-    if (!signUpError) {
+
+    // Supabase's own email-enumeration protection: signing up with an
+    // email that already exists and is already confirmed doesn't
+    // error, it returns success with session: null and an EMPTY
+    // identities array (a brand-new account's has one entry). Without
+    // this check that looked exactly like "awaiting confirmation" --
+    // except no email was ever actually sent, since there's nothing to
+    // confirm on an account that's already confirmed, so the screen
+    // could never resolve no matter how many times "Resend" was hit.
+    const looksLikeExistingAccount = !signUpError && (signUpData?.user as any)?.identities?.length === 0
+
+    if (!signUpError && !looksLikeExistingAccount) {
       setLoading(false)
       if (!signUpData.session) { setAwaitingConfirmation(true); return }
       setStep(2)
       return
     }
 
-    if (signUpError.message?.toLowerCase().includes('already registered')) {
+    if (looksLikeExistingAccount || signUpError?.message?.toLowerCase().includes('already registered')) {
       const { data: signInData, error: signInError } = await signIn(email.trim(), password)
       if (!signInError && signInData?.user) {
         const { data: { user: authUser } } = await supabase.auth.getUser()
@@ -109,7 +120,7 @@ export default function EmployerSignupPage() {
     }
 
     setLoading(false)
-    setError(signUpError.message)
+    setError(signUpError?.message || 'Something went wrong — try again.')
   }
 
   const handleCompanyDetails = async () => {

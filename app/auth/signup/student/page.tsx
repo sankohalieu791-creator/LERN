@@ -104,7 +104,19 @@ export default function StudentSignupPage() {
     const { data: signUpData, error: signUpError } = await signUp(email.trim(), password, {
       role: 'student', full_name: fullName.trim(), date_of_birth: dob,
     }, typeof window !== 'undefined' ? `${window.location.origin}/auth/signup/student` : undefined)
-    if (!signUpError) {
+
+    // Supabase's own email-enumeration protection: signing up with an
+    // email that already exists and is already confirmed doesn't
+    // error, it returns success with session: null and an EMPTY
+    // identities array (a brand-new account's has one entry). Without
+    // this check that looked exactly like "click the confirmation
+    // link" -- except no email was ever actually sent, since there's
+    // nothing to confirm on an account that's already confirmed, so
+    // the screen could never resolve no matter how many times "Resend"
+    // was hit.
+    const looksLikeExistingAccount = !signUpError && (signUpData?.user as any)?.identities?.length === 0
+
+    if (!signUpError && !looksLikeExistingAccount) {
       setLoading(false)
       // No session back means the project requires clicking a
       // confirmation link before this account is real — the point of
@@ -121,7 +133,7 @@ export default function StudentSignupPage() {
     // in a new tab/session with no live token to detect above. Try signing
     // them in with what they just typed instead of dead-ending on an error
     // they have no way to act on.
-    if (signUpError.message?.toLowerCase().includes('already registered')) {
+    if (looksLikeExistingAccount || signUpError?.message?.toLowerCase().includes('already registered')) {
       const { data: signInData, error: signInError } = await signIn(email.trim(), password)
       if (!signInError && signInData?.user && await resumeFromSession(signInData.user)) {
         setLoading(false)
@@ -132,7 +144,7 @@ export default function StudentSignupPage() {
     }
 
     setLoading(false)
-    setError(signUpError.message)
+    setError(signUpError?.message || 'Something went wrong — try again.')
   }
 
   const handleA2Submit = async () => {
