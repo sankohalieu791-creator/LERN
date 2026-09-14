@@ -2,7 +2,7 @@
 // onward for the source of truth. Every user is exactly one role; the
 // role decides what they can see and do (enforced in RLS, not here).
 
-export type Role = 'student' | 'institution_staff' | 'provider_staff' | 'employer'
+export type Role = 'student' | 'institution_staff' | 'provider_staff' | 'employer' | 'ops_admin'
 export type OrgType = 'institution' | 'provider'
 
 // Build Spec: Feed and My Work (student) v1.0 -- exactly these 4,

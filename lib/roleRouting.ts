@@ -10,6 +10,7 @@ export function routeForRole(role: Role | undefined | null): string {
     case 'institution_staff': return '/institution'
     case 'provider_staff': return '/provider'
     case 'employer': return '/employer'
+    case 'ops_admin': return '/ops'
     default: return '/auth/start'
   }
 }

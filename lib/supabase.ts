@@ -184,6 +184,64 @@ export const submitMoreEmployerInfo = async (message: string) => {
   return { error }
 }
 
+// ── Build Spec: Internal Ops Tool v1.0 -- gated by is_ops_admin() in
+// every one of these RPCs, never by this client code. A separate
+// area, a separate 'ops_admin' role, reachable only via /ops. ──
+export const getOpsOverviewCounts = async () => {
+  const { data, error } = await supabase.rpc('get_ops_overview_counts').single()
+  return { data, error }
+}
+
+export const getOpsContentReports = async () => {
+  const { data, error } = await supabase.rpc('get_ops_content_reports')
+  return { data, error }
+}
+
+export const opsRestoreReport = async (postId: string) => {
+  const { error } = await supabase.rpc('ops_restore_report', { p_post_id: postId })
+  return { error }
+}
+
+export const opsRemoveReport = async (postId: string) => {
+  const { error } = await supabase.rpc('ops_remove_report', { p_post_id: postId })
+  return { error }
+}
+
+export const opsEscalateReport = async (postId: string, studentName: string, description: string, studentId?: string) => {
+  const { data, error } = await supabase.rpc('ops_escalate_report', {
+    p_post_id: postId, p_student_name: studentName, p_description: description, p_student_id: studentId || null,
+  })
+  return { data, error }
+}
+
+export const getSafeguardingConcerns = async () => {
+  const { data, error } = await supabase.rpc('get_safeguarding_concerns')
+  return { data, error }
+}
+
+export const getSafeguardingConcernActions = async (concernId: string) => {
+  const { data, error } = await supabase.rpc('get_safeguarding_concern_actions', { p_concern_id: concernId })
+  return { data, error }
+}
+
+export const createSafeguardingConcern = async (fields: { raisedByName: string; studentName: string; description: string; studentId?: string; organisationId?: string }) => {
+  const { data, error } = await supabase.rpc('create_safeguarding_concern', {
+    p_raised_by_name: fields.raisedByName, p_student_name: fields.studentName, p_description: fields.description,
+    p_student_id: fields.studentId || null, p_organisation_id: fields.organisationId || null,
+  })
+  return { data, error }
+}
+
+export const updateSafeguardingConcernStatus = async (concernId: string, status: string, note?: string) => {
+  const { error } = await supabase.rpc('update_safeguarding_concern_status', { p_concern_id: concernId, p_status: status, p_note: note || null })
+  return { error }
+}
+
+export const getAdminAuditLog = async (limit = 100) => {
+  const { data, error } = await supabase.rpc('get_admin_audit_log', { p_limit: limit })
+  return { data, error }
+}
+
 // Screens A3/O2 — active, non-pre-ticked consent.
 export const recordConsent = async (userId: string) => {
   const { error } = await supabase

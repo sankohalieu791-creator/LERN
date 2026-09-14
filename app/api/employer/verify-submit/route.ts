@@ -40,17 +40,17 @@ function checkEmailDomain(email: string, website: string): { result: 'pass' | 'f
   return { result: matches ? 'pass' : 'fail' }
 }
 
-async function checkCompaniesHouse(companyNumber: string): Promise<{ result: 'pass' | 'fail' | 'not_configured'; detail: string; officers: string[] }> {
-  if (!CH_API_KEY) return { result: 'not_configured', detail: 'Companies House API key not configured — check cannot run automatically.', officers: [] }
-  if (!companyNumber) return { result: 'fail', detail: 'No Companies House number provided.', officers: [] }
+async function checkCompaniesHouse(companyNumber: string): Promise<{ result: 'pass' | 'fail' | 'not_configured'; detail: string; officers: string[]; companyName: string | null }> {
+  if (!CH_API_KEY) return { result: 'not_configured', detail: 'Companies House API key not configured — check cannot run automatically.', officers: [], companyName: null }
+  if (!companyNumber) return { result: 'fail', detail: 'No Companies House number provided.', officers: [], companyName: null }
 
   const auth = 'Basic ' + Buffer.from(`${CH_API_KEY}:`).toString('base64')
   try {
     const companyRes = await fetch(`https://api.company-information.service.gov.uk/company/${encodeURIComponent(companyNumber)}`, {
       headers: { Authorization: auth },
     })
-    if (companyRes.status === 404) return { result: 'fail', detail: 'No company found with that number.', officers: [] }
-    if (!companyRes.ok) return { result: 'fail', detail: `Companies House lookup failed (${companyRes.status}).`, officers: [] }
+    if (companyRes.status === 404) return { result: 'fail', detail: 'No company found with that number.', officers: [], companyName: null }
+    if (!companyRes.ok) return { result: 'fail', detail: `Companies House lookup failed (${companyRes.status}).`, officers: [], companyName: null }
     const company = await companyRes.json()
     const status = company.company_status as string
     const active = status === 'active'
@@ -72,9 +72,10 @@ async function checkCompaniesHouse(companyNumber: string): Promise<{ result: 'pa
       result: active ? 'pass' : 'fail',
       detail: active ? `Active — ${company.company_name}` : `Company status is "${status}", not active — ${company.company_name}`,
       officers,
+      companyName: company.company_name || null,
     }
   } catch (err) {
-    return { result: 'fail', detail: 'Could not reach Companies House — try again.', officers: [] }
+    return { result: 'fail', detail: 'Could not reach Companies House — try again.', officers: [], companyName: null }
   }
 }
 
@@ -98,6 +99,7 @@ export async function POST(req: NextRequest) {
 
   const { error: updateError } = await supabaseAdmin.from('users').update({
     employer_company_number: companyNumber?.trim() || null,
+    employer_company_name: chCheck.companyName,
     employer_website: website.trim(),
     employer_verification_requested_at: new Date().toISOString(),
     employer_verification_status: 'pending',

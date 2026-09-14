@@ -20,7 +20,10 @@ const supabaseAdmin = createClient(
 // Keep in sync with the founder-allowlist test accounts — these already
 // have real seeded courses/workshops/briefs/posts behind them from
 // earlier build passes.
-const PERSONA_EMAIL: Record<Role, string> = {
+// Partial, deliberately -- 'ops_admin' must never be reachable through
+// the public demo gateway, so it's not just omitted here, it can't be
+// added without this type also changing to notice.
+const PERSONA_EMAIL: Partial<Record<Role, string>> = {
   student: 'sankohalieu791@gmail.com',
   institution_staff: 'alieu@joinirl.co.uk',
   provider_staff: 'mohalieu58@gmail.com',
@@ -67,7 +70,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'This account can’t switch roles.' }, { status: 403 })
   }
 
-  const targetEmail = PERSONA_EMAIL[role as Role]
+  // Already checked `role in PERSONA_EMAIL` above, so this is defined.
+  const targetEmail = PERSONA_EMAIL[role as Role]!
   const { data, error } = await supabaseAdmin.auth.admin.generateLink({ type: 'magiclink', email: targetEmail })
   if (error || !data?.properties?.hashed_token) {
     return NextResponse.json({ error: error?.message || 'Could not switch roles.' }, { status: 500 })
