@@ -12,6 +12,7 @@ import type { LucideIcon } from 'lucide-react'
 import Logo from '@/components/v2/Logo'
 import NotificationsBell from '@/components/v2/NotificationsBell'
 import PostComposer from '@/components/v2/PostComposer'
+import PresenceBadge from '@/components/v2/PresenceBadge'
 
 function orgInitials(name?: string | null) {
   if (!name) return 'LN'
@@ -31,20 +32,8 @@ function roleLabelFromHref(href: string) {
 
 export interface NavItem { key: string; label: string; icon: LucideIcon; href: string }
 
-// Five real colours, not the same one reused twice -- away and offline
-// used to both be ink-quaternary grey, busy and do-not-disturb both
-// danger-solid red, so two of the five options were visually
-// indistinguishable from another. do_not_disturb has no existing
-// token (nothing else in the app needed purple before this), so it's
-// the one hardcoded hex here -- same pattern already used for other
-// one-off brand colours elsewhere in this file.
-const PRESENCE_DOT: Record<string, string> = {
-  active: 'bg-success-solid',
-  busy: 'bg-danger-solid',
-  away: 'bg-warning-solid',
-  do_not_disturb: 'bg-[#8B5CF6]',
-  offline: 'bg-ink-quaternary',
-}
+// Colour + icon per status now lives in PresenceBadge.tsx (Teams-style
+// -- a checkmark, clock, dash etc, not colour alone).
 const PRESENCE_LABEL: Record<string, string> = {
   active: 'Active', busy: 'Busy', away: 'Away', offline: 'Offline', do_not_disturb: 'Do not disturb',
 }
@@ -272,7 +261,7 @@ export default function OrgShell({
                   crowding the header on wider screens (same lg-only
                   allowance identityName above already gets). */}
               <span className="hidden lg:flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-tertiary">
-                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${PRESENCE_DOT[user?.presence_status || 'active']}`} />
+                <PresenceBadge status={user?.presence_status} size={11} ringColor="var(--paper)" />
                 {PRESENCE_LABEL[user?.presence_status || 'active']}
               </span>
               <button
@@ -295,7 +284,7 @@ export default function OrgShell({
                     user?.full_name?.[0]?.toUpperCase() || <UserIcon className="w-[18px] h-[18px]" />
                   )}
                 </span>
-                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface ${PRESENCE_DOT[user?.presence_status || 'active']}`} />
+                <PresenceBadge status={user?.presence_status} size={15} className="absolute -bottom-0.5 -right-0.5 border-2 border-surface" />
               </button>
               {profileOpen && (
                 <>
@@ -316,7 +305,7 @@ export default function OrgShell({
                               (user?.presence_status || 'active') === s ? 'bg-surface-muted text-ink' : 'text-ink-tertiary hover:bg-surface-muted'
                             }`}
                           >
-                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${PRESENCE_DOT[s]}`} /> <span className="truncate">{PRESENCE_LABEL[s]}</span>
+                            <PresenceBadge status={s} size={12} ringColor="var(--surface)" /> <span className="truncate">{PRESENCE_LABEL[s]}</span>
                           </button>
                         ))}
                       </div>

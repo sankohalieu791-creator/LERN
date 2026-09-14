@@ -10,6 +10,7 @@ import {
   getWins, createWin, reportWin, uploadPostImage, uploadPostVideo,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
+import PresenceBadge from '@/components/v2/PresenceBadge'
 import type { ReactionType } from '@/lib/types'
 import { MILESTONE_TYPES, MILESTONE_BY_KEY, STICKER_OPTIONS, type MilestoneType } from '@/lib/feedConstants'
 import {
@@ -25,17 +26,12 @@ const WIN_VIDEO_MAX_SECONDS = 20
 // between student (--app-* dark tokens) and org (--paper/--ink)
 // contexts, and pulling a colour from the wrong token system here would
 // resolve to whatever that token happens to mean in the other one.
-const PRESENCE_DOT: Record<string, string> = {
-  active: '#1E7A34', busy: '#B3401E', away: '#B3651E', do_not_disturb: '#8B5CF6', offline: '#9CA3AF',
-}
+// Teams-style icon-per-status now lives in PresenceBadge.tsx, shared
+// with OrgShell's own avatar badge -- ringColor is the one thing that
+// still needs to vary per token system.
 function StaffPresenceDot({ role, status }: { role?: string; status?: string }) {
   if (role !== 'institution_staff' && role !== 'provider_staff') return null
-  return (
-    <span
-      className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2"
-      style={{ backgroundColor: PRESENCE_DOT[status || 'offline'], borderColor: 'var(--app-bg)' }}
-    />
-  )
+  return <PresenceBadge status={status} size={14} ringColor="var(--app-bg)" className="absolute -bottom-0.5 -right-0.5 border-2 border-[var(--app-bg)]" />
 }
 
 // Build Spec: The Feed (Wins strip, milestone posts) v2.0, 2 September
