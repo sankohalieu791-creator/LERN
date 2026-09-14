@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getTalentPools, createTalentPool, deleteTalentPool, getTalentPoolMembers, removeFromTalentPool,
-  getTalentPoolPreviewMembers, getAvatarUrl, getMyInterest, expressInterest, sendInterestMessage,
+  getTalentPoolPreviewMembers, getMyInterest, expressInterest, sendInterestMessage,
 } from '@/lib/supabase'
+import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { Bookmark, Plus, X, Trash2, ChevronLeft, UserCheck, Users, Send, Clock } from 'lucide-react'
 
 // Talent pools rebuild -- Charles Booth-call selling feature. The
@@ -44,7 +45,7 @@ function initials(name?: string) {
 // photo when they have one, initials otherwise, same fallback every
 // other avatar in the app uses.
 function CandidateAvatar({ person, size = 36 }: { person: { full_name?: string; avatar_path?: string | null }; size?: number }) {
-  const url = person.avatar_path ? getAvatarUrl(person.avatar_path) : null
+  const url = useAvatarUrl(person.avatar_path)
   if (url) return <img src={url} alt="" className="rounded-full object-cover flex-shrink-0" style={{ width: size, height: size }} />
   return (
     <span

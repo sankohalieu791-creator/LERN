@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { searchPosts, searchPeople, getSignedFileUrl, getAvatarUrl } from '@/lib/supabase'
+import { searchPosts, searchPeople, getSignedFileUrl } from '@/lib/supabase'
+import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { ChevronLeft, Search as SearchIcon, X, Play, User as UserIcon } from 'lucide-react'
 
 // The Feed header's search icon used to do nothing at all -- searches
@@ -91,7 +92,7 @@ export default function StudentSearchPanel() {
 function PersonResultRow({ person }: { person: any }) {
   const router = useRouter()
   const { user } = useAuth()
-  const avatarUrl = getAvatarUrl(person.avatar_path)
+  const avatarUrl = useAvatarUrl(person.avatar_path)
   return (
     <button
       onClick={() => router.push(person.id === user?.id ? '/student/profile' : `/student/profile/${person.id}`)}

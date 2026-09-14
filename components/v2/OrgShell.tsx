@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
-import { setSidebarCollapsed, setPresenceStatus, signOut, supabase, getPendingReviewCount, getPendingInterestCount, getAvatarUrl } from '@/lib/supabase'
+import { setSidebarCollapsed, setPresenceStatus, signOut, supabase, getPendingReviewCount, getPendingInterestCount } from '@/lib/supabase'
+import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { ChevronLeft, ChevronRight, Settings, User as UserIcon, Plus, LogOut, Menu, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import Logo from '@/components/v2/Logo'
@@ -142,7 +143,12 @@ export default function OrgShell({
   // employer has no org logo to fall back to (no organisations row at
   // all) -- their own profile picture (Settings' Account card) is the
   // equivalent identity image for them.
-  const identityLogoUrl = orgLogoPath ? getAvatarUrl(orgLogoPath) : (!user?.organisation_id && user?.avatar_path ? getAvatarUrl(user.avatar_path) : null)
+  // Both hooks called unconditionally (rules of hooks), the choice
+  // between their results made after -- same logic as before, just two
+  // signed-URL fetches instead of two synchronous public-URL calls.
+  const orgLogoUrl = useAvatarUrl(orgLogoPath)
+  const myAvatarUrl = useAvatarUrl(user?.avatar_path)
+  const identityLogoUrl = orgLogoPath ? orgLogoUrl : (!user?.organisation_id ? myAvatarUrl : null)
 
   // Badge counts are real, not decorative -- only fetched (and only
   // rendered, see NAV_BADGES below) for the sections that actually
@@ -283,8 +289,8 @@ export default function OrgShell({
                     span so only the avatar content clips, not the dot
                     sitting outside it. */}
                 <span className="absolute inset-0 rounded-full overflow-hidden flex items-center justify-center">
-                  {user?.avatar_path ? (
-                    <img src={getAvatarUrl(user.avatar_path) || ''} alt="" className="w-full h-full object-cover" />
+                  {myAvatarUrl ? (
+                    <img src={myAvatarUrl} alt="" className="w-full h-full object-cover" />
                   ) : (
                     user?.full_name?.[0]?.toUpperCase() || <UserIcon className="w-[18px] h-[18px]" />
                   )}

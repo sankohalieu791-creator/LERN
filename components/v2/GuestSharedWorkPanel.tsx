@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getGuestProfiles, getMyInterest, expressInterest, getStudentsAdultStatus, getGuestContext, getAvatarUrl } from '@/lib/supabase'
+import { getGuestProfiles, getMyInterest, expressInterest, getStudentsAdultStatus, getGuestContext } from '@/lib/supabase'
+import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { BadgeCheck, Send, Check, Clock, ShieldCheck, Building2, Eye, Briefcase } from 'lucide-react'
 
 const TYPE_LABEL: Record<string, string> = { brief: 'Brief', course: 'Course', workshop: 'Workshop' }
@@ -117,13 +118,14 @@ function StudentProfileCard({ profile, status, adult, sending, onExpressInterest
   onExpressInterest: () => void
 }) {
   const { student, verifications, experience } = profile
+  const avatarUrl = useAvatarUrl(student.avatar_path)
 
   return (
     <div className="bg-surface border border-edge rounded-2xl p-5">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3 min-w-0">
-          {student.avatar_path ? (
-            <img src={getAvatarUrl(student.avatar_path) || ''} alt="" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
           ) : (
             <span className="w-12 h-12 rounded-full flex items-center justify-center text-[15px] font-bold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
               {(student.full_name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()}

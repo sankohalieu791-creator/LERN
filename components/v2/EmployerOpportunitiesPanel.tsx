@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getMyOpportunities, createOpportunity, updateOpportunity, closeOpportunity, reopenOpportunity, deleteOpportunity, getAvatarUrl } from '@/lib/supabase'
+import { getMyOpportunities, createOpportunity, updateOpportunity, closeOpportunity, reopenOpportunity, deleteOpportunity } from '@/lib/supabase'
+import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { Plus, Trash2, Megaphone, Pencil, Lock, RotateCcw } from 'lucide-react'
 
 type OppType = 'job' | 'apprenticeship' | 'internship'
@@ -21,6 +22,7 @@ export default function EmployerOpportunitiesPanel() {
   const [salary, setSalary] = useState('')
   const [location, setLocation] = useState('')
   const [saving, setSaving] = useState(false)
+  const avatarUrl = useAvatarUrl(user?.avatar_path)
 
   const load = () => {
     if (!user) return
@@ -156,7 +158,7 @@ export default function EmployerOpportunitiesPanel() {
                   profile picture (Settings) is the identity every
                   posting shows, same as every other card in the app. */}
               <div className="w-11 h-11 rounded-xl bg-surface-subtle border border-edge flex items-center justify-center flex-shrink-0 overflow-hidden">
-                {user?.avatar_path ? <img src={getAvatarUrl(user.avatar_path) || ''} alt="" className="w-full h-full object-cover" /> : <Megaphone className="w-4 h-4 text-ink-quaternary" />}
+                {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <Megaphone className="w-4 h-4 text-ink-quaternary" />}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-0.5">

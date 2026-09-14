@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
   getFeed, setPostReaction, getSignedFileUrl,
-  reportPost, getVerifiedAuthorIds, getAvatarUrl,
+  reportPost, getVerifiedAuthorIds,
   getWins, createWin, reportWin, uploadPostImage, uploadPostVideo,
 } from '@/lib/supabase'
+import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import type { ReactionType } from '@/lib/types'
 import { MILESTONE_TYPES, MILESTONE_BY_KEY, STICKER_OPTIONS, type MilestoneType } from '@/lib/feedConstants'
 import {
@@ -123,6 +124,15 @@ export default function FeedPanel() {
   )
 }
 
+// Its own component (not inline in WinsStrip's map below) purely
+// because a signed avatar URL needs a hook call, and hooks can't be
+// called per-iteration inside a bare .map() -- each instance of this
+// is its own component, so that's legal here.
+function WinAuthorAvatar({ path, name }: { path?: string; name?: string }) {
+  const url = useAvatarUrl(path)
+  return url ? <img src={url} alt="" className="w-full h-full object-cover" /> : <>{initials(name)}</>
+}
+
 // ── Wins strip -- achievements only, expires like a story (see
 // getWins: last 2 days, client-side window, nothing stored as an
 // expiry and nothing accumulates into a permanent highlight reel). ──
@@ -159,11 +169,7 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
             <button key={w.id} onClick={() => setViewing(w)} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 60 }}>
               <span className="relative rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 54, height: 54, border: `3px solid ${meta?.ring || '#0F6E56'}` }}>
                 <span className="w-full h-full rounded-full overflow-hidden flex items-center justify-center text-[13px] font-semibold" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
-                  {w.author?.avatar_path ? (
-                    <img src={getAvatarUrl(w.author.avatar_path) || ''} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    initials(w.author?.full_name)
-                  )}
+                  <WinAuthorAvatar path={w.author?.avatar_path} name={w.author?.full_name} />
                 </span>
                 <StaffPresenceDot role={w.author?.role} status={w.author?.presence_status} />
               </span>
@@ -443,6 +449,7 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
   const router = useRouter()
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
+  const authorAvatarUrl = useAvatarUrl(post.author_avatar_path)
   const reactions: any[] = post.post_reactions || []
   const myReaction = reactions.find(r => r.user_id === user?.id)?.reaction as ReactionType | undefined
   const meta = post.milestone_type ? MILESTONE_BY_KEY[post.milestone_type as MilestoneType] : null
@@ -502,7 +509,7 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
               of whether the author had one set, so this always fell
               back to initials. */}
           {post.author_avatar_path ? (
-            <img src={getAvatarUrl(post.author_avatar_path) || ''} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+            <img src={authorAvatarUrl || ''} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
           ) : (
             <span className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
               {initials(post.author_name)}

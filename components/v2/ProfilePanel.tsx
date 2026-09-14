@@ -8,9 +8,10 @@ import {
   getFollowCounts, getVerifiedWorkForProfile, getMyPosts, getSelfQualifications,
   addSelfQualification, deleteSelfQualification, uploadSelfQualificationFile, getSignedFileUrl, deletePost,
   updateProfileBioTags, getExperienceEntries, addExperienceEntry, deleteExperienceEntry,
-  getSavedOpportunities, unsaveOpportunity, updateUserProfile, uploadAvatar, removeAvatar, getAvatarUrl,
+  getSavedOpportunities, unsaveOpportunity, updateUserProfile, uploadAvatar, removeAvatar,
   isUsernameAvailable, getMyOrganisationInfo, getPublicStudentProfile,
 } from '@/lib/supabase'
+import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import {
   FolderCheck, Briefcase, Grid3x3, Settings as SettingsIcon, Plus, X, Trash2, Play,
   Bookmark, Lock, FilePlus, CheckCircle2, Camera, ChevronLeft, ChevronRight, ArrowRight,
@@ -235,7 +236,7 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
 // whole screen, since the tag pills right below it in that same
 // screenshot DO match the spec text's light pill exactly.
 export function Avatar({ path, name, size, textSize, variant = 'light' }: { path?: string | null; name?: string; size: number; textSize: number; variant?: 'light' | 'solid' }) {
-  const url = getAvatarUrl(path)
+  const url = useAvatarUrl(path)
   if (url) {
     return (
       <img

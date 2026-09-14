@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getOpportunities, getMyReceivedInterest, respondToInterest,
-  applyToOpportunity, getMyOpportunityApplications, getAvatarUrl, getMyApplications,
+  applyToOpportunity, getMyOpportunityApplications, getMyApplications,
   getSavedOpportunities, saveOpportunity, unsaveOpportunity,
 } from '@/lib/supabase'
+import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import type { ApplicationStage } from '@/lib/supabase'
 import {
   Search, X, Briefcase, Clock, Check, Ban, Send, LineChart, Bookmark, BadgeCheck,
@@ -52,6 +53,26 @@ function isAdult(dob?: string) {
 function initials(name?: string) {
   if (!name) return '?'
   return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
+}
+
+// Its own component (not inline in the opportunities.map below) since
+// a signed avatar URL needs a hook call, illegal per-iteration inside
+// a bare .map() -- each card gets its own instance of this instead.
+function OpportunityLogo({ path, name }: { path?: string; name?: string }) {
+  const url = useAvatarUrl(path)
+  if (!url) {
+    return (
+      <div className="w-14 h-14 rounded-2xl bg-[#252525] flex items-center justify-center text-white font-bold text-[16px] flex-shrink-0">
+        {initials(name)}
+      </div>
+    )
+  }
+  return (
+    <img
+      src={url} alt="" draggable={false} onContextMenu={e => e.preventDefault()}
+      className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' } as any}
+    />
+  )
 }
 
 export default function StudentDiscoverPanel() {
@@ -313,16 +334,7 @@ export default function StudentDiscoverPanel() {
                       opportunity), then the employer's own profile
                       picture (set once in Settings, covers every
                       posting automatically), initials last. */}
-                  {(o.logo_path || o.employer?.avatar_path) ? (
-                    <img
-                      src={getAvatarUrl(o.logo_path || o.employer?.avatar_path) || ''} alt="" draggable={false} onContextMenu={e => e.preventDefault()}
-                      className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' } as any}
-                    />
-                  ) : (
-                    <div className="w-14 h-14 rounded-2xl bg-[#252525] flex items-center justify-center text-white font-bold text-[16px] flex-shrink-0">
-                      {initials(o.employer?.full_name)}
-                    </div>
-                  )}
+                  <OpportunityLogo path={o.logo_path || o.employer?.avatar_path} name={o.employer?.full_name} />
                   <div className="flex-1 min-w-0">
                     {/* Type badge only on the combined Explore tab --
                         redundant once you're already inside a

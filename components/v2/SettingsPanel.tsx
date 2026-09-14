@@ -9,9 +9,10 @@ import {
   exportMyData, deleteMyAccount, submitReport, signOut,
   getOrgStaff, updateOrganisationProfile, supabase,
   requestEmailChange, sendPasswordResetEmail, signOutEverywhere,
-  getBlockedUsers, unblockUser, setCookieConsent, uploadOrgLogo, getAvatarUrl,
+  getBlockedUsers, unblockUser, setCookieConsent, uploadOrgLogo,
   uploadAvatar, removeAvatar,
 } from '@/lib/supabase'
+import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
 import {
   Sun, Moon, Monitor, ShieldCheck, Users2, Ticket,
@@ -43,6 +44,12 @@ export default function SettingsPanel() {
   const [screen, setScreen] = useState<Screen>(null)
   const [org, setOrg] = useState<any>(null)
   const [busyField, setBusyField] = useState<string | null>(null)
+  // Called here, before any of the sub-screen early returns below --
+  // hooks can't move past a conditional return, unlike the old
+  // synchronous getAvatarUrl() calls these replace, which could sit
+  // anywhere since they weren't hooks at all.
+  const logoUrl = useAvatarUrl(org?.logo_path)
+  const avatarUrl = useAvatarUrl(user?.avatar_path)
   const isOrgAdmin = user?.role === 'institution_staff' || user?.role === 'provider_staff'
 
   useEffect(() => {
@@ -111,9 +118,6 @@ export default function SettingsPanel() {
   if (screen === 'report') return <ReportScreen userId={user.id} organisationId={user.organisation_id || null} onBack={() => setScreen(null)} />
   if (screen === 'delete') return <DeleteAccountScreen email={user.email} onBack={() => setScreen(null)} />
   if (screen === 'consent') return <ConsentScreen consentedAt={user.consented_at} onBack={() => setScreen(null)} onDelete={() => setScreen('delete')} />
-
-  const logoUrl = org?.logo_path ? getAvatarUrl(org.logo_path) : null
-  const avatarUrl = user.avatar_path ? getAvatarUrl(user.avatar_path) : null
 
   return (
     <div className="max-w-2xl mx-auto pb-10">
@@ -322,7 +326,7 @@ function PhotoScreen({ onBack }: { onBack: () => void }) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const photoRef = useRef<HTMLInputElement>(null)
-  const avatarUrl = user?.avatar_path ? getAvatarUrl(user.avatar_path) : null
+  const avatarUrl = useAvatarUrl(user?.avatar_path)
 
   const choose = async (file: File | null) => {
     if (!file || !user) return
@@ -499,7 +503,7 @@ function OrganisationScreen({ org, onBack, onChanged }: { org: any; onBack: () =
     onChanged()
   }
 
-  const logoUrl = org?.logo_path ? getAvatarUrl(org.logo_path) : null
+  const logoUrl = useAvatarUrl(org?.logo_path)
 
   return (
     <ScreenShell title="Organisation" onBack={onBack}>

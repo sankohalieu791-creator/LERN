@@ -6,8 +6,9 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getVisibleWorkItems, getMySubmissions, getMyOrgType, getWorkItemMemberCount,
   submitWork, uploadSubmissionFile, getSignedFileUrl, redeemJoinCode,
-  markWorkItemStarted, getMyStartedWorkItemIds, getAvatarUrl, getSubmissionAttachments,
+  markWorkItemStarted, getMyStartedWorkItemIds, getSubmissionAttachments,
 } from '@/lib/supabase'
+import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import type { WorkItem } from '@/lib/types'
 import {
   Clock, Users, BadgeCheck, Paperclip, X, Video, MapPin, CalendarClock,
@@ -57,7 +58,7 @@ function initials(name?: string) {
 // (WorkItemDetail is portaled outside StudentShell's own data-theme
 // scope), so each keeps its own span rather than sharing one here.
 function OrgHostAvatar({ hostName, org }: { hostName?: string; org?: { name?: string; logo_path?: string | null } }) {
-  const logoUrl = org?.logo_path ? getAvatarUrl(org.logo_path) : null
+  const logoUrl = useAvatarUrl(org?.logo_path)
   if (logoUrl) return <img src={logoUrl} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
   return (
     <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#3A2E24] to-[#241C15] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">

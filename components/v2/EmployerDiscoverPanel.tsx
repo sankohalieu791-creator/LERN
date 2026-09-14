@@ -5,8 +5,9 @@ import { createPortal } from 'react-dom'
 import { useAuth } from '@/context/AuthContext'
 import {
   getDiscoverWork, getMyInterest, expressInterest, getTalentPools, createTalentPool, addToTalentPool,
-  getVerifiedWorkForProfile, getExperienceEntries, getSelfQualifications, getAvatarUrl,
+  getVerifiedWorkForProfile, getExperienceEntries, getSelfQualifications,
 } from '@/lib/supabase'
+import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { BadgeCheck, Search, Send, Check, Clock, Bookmark, Shield, X, Briefcase, FolderCheck } from 'lucide-react'
 
 type WorkType = 'all' | 'brief' | 'course' | 'workshop'
@@ -321,6 +322,7 @@ function CandidateProfileModal({ student, status, onClose, onExpressInterest }: 
   const [work, setWork] = useState<any[] | null>(null)
   const [experience, setExperience] = useState<any[]>([])
   const [quals, setQuals] = useState<any[]>([])
+  const avatarUrl = useAvatarUrl(student.avatar_path)
 
   useEffect(() => {
     getVerifiedWorkForProfile(student.id).then(({ data }) => setWork((data || []).filter((v: any) => v.visibility === 'public')))
@@ -338,8 +340,8 @@ function CandidateProfileModal({ student, status, onClose, onExpressInterest }: 
 
         <div className="p-5">
           <div className="flex items-center gap-3 mb-4">
-            {student.avatar_path ? (
-              <img src={getAvatarUrl(student.avatar_path) || ''} alt="" className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
             ) : (
               <span className="w-14 h-14 rounded-full flex items-center justify-center text-[16px] font-bold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
                 {(student.full_name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()}

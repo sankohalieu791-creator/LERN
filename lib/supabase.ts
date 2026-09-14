@@ -1149,8 +1149,11 @@ export const isUsernameAvailable = async (username: string, excludeUserId: strin
 }
 
 // ── Settings: profile photo, privacy, security, blocking ──────────
-// avatars is a public bucket -- reading it back is just the public
-// URL, no signed-URL round trip needed the way private buckets need.
+// avatars used to be a public bucket -- checklist item: "Profile
+// photos sit in signed, access-controlled storage, not a public
+// bucket." Upload/remove are unaffected (bucket visibility doesn't
+// change how you write to it); the read side moves from a permanent
+// public URL to a time-limited signed one below.
 export const uploadAvatar = async (userId: string, file: File) => {
   const path = `${userId}/${Date.now()}_${file.name}`
   const { error } = await supabase.storage.from('avatars').upload(path, file)
@@ -1163,8 +1166,22 @@ export const removeAvatar = async (userId: string, currentPath?: string | null) 
   if (!error && currentPath) await supabase.storage.from('avatars').remove([currentPath])
   return { error }
 }
-export const getAvatarUrl = (path?: string | null) =>
-  path ? supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl : null
+
+// Cached by path (a 1-hour signed URL, kept for 55 minutes) so a feed
+// or list rendering the same person's avatar many times over only
+// ever signs it once. Works identically whether the bucket is public
+// or private -- createSignedUrl doesn't care -- so this ships safely
+// ahead of the bucket itself actually flipping to private.
+const avatarUrlCache = new Map<string, { url: string; expiresAt: number }>()
+export const getAvatarSignedUrl = async (path?: string | null): Promise<string | null> => {
+  if (!path) return null
+  const cached = avatarUrlCache.get(path)
+  if (cached && cached.expiresAt > Date.now()) return cached.url
+  const { data, error } = await supabase.storage.from('avatars').createSignedUrl(path, 3600)
+  if (error || !data?.signedUrl) return null
+  avatarUrlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + 55 * 60 * 1000 })
+  return data.signedUrl
+}
 
 // Changing email through Supabase auth sends a confirmation link to
 // the NEW address and only swaps it over once that's clicked --
