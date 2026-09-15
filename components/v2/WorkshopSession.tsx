@@ -401,20 +401,34 @@ export default function WorkshopSession({
     // prompt below could never render no matter what it said.
     const finishedBlob = recording ? await stopRecordingAndWait() : null
 
+    let endErrorMessage: string | null = null
     if (canEnd) {
       const { error: endError } = await endWorkshop(workItemId)
-      if (endError) setActionError("Couldn't mark the session ended: " + endError.message) // non-fatal -- still lets the host actually leave
-      else onEnded?.()
+      if (endError) endErrorMessage = "Couldn't mark the session ended: " + endError.message // non-fatal -- still lets the host actually leave
     }
     cameraRef.current?.close(); micRef.current?.close(); screenRef.current?.close()
     await clientRef.current?.leave().catch(() => {})
     clientRef.current = null
+    if (endErrorMessage) setActionError(endErrorMessage)
 
     // Nothing recorded (or already saved and dismissed) -- close exactly
     // as before. Otherwise stay mounted on a dedicated "session ended"
     // screen until the person actually chooses what to do with it.
-    if (finishedBlob) setEnded(true)
-    else onClose()
+    //
+    // onEnded (the parent's own list refresh) is deliberately NOT called
+    // yet in the recording case -- it used to fire immediately here,
+    // and if the parent's list only shows live/ongoing sessions, that
+    // refetch removes this exact item (endWorkshop just ended it) from
+    // the list it maps over, unmounting this whole component along with
+    // it before "ended" ever got a chance to render anything. Calling it
+    // from finishAfterRecording() instead means the parent only finds
+    // out once there's nothing left here to lose.
+    if (finishedBlob) {
+      setEnded(true)
+    } else {
+      if (canEnd && !endErrorMessage) onEnded?.()
+      onClose()
+    }
   }
 
   // The one path off the "session ended" screen, whether or not they
@@ -424,6 +438,7 @@ export default function WorkshopSession({
   const finishAfterRecording = () => {
     setRecordingBlob(null)
     setEnded(false)
+    onEnded?.() // deferred from leave() -- safe now, nothing left here to lose
     onClose()
   }
 
