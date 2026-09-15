@@ -172,6 +172,7 @@ export default function EmployerSignupPage() {
   return (
     <AuthShell
       step={step} totalSteps={3}
+      onBack={step === 2 ? () => setStep(1) : step === 3 ? () => setStep(2) : undefined}
       title={step === 1 ? 'Create your employer account' : step === 2 ? 'Tell us about your company' : 'How LERN protects young people'}
       subtitle={
         step === 1 ? 'Browse verified work, set briefs, and track interest — all routed through the organisation.'

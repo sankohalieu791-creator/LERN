@@ -262,7 +262,10 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
           WHOLE app (body, which has no dark background of its own) rather
           than just its immediate parent. Painting main itself removes any
           chance of that white flash showing mid-scroll. */}
-      <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[var(--app-bg)] pb-[calc(60px+env(safe-area-inset-bottom))] lg:pb-0">
+      {/* tabIndex so a keyboard-only user can Tab straight into this
+          scrollable region -- otherwise arrow keys/Page Down/Space have
+          no focused scrollable element to act on. */}
+      <main tabIndex={0} className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[var(--app-bg)] pb-[calc(60px+env(safe-area-inset-bottom))] lg:pb-0">
         {isFeed ? children : <div className="lg:max-w-3xl lg:mx-auto">{children}</div>}
       </main>
 

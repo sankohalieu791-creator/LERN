@@ -327,7 +327,10 @@ export default function OrgShell({
             has always given it, so the padding is dropped only for the
             Feed route rather than globally, which would strip margins
             from Dashboard/Review/Students/Settings etc. too. */}
-        <main className={`flex-1 min-h-0 overflow-y-auto bg-paper ${pathname.endsWith('/feed') ? '' : 'px-5 lg:px-10 py-7 pb-8'}`}>
+        {/* tabIndex so a keyboard-only user can Tab straight into this
+            scrollable region -- otherwise arrow keys/Page Down/Space have
+            no focused scrollable element to act on. */}
+        <main tabIndex={0} className={`flex-1 min-h-0 overflow-y-auto bg-paper ${pathname.endsWith('/feed') ? '' : 'px-5 lg:px-10 py-7 pb-8'}`}>
           {children}
         </main>
       </div>

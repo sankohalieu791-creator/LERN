@@ -1,12 +1,14 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft } from 'lucide-react'
 import Logo from '@/components/v2/Logo'
 
 // Shared layout for every auth/onboarding screen: desktop/laptop-first
 // (generous centered column, not a mobile card), paper/ink/orange theme.
 export default function AuthShell({
-  step, totalSteps, title, subtitle, children, wide = false,
+  step, totalSteps, title, subtitle, children, wide = false, onBack,
 }: {
   step?: number
   totalSteps?: number
@@ -14,7 +16,12 @@ export default function AuthShell({
   subtitle?: string
   children: React.ReactNode
   wide?: boolean
+  // A wizard step passes its own handler (go back one step); anything
+  // without one falls back to plain browser back, so this always does
+  // something sensible without every call site needing to think about it.
+  onBack?: () => void
 }) {
+  const router = useRouter()
   return (
     // paddingTop: env(safe-area-inset-top) -- missing entirely before,
     // so on a standalone PWA the LERN logo sat right at the true top
@@ -38,7 +45,14 @@ export default function AuthShell({
       className="min-h-screen flex flex-col"
       style={{ paddingTop: 'env(safe-area-inset-top)', background: 'linear-gradient(180deg, var(--accent-bg-soft) 0%, var(--accent-bg) 30%, var(--paper) 75%)' }}
     >
-      <header className="flex-shrink-0 px-10 py-7">
+      <header className="flex-shrink-0 px-10 py-7 flex items-center gap-4">
+        <button
+          onClick={() => (onBack ? onBack() : router.back())}
+          aria-label="Back"
+          className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-full hover:bg-black/5 text-ink transition flex-shrink-0"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
         <Logo size="lg" />
       </header>
 

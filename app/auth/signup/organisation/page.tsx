@@ -245,6 +245,7 @@ function OrganisationSignupInner() {
     <AuthShell
       step={typeof step === 'number' ? step : 1}
       totalSteps={mode === 'join' ? 2 : 3}
+      onBack={step === 2 ? () => setStep(1) : undefined}
       title={
         step === 'orgname' ? `Name your ${orgType === 'institution' ? 'school or college' : 'organisation'}`
         : step === 2 ? 'Safeguarding and data protection'

@@ -51,21 +51,28 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   })
 
   return (
-    <div data-theme={theme} className="min-h-screen bg-paper flex">
+    <div data-theme={theme} className="h-screen overflow-hidden bg-paper flex">
+      {/* h-screen + overflow-hidden here, not min-h-screen -- a min-height
+          lets this whole row grow taller than the viewport to match a
+          long page (a big table, say), which drags the sidebar's own
+          height along with it and pushes "Sign out" (and on a short
+          screen, half the nav) below the fold with no way to reach it.
+          Pinning this row to the viewport and letting only <main> scroll
+          internally is what actually keeps the sidebar fully on-screen. */}
       {/* Laptop: the sidebar stays exactly as it always did. Phone: it
           disappears entirely (was a fixed 240px column that used to eat
           most of a phone screen, leaving the actual content squeezed into
           a sliver) in favour of a top bar + slide-out drawer, same pattern
           OrgShell already uses for the customer-facing app. */}
-      <aside className="hidden lg:flex w-60 flex-shrink-0 border-r border-edge-subtle flex-col py-5 px-3">
+      <aside className="hidden lg:flex w-60 flex-shrink-0 border-r border-edge-subtle flex-col py-5 px-3 overflow-y-auto">
         <div className="px-2 mb-6"><Logo size="sm" /></div>
         <nav className="flex-1 space-y-1">{navLinks()}</nav>
-        <button onClick={handleSignOut} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13.5px] font-semibold text-ink-tertiary hover:text-danger-text hover:bg-surface-muted transition">
+        <button onClick={handleSignOut} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13.5px] font-semibold text-ink-tertiary hover:text-danger-text hover:bg-surface-muted transition flex-shrink-0">
           <LogOut className="w-4 h-4 flex-shrink-0" /> Sign out
         </button>
       </aside>
 
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 h-full flex flex-col">
         <header className="lg:hidden flex items-center justify-between h-14 px-4 border-b border-edge-subtle flex-shrink-0">
           <button
             onClick={() => setDrawerOpen(true)} aria-label="Open menu"
@@ -76,7 +83,11 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
           <span className="text-ink"><Logo size="sm" /></span>
           <span className="w-9" />
         </header>
-        <main className="flex-1 px-4 py-5 lg:px-8 lg:py-7 overflow-y-auto overflow-x-hidden">{children}</main>
+        {/* tabIndex so a keyboard-only user (no mouse) can Tab straight
+            into this scrollable region and use arrow keys/Page Down/Space
+            to move through it -- without this, focus has nowhere to land
+            inside it and those keys have nothing to act on. */}
+        <main tabIndex={0} className="flex-1 min-h-0 px-4 py-5 lg:px-8 lg:py-7 overflow-y-auto overflow-x-hidden">{children}</main>
       </div>
 
       {drawerOpen && (
