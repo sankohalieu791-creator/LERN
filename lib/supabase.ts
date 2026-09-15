@@ -864,16 +864,15 @@ export const searchPeople = async (query: string) => {
   return { data: data as { id: string; full_name: string; avatar_path: string | null; role: string }[] | null, error }
 }
 
+// Goes through the search_posts() RPC, not a direct posts_feed query --
+// that RPC has its own explicit "caller must belong to an organisation"
+// gate, deliberately stricter than passive Feed browsing (which a
+// codeless "explore without a code" student can still do). Search
+// itself stays locked until they've actually joined one.
 export const searchPosts = async (query: string) => {
   const q = query.trim()
   if (!q) return { data: [], error: null }
-  const { data, error } = await supabase
-    .from('posts_feed')
-    .select('*')
-    .eq('hidden', false)
-    .or(`content.ilike.%${q}%,title.ilike.%${q}%,category.ilike.%${q}%`)
-    .order('created_at', { ascending: false })
-    .limit(30)
+  const { data, error } = await supabase.rpc('search_posts', { q })
   if (error || !data) return { data, error }
   return { data: await attachReactions(data), error: null }
 }
