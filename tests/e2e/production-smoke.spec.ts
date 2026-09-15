@@ -242,8 +242,10 @@ test.describe('Institution signup, real end to end', () => {
       await page.getByLabel('Email').fill(email)
       await page.getByLabel('Password').fill(password)
       await page.getByRole('button', { name: 'Log in' }).click()
-      await page.waitForURL(u => new URL(u).pathname === '/student', { timeout: 15_000 })
-      await page.goto('/auth/signup/organisation')
+      // Login now detects an unfinished org signup (role is still the
+      // placeholder 'student') and sends it straight back to the org
+      // wizard itself, not the student dashboard -- no manual goto needed.
+      await page.waitForURL(u => new URL(u).pathname === '/auth/signup/organisation', { timeout: 15_000 })
     }
 
     await expect(page.getByText(/safeguarding and data-processing position/i)).toBeVisible({ timeout: 15_000 })

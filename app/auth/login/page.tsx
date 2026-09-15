@@ -62,6 +62,21 @@ export default function LoginPage() {
     const { data: profile } = await getUserProfile(data.user.id)
     await refreshUser()
     setLoading(false)
+
+    // An organisation signup uses role: 'student' as a placeholder until
+    // the org actually gets created -- signup_mode only ever gets set by
+    // that flow. Without this check, confirming the email and then just
+    // logging in normally (rather than remembering to click the emailed
+    // link specifically) dropped someone mid-way through setting up a
+    // school straight into the student app instead of back into their
+    // own unfinished signup.
+    const signupMode = data.user.user_metadata?.signup_mode
+    if (profile?.role === 'student' && !profile.organisation_id && signupMode) {
+      const orgType = data.user.user_metadata?.org_type === 'provider' ? 'provider' : 'institution'
+      setGreeting({ name: profile?.full_name || '', dest: `/auth/signup/organisation?type=${orgType}` })
+      return
+    }
+
     setGreeting({ name: profile?.full_name || '', dest: routeForRole(profile?.role) })
   }
 

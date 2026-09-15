@@ -119,11 +119,14 @@ function OrganisationSignupInner() {
 
     setLoading(true)
     const redirectTo = typeof window !== 'undefined' ? window.location.href.split('?')[0] + `?type=${orgType}` : undefined
-    // org_name/signup_mode ride in the auth user's own metadata, not
-    // just React state — a confirmation-link click is a fresh page
+    // org_name/signup_mode/org_type ride in the auth user's own metadata,
+    // not just React state — a confirmation-link click is a fresh page
     // load, which would otherwise lose everything typed on this step.
+    // org_type specifically is also what lets a plain /auth/login sign-in
+    // (as opposed to clicking the emailed link) send this account back to
+    // the right flavour of the signup wizard instead of guessing institution.
     const { data: signUpData, error: signUpError } = await signUp(email.trim(), password, {
-      role: 'student', full_name: fullName.trim(), org_name: mode === 'create' ? orgName.trim() : undefined, signup_mode: mode,
+      role: 'student', full_name: fullName.trim(), org_name: mode === 'create' ? orgName.trim() : undefined, signup_mode: mode, org_type: orgType,
     } as any, redirectTo)
     // role is a placeholder here — create_organisation_and_join or
     // redeem_staff_join_code (step 1->2) overwrites it once the org
