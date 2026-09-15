@@ -2163,30 +2163,6 @@ export const claimGuestInvite = async (inviteId: string, fullName: string, email
   return { error }
 }
 
-// ── Demo gateway (public "try LERN" login — see app/api/demo-switch) ──
-// One real email+password (Lern12@gmail.com / Lerntesterapp) anyone can
-// sign in with; this then swaps the session into whichever of the 4
-// seeded test accounts the visitor picks. Only works while the current
-// session belongs to a user flagged is_demo_gateway — enforced server-side.
-export const demoSwitchRole = async (role: Role) => {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.access_token) return { error: { message: 'Not signed in.' } }
-  const res = await fetch('/api/demo-switch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-    body: JSON.stringify({ role }),
-  })
-  const body = await res.json()
-  if (!res.ok) return { error: body }
-  // token_hash-based verification takes ONLY { token_hash, type } -- passing
-  // email alongside it (even though the API response includes it) mixes
-  // it with the separate OTP-code shape ({ email, token, type }) and is
-  // exactly what Supabase's "Only the token_hash and type should be
-  // provided" error is guarding against.
-  const { error } = await supabase.auth.verifyOtp({ token_hash: body.tokenHash, type: 'magiclink' })
-  return { error }
-}
-
 // ── Profile ────────────────────────────────────────────────────
 export const getFollowCounts = async (userId: string) => {
   const [{ count: followers }, { count: following }] = await Promise.all([
