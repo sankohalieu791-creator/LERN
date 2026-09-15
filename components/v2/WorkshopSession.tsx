@@ -122,6 +122,11 @@ export default function WorkshopSession({
   const [recording, setRecording] = useState(false)
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null)
   const [savingRecording, setSavingRecording] = useState(false)
+  // Set once the call itself has ended but a recording is still waiting
+  // on a save decision -- keeps this component on screen for exactly
+  // that reason instead of closing straight to the outer page (see leave()).
+  const [ended, setEnded] = useState(false)
+  const stopResolveRef = useRef<((blob: Blob | null) => void) | null>(null)
 
   const trackPresence = useCallback((extra?: Partial<Participant>) => {
     presenceRef.current?.track({ name: user?.full_name, userId: user?.id, isHost: !!canEnd, handRaised, muted: !micOn, ...extra })
@@ -389,8 +394,14 @@ export default function WorkshopSession({
   // leaving by ANY path now ends it for real, not just the one
   // deliberately-labelled button.
   const leave = async () => {
+    // Actually wait for the recording to finish (not just call stop() and
+    // press on) before deciding anything -- calling onClose() straight
+    // after used to unmount this whole component before MediaRecorder's
+    // own stop event had a chance to even fire, so the save-or-not
+    // prompt below could never render no matter what it said.
+    const finishedBlob = recording ? await stopRecordingAndWait() : null
+
     if (canEnd) {
-      if (recording) stopRecording() // keeps whatever was captured so far, ready to save from the end screen
       const { error: endError } = await endWorkshop(workItemId)
       if (endError) setActionError("Couldn't mark the session ended: " + endError.message) // non-fatal -- still lets the host actually leave
       else onEnded?.()
@@ -398,6 +409,21 @@ export default function WorkshopSession({
     cameraRef.current?.close(); micRef.current?.close(); screenRef.current?.close()
     await clientRef.current?.leave().catch(() => {})
     clientRef.current = null
+
+    // Nothing recorded (or already saved and dismissed) -- close exactly
+    // as before. Otherwise stay mounted on a dedicated "session ended"
+    // screen until the person actually chooses what to do with it.
+    if (finishedBlob) setEnded(true)
+    else onClose()
+  }
+
+  // The one path off the "session ended" screen, whether or not they
+  // actually saved anything -- an explicit choice, not an automatic
+  // close the instant a save finishes, since someone may want both
+  // "Save to LERN" and "Save to device" before they're done here.
+  const finishAfterRecording = () => {
+    setRecordingBlob(null)
+    setEnded(false)
     onClose()
   }
 
@@ -451,6 +477,12 @@ export default function WorkshopSession({
         const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || 'video/webm' })
         setRecordingBlob(blob)
         stream.getTracks().forEach(t => t.stop())
+        // MediaRecorder.stop() only fires this asynchronously -- leave()
+        // needs to actually wait for it before deciding whether there's
+        // anything to prompt about, rather than closing the session out
+        // from under a recording that hasn't finished flushing yet.
+        stopResolveRef.current?.(blob)
+        stopResolveRef.current = null
       }
       recorder.start(1000)
       mediaRecorderRef.current = recorder
@@ -466,6 +498,16 @@ export default function WorkshopSession({
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop()
     setRecording(false)
   }
+
+  // Used specifically when ending the call -- resolves with the actual
+  // blob once MediaRecorder has genuinely finished, instead of firing
+  // stop() and moving on before it's done.
+  const stopRecordingAndWait = (): Promise<Blob | null> => new Promise(resolve => {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') { resolve(null); return }
+    stopResolveRef.current = resolve
+    mediaRecorderRef.current.stop()
+    setRecording(false)
+  })
 
   const toggleRecording = () => { recording ? stopRecording() : startRecording() }
 
@@ -527,12 +569,14 @@ export default function WorkshopSession({
       <div className="flex items-center justify-between px-5 py-3.5 flex-shrink-0">
         <div>
           <p className="text-white font-bold text-[15px]">{title}</p>
-          <p className="text-[#8A8373] text-[12px] flex items-center gap-1.5">
-            <Users className="w-3.5 h-3.5" /> {allTiles.length} in the room
-            {recording && <span className="flex items-center gap-1 text-[#FF6B4E] font-semibold ml-1"><Circle className="w-2 h-2 fill-current" /> Recording</span>}
-          </p>
+          {!ended && (
+            <p className="text-[#8A8373] text-[12px] flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5" /> {allTiles.length} in the room
+              {recording && <span className="flex items-center gap-1 text-[#FF6B4E] font-semibold ml-1"><Circle className="w-2 h-2 fill-current" /> Recording</span>}
+            </p>
+          )}
         </div>
-        {canEnd && (
+        {canEnd && !ended && (
           <button onClick={endForEveryone} className="flex items-center gap-1.5 bg-[#B3401E] hover:bg-[#9c3419] text-white text-[12px] font-semibold px-3.5 py-2 rounded-full transition flex-shrink-0">
             <Square className="w-3 h-3 fill-current" /> End for everyone
           </button>
@@ -552,9 +596,9 @@ export default function WorkshopSession({
         <div className="mx-5 mb-2 flex-shrink-0 bg-[#1E1A16] border border-white/10 rounded-xl px-4 py-3.5">
           <div className="flex items-center justify-between gap-3 mb-2.5">
             <p className="text-white text-[13px] font-semibold">
-              Recording ready — {(recordingBlob.size / 1024 / 1024).toFixed(1)} MB
+              {ended ? 'Save this recording before you go?' : 'Recording ready'} — {(recordingBlob.size / 1024 / 1024).toFixed(1)} MB
             </p>
-            <button onClick={() => setRecordingBlob(null)} className="text-[#8A8373] hover:text-white flex-shrink-0">
+            <button onClick={() => ended ? finishAfterRecording() : setRecordingBlob(null)} className="text-[#8A8373] hover:text-white flex-shrink-0">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -578,7 +622,19 @@ export default function WorkshopSession({
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col px-5 pb-4 min-w-0">
-          {connecting ? (
+          {ended ? (
+            // The call itself is already over at this point (Agora client
+            // left, host's endWorkshop already ran) -- this only exists
+            // to hold the screen open long enough for the banner above to
+            // actually be seen and acted on, which closing straight to
+            // onClose() never gave it the chance to do.
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center">
+              <p className="text-white font-semibold">Session ended.</p>
+              <button onClick={finishAfterRecording} className="bg-white/10 hover:bg-white/20 text-white text-[13px] font-semibold px-5 py-2.5 rounded-full transition">
+                Done
+              </button>
+            </div>
+          ) : connecting ? (
             <div className="flex-1 flex items-center justify-center text-[#8A8373]">Connecting…</div>
           ) : error ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
@@ -707,45 +763,49 @@ export default function WorkshopSession({
 
       {/* Every control lives here now — camera/mic/share same as any
           other video call, plus Q&A and Record alongside them instead
-          of stranded up in the header. */}
-      <div className="flex items-center justify-center gap-3 px-5 py-4 flex-shrink-0 border-t border-white/10">
-        <RoomButton active={micOn} onClick={toggleMic} onIcon={Mic} offIcon={MicOff} disabled={!joined} />
-        <RoomButton active={cameraOn} onClick={toggleCamera} onIcon={Video} offIcon={VideoOff} disabled={!joined} />
-        <button
-          onClick={toggleScreenShare} disabled={!joined}
-          className={`w-11 h-11 rounded-full flex items-center justify-center transition ${screenSharing ? 'bg-brand text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
-        >
-          <ScreenShare className="w-[18px] h-[18px]" />
-        </button>
-        {!canEnd && (
+          of stranded up in the header. Hidden once the call has actually
+          ended (ended === true) -- toggling mic/camera/recording for a
+          call that's already been left doesn't do anything meaningful. */}
+      {!ended && (
+        <div className="flex items-center justify-center gap-3 px-5 py-4 flex-shrink-0 border-t border-white/10">
+          <RoomButton active={micOn} onClick={toggleMic} onIcon={Mic} offIcon={MicOff} disabled={!joined} />
+          <RoomButton active={cameraOn} onClick={toggleCamera} onIcon={Video} offIcon={VideoOff} disabled={!joined} />
           <button
-            onClick={toggleHand} disabled={!joined}
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition ${handRaised ? 'bg-brand text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+            onClick={toggleScreenShare} disabled={!joined}
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition ${screenSharing ? 'bg-brand text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
           >
-            <Hand className="w-[18px] h-[18px]" />
+            <ScreenShare className="w-[18px] h-[18px]" />
           </button>
-        )}
-        {canEnd && (
+          {!canEnd && (
+            <button
+              onClick={toggleHand} disabled={!joined}
+              className={`w-11 h-11 rounded-full flex items-center justify-center transition ${handRaised ? 'bg-brand text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+            >
+              <Hand className="w-[18px] h-[18px]" />
+            </button>
+          )}
+          {canEnd && (
+            <button
+              onClick={toggleRecording}
+              title="Records your own camera/mic only, not the full call"
+              className={`w-11 h-11 rounded-full flex items-center justify-center transition ${recording ? 'bg-[#B3401E] hover:bg-[#9c3419] text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+            >
+              {recording ? <StopCircle className="w-[18px] h-[18px]" /> : <Circle className="w-[15px] h-[15px] fill-current text-[#FF6B4E]" />}
+            </button>
+          )}
           <button
-            onClick={toggleRecording}
-            title="Records your own camera/mic only, not the full call"
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition ${recording ? 'bg-[#B3401E] hover:bg-[#9c3419] text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+            onClick={() => setQaOpen(v => !v)}
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition relative ${qaOpen ? 'bg-brand text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
           >
-            {recording ? <StopCircle className="w-[18px] h-[18px]" /> : <Circle className="w-[15px] h-[15px] fill-current text-[#FF6B4E]" />}
+            <HelpCircle className="w-[18px] h-[18px]" />
+            {raisedHands.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand text-white text-[9px] font-bold flex items-center justify-center border-2 border-[#141110]">{raisedHands.length}</span>}
           </button>
-        )}
-        <button
-          onClick={() => setQaOpen(v => !v)}
-          className={`w-11 h-11 rounded-full flex items-center justify-center transition relative ${qaOpen ? 'bg-brand text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
-        >
-          <HelpCircle className="w-[18px] h-[18px]" />
-          {raisedHands.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand text-white text-[9px] font-bold flex items-center justify-center border-2 border-[#141110]">{raisedHands.length}</span>}
-        </button>
-        <div className="w-px h-7 bg-white/10 mx-1" />
-        <button onClick={leave} className="w-11 h-11 rounded-full bg-[#B3401E] text-white flex items-center justify-center hover:bg-[#9c3419] transition">
-          <PhoneOff className="w-[18px] h-[18px]" />
-        </button>
-      </div>
+          <div className="w-px h-7 bg-white/10 mx-1" />
+          <button onClick={leave} className="w-11 h-11 rounded-full bg-[#B3401E] text-white flex items-center justify-center hover:bg-[#9c3419] transition">
+            <PhoneOff className="w-[18px] h-[18px]" />
+          </button>
+        </div>
+      )}
     </div>
   ), document.body)
 }
