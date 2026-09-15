@@ -218,3 +218,43 @@ test.describe('Employer verification, real data', () => {
     await page.screenshot({ path: 'test-results/employer-pending.png', fullPage: true })
   })
 })
+
+test.describe('Institution signup, real end to end', () => {
+  const email = 'preview.school@lernapp.uk'
+  const password = 'TestPassword123!'
+
+  test.beforeAll(() => deleteUserByEmail(email))
+  test.afterAll(() => deleteUserByEmail(email))
+
+  test('sets up a new school, gets a join code, lands on the real dashboard', async ({ page }) => {
+    await page.goto('/auth/signup/organisation')
+    await page.getByLabel('School or college name').fill('Preview School')
+    await page.getByLabel('Your full name').fill('Preview Staff')
+    await page.getByLabel('Your email').fill(email)
+    await page.getByLabel('Password').fill(password)
+    await page.getByRole('button', { name: 'Continue', exact: true }).click()
+
+    const needsConfirm = await page.getByText(/check your email/i)
+      .waitFor({ state: 'visible', timeout: 20_000 }).then(() => true).catch(() => false)
+    if (needsConfirm) {
+      await confirmEmail(email)
+      await page.goto('/auth/login')
+      await page.getByLabel('Email').fill(email)
+      await page.getByLabel('Password').fill(password)
+      await page.getByRole('button', { name: 'Log in' }).click()
+      await page.waitForURL(u => new URL(u).pathname === '/student', { timeout: 15_000 })
+      await page.goto('/auth/signup/organisation')
+    }
+
+    await expect(page.getByText(/safeguarding and data-processing position/i)).toBeVisible({ timeout: 15_000 })
+    await page.getByRole('button', { name: /i agree, accept/i }).click()
+
+    await expect(page.getByText(/your join code/i)).toBeVisible({ timeout: 15_000 })
+    await page.screenshot({ path: 'test-results/institution-join-code.png', fullPage: true })
+    await page.getByRole('button', { name: 'Continue', exact: true }).click()
+
+    await page.waitForURL(u => new URL(u).pathname === '/institution', { timeout: 15_000 })
+    await expect(page.locator('body')).not.toContainText('Application error')
+    await page.screenshot({ path: 'test-results/institution-dashboard.png', fullPage: true })
+  })
+})
