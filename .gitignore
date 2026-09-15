@@ -7,3 +7,7 @@ tsconfig.tsbuildinfo
 
 .vercel
 scripts/.seed-manifest*.json
+
+# Playwright output -- generated screenshots/traces from local test runs
+/test-results/
+/playwright-report/
