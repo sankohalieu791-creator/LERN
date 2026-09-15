@@ -224,7 +224,7 @@ function OrganisationSignupInner() {
       <AuthShell title="Check your email" subtitle={`We've sent a confirmation link to ${email.trim()}.`}>
         <div className="bg-white border border-[#E2DDD1] rounded-2xl p-5 mb-6">
           <p className="text-[14px] text-[#4A453B] leading-relaxed">
-            Click the link in that email to confirm it's really you — then you'll land right back here to carry on{mode === 'create' ? ` setting up ${orgName || 'your organisation'}` : ''}.
+            Click the link in that email to continue.
           </p>
         </div>
         <SecondaryButton

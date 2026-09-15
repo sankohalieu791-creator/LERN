@@ -178,7 +178,7 @@ export default function StudentSignupPage() {
       <AuthShell title="Check your email" subtitle={`We've sent a confirmation link to ${email.trim()}.`}>
         <div className="bg-white border border-[#E2DDD1] rounded-2xl p-5 mb-6">
           <p className="text-[14px] text-[#4A453B] leading-relaxed">
-            Click the link in that email to confirm it's really you — then you'll land right back here to carry on. This is what proves the account belongs to whoever owns that inbox, not just whoever typed it in.
+            Click the link in that email to continue.
           </p>
         </div>
         <SecondaryButton
