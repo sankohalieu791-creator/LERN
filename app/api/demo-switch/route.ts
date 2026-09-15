@@ -17,16 +17,20 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
 
-// Keep in sync with the founder-allowlist test accounts — these already
-// have real seeded courses/workshops/briefs/posts behind them from
-// earlier build passes.
-// Partial, deliberately -- 'ops_admin' must never be reachable through
-// the public demo gateway, so it's not just omitted here, it can't be
-// added without this type also changing to notice.
+// Keep in sync with whichever real accounts currently hold each preview
+// role -- institution_staff and provider_staff are deliberately absent
+// right now. Their old target accounts (alieu@joinirl.co.uk,
+// mohalieu58@gmail.com) were freed up in the September demo-data cleanup
+// -- alieu@joinirl.co.uk is now an ops_admin login, mohalieu58@gmail.com
+// was deleted outright. Leaving stale entries here would have let anyone
+// on the public demo gateway "switch" straight into the ops_admin
+// account through what looks like an innocuous "School / college" card.
+// Add these back only once dedicated preview accounts exist for those
+// two roles -- the role-check below is a second line of defence against
+// exactly this happening again, but the map staying accurate is the
+// actual fix.
 const PERSONA_EMAIL: Partial<Record<Role, string>> = {
   student: 'sankohalieu791@gmail.com',
-  institution_staff: 'alieu@joinirl.co.uk',
-  provider_staff: 'mohalieu58@gmail.com',
   employer: 'sankohaugusta9@gmail.com',
 }
 
@@ -72,6 +76,20 @@ export async function POST(req: NextRequest) {
 
   // Already checked `role in PERSONA_EMAIL` above, so this is defined.
   const targetEmail = PERSONA_EMAIL[role as Role]!
+
+  // Belt and braces: confirm the target account's role in the database
+  // still actually matches what this map claims it is, right before
+  // generating a real sign-in link for it. PERSONA_EMAIL going stale
+  // (an account it points at gets repurposed or deleted) is exactly how
+  // this route once would have handed out an ops_admin session through
+  // an "institution_staff" button -- this check makes that fail loudly
+  // instead of silently working.
+  const { data: targetProfile } = await supabaseAdmin
+    .from('users').select('role').eq('email', targetEmail).single()
+  if (!targetProfile || targetProfile.role !== role) {
+    return NextResponse.json({ error: 'That preview account isn’t set up right now.' }, { status: 503 })
+  }
+
   const { data, error } = await supabaseAdmin.auth.admin.generateLink({ type: 'magiclink', email: targetEmail })
   if (error || !data?.properties?.hashed_token) {
     return NextResponse.json({ error: error?.message || 'Could not switch roles.' }, { status: 500 })
