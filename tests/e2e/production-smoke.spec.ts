@@ -324,3 +324,91 @@ test.describe('Search shows the other student, not yourself', () => {
     await expect(page.getByText('Amara Test', { exact: true })).not.toBeVisible()
   })
 })
+
+test.describe('Employer inbox placeholder text', () => {
+  const employerEmail = 'qa.employerinbox@lernapp.uk'
+  const studentEmail = 'qa.noname.student@lernapp.uk'
+  const password = 'TestPassword123!'
+
+  // Genuinely verifies the employer through the real flow (real company,
+  // real ops approval via an authenticated ops session) rather than
+  // shortcutting employer_verified -- the inbox is unreachable at all
+  // without it, so there is no way to test this defect otherwise.
+  test.beforeAll(async () => {
+    await deleteUserByEmail(employerEmail)
+    await deleteUserByEmail(studentEmail)
+
+    const { data: empData, error: empErr } = await admin.auth.admin.createUser({
+      email: employerEmail, password, email_confirm: true,
+      user_metadata: { role: 'employer', full_name: 'QA Employer' },
+    })
+    if (empErr) throw empErr
+    const employerId = empData.user.id
+
+    await admin.from('users').update({
+      employer_company_number: '17200180',
+      employer_company_name: 'IRL CONNECT LTD',
+      employer_website: 'lernapp.uk',
+      employer_verification_requested_at: new Date().toISOString(),
+      employer_verification_status: 'pending',
+      employer_check_email_domain: 'pass',
+      employer_check_ch: 'pass',
+      employer_check_ch_detail: 'Active — IRL CONNECT LTD',
+      consented_at: new Date().toISOString(),
+    }).eq('id', employerId)
+
+    const anon = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    const { data: opsSession, error: opsErr } = await anon.auth.signInWithPassword({
+      email: 'alieu@joinirl.co.uk', password: 'alieu1221&',
+    })
+    if (opsErr) throw opsErr
+    const opsClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${opsSession.session.access_token}` } },
+    })
+    await opsClient.rpc('set_employer_manual_check', { p_employer_id: employerId, p_check: 'website', p_value: true })
+    await opsClient.rpc('set_employer_manual_check', { p_employer_id: employerId, p_check: 'officer', p_value: true })
+    const { error: approveErr } = await opsClient.rpc('approve_employer_verification', { p_employer_id: employerId })
+    if (approveErr) throw approveErr
+
+    const { data: studData, error: studErr } = await admin.auth.admin.createUser({
+      email: studentEmail, password, email_confirm: true,
+      user_metadata: { role: 'student', full_name: 'placeholder', date_of_birth: '2008-01-01' },
+    })
+    if (studErr) throw studErr
+    await admin.from('users').update({ full_name: null }).eq('id', studData.user.id)
+
+    const { error: interestErr } = await admin.from('interest').insert([{
+      employer_id: employerId, student_id: studData.user.id, status: 'pending',
+    }])
+    if (interestErr) throw interestErr
+  })
+
+  test.afterAll(async () => {
+    await deleteUserByEmail(employerEmail)
+    await deleteUserByEmail(studentEmail)
+  })
+
+  test('shows the full "A student" fallback, not truncated to "A"', async ({ page }) => {
+    await page.goto('/auth/login')
+    await page.getByLabel('Email').fill(employerEmail)
+    await page.getByLabel('Password').fill(password)
+    await page.getByRole('button', { name: 'Log in' }).click()
+    await page.waitForURL(u => new URL(u).pathname === '/employer', { timeout: 15_000 })
+
+    const needsConsent = await page.getByText(/how lern protects young people/i)
+      .waitFor({ state: 'visible', timeout: 5_000 }).then(() => true).catch(() => false)
+    if (needsConsent) {
+      await page.getByRole('button', { name: /i understand, accept/i }).click()
+      await page.waitForURL(u => new URL(u).pathname === '/employer', { timeout: 15_000 })
+    }
+
+    await page.goto('/employer/inbox')
+    // The exact 10 September defect: .split(' ')[0] was applied to the
+    // fallback phrase itself, truncating "A student" down to just "A".
+    // Matching the exact full phrase (not a substring) is what actually
+    // distinguishes the fix from the bug -- a loose substring check
+    // would pass either way.
+    await expect(page.getByText('A student', { exact: true })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('A', { exact: true })).not.toBeVisible()
+  })
+})
