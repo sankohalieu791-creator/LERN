@@ -412,3 +412,52 @@ test.describe('Employer inbox placeholder text', () => {
     await expect(page.getByText('A', { exact: true })).not.toBeVisible()
   })
 })
+
+test.describe('Unverified organisation join codes are rejected', () => {
+  // The live incident this guards against: institution/provider signup
+  // has never had a Companies-House-style verification step the way
+  // employer signup does. Before the redeem_join_code/
+  // redeem_staff_join_code fix, ANY brand-new account -- including one
+  // signed up seconds earlier via "Continue with Google" -- could create
+  // an organisation, generate a real join code, and immediately bring
+  // real people (including under-18 students) into it with nobody at
+  // LERN ever having reviewed it. This is a pure API-level test (no
+  // browser) since it's a backend guarantee, not a UI one.
+  const orgName = 'QA Unverified Org Test'
+  let orgId: string
+
+  test.beforeAll(async () => {
+    const { data } = await admin.from('organisations').insert([{ name: orgName, type: 'provider' }]).select().single()
+    orgId = data.id
+  })
+
+  test.afterAll(async () => {
+    await admin.from('join_codes').delete().eq('organisation_id', orgId)
+    await admin.from('organisations').delete().eq('id', orgId)
+  })
+
+  test('a code from a brand-new, unverified organisation cannot be redeemed', async () => {
+    const code = 'Q' + Math.random().toString(36).slice(2, 5).toUpperCase()
+    // created_by just needs to be a real user id -- the join_codes row
+    // itself doesn't encode which org verification state it was made
+    // under, only redeem_join_code checks that, live, at redemption time.
+    const anyUser = (await admin.auth.admin.listUsers({ page: 1, perPage: 1 })).data.users[0]
+    await admin.from('join_codes').insert([{ organisation_id: orgId, code, role_type: 'student', created_by: anyUser.id }])
+
+    const email = `qa.unverified-org.${Date.now()}@lernapp.uk`
+    const { data: created } = await admin.auth.admin.createUser({ email, password: 'TestPassword123!', email_confirm: true })
+    const anon = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    const { data: signIn } = await anon.auth.signInWithPassword({ email, password: 'TestPassword123!' })
+    const asNewAccount = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${signIn!.session!.access_token}` } },
+    })
+
+    const { error } = await asNewAccount.rpc('redeem_join_code', { p_code: code })
+    expect(error?.message).toMatch(/not been verified/i)
+
+    const { data: profile } = await admin.from('users').select('organisation_id').eq('id', created!.user!.id).single()
+    expect(profile?.organisation_id).toBeNull()
+
+    await admin.auth.admin.deleteUser(created!.user!.id)
+  })
+})
