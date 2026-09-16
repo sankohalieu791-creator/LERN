@@ -5,9 +5,11 @@
 export type Role = 'student' | 'institution_staff' | 'provider_staff' | 'employer' | 'ops_admin'
 export type OrgType = 'institution' | 'provider'
 
-// Build Spec: Feed and My Work (student) v1.0 -- exactly these 4,
-// "no separate Like... a like and a reaction are the same gesture."
-export type ReactionType = 'congratulations' | 'well_done' | 'keep_going' | 'proud' | 'good_luck'
+// Build Spec: Feed and My Work (student) v1.0 originally shipped
+// exactly 5 of these ("no separate Like... a like and a reaction are
+// the same gesture"). Widened per direct request for more positive/
+// encouraging range plus a way to react with a question, not just praise.
+export type ReactionType = 'congratulations' | 'well_done' | 'keep_going' | 'proud' | 'good_luck' | 'love_it' | 'insightful' | 'question'
 
 export interface Post {
   id: string

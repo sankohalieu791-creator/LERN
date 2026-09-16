@@ -480,7 +480,12 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
   // set (old milestone-tagged rows, mainly) falls back to the first
   // two stickers rather than showing nothing.
   const choiceKeys: string[] = post.sticker_choices?.length ? post.sticker_choices : STICKER_OPTIONS.slice(0, 2).map(s => s.key)
-  const options = choiceKeys.map(k => STICKER_OPTIONS.find(s => s.key === k)).filter(Boolean) as typeof STICKER_OPTIONS
+  const rawOptions = choiceKeys.map(k => STICKER_OPTIONS.find(s => s.key === k)).filter(Boolean) as typeof STICKER_OPTIONS
+  // Counted per reaction and sorted highest-first -- there was only
+  // ever one combined total shown before, so there was no way to tell
+  // "12 people picked this one, 1 picked the other" apart at a glance.
+  const countFor = (key: string) => reactions.filter(r => r.reaction === key).length
+  const options = [...rawOptions].sort((a, b) => countFor(b.key) - countFor(a.key))
 
   useEffect(() => {
     if (post.image_path) getSignedFileUrl('post-images', post.image_path).then(({ url }) => setMediaUrl(url))
@@ -576,7 +581,9 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
 
       <div className="flex items-center justify-between gap-2 px-4 py-3.5">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {options.map(r => (
+          {options.map(r => {
+            const count = countFor(r.key)
+            return (
             <button
               key={r.key} onClick={() => react(r.key)} title={r.label}
               className="flex items-center gap-1.5 rounded-full border transition"
@@ -588,8 +595,10 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
             >
               <span className="text-[13px] leading-none">{r.emoji}</span>
               <span className="text-[12px] font-medium leading-none" style={{ color: myReaction === r.key ? '#F26B21' : '#5A5A5A' }}>{r.label}</span>
+              {count > 0 && <span className="text-[12px] font-semibold leading-none" style={{ color: myReaction === r.key ? '#F26B21' : '#8A8373' }}>{count}</span>}
             </button>
-          ))}
+            )
+          })}
         </div>
         {reactions.length > 0 && <span className="text-[12px] flex-shrink-0" style={{ color: '#5A5A5A' }}>{reactions.length}</span>}
       </div>

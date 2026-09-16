@@ -9,12 +9,12 @@ import {
   addSelfQualification, deleteSelfQualification, uploadSelfQualificationFile, getSignedFileUrl, deletePost,
   updateProfileBioTags, getExperienceEntries, addExperienceEntry, deleteExperienceEntry,
   getSavedOpportunities, unsaveOpportunity, updateUserProfile, uploadAvatar, removeAvatar,
-  isUsernameAvailable, getMyOrganisationInfo, getPublicStudentProfile,
+  isUsernameAvailable, getMyOrganisationInfo, getPublicStudentProfile, blockUser,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import {
   FolderCheck, Briefcase, Grid3x3, Settings as SettingsIcon, Plus, X, Trash2, Play,
-  Bookmark, Lock, FilePlus, CheckCircle2, Camera, ChevronLeft, ChevronRight, ArrowRight,
+  Bookmark, Lock, FilePlus, CheckCircle2, Camera, ChevronLeft, ChevronRight, ArrowRight, MoreHorizontal, UserX,
 } from 'lucide-react'
 
 function initials(name?: string) {
@@ -71,6 +71,13 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
   const [addingExperience, setAddingExperience] = useState(false)
   const [addingQual, setAddingQual] = useState(false)
   const [orgName, setOrgName] = useState<string | null>(null)
+  // getBlockedUsers/unblockUser and the "Blocked accounts" list in
+  // Settings already existed -- its own empty state even said "Block
+  // someone from their profile," but nothing on a profile actually
+  // could. This is that missing entry point.
+  const [blockMenuOpen, setBlockMenuOpen] = useState(false)
+  const [blocking, setBlocking] = useState(false)
+  const [blockedNotice, setBlockedNotice] = useState(false)
 
   const load = () => {
     if (!profileId) return
@@ -135,6 +142,48 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
           >
             <SettingsIcon className="w-5 h-5" />
           </button>
+        )}
+
+        {!isOwn && (
+          <div className="absolute top-4 right-4">
+            <button
+              onClick={() => setBlockMenuOpen(v => !v)}
+              aria-label="More options"
+              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition text-[var(--app-text-secondary)]"
+            >
+              <MoreHorizontal className="w-5 h-5" />
+            </button>
+            {blockMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setBlockMenuOpen(false)} />
+                <div className="absolute right-0 top-11 bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl shadow-lg py-1.5 w-44 z-20">
+                  <button
+                    onClick={async () => {
+                      if (!authUser || !profileId) return
+                      setBlocking(true)
+                      await blockUser(authUser.id, profileId)
+                      setBlocking(false)
+                      setBlockMenuOpen(false)
+                      setBlockedNotice(true)
+                      setTimeout(() => router.back(), 1200)
+                    }}
+                    disabled={blocking}
+                    className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-[var(--app-overlay-1)] transition disabled:opacity-50"
+                  >
+                    <UserX className="w-4 h-4" /> {blocking ? 'Blocking…' : `Block ${profile.full_name?.split(' ')[0] || 'this account'}`}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {blockedNotice && (
+          <div className="fixed inset-x-0 top-4 z-50 flex justify-center px-4">
+            <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl shadow-lg px-4 py-2.5 text-[13px] font-semibold">
+              Blocked — you won't see each other's posts or profile.
+            </div>
+          </div>
         )}
 
         {editingBio && (

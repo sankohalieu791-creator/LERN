@@ -56,16 +56,21 @@ export default function WorkItemsPanel({ type }: { type: ItemType }) {
     <div>
       <div className="flex items-center justify-between mb-5">
         <p className="font-bold text-ink text-[15px]">{copy.heading}</p>
+        {/* Outline, always "+ [label]" -- matches Briefs' own Create
+            button exactly, now that this opens the same kind of modal
+            box Briefs already did rather than toggling an inline card
+            open/closed in the page flow. */}
         <button
-          onClick={() => setShowCreate(v => !v)}
-          className="flex items-center gap-1.5 bg-brand text-white font-semibold text-[13px] px-4 py-2 rounded-lg hover:bg-brand-hover transition"
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-1.5 border border-edge text-ink font-semibold text-[13px] px-4 py-2 rounded-lg hover:border-edge-input transition"
         >
-          {showCreate ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-          {showCreate ? 'Cancel' : copy.button}
+          <Plus className="w-3.5 h-3.5" /> {copy.button}
         </button>
       </div>
 
-      {showCreate && <CreateWorkItemForm type={type} onCreated={() => { setShowCreate(false); load() }} />}
+      {showCreate && (
+        <CreateWorkItemForm type={type} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />
+      )}
 
       {loading ? (
         <p className="text-ink-tertiary text-[14px]">Loading…</p>
@@ -603,8 +608,9 @@ function FileDropzone({ files, onChange, multiple }: { files: File[]; onChange: 
 
 // Courses/Workshops — both online-or-in-person, both with a real
 // deadline and topic/description, not just a bare title+criteria.
-function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: () => void }) {
+function CreateWorkItemForm({ type, onClose, onCreated }: { type: ItemType; onClose: () => void; onCreated: () => void }) {
   const { user } = useAuth()
+  const theme = useResolvedTheme()
   const [title, setTitle] = useState('')
   const [topic, setTopic] = useState('')
   const [description, setDescription] = useState('')
@@ -641,8 +647,19 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
     onCreated()
   }
 
-  return (
-    <div className="bg-surface-subtle border border-edge-subtle rounded-xl p-5 mb-5">
+  // Same modal chrome as NewBriefForm -- was a plain inline card that
+  // opened/closed within the page's own flow, the one thing here that
+  // still didn't match how creating a brief already worked.
+  return createPortal((
+    <div data-theme={theme} className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 sm:p-8">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg max-h-[92dvh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-edge-subtle flex-shrink-0">
+          <p className="font-bold text-ink text-[16px]">{copyForModal(type)}</p>
+          <button onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-tertiary transition">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5">
       <ErrorBanner message={error} />
       <TextField label="Title" value={title} onChange={setTitle} placeholder={type === 'course' ? 'Intro to Web Development' : 'Design a mobile app icon'} autoFocus />
       <TextField label="Topic / subject (optional)" value={topic} onChange={setTopic} placeholder={type === 'course' ? 'e.g. Web Development' : 'e.g. Graphic Design'} />
@@ -699,8 +716,14 @@ function CreateWorkItemForm({ type, onCreated }: { type: ItemType; onCreated: ()
         )}
       </label>
       <PrimaryButton onClick={handleSubmit} loading={loading}>Create</PrimaryButton>
+        </div>
+      </div>
     </div>
-  )
+  ), document.body)
+}
+
+function copyForModal(type: ItemType) {
+  return type === 'course' ? 'New course' : 'New workshop'
 }
 
 // Briefs' "two ways": set a new brief, or upload coursework/exam work a

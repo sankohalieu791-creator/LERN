@@ -70,4 +70,7 @@ export const STICKER_OPTIONS: { key: string; emoji: string; label: string }[] = 
   { key: 'keep_going', emoji: '💪', label: 'Keep going' },
   { key: 'proud', emoji: '⭐', label: 'Proud of you' },
   { key: 'good_luck', emoji: '🍀', label: 'Good luck' },
+  { key: 'love_it', emoji: '❤️', label: 'Love it' },
+  { key: 'insightful', emoji: '💡', label: 'Insightful' },
+  { key: 'question', emoji: '🤔', label: 'Question' },
 ]
