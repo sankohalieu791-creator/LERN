@@ -123,11 +123,18 @@ export default function SettingsPanel() {
     <div className="max-w-2xl mx-auto pb-10">
       <p className="text-[22px] font-bold text-ink mb-5">Settings</p>
 
-      {/* ── Organisation, first -- this identity (name, logo, verified
-          tick) is what actually shows up on course/brief/workshop
-          cards, ahead of the staff member's own personal account. ── */}
-      {isOrgAdmin && (
-        <Group title="Organisation">
+      {/* ── Profile -- used to be two separate groups, "Organisation"
+          and "Account", stacked one above the other. Two headed
+          sections for what's really one person's settings read as two
+          separate profiles side by side; the organisation identity
+          (name, logo, verified tick -- what actually shows up on
+          course/brief/workshop cards) now leads the same single group
+          the personal rows sit in, not a section of its own. This used
+          to also carry a second "Join codes and staff" row that opened
+          this exact same OrganisationScreen a click below -- removed,
+          not merged, since it was a plain duplicate of the row above it. ── */}
+      <Group title="Profile">
+        {isOrgAdmin && (
           <Row
             label={org?.name || 'Your organisation'}
             onClick={() => setScreen('organisation')}
@@ -142,12 +149,7 @@ export default function SettingsPanel() {
               </span>
             }
           />
-          <Row label="Join codes and staff" onClick={() => setScreen('organisation')} />
-        </Group>
-      )}
-
-      {/* ── Account ── */}
-      <Group title="Account">
+        )}
         <Row
           label="Profile photo" onClick={() => setScreen('photo')}
           right={avatarUrl ? <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" /> : <span className="w-8 h-8 rounded-full bg-accent-bg text-brand font-bold text-[12px] flex items-center justify-center">{user.full_name?.[0]?.toUpperCase() || 'U'}</span>}
