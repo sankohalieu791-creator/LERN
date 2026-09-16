@@ -41,8 +41,15 @@ export default function AuthShell({
     // to --paper further down. Instagram-adjacent without borrowing
     // anything literal: warm, not saturated, still this app's own
     // paper/ink/orange identity.
+    // min-h-[100dvh], not min-h-screen (100vh) -- 100vh is a fixed number
+    // baked in from whatever the viewport was on load, so on phone it
+    // doesn't shrink/grow as the browser's own address bar collapses or
+    // reappears while scrolling. That's exactly "the footer doesn't
+    // stick down, it stays up where the bigger address-bar-visible
+    // viewport put it" -- dvh recalculates against whatever's actually
+    // visible right now instead.
     <div
-      className="min-h-screen flex flex-col"
+      className="min-h-[100dvh] flex flex-col"
       style={{ paddingTop: 'env(safe-area-inset-top)', background: 'linear-gradient(180deg, var(--accent-bg-soft) 0%, var(--accent-bg) 30%, var(--paper) 75%)' }}
     >
       <header className="flex-shrink-0 px-10 py-7 flex items-center gap-4">
