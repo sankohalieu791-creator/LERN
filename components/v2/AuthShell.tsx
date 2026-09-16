@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -22,6 +23,16 @@ export default function AuthShell({
   onBack?: () => void
 }) {
   const router = useRouter()
+
+  // See globals.css's own comment on body.auth-scroll -- every other
+  // shell keeps the app-wide hidden scrollbar (native-app feel), but a
+  // long signup screen needs a real, visible one so keyboard-only
+  // navigation (no mouse) has something to actually see moving.
+  useEffect(() => {
+    document.body.classList.add('auth-scroll')
+    return () => document.body.classList.remove('auth-scroll')
+  }, [])
+
   return (
     // paddingTop: env(safe-area-inset-top) -- missing entirely before,
     // so on a standalone PWA the LERN logo sat right at the true top

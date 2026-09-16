@@ -540,16 +540,30 @@ export default function WorkshopSession({
   const saveRecordingToLern = async () => {
     if (!recordingBlob || !user) return
     setSavingRecording(true)
-    const ext = recordingBlob.type.includes('mp4') ? 'mp4' : 'webm'
-    const path = `${workItemId}/${Date.now()}_recording.${ext}`
-    const { error: upErr } = await supabase.storage.from('session-recordings').upload(path, recordingBlob, { contentType: recordingBlob.type })
-    if (upErr) { setSavingRecording(false); setActionError('Could not save the recording: ' + upErr.message); return }
-    const { error: dbErr } = await supabase.from('work_item_recordings').insert([{
-      work_item_id: workItemId, status: 'available', file_list: [{ path, size: recordingBlob.size }], started_by: user.id,
-    }])
-    setSavingRecording(false)
-    if (dbErr) { setActionError('Saved the file, but could not log it against this session: ' + dbErr.message); return }
-    setRecordingBlob(null)
+    setActionError('')
+    // A 30-50 minute recording can be several hundred MB and take minutes
+    // to upload on an ordinary connection -- previously nothing here
+    // caught a dropped connection or gateway timeout partway through, so
+    // that threw uncaught: the spinner stuck on "Saving..." forever and
+    // recordingBlob was never cleared, but nothing told the host that,
+    // and closing out of the ended-screen from there lost the recording
+    // for good with no error ever shown. Caught now so it always either
+    // succeeds or leaves a clear, retryable error with the blob intact.
+    try {
+      const ext = recordingBlob.type.includes('mp4') ? 'mp4' : 'webm'
+      const path = `${workItemId}/${Date.now()}_recording.${ext}`
+      const { error: upErr } = await supabase.storage.from('session-recordings').upload(path, recordingBlob, { contentType: recordingBlob.type })
+      if (upErr) throw new Error(upErr.message)
+      const { error: dbErr } = await supabase.from('work_item_recordings').insert([{
+        work_item_id: workItemId, status: 'available', file_list: [{ path, size: recordingBlob.size }], started_by: user.id,
+      }])
+      if (dbErr) throw new Error('Saved the file, but could not log it against this session: ' + dbErr.message)
+      setRecordingBlob(null)
+    } catch (e: any) {
+      setActionError(e?.message || 'Could not save the recording — check your connection and try again.')
+    } finally {
+      setSavingRecording(false)
+    }
   }
 
   const send = async () => {
@@ -613,7 +627,16 @@ export default function WorkshopSession({
             <p className="text-white text-[13px] font-semibold">
               {ended ? 'Save this recording before you go?' : 'Recording ready'} — {(recordingBlob.size / 1024 / 1024).toFixed(1)} MB
             </p>
-            <button onClick={() => ended ? finishAfterRecording() : setRecordingBlob(null)} className="text-[#8A8373] hover:text-white flex-shrink-0">
+            {/* Disabled mid-upload -- this used to be the exact way a
+                slow save quietly lost a long recording: closing this
+                banner while "Saving..." was still in flight discarded
+                recordingBlob (and, when ended, the whole screen) with
+                the upload left to fail in the background unseen. */}
+            <button
+              onClick={() => ended ? finishAfterRecording() : setRecordingBlob(null)}
+              disabled={savingRecording}
+              className="text-[#8A8373] hover:text-white flex-shrink-0 disabled:opacity-30"
+            >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -645,8 +668,11 @@ export default function WorkshopSession({
             // onClose() never gave it the chance to do.
             <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center">
               <p className="text-white font-semibold">Session ended.</p>
-              <button onClick={finishAfterRecording} className="bg-white/10 hover:bg-white/20 text-white text-[13px] font-semibold px-5 py-2.5 rounded-full transition">
-                Done
+              <button
+                onClick={finishAfterRecording} disabled={savingRecording}
+                className="bg-white/10 hover:bg-white/20 text-white text-[13px] font-semibold px-5 py-2.5 rounded-full transition disabled:opacity-30"
+              >
+                {savingRecording ? 'Saving recording…' : 'Done'}
               </button>
             </div>
           ) : connecting ? (

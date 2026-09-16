@@ -341,22 +341,26 @@ main {
   overflow-x: clip;
 }
 
-::-webkit-scrollbar {
-  width: 8px;
+/* Auth/onboarding is the one place that deliberately keeps a real,
+   visible scrollbar instead of the app-wide hidden one above -- "so you
+   don't get stuck without a mouse" on a long signup screen, same as any
+   normal web page. This used to be a bare, unscoped ::-webkit-scrollbar
+   rule in stray purple/black that never actually showed anything: it set
+   width/colours but never undid the universal `display: none` above, so
+   the "visible scrollbar" it was meant to add never rendered at all,
+   just left a plain scroll-with-nothing-to-see everywhere including the
+   signup/login pages ("the scrolling is messed up"). Scoped to
+   body.auth-scroll (toggled by AuthShell) and using the real brand
+   colour, not a leftover placeholder.
+*/
+body.auth-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--brand) transparent;
 }
-
-::-webkit-scrollbar-track {
-  background: #0a0a0a;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #7C3AED;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #6D28D9;
-}
+body.auth-scroll::-webkit-scrollbar { display: block; width: 8px; }
+body.auth-scroll::-webkit-scrollbar-track { background: transparent; }
+body.auth-scroll::-webkit-scrollbar-thumb { background: var(--brand); border-radius: 4px; }
+body.auth-scroll::-webkit-scrollbar-thumb:hover { background: #D9601C; }
 
 /* Animations */
 @keyframes fadeIn {

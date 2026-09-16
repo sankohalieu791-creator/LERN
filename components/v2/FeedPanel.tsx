@@ -178,7 +178,13 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
                 <span className="w-full h-full rounded-full overflow-hidden flex items-center justify-center text-[13px] font-semibold" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
                   <WinAuthorAvatar path={w.author?.avatar_path} name={w.author?.full_name} />
                 </span>
-                <StaffPresenceDot role={w.author?.role} status={w.author?.presence_status} />
+                {/* Wins are fetched once on mount, so a status change made
+                    in Settings right after loading this strip wouldn't
+                    show here until the next refetch -- for the viewer's
+                    own win, read the live value straight from AuthContext
+                    (already updated the instant they change it) instead
+                    of the snapshot this list was fetched with. */}
+                <StaffPresenceDot role={w.author?.role} status={w.author?.id === userId ? user?.presence_status : w.author?.presence_status} />
               </span>
               <span className="text-[11px] truncate w-full text-center" style={{ color: '#5A5A5A' }}>{firstName(w.author?.full_name)}</span>
             </button>
