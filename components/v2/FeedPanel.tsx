@@ -80,6 +80,17 @@ export default function FeedPanel() {
     })
   }
   useEffect(load, [])
+  // Posting from the shell's own FAB while already sitting on Feed used
+  // to force a full window.location.reload() just to pick this new
+  // fetch up -- a real reload re-downloads and re-boots the whole app
+  // (the splash-logo flash reported when switching tabs quickly), and
+  // router.refresh() doesn't help either, since this is a plain
+  // client-side useEffect fetch, not server component data. A shared
+  // event lets the shell ask for a real refetch with neither.
+  useEffect(() => {
+    window.addEventListener('lern:feed-refresh', load)
+    return () => window.removeEventListener('lern:feed-refresh', load)
+  }, [])
 
   if (loading) {
     return (
@@ -371,6 +382,20 @@ function WinViewer({ win, isOwn, organisationId, userId, onClose }: {
     if (win.video_path) getSignedFileUrl('post-videos', win.video_path).then(({ url }) => setMediaUrl(url))
     else if (win.image_path) getSignedFileUrl('post-images', win.image_path).then(({ url }) => setMediaUrl(url))
   }, [win.image_path, win.video_path])
+
+  // This overlay is always dark, on purpose, regardless of the org's
+  // own light/dark preference -- but the phone's own system chrome
+  // strip below the safe area is painted from the page's theme-color
+  // meta tag, which is still whatever the org's light/dark setting is.
+  // In dark mode that happens to match by coincidence; in light mode
+  // it showed a light strip under an otherwise all-dark story. Swap
+  // the tag to black for as long as this is open, restore it on close.
+  useEffect(() => {
+    const tag = document.querySelector('meta[name="theme-color"]')
+    const previous = tag?.getAttribute('content') ?? null
+    tag?.setAttribute('content', '#000000')
+    return () => { if (previous !== null) tag?.setAttribute('content', previous) }
+  }, [])
 
   // Real Instagram-Story shape now: the photo/video is the full-bleed
   // background, not a small rounded thumbnail sitting under the text

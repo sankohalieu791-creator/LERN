@@ -80,7 +80,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span className="text-ink"><Logo size="sm" /></span>
+          <span className="text-ink"><Logo size="md" /></span>
           <span className="w-9" />
         </header>
         {/* tabIndex so a keyboard-only user (no mouse) can Tab straight

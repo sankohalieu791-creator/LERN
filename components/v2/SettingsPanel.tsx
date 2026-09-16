@@ -228,9 +228,9 @@ export default function SettingsPanel() {
         <LinkRow label="Terms of Service" href="/legal/terms" />
         <LinkRow label="Public safeguarding summary" href="/legal/safeguarding" />
         <Row label="App version" value="1.0" noChevron />
-        <a href="mailto:support@lernapp.uk" className="flex items-center justify-between px-4 py-3.5 hover:bg-surface-muted transition">
+        <a href="mailto:alieu@joinirl.co.uk" className="flex items-center justify-between px-4 py-3.5 hover:bg-surface-muted transition">
           <span className="text-[14px] text-ink">Contact and support</span>
-          <span className="flex items-center gap-1 text-[13px] text-ink-secondary"><Mail className="w-3.5 h-3.5" /> support@lernapp.uk</span>
+          <span className="flex items-center gap-1 text-[13px] text-ink-secondary"><Mail className="w-3.5 h-3.5" /> alieu@joinirl.co.uk</span>
         </a>
       </Group>
 

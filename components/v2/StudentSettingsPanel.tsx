@@ -272,9 +272,9 @@ export default function StudentSettingsPanel() {
           onToggle={async v => { setBusyField('cookies'); await setCookieConsent(user.id, v); await refreshUser(); setBusyField(null) }}
         />
         <Row label="App version" value="1.0" noChevron />
-        <a href="mailto:support@lernapp.uk" className="flex items-center justify-between px-4 py-3.5 hover:bg-[var(--app-overlay-1)] transition">
+        <a href="mailto:alieu@joinirl.co.uk" className="flex items-center justify-between px-4 py-3.5 hover:bg-[var(--app-overlay-1)] transition">
           <span className="text-[14px]">Contact and support</span>
-          <span className="flex items-center gap-1 text-[13px] text-[var(--app-text-secondary)]"><Mail className="w-3.5 h-3.5" /> support@lernapp.uk</span>
+          <span className="flex items-center gap-1 text-[13px] text-[var(--app-text-secondary)]"><Mail className="w-3.5 h-3.5" /> alieu@joinirl.co.uk</span>
         </a>
       </Group>
 

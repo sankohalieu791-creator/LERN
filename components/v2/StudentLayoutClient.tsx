@@ -31,11 +31,15 @@ export default function StudentLayoutClient({ children }: { children: React.Reac
           onClose={() => setComposerOpen(false)}
           onPosted={() => {
             setComposerOpen(false)
-            // Already on Feed -> nothing to navigate to, so force a real
-            // reload to pick up the new post (FeedPanel fetches once on
-            // mount, a same-route push won't remount it). Anywhere else,
-            // a normal navigation to Feed mounts it fresh.
-            if (pathname === '/student/feed') window.location.reload()
+            // Already on Feed -> nothing to navigate to. FeedPanel only
+            // fetches once on mount (a same-route push won't remount
+            // it), so a real window.location.reload() used to stand in
+            // for that -- except a reload re-downloads and re-boots the
+            // whole app, which is the splash-logo flash this was
+            // reported as. The shared event asks FeedPanel to refetch
+            // directly, no reload needed. Anywhere else, a normal
+            // navigation to Feed mounts it fresh regardless.
+            if (pathname === '/student/feed') window.dispatchEvent(new Event('lern:feed-refresh'))
             else router.push('/student/feed')
           }}
         />

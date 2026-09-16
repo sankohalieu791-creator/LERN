@@ -234,7 +234,9 @@ export default function OrgShell({
                 default, invisible against a dark-mode header. The
                 laptop sidebar's own wordmark right above already gets
                 text-ink; this one just never did. */}
-            <span className="text-ink"><Logo size="sm" /></span>
+            {/* md, not sm -- StudentShell's own phone header already
+                uses md; this one was noticeably smaller for no reason. */}
+            <span className="text-ink"><Logo size="md" /></span>
           </div>
           <div className="hidden lg:flex items-center gap-2 min-w-0">
             {identityLogoUrl && <img src={identityLogoUrl} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />}
@@ -259,9 +261,10 @@ export default function OrgShell({
                   on the avatar below stays as a compact always-there
                   indicator, but the actual word only fits without
                   crowding the header on wider screens (same lg-only
-                  allowance identityName above already gets). */}
+                  allowance identityName above already gets). Text only
+                  here, no second badge -- the avatar's own dot below is
+                  the one status indicator, this was showing it twice. */}
               <span className="hidden lg:flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-tertiary">
-                <PresenceBadge status={user?.presence_status} size={11} ringColor="var(--paper)" />
                 {PRESENCE_LABEL[user?.presence_status || 'active']}
               </span>
               <button
@@ -344,22 +347,34 @@ export default function OrgShell({
           wasn't actually "to post", just "to the place you post from".
           safe-area-inset-bottom so it never sits under a phone's own
           home-indicator/gesture bar. ── */}
-      <button
-        id="org-fab"
-        onClick={() => setComposerOpen(true)}
-        aria-label="New post"
-        className="lg:hidden fixed right-5 z-20 w-14 h-14 rounded-full bg-brand text-white shadow-lg flex items-center justify-center active:scale-95 transition"
-        style={{ bottom: 'calc(1.25rem + env(safe-area-inset-bottom))', boxShadow: '0 4px 14px rgba(0,0,0,0.35)' }}
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      {/* Feed only -- posting from Review, Interest received etc. made
+          no sense there; this was showing on every org page with no
+          condition on it at all. */}
+      {pathname === phoneItems[0].href && (
+        <button
+          id="org-fab"
+          onClick={() => setComposerOpen(true)}
+          aria-label="New post"
+          className="lg:hidden fixed right-5 z-20 w-14 h-14 rounded-full bg-brand text-white shadow-lg flex items-center justify-center active:scale-95 transition"
+          style={{ bottom: 'calc(1.25rem + env(safe-area-inset-bottom))', boxShadow: '0 4px 14px rgba(0,0,0,0.35)' }}
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      )}
 
       {composerOpen && (
         <PostComposer
           onClose={() => setComposerOpen(false)}
           onPosted={() => {
             setComposerOpen(false)
-            if (pathname === phoneItems[0].href) window.location.reload()
+            // FeedPanel fetches client-side, once on mount -- router.
+            // refresh() only re-runs server components, so it wouldn't
+            // actually pick up the new post here. The old
+            // window.location.reload() did, but by re-downloading and
+            // re-booting the whole app (the logo/splash flash the
+            // reload bug report describes). This event asks FeedPanel
+            // to refetch directly, no reload needed either way.
+            if (pathname === phoneItems[0].href) window.dispatchEvent(new Event('lern:feed-refresh'))
             else router.push(phoneItems[0].href)
           }}
         />
