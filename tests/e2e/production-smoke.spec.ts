@@ -260,3 +260,67 @@ test.describe('Institution signup, real end to end', () => {
     await page.screenshot({ path: 'test-results/institution-dashboard.png', fullPage: true })
   })
 })
+
+test.describe('Search shows the other student, not yourself', () => {
+  // Two real students, same org, created directly via the admin API
+  // rather than through full signup -- only search + profile display
+  // are under test here, so the org itself is just scaffolding.
+  const orgId = '22222222-2222-4222-8222-222222222222'
+  const emailA = 'qa.crossprofile.a@lernapp.uk'
+  const emailB = 'qa.crossprofile.b@lernapp.uk'
+  const nameB = 'Bilal Test'
+  const password = 'TestPassword123!'
+
+  const createStudent = async (email: string, fullName: string) => {
+    const { data, error } = await admin.auth.admin.createUser({
+      email, password, email_confirm: true,
+      user_metadata: { role: 'student', full_name: fullName, date_of_birth: '2008-01-01' },
+    })
+    if (error) throw error
+    await admin.from('users').update({ organisation_id: orgId, consented_at: new Date().toISOString() }).eq('id', data.user.id)
+  }
+
+  test.beforeAll(async () => {
+    await deleteUserByEmail(emailA)
+    await deleteUserByEmail(emailB)
+    await admin.from('organisations').upsert({ id: orgId, name: 'QA Cross-Profile Test Org', type: 'institution' })
+    await createStudent(emailA, 'Amara Test')
+    await createStudent(emailB, nameB)
+  })
+
+  test.afterAll(async () => {
+    await deleteUserByEmail(emailA)
+    await deleteUserByEmail(emailB)
+    await admin.from('organisations').delete().eq('id', orgId)
+  })
+
+  test('viewing another student profile from search shows their name, not the viewer\'s own', async ({ page }) => {
+    await page.goto('/auth/login')
+    await page.getByLabel('Email').fill(emailA)
+    await page.getByLabel('Password').fill(password)
+    await page.getByRole('button', { name: 'Log in' }).click()
+    await page.waitForURL(u => new URL(u).pathname === '/student', { timeout: 15_000 })
+
+    // Created via the admin API, not the real wizard -- never went
+    // through consent, so the app correctly intercepts with it first.
+    const needsConsent = await page.getByText(/keeping you safe/i)
+      .waitFor({ state: 'visible', timeout: 5_000 }).then(() => true).catch(() => false)
+    if (needsConsent) {
+      await page.getByRole('button', { name: /i understand, accept/i }).click()
+      await page.waitForURL(u => new URL(u).pathname === '/student', { timeout: 15_000 })
+    }
+
+    await page.goto('/student/search')
+    await page.getByPlaceholder('Search people, posts and videos…').fill('Bilal')
+    const result = page.getByText(nameB, { exact: true })
+    await expect(result).toBeVisible({ timeout: 10_000 })
+    await result.click()
+
+    // The exact defect from 10 September: this used to default to the
+    // viewer's OWN name (Amara Test) instead of the profile actually
+    // being viewed (Bilal Test).
+    await page.waitForURL(/\/student\/profile\//, { timeout: 10_000 })
+    await expect(page.getByText(nameB, { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('Amara Test', { exact: true })).not.toBeVisible()
+  })
+})
