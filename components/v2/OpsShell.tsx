@@ -65,7 +65,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
           a sliver) in favour of a top bar + slide-out drawer, same pattern
           OrgShell already uses for the customer-facing app. */}
       <aside className="hidden lg:flex w-60 flex-shrink-0 border-r border-edge-subtle flex-col py-5 px-3 overflow-y-auto">
-        <div className="px-2 mb-6"><Logo size="sm" /></div>
+        <div className="px-2 mb-6 text-ink"><Logo size="sm" /></div>
         <nav className="flex-1 space-y-1">{navLinks()}</nav>
         <button onClick={handleSignOut} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13.5px] font-semibold text-ink-tertiary hover:text-danger-text hover:bg-surface-muted transition flex-shrink-0">
           <LogOut className="w-4 h-4 flex-shrink-0" /> Sign out

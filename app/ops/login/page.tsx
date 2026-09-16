@@ -33,7 +33,7 @@ export default function OpsLoginPage() {
   }
 
   return (
-    <AuthShell title="LERN Ops" subtitle="Internal tool — LERN team only.">
+    <AuthShell title="LERN Ops" subtitle="Internal tool — LERN team only." onBack={() => router.push('/')}>
       <ErrorBanner message={error} />
       <TextField label="Email" type="email" value={email} onChange={setEmail} placeholder="you@opstool.co.uk" autoFocus />
       <TextField label="Password" type="password" value={password} onChange={setPassword} placeholder="Password" />
