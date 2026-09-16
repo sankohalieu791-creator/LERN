@@ -37,9 +37,14 @@ export default function PreviousSessionsCard() {
           {items.map(i => {
             const recordings = (i.work_item_recordings || []).filter((r: any) => r.status === 'available' && r.file_list?.[0]?.path)
             return (
-              <div key={i.id} className="flex items-center justify-between gap-3 text-[13px] px-3.5 py-2.5 bg-surface-subtle rounded-lg">
-                <span className="text-ink font-semibold truncate">{i.title}</span>
-                <div className="flex items-center gap-2.5 flex-shrink-0">
+              // Title + metadata + button were all forced onto one
+              // fixed-shrink row -- fine on a laptop, but nothing here
+              // could actually shrink or wrap, so a phone-width screen
+              // just ran the button off the edge of the card. Stacks
+              // instead of overflowing below sm.
+              <div key={i.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3 text-[13px] px-3.5 py-2.5 bg-surface-subtle rounded-lg">
+                <span className="text-ink font-semibold truncate min-w-0">{i.title}</span>
+                <div className="flex items-center gap-2.5 flex-wrap sm:flex-shrink-0">
                   <span className="text-ink-tertiary">
                     {TYPE_LABEL[i.type]} · Ended {new Date(i.ended_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>

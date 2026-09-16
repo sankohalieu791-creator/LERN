@@ -57,7 +57,7 @@ test.describe('Public pages', () => {
 
   test('ops login rejects wrong password for the real ops email', async ({ page }) => {
     await page.goto('/ops/login')
-    await page.getByLabel('Email').fill('alieu@joinirl.co.uk')
+    await page.getByLabel('Email').fill('Lernapp@alieu.co.uk')
     await page.getByLabel('Password').fill('definitely-not-the-real-password')
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByText(/incorrect email or password/i)).toBeVisible({ timeout: 10_000 })
@@ -359,7 +359,7 @@ test.describe('Employer inbox placeholder text', () => {
 
     const anon = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
     const { data: opsSession, error: opsErr } = await anon.auth.signInWithPassword({
-      email: 'alieu@joinirl.co.uk', password: 'alieu1221&',
+      email: 'Lernapp@alieu.co.uk', password: 'alieu1221&',
     })
     if (opsErr) throw opsErr
     const opsClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {

@@ -221,9 +221,9 @@ function EmployerThread({ item, onBack }: { item: any; onBack: () => void }) {
             <span className="flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: status.bg, color: status.fg }}>{status.label}</span>
           </div>
 
-          <div className="space-y-2.5 lg:mt-4">
-            {item.message && <ChatBubble fromOrg={false} message={{ body: item.message }} />}
-            {messages.map(m => <ChatBubble key={m.id} fromOrg={m.sender_role === 'org'} message={m} />)}
+          <div className="space-y-3.5 lg:mt-4">
+            {item.message && <ChatBubble fromOrg={false} message={{ body: item.message }} timestamp={item.created_at} isFirst />}
+            {messages.map(m => <ChatBubble key={m.id} fromOrg={m.sender_role === 'org'} message={m} timestamp={m.created_at} />)}
             {messages.length === 0 && !item.message && (
               <p className="text-[13px] text-ink-tertiary text-center py-6">No messages yet — say why you're interested.</p>
             )}
@@ -278,15 +278,25 @@ function EmployerThread({ item, onBack }: { item: any; onBack: () => void }) {
   )
 }
 
-function ChatBubble({ fromOrg, message }: { fromOrg: boolean; message: { body?: string; file_path?: string; file_name?: string; file_type?: string } }) {
+function messageTime(iso?: string) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+// Same fix as InterestReceivedPanel's own ChatBubble -- no timestamp
+// anywhere in this thread before, which read as flat rather than like
+// a real conversation.
+function ChatBubble({ fromOrg, message, timestamp, isFirst }: { fromOrg: boolean; message: { body?: string; file_path?: string; file_name?: string; file_type?: string }; timestamp?: string; isFirst?: boolean }) {
   return (
-    <div className={`flex ${fromOrg ? 'justify-start' : 'justify-end'}`}>
+    <div className={`flex flex-col ${fromOrg ? 'items-start' : 'items-end'}`}>
+      {isFirst && <p className="text-[11px] font-semibold text-ink-quaternary uppercase tracking-wide mb-1 px-1">Original message</p>}
       <div className={`max-w-[80%] rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
         fromOrg ? 'bg-surface-muted text-ink-secondary' : 'bg-accent-bg text-ink'
       }`}>
         {message.body && <p className={message.file_path ? 'mb-2' : ''}>{message.body}</p>}
         {message.file_path && <MessageAttachment path={message.file_path} name={message.file_name} type={message.file_type} />}
       </div>
+      {timestamp && <p className="text-[11px] text-ink-quaternary mt-1 px-1">{messageTime(timestamp)}</p>}
     </div>
   )
 }

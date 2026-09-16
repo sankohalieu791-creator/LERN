@@ -261,9 +261,9 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
             </div>
           </div>
 
-          <div className="space-y-2.5 lg:mt-4">
-            {item.message && <ChatBubble fromEmployer message={{ body: item.message }} />}
-            {messages.map(m => <ChatBubble key={m.id} fromEmployer={m.sender_role === 'employer'} message={m} />)}
+          <div className="space-y-3.5 lg:mt-4">
+            {item.message && <ChatBubble fromEmployer message={{ body: item.message }} timestamp={item.created_at} isFirst />}
+            {messages.map(m => <ChatBubble key={m.id} fromEmployer={m.sender_role === 'employer'} message={m} timestamp={m.created_at} />)}
           </div>
         </div>
       </div>
@@ -318,15 +318,27 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   )
 }
 
-function ChatBubble({ fromEmployer, message }: { fromEmployer: boolean; message: { body?: string; file_path?: string; file_name?: string; file_type?: string } }) {
+function messageTime(iso?: string) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+// No timestamp anywhere in this thread before -- every message just sat
+// in a plain stack with nothing to say when any of it actually
+// happened, which is exactly what made a back-and-forth conversation
+// read as flat rather than like a real chat thread. isFirst gets its
+// own small label since it's really the original request, not a reply.
+function ChatBubble({ fromEmployer, message, timestamp, isFirst }: { fromEmployer: boolean; message: { body?: string; file_path?: string; file_name?: string; file_type?: string }; timestamp?: string; isFirst?: boolean }) {
   return (
-    <div className={`flex ${fromEmployer ? 'justify-start' : 'justify-end'}`}>
+    <div className={`flex flex-col ${fromEmployer ? 'items-start' : 'items-end'}`}>
+      {isFirst && <p className="text-[11px] font-semibold text-ink-quaternary uppercase tracking-wide mb-1 px-1">Original request</p>}
       <div className={`max-w-[80%] rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
         fromEmployer ? 'bg-surface-muted text-ink-secondary' : 'bg-accent-bg text-ink'
       }`}>
         {message.body && <p className={message.file_path ? 'mb-2' : ''}>{message.body}</p>}
         {message.file_path && <MessageAttachment path={message.file_path} name={message.file_name} type={message.file_type} />}
       </div>
+      {timestamp && <p className="text-[11px] text-ink-quaternary mt-1 px-1">{messageTime(timestamp)}</p>}
     </div>
   )
 }

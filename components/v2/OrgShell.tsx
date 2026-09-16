@@ -351,12 +351,17 @@ export default function OrgShell({
           no sense there; this was showing on every org page with no
           condition on it at all. */}
       {pathname === phoneItems[0].href && (
+        // Plain and simple, not an orange fill -- same weight as the
+        // student app's own "+" (a bare icon, theme-coloured, no brand
+        // fill), just floating rather than docked in a tab bar since
+        // this shell doesn't have one. Sits closer to the true bottom
+        // edge now too, not floating noticeably above it.
         <button
           id="org-fab"
           onClick={() => setComposerOpen(true)}
           aria-label="New post"
-          className="lg:hidden fixed right-5 z-20 w-14 h-14 rounded-full bg-brand text-white shadow-lg flex items-center justify-center active:scale-95 transition"
-          style={{ bottom: 'calc(1.25rem + env(safe-area-inset-bottom))', boxShadow: '0 4px 14px rgba(0,0,0,0.35)' }}
+          className="lg:hidden fixed right-5 z-20 w-12 h-12 rounded-full bg-surface border border-edge text-ink shadow-lg flex items-center justify-center active:scale-95 transition"
+          style={{ bottom: 'calc(0.5rem + env(safe-area-inset-bottom))', boxShadow: '0 2px 10px rgba(0,0,0,0.2)' }}
         >
           <Plus className="w-6 h-6" />
         </button>
