@@ -450,6 +450,35 @@ export const reopenWorkItem = async (workItemId: string) => {
   return { error }
 }
 
+// The one thing a draft/scheduled brief was missing entirely: a way
+// back OUT of that state. Saving as a draft worked fine on its own,
+// but with no "Publish now" anywhere, a draft could never actually
+// become a real, live brief -- it just sat there permanently, which
+// is exactly what "save as draft doesn't work" was describing.
+export const publishWorkItemNow = async (workItemId: string) => {
+  const { data, error } = await supabase.from('work_items').update({ publish_state: 'posted', scheduled_for: null }).eq('id', workItemId).select().single()
+  if (!error && !data) return { error: { message: "Couldn't publish this — it may not belong to your organisation." } as any }
+  return { error }
+}
+
+// Called opportunistically whenever a staff member loads their own
+// work items (see BriefsPanel's load()) -- there's no cron job in this
+// project, so a scheduled brief's actual publish_state only flips to
+// 'posted' the next time someone looks. Students can already see it
+// the moment scheduled_for arrives regardless (work_item_is_live()
+// checks the time live, at read time), so nothing is ever late; this
+// just keeps the STAFF view's own state honest instead of showing
+// "Scheduled" forever after the time has already passed.
+export const publishOverdueScheduledWorkItems = async (organisationId: string) => {
+  const { error } = await supabase
+    .from('work_items')
+    .update({ publish_state: 'posted' })
+    .eq('organisation_id', organisationId)
+    .eq('publish_state', 'scheduled')
+    .lte('scheduled_for', new Date().toISOString())
+  return { error }
+}
+
 // Staff-only, called the moment the host actually opens the room —
 // records started_at and fans out a "session has started, join now"
 // notification (first time only; rejoining doesn't re-notify).

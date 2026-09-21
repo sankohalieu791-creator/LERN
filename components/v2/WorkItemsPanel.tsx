@@ -9,11 +9,12 @@ import {
   getWorkItems, createWorkItem, getGroups, createGroup, getGroupMembers,
   uploadWorkItemAttachment, uploadSubmissionFileFor, submitWorkForStudents, getSignedFileUrl, startWorkItemSession,
   closeWorkItem, reopenWorkItem, getWorkItemRecordings, getBriefStatusSummaries,
+  publishWorkItemNow, publishOverdueScheduledWorkItems,
 } from '@/lib/supabase'
 import { TextField, PrimaryButton, ErrorBanner, Spinner } from '@/components/v2/Field'
 import WorkshopSession from '@/components/v2/WorkshopSession'
 import type { WorkItem, Group } from '@/lib/types'
-import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw, Film, Download, Clock, PenLine, CheckCircle2 } from 'lucide-react'
+import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw, Film, Download, Clock, PenLine, CheckCircle2, Send } from 'lucide-react'
 
 type ItemType = 'brief' | 'course' | 'workshop'
 
@@ -98,8 +99,14 @@ function BriefsPanel() {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
 
-  const load = () => {
+  const load = async () => {
     if (!user?.organisation_id) return
+    // No cron job in this project -- a scheduled brief's stored state
+    // only ever catches up to reality the next time someone loads this
+    // list. Students already see it the moment the time arrives either
+    // way (work_item_is_live() checks live), this just stops the
+    // STAFF view from showing "Scheduled" forever after it's passed.
+    await publishOverdueScheduledWorkItems(user.organisation_id)
     getWorkItems(user.organisation_id).then(({ data }) => {
       const briefs = (data || []).filter((i: any) => i.type === 'brief')
       setItems(briefs)
@@ -107,7 +114,7 @@ function BriefsPanel() {
       getBriefStatusSummaries(briefs, user.organisation_id!).then(setSummaries)
     })
   }
-  useEffect(load, [user?.organisation_id])
+  useEffect(() => { load() }, [user?.organisation_id])
 
   return (
     <div>
@@ -330,6 +337,15 @@ function WorkItemCard({ item, onChanged, summary }: { item: any; onChanged: () =
     onChanged()
   }
 
+  const publishNow = async () => {
+    setBusy(true)
+    setActionError('')
+    const { error } = await publishWorkItemNow(item.id)
+    setBusy(false)
+    if (error) { setActionError(error.message); return }
+    onChanged()
+  }
+
   const reopen = async () => {
     setBusy(true)
     setActionError('')
@@ -345,15 +361,28 @@ function WorkItemCard({ item, onChanged, summary }: { item: any; onChanged: () =
         <p className="font-bold text-ink text-[14px] min-w-0 truncate">{item.title}</p>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {item.publish_state === 'draft' && (
-            <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary bg-surface-muted px-2 py-0.5 rounded-full">
-              <PenLine className="w-3 h-3" /> Draft
-            </span>
+            <>
+              <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary bg-surface-muted px-2 py-0.5 rounded-full">
+                <PenLine className="w-3 h-3" /> Draft
+              </span>
+              {/* The one thing missing entirely before -- a draft had a
+                  badge and a Revoke button, but nothing that actually
+                  moved it OUT of draft. */}
+              <button onClick={publishNow} disabled={busy} title="Post this now" className="flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline disabled:opacity-50">
+                <Send className="w-3 h-3" /> Publish now
+              </button>
+            </>
           )}
           {item.publish_state === 'scheduled' && (
-            <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-brand bg-accent-bg px-2 py-0.5 rounded-full">
-              <Clock className="w-3 h-3" />
-              Scheduled {item.scheduled_for && new Date(item.scheduled_for).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-            </span>
+            <>
+              <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-brand bg-accent-bg px-2 py-0.5 rounded-full">
+                <Clock className="w-3 h-3" />
+                Scheduled {item.scheduled_for && new Date(item.scheduled_for).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <button onClick={publishNow} disabled={busy} title="Post this now instead of waiting" className="flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline disabled:opacity-50">
+                <Send className="w-3 h-3" /> Publish now
+              </button>
+            </>
           )}
           {item.closed_at && (
             <span className="text-[11px] font-semibold uppercase tracking-wide text-danger-text bg-danger-bg px-2 py-0.5 rounded-full">

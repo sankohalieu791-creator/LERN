@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
   getFeed, setPostReaction, getSignedFileUrl,
-  reportPost, getVerifiedAuthorIds,
+  reportPost, deletePost, getVerifiedAuthorIds,
   getWins, createWin, reportWin, deleteWin, uploadPostImage, uploadPostVideo,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
@@ -147,7 +147,7 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
   const { user } = useAuth()
   const [wins, setWins] = useState<any[]>([])
   const [addOpen, setAddOpen] = useState(false)
-  const [viewing, setViewing] = useState<any | null>(null)
+  const [viewingIndex, setViewingIndex] = useState<number | null>(null)
 
   const load = () => { getWins().then(({ data }) => setWins(data || [])) }
   useEffect(load, [])
@@ -170,10 +170,10 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
           <span className="text-[11px] truncate w-full text-center" style={{ color: '#5A5A5A' }}>Add win</span>
         </button>
 
-        {wins.map(w => {
+        {wins.map((w, i) => {
           const meta = MILESTONE_BY_KEY[w.milestone_type as MilestoneType]
           return (
-            <button key={w.id} onClick={() => setViewing(w)} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 60 }}>
+            <button key={w.id} onClick={() => setViewingIndex(i)} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 60 }}>
               <span className="relative rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 54, height: 54, border: `3px solid ${meta?.ring || '#0F6E56'}` }}>
                 <span className="w-full h-full rounded-full overflow-hidden flex items-center justify-center text-[13px] font-semibold" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
                   <WinAuthorAvatar path={w.author?.avatar_path} name={w.author?.full_name} />
@@ -205,11 +205,11 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
           onAdded={() => { setAddOpen(false); load() }}
         />
       )}
-      {viewing && (
+      {viewingIndex !== null && (
         <WinViewer
-          win={viewing} isOwn={viewing.author_id === user?.id} organisationId={organisationId} userId={userId}
-          onClose={() => setViewing(null)}
-          onDeleted={() => { setViewing(null); load() }}
+          wins={wins} startIndex={viewingIndex} userId={userId} organisationId={organisationId}
+          onClose={() => setViewingIndex(null)}
+          onDeleted={() => { setViewingIndex(null); load() }}
         />
       )}
     </div>
@@ -375,17 +375,29 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
   ), document.body)
 }
 
-// A win's own short card, full-screen, tap to close -- a story, not a
-// permanent post. No reactions here (that's the post card's thing);
-// still reportable, same as everything else on the feed.
-function WinViewer({ win, isOwn, organisationId, userId, onClose, onDeleted }: {
-  win: any; isOwn: boolean; organisationId: string; userId: string; onClose: () => void; onDeleted: () => void
+// Instagram-Stories shape, properly this time: a full deck (every win
+// in the strip, not just the one tapped), a segmented progress bar
+// across the top like every real story viewer has, and tap-zone/swipe
+// navigation between them -- "I tap on a win and I swipe" -- instead of
+// the old single-win overlay where the only way out was closing it
+// entirely.
+function WinViewer({ wins, startIndex, organisationId, userId, onClose, onDeleted }: {
+  wins: any[]; startIndex: number; organisationId: string; userId: string; onClose: () => void; onDeleted: () => void
 }) {
-  const [mediaUrl, setMediaUrl] = useState<string | null>(null)
+  const [index, setIndex] = useState(startIndex)
   const [reportOpen, setReportOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null)
+  const touchStartX = useRef<number | null>(null)
+  const { user } = useAuth()
+
+  const win = wins[index]
+  const isOwn = win.author_id === user?.id
   const meta = MILESTONE_BY_KEY[win.milestone_type as MilestoneType]
+
+  const goNext = () => { if (index < wins.length - 1) setIndex(index + 1); else onClose() }
+  const goPrev = () => { if (index > 0) setIndex(index - 1) }
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -395,9 +407,11 @@ function WinViewer({ win, isOwn, organisationId, userId, onClose, onDeleted }: {
   }
 
   useEffect(() => {
+    setMediaUrl(null)
+    setMenuOpen(false)
     if (win.video_path) getSignedFileUrl('post-videos', win.video_path).then(({ url }) => setMediaUrl(url))
     else if (win.image_path) getSignedFileUrl('post-images', win.image_path).then(({ url }) => setMediaUrl(url))
-  }, [win.image_path, win.video_path])
+  }, [win.id, win.image_path, win.video_path])
 
   // This overlay is always dark, on purpose, regardless of the org's
   // own light/dark preference -- but the phone's own system chrome
@@ -413,28 +427,52 @@ function WinViewer({ win, isOwn, organisationId, userId, onClose, onDeleted }: {
     return () => { if (previous !== null) tag?.setAttribute('content', previous) }
   }, [])
 
-  // Real Instagram-Story shape now: the photo/video is the full-bleed
-  // background, not a small rounded thumbnail sitting under the text
-  // ("show the full picture or video" -- it was capped at 280px tall
-  // with padding around it, which is what made it look small
-  // regardless of the source image's own size). A text-only win (no
-  // media at all) still gets the milestone-colour gradient as its
-  // background, same as before.
+  const onTouchStart = (e: React.TouchEvent) => { touchStartX.current = e.touches[0].clientX }
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return
+    const delta = e.changedTouches[0].clientX - touchStartX.current
+    touchStartX.current = null
+    if (Math.abs(delta) < 50) return // not a real swipe, just a tap -- let the tap-zone click handle it
+    if (delta < 0) goNext() // swiped left -> next
+    else goPrev() // swiped right -> previous
+  }
+
   return createPortal((
-    <div className="fixed inset-0 z-50 bg-black" onClick={onClose}>
-      {mediaUrl ? (
+    <div className="fixed inset-0 z-50 bg-black" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      {/* object-contain, not object-cover -- "shows the video and pic
+          clearly" meant never cropping into the actual content to fill
+          the frame. Letterboxed against the milestone-colour gradient
+          (already this win's own background) instead of a plain black
+          bar, so a portrait phone photo and a landscape screen-recording
+          both show completely, whichever way round they are. */}
+      <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${meta?.ring || '#0F6E56'}, #1A1613)` }} />
+      {mediaUrl && (
         win.video_path
-          ? <video src={mediaUrl} className="absolute inset-0 w-full h-full object-cover" autoPlay loop muted playsInline />
-          : <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-      ) : (
-        <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${meta?.ring || '#0F6E56'}, #1A1613)` }} />
+          ? <video key={win.id} src={mediaUrl} className="absolute inset-0 w-full h-full object-contain" autoPlay loop muted playsInline />
+          : <img key={win.id} src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-contain" />
       )}
+
+      {/* Tap zones -- left third goes back, right two-thirds goes on,
+          sitting under everything else so the header/footer controls
+          (stopPropagation'd) still get first claim on a tap. */}
+      <button aria-label="Previous win" onClick={goPrev} className="absolute inset-y-0 left-0 w-1/3 z-0" />
+      <button aria-label="Next win" onClick={goNext} className="absolute inset-y-0 right-0 w-2/3 z-0" />
+
+      {/* Segmented progress bar, one per win in the deck -- the one
+          thing every real story viewer has that this never did. */}
+      <div className="absolute inset-x-0 z-10 flex gap-1 px-3" style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}>
+        {wins.map((w, i) => (
+          <div key={w.id} className="h-[3px] flex-1 rounded-full overflow-hidden bg-white/25">
+            <div className="h-full bg-white rounded-full" style={{ width: i <= index ? '100%' : '0%' }} />
+          </div>
+        ))}
+      </div>
 
       {/* Top scrim + controls -- name/pill readable over any media,
           bright or dark. */}
       <div
-        className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-4 pb-10"
-        style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))', background: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)' }}
+        className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 px-4 pb-10"
+        style={{ paddingTop: 'calc(1.5rem + env(safe-area-inset-top))', background: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-2.5 text-white min-w-0">
@@ -478,7 +516,7 @@ function WinViewer({ win, isOwn, organisationId, userId, onClose, onDeleted }: {
 
       {win.content && (
         <div
-          className="absolute inset-x-0 bottom-0 px-6 pt-16 text-white text-center"
+          className="absolute inset-x-0 bottom-0 z-10 px-6 pt-16 text-white text-center"
           style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))', background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)' }}
           onClick={e => e.stopPropagation()}
         >
@@ -490,7 +528,7 @@ function WinViewer({ win, isOwn, organisationId, userId, onClose, onDeleted }: {
         <div onClick={e => e.stopPropagation()}>
           <ReportSheet
             onClose={() => setReportOpen(false)}
-            onSent={() => { setReportOpen(false); onClose() }}
+            onSent={() => { setReportOpen(false); goNext() }}
             onSend={(reasonKey, note) => reportWin(win.id, organisationId, userId, reasonKey, note)}
           />
         </div>
@@ -504,6 +542,15 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
   const router = useRouter()
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    const { error } = await deletePost(post.id)
+    if (error) { setDeleting(false); return }
+    onChanged()
+  }
   const authorAvatarUrl = useAvatarUrl(post.author_avatar_path)
   const reactions: any[] = post.post_reactions || []
   const myReaction = reactions.find(r => r.user_id === user?.id)?.reaction as ReactionType | undefined
@@ -589,7 +636,26 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
               {meta.pillLabel}
             </span>
           )}
-          {post.author_id !== user?.id && (
+          {post.author_id === user?.id ? (
+            <div className="relative">
+              <button onClick={() => setMenuOpen(v => !v)} aria-label="Post options" className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition">
+                <MoreHorizontal className="w-4 h-4" style={{ color: 'var(--app-text-tertiary)' }} />
+              </button>
+              {menuOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                  <div className="absolute right-0 top-8 rounded-xl shadow-lg py-1.5 w-40 z-20" style={{ backgroundColor: 'var(--app-surface)' }}>
+                    <button
+                      onClick={handleDelete} disabled={deleting}
+                      className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold text-danger-text hover:bg-[var(--app-overlay-1)] transition disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> {deleting ? 'Deleting…' : 'Delete post'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
             <button onClick={() => setReportOpen(true)} aria-label="Report this post" className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition">
               <MoreHorizontal className="w-4 h-4" style={{ color: 'var(--app-text-tertiary)' }} />
             </button>
