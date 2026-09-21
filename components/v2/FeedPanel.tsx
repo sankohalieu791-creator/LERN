@@ -7,14 +7,14 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getFeed, setPostReaction, getSignedFileUrl,
   reportPost, getVerifiedAuthorIds,
-  getWins, createWin, reportWin, uploadPostImage, uploadPostVideo,
+  getWins, createWin, reportWin, deleteWin, uploadPostImage, uploadPostVideo,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import PresenceBadge from '@/components/v2/PresenceBadge'
 import type { ReactionType } from '@/lib/types'
 import { MILESTONE_TYPES, MILESTONE_BY_KEY, STICKER_OPTIONS, type MilestoneType } from '@/lib/feedConstants'
 import {
-  X, MoreHorizontal, EyeOff, Check, Camera, BadgeCheck, Plus,
+  X, MoreHorizontal, EyeOff, Check, Camera, BadgeCheck, Plus, Trash2,
 } from 'lucide-react'
 
 // Max length for a win's own video, in seconds -- "as a win maximum is
@@ -209,6 +209,7 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
         <WinViewer
           win={viewing} isOwn={viewing.author_id === user?.id} organisationId={organisationId} userId={userId}
           onClose={() => setViewing(null)}
+          onDeleted={() => { setViewing(null); load() }}
         />
       )}
     </div>
@@ -377,12 +378,21 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
 // A win's own short card, full-screen, tap to close -- a story, not a
 // permanent post. No reactions here (that's the post card's thing);
 // still reportable, same as everything else on the feed.
-function WinViewer({ win, isOwn, organisationId, userId, onClose }: {
-  win: any; isOwn: boolean; organisationId: string; userId: string; onClose: () => void
+function WinViewer({ win, isOwn, organisationId, userId, onClose, onDeleted }: {
+  win: any; isOwn: boolean; organisationId: string; userId: string; onClose: () => void; onDeleted: () => void
 }) {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const meta = MILESTONE_BY_KEY[win.milestone_type as MilestoneType]
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    const { error } = await deleteWin(win.id)
+    if (error) { setDeleting(false); return }
+    onDeleted()
+  }
 
   useEffect(() => {
     if (win.video_path) getSignedFileUrl('post-videos', win.video_path).then(({ url }) => setMediaUrl(url))
@@ -436,8 +446,12 @@ function WinViewer({ win, isOwn, organisationId, userId, onClose }: {
             <span className="inline-block text-[11px] font-semibold px-2.5 py-[3px] rounded-full mt-0.5" style={{ backgroundColor: 'rgba(255,255,255,0.22)' }}>{meta?.pillLabel}</span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {!isOwn && (
+        <div className="relative flex items-center gap-1.5 flex-shrink-0">
+          {isOwn ? (
+            <button onClick={() => setMenuOpen(v => !v)} aria-label="Win options" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white">
+              <MoreHorizontal className="w-[18px] h-[18px]" />
+            </button>
+          ) : (
             <button onClick={() => setReportOpen(true)} aria-label="Report this win" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white">
               <MoreHorizontal className="w-[18px] h-[18px]" />
             </button>
@@ -445,6 +459,20 @@ function WinViewer({ win, isOwn, organisationId, userId, onClose }: {
           <button onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white">
             <X className="w-5 h-5" />
           </button>
+
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-11 bg-white rounded-xl shadow-lg py-1.5 w-40 z-20">
+                <button
+                  onClick={handleDelete} disabled={deleting}
+                  className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold text-[#C4314B] hover:bg-black/5 transition disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> {deleting ? 'Deleting…' : 'Delete win'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import type { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack, ILocalVideoTrack } from 'agora-rtc-sdk-ng'
 import { useAuth } from '@/context/AuthContext'
 import { supabase, endWorkshop, getWorkshopMessages, sendWorkshopMessage, isParticipantRemoved, removeWorkshopParticipant } from '@/lib/supabase'
+import * as tus from 'tus-js-client'
 import {
   Mic, MicOff, Video, VideoOff, ScreenShare, PhoneOff, Users, Square,
   HelpCircle, Send, Hand, Circle, StopCircle, X, Download, Save, Loader2,
@@ -122,6 +123,7 @@ export default function WorkshopSession({
   const [recording, setRecording] = useState(false)
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null)
   const [savingRecording, setSavingRecording] = useState(false)
+  const [saveProgress, setSaveProgress] = useState(0)
   // Set once the call itself has ended but a recording is still waiting
   // on a save decision -- keeps this component on screen for exactly
   // that reason instead of closing straight to the outer page (see leave()).
@@ -173,6 +175,10 @@ export default function WorkshopSession({
       clientRef.current = client
       await client.join(APP_ID, channelName, token, myUid)
       setJoined(true)
+      // Recording is compulsory now, not a host choice -- starts the
+      // moment the host actually joins, and the control bar's own
+      // record button (below) no longer lets it be turned off mid-call.
+      if (canEnd) startRecording()
 
       // Presence: tell everyone else who's actually behind this uid.
       const presence = supabase.channel(`presence-${channelName}`, { config: { presence: { key: String(myUid) } } })
@@ -509,11 +515,6 @@ export default function WorkshopSession({
     }
   }
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop()
-    setRecording(false)
-  }
-
   // Used specifically when ending the call -- resolves with the actual
   // blob once MediaRecorder has genuinely finished, instead of firing
   // stop() and moving on before it's done.
@@ -523,8 +524,6 @@ export default function WorkshopSession({
     mediaRecorderRef.current.stop()
     setRecording(false)
   })
-
-  const toggleRecording = () => { recording ? stopRecording() : startRecording() }
 
   const downloadRecording = () => {
     if (!recordingBlob) return
@@ -540,20 +539,43 @@ export default function WorkshopSession({
   const saveRecordingToLern = async () => {
     if (!recordingBlob || !user) return
     setSavingRecording(true)
+    setSaveProgress(0)
     setActionError('')
-    // A 30-50 minute recording can be several hundred MB and take minutes
-    // to upload on an ordinary connection -- previously nothing here
-    // caught a dropped connection or gateway timeout partway through, so
-    // that threw uncaught: the spinner stuck on "Saving..." forever and
-    // recordingBlob was never cleared, but nothing told the host that,
-    // and closing out of the ended-screen from there lost the recording
-    // for good with no error ever shown. Caught now so it always either
-    // succeeds or leaves a clear, retryable error with the blob intact.
+    // A 30-50 minute recording can be several hundred MB. supabase-js's
+    // plain storage.upload() sends it as a single request, which is
+    // exactly what was throwing "exceeding the maximum" -- the standard
+    // (non-resumable) upload endpoint has a much lower effective size
+    // ceiling than the bucket's own file_size_limit column controls, no
+    // matter how high that's set. The resumable (TUS) endpoint is
+    // Supabase's own documented answer for anything beyond a few MB: it
+    // uploads in fixed 6MB chunks with automatic retry per chunk, so a
+    // dropped connection partway through loses seconds, not the whole
+    // recording, and there's no single-request size ceiling to hit.
     try {
       const ext = recordingBlob.type.includes('mp4') ? 'mp4' : 'webm'
       const path = `${workItemId}/${Date.now()}_recording.${ext}`
-      const { error: upErr } = await supabase.storage.from('session-recordings').upload(path, recordingBlob, { contentType: recordingBlob.type })
-      if (upErr) throw new Error(upErr.message)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Your session has expired — sign in again and retry.')
+
+      await new Promise<void>((resolve, reject) => {
+        const upload = new tus.Upload(recordingBlob, {
+          endpoint: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/upload/resumable`,
+          retryDelays: [0, 3000, 5000, 10000, 20000],
+          headers: { authorization: `Bearer ${session.access_token}` },
+          uploadDataDuringCreation: true,
+          removeFingerprintOnSuccess: true,
+          metadata: { bucketName: 'session-recordings', objectName: path, contentType: recordingBlob.type, cacheControl: '3600' },
+          chunkSize: 6 * 1024 * 1024, // Supabase's resumable endpoint requires exactly 6MB chunks
+          onError: reject,
+          onProgress: (sent, total) => setSaveProgress(Math.round((sent / total) * 100)),
+          onSuccess: () => resolve(),
+        })
+        upload.findPreviousUploads().then(previous => {
+          if (previous.length) upload.resumeFromPreviousUpload(previous[0])
+          upload.start()
+        })
+      })
+
       const { error: dbErr } = await supabase.from('work_item_recordings').insert([{
         work_item_id: workItemId, status: 'available', file_list: [{ path, size: recordingBlob.size }], started_by: user.id,
       }])
@@ -594,7 +616,23 @@ export default function WorkshopSession({
   // header sits under the phone's own notch/status bar and the control
   // bar sits under the home-indicator/gesture area.
   return createPortal((
-    <div className="fixed inset-0 z-50 bg-[#141110] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    // Full-viewport dark backdrop, explicit 100dvh (not inset-0's implicit
+    // large-viewport sizing) -- on mobile Safari/Chrome, a fixed element
+    // sized against the LARGE viewport (address bar hidden) stays that
+    // size even while the address bar is actually showing, leaving real
+    // dead space below the control bar that reads as "the buttons are
+    // high when they should be low." dvh tracks whichever viewport is
+    // actually visible right now.
+    //
+    // On a laptop the call itself is boxed (Teams' own "not full-bleed
+    // edge to edge" shape) inside this backdrop rather than stretched
+    // across the whole monitor -- lg:max-w-5xl keeps every tile visible
+    // and roughly square instead of stretched painfully wide.
+    <div className="fixed top-0 left-0 right-0 z-50 bg-black flex items-center justify-center" style={{ height: '100dvh' }}>
+      <div
+        className="w-full h-full lg:max-w-5xl lg:h-[90dvh] lg:rounded-2xl lg:border lg:border-white/10 lg:overflow-hidden bg-[#141110] flex flex-col"
+        style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
       <div className="flex items-center justify-between px-5 py-3.5 flex-shrink-0">
         <div>
           <p className="text-white font-bold text-[15px]">{title}</p>
@@ -646,7 +684,7 @@ export default function WorkshopSession({
               className="flex items-center gap-1.5 bg-brand text-white text-[12px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50"
             >
               {savingRecording ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              {savingRecording ? 'Saving…' : 'Save to LERN'}
+              {savingRecording ? `Saving… ${saveProgress}%` : 'Save to LERN'}
             </button>
             <button
               onClick={downloadRecording}
@@ -826,13 +864,16 @@ export default function WorkshopSession({
             </button>
           )}
           {canEnd && (
-            <button
-              onClick={toggleRecording}
-              title="Records your own camera/mic only, not the full call"
-              className={`w-11 h-11 rounded-full flex items-center justify-center transition ${recording ? 'bg-[#B3401E] hover:bg-[#9c3419] text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+            // No longer a toggle -- recording is compulsory for every
+            // live session now, started automatically on join. This is
+            // a status indicator, not a control; nothing here can turn
+            // it off mid-call.
+            <div
+              title="Recording is compulsory for every live session"
+              className="w-11 h-11 rounded-full flex items-center justify-center bg-[#B3401E]/90 text-white"
             >
-              {recording ? <StopCircle className="w-[18px] h-[18px]" /> : <Circle className="w-[15px] h-[15px] fill-current text-[#FF6B4E]" />}
-            </button>
+              {recording ? <Circle className="w-[15px] h-[15px] fill-current text-white animate-pulse" /> : <Loader2 className="w-[16px] h-[16px] animate-spin" />}
+            </div>
           )}
           <button
             onClick={() => setQaOpen(v => !v)}
@@ -847,6 +888,7 @@ export default function WorkshopSession({
           </button>
         </div>
       )}
+      </div>
     </div>
   ), document.body)
 }

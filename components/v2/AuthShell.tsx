@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -23,13 +23,6 @@ export default function AuthShell({
   onBack?: () => void
 }) {
   const router = useRouter()
-  // Google/Teams-style sign-in never just appears -- the mark and the
-  // card each settle in with a short, separate beat rather than the
-  // whole page popping in at once instantly, which read as "dead."
-  // Two flags, not one: the logo leads by ~80ms so it doesn't look tied
-  // to the card, the same slight stagger Google's own sign-in uses.
-  const [logoIn, setLogoIn] = useState(false)
-  const [cardIn, setCardIn] = useState(false)
 
   // See globals.css's own comment on body.auth-scroll -- every other
   // shell keeps the app-wide hidden scrollbar (native-app feel), but a
@@ -37,13 +30,7 @@ export default function AuthShell({
   // navigation (no mouse) has something to actually see moving.
   useEffect(() => {
     document.body.classList.add('auth-scroll')
-    const t1 = setTimeout(() => setLogoIn(true), 30)
-    const t2 = setTimeout(() => setCardIn(true), 110)
-    return () => {
-      document.body.classList.remove('auth-scroll')
-      clearTimeout(t1)
-      clearTimeout(t2)
-    }
+    return () => document.body.classList.remove('auth-scroll')
   }, [])
 
   return (
@@ -84,25 +71,11 @@ export default function AuthShell({
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className={`transition-all duration-500 ease-out ${logoIn ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1'}`}>
-          <Logo size="lg" />
-        </div>
+        <Logo size="lg" />
       </header>
 
       <main className="flex-1 flex items-start justify-center px-6 pb-20">
-        {/* The Google/Teams shape this was asked to move toward: the
-            form lives inside its own raised card floating on the page's
-            gradient, not directly on it -- same colours as before,
-            just given an actual edge instead of blending straight into
-            the background. White, not a theme token -- this shell is
-            deliberately light-only (see the file header comment), so a
-            theme-variable surface colour would go dark under a system
-            dark preference while everything else here stayed light. */}
-        <div
-          className={`w-full ${wide ? 'max-w-3xl' : 'max-w-md'} mt-6 bg-white border border-[#E2DDD1] rounded-[28px] shadow-[0_2px_24px_rgba(26,20,10,0.08)] px-8 py-10 sm:px-12 transition-all duration-500 ease-out ${
-            cardIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
-          }`}
-        >
+        <div className={`w-full ${wide ? 'max-w-3xl' : 'max-w-md'} pt-6`}>
           {step && totalSteps && (
             <div className="flex items-center gap-1.5 mb-8">
               {Array.from({ length: totalSteps }, (_, i) => (

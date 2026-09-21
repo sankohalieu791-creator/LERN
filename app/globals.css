@@ -15,6 +15,15 @@
 html, body {
   overscroll-behavior: none;
 }
+/* Auth/onboarding is the one place that keeps the normal, real page
+   bounce -- "pull down and it stays down, pull up and it stays up"
+   instead of springing back was this exact rule's overscroll-behavior:
+   none stopping the natural rubber-band correction on a plain page,
+   which reads as broken/stuck rather than as the deliberate no-bounce
+   feel the rest of the app's own shells actually want. */
+body.auth-scroll {
+  overscroll-behavior: auto;
+}
 
 /* Every real screen paints its own full-bleed background (bg-paper on
    light shells, bg-[var(--app-bg)] on the student shell), so body's

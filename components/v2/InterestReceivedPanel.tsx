@@ -269,45 +269,59 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
       </div>
 
       {item.status !== 'declined' && (
-        <div className="flex-shrink-0 bg-paper lg:bg-transparent border-t border-edge lg:border-0 px-4 lg:px-0 py-3 lg:py-0 lg:mt-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}>
+        // WhatsApp/iMessage shape: one pill-shaped bar pinned to the
+        // bottom, the "+" living inside it on the left rather than as
+        // its own separate square button outside, a round send button
+        // on the right. Replaces the old stacked textarea + a row of
+        // two full-width buttons underneath, which read as a form, not
+        // a conversation.
+        <div className="flex-shrink-0 bg-paper lg:bg-transparent border-t border-edge lg:border-0 px-3 lg:px-0 py-2.5 lg:py-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.625rem)' }}>
+          <div className="flex items-center justify-between gap-2 mb-1.5 px-1">
+            <p className="text-[11.5px] text-ink-quaternary leading-snug">
+              {item.status === 'pending' ? 'Sending a reply also accepts this request. ' : ''}Never share personal contact details.
+            </p>
+            {item.status === 'pending' && (
+              <button onClick={decline} className="flex items-center gap-1 text-[12px] font-semibold text-ink-tertiary hover:text-danger-text transition flex-shrink-0">
+                <Ban className="w-3 h-3" /> Decline
+              </button>
+            )}
+          </div>
+
           {attachFile && (
-            <div className="flex items-center gap-2 bg-surface-subtle border border-edge rounded-lg px-3 py-2 mb-2">
+            <div className="flex items-center gap-2 bg-surface-subtle border border-edge rounded-lg px-3 py-2 mb-2 ml-1">
               <Paperclip className="w-3.5 h-3.5 text-ink-tertiary flex-shrink-0" />
               <span className="text-[12.5px] text-ink truncate flex-1">{attachFile.name}</span>
               <button onClick={() => setAttachFile(null)} aria-label="Remove attachment" className="text-ink-tertiary hover:text-danger-text transition flex-shrink-0"><X className="w-3.5 h-3.5" /></button>
             </div>
           )}
+
           <div className="flex items-end gap-2">
-            <label className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg border border-edge text-ink-tertiary hover:border-brand hover:text-brand transition cursor-pointer" aria-label="Attach a file">
-              <Plus className="w-4 h-4" />
-              <input
-                type="file" className="hidden"
-                accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx"
-                onChange={e => setAttachFile(e.target.files?.[0] || null)}
+            <div className="flex-1 flex items-end gap-1 bg-surface-subtle border border-edge rounded-[22px] pl-1.5 pr-1.5 py-1.5 focus-within:border-brand transition">
+              <label className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-ink-tertiary hover:text-brand hover:bg-surface transition cursor-pointer" aria-label="Attach a file">
+                <Plus className="w-[18px] h-[18px]" />
+                <input
+                  type="file" className="hidden"
+                  accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx"
+                  onChange={e => setAttachFile(e.target.files?.[0] || null)}
+                />
+              </label>
+              <textarea
+                value={reply} onChange={e => setReply(e.target.value)}
+                placeholder="Message…"
+                rows={1}
+                className="flex-1 bg-transparent text-[14px] text-ink placeholder-ink-quaternary outline-none resize-none py-1.5 max-h-28"
               />
-            </label>
-            <textarea
-              value={reply} onChange={e => setReply(e.target.value)}
-              placeholder="Reply on the student's behalf — never share personal contact details."
-              rows={2}
-              className="flex-1 bg-surface-subtle border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
-            />
-          </div>
-          <div className="flex items-center gap-2 mt-2.5">
+            </div>
             <button
               onClick={() => send(item.status === 'pending')}
               disabled={sending || (!reply.trim() && !attachFile)}
-              className="flex items-center gap-1.5 bg-brand text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:bg-brand-hover transition disabled:opacity-40"
+              aria-label={item.status === 'pending' ? 'Accept and reply' : 'Send'}
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-hover transition disabled:opacity-40"
             >
-              <Send className="w-3.5 h-3.5" /> {sending ? 'Sending…' : item.status === 'pending' ? 'Accept and reply' : 'Reply'}
+              <Send className="w-4 h-4" />
             </button>
-            {item.status === 'pending' && (
-              <button onClick={decline} className="flex items-center gap-1.5 bg-surface border border-edge text-ink-secondary text-[13px] font-semibold px-4 py-2 rounded-lg hover:border-danger-text hover:text-danger-text transition">
-                <Ban className="w-3.5 h-3.5" /> Decline
-              </button>
-            )}
           </div>
-          {sendError && <p className="text-[12px] text-danger-text mt-2">{sendError}</p>}
+          {sendError && <p className="text-[12px] text-danger-text mt-2 ml-1">{sendError}</p>}
         </div>
       )}
 

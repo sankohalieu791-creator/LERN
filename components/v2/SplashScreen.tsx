@@ -23,8 +23,11 @@ export default function SplashScreen() {
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => setStage('visible'))
-    const holdTimer = setTimeout(() => setStage('exit'), 1300)
-    const goneTimer = setTimeout(() => setStage('gone'), 1700)
+    // Held for ~3.5s total (was 1.3s) and the mark itself is bigger and
+    // given a soft white glow -- "needs to be more professional, a bit
+    // brighter and a bit bigger and last at least 3-4 sec."
+    const holdTimer = setTimeout(() => setStage('exit'), 3500)
+    const goneTimer = setTimeout(() => setStage('gone'), 3900)
     return () => {
       cancelAnimationFrame(raf)
       clearTimeout(holdTimer)
@@ -47,8 +50,9 @@ export default function SplashScreen() {
         className={`text-white transition-all duration-[550ms] ease-out ${
           logoVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
         }`}
+        style={{ filter: 'drop-shadow(0 0 22px rgba(255,255,255,0.35)) drop-shadow(0 0 6px rgba(255,255,255,0.5))' }}
       >
-        <Logo size={66} />
+        <Logo size={96} />
       </div>
     </div>
   )

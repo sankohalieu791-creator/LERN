@@ -992,6 +992,13 @@ export const getVerifiedAuthorIds = async (authorIds: string[]) => {
   return { data: Array.from(new Set((data as any[]).map(v => v.submissions?.student_id).filter(Boolean))), error: null }
 }
 
+// "wins: author or org staff delete" RLS already limits this to the
+// win's own author or their org's own staff -- nothing extra to check here.
+export const deleteWin = async (winId: string) => {
+  const { error } = await supabase.from('wins').delete().eq('id', winId)
+  return { error }
+}
+
 export const reportWin = async (winId: string, organisationId: string | null, reporterId: string, reasonKey: string, note: string) => {
   const reasonLabel = REPORT_REASONS.find(r => r.key === reasonKey)?.label || 'Something else'
   const reason = note.trim() ? `${reasonLabel} — ${note.trim()}` : reasonLabel
@@ -1003,7 +1010,17 @@ export const reportWin = async (winId: string, organisationId: string | null, re
 // hidden row to just its own author/org-staff, so this stays safe
 // without a client-side filter doing that job.
 export const getWins = async () => {
-  const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+  // 24h, not 48 -- "the win needs to last for 24hrs and after that it
+  // automatically deletes." There's no cron/scheduled job in this
+  // project to sweep expired rows on a timer, so cleanup is opportunistic:
+  // every real load also deletes this viewer's OWN wins past the cutoff
+  // (RLS -- "wins: author or org staff delete" -- only lets each caller
+  // delete their own or their org's, so this naturally stays scoped
+  // without needing a service-role job). Combined with the query filter
+  // below, nothing expired is ever visible even in the moment before its
+  // author's own next load sweeps it away for good.
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  supabase.from('wins').delete().lt('created_at', cutoff).then(() => {})
   const { data, error } = await supabase
     .from('wins')
     .select('*, author:users!wins_author_id_fkey(full_name, role, presence_status, avatar_path)')
