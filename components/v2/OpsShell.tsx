@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { signOut } from '@/lib/supabase'
 import { useResolvedTheme } from '@/context/ThemeProvider'
 import Logo from '@/components/v2/Logo'
-import { LayoutDashboard, Building2, Flag, ShieldAlert, ClipboardList, ScrollText, Settings, LogOut, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Building2, Flag, ShieldAlert, ClipboardList, ScrollText, Settings, LogOut, Menu, X, UserPlus } from 'lucide-react'
 
 const NAV = [
   { href: '/ops', label: 'Overview', icon: LayoutDashboard },
@@ -14,6 +14,7 @@ const NAV = [
   { href: '/ops/reports', label: 'Content reports', icon: Flag },
   { href: '/ops/concerns', label: 'Safeguarding concerns', icon: ShieldAlert },
   { href: '/ops/dbs', label: 'DBS & sessions', icon: ClipboardList },
+  { href: '/ops/invite', label: 'Invite', icon: UserPlus },
   { href: '/ops/audit', label: 'Audit log', icon: ScrollText },
   { href: '/ops/settings', label: 'Settings', icon: Settings },
 ]

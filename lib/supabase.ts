@@ -242,6 +242,29 @@ export const getAdminAuditLog = async (limit = 100) => {
   return { data, error }
 }
 
+// ── Ops: invite a new team member ─────────────────────────────────
+export const createOpsInvite = async (email: string) => {
+  const { data, error } = await supabase.rpc('create_ops_invite', { p_email: email })
+  return { data, error }
+}
+
+export const getOpsInvites = async () => {
+  const { data, error } = await supabase.from('ops_invites').select('*').order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// Public -- no session required, called from the accept-invite screen
+// before the invitee even has an account.
+export const getOpsInviteByToken = async (token: string) => {
+  const { data, error } = await supabase.rpc('get_ops_invite_by_token', { p_token: token })
+  return { data: data?.[0] as { email: string; valid: boolean } | undefined, error }
+}
+
+export const acceptOpsInvite = async (token: string) => {
+  const { error } = await supabase.rpc('accept_ops_invite', { p_token: token })
+  return { error }
+}
+
 // Screens A3/O2 — active, non-pre-ticked consent.
 export const recordConsent = async (userId: string) => {
   const { error } = await supabase
