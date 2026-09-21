@@ -43,7 +43,7 @@ export default function ChooseRolePage() {
   const router = useRouter()
 
   return (
-    <AuthShell title="Who's signing up?" subtitle="Pick the option that describes you — each one leads somewhere different.">
+    <AuthShell title="Who's signing up?" subtitle="Pick the option that describes you — each one leads somewhere different." onBack={() => router.push('/')}>
       <div className="space-y-3">
         {CHOICES.map(c => (
           <button

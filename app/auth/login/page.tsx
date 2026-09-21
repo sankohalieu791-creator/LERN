@@ -83,7 +83,7 @@ export default function LoginPage() {
   if (greeting) return <LoginGreeting name={greeting.name} onDone={() => router.replace(greeting.dest)} />
 
   return (
-    <AuthShell title="Welcome back" subtitle="Log in to your LERN account.">
+    <AuthShell title="Welcome back" subtitle="Log in to your LERN account." onBack={() => router.push('/')}>
       <ErrorBanner message={error} />
       <form onSubmit={handleSubmit}>
         <TextField label="Email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" autoFocus />

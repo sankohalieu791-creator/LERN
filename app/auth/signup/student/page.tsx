@@ -199,7 +199,7 @@ export default function StudentSignupPage() {
     <AuthShell
       step={typeof step === 'number' ? step : 1}
       totalSteps={3}
-      onBack={step === 2 || step === 'dob' ? () => setStep(1) : step === 3 ? () => setStep(2) : undefined}
+      onBack={step === 2 || step === 'dob' ? () => setStep(1) : step === 3 ? () => setStep(2) : () => router.push('/auth/start')}
       title={
         step === 1 ? 'Create your account'
         : step === 'dob' ? 'One more thing'
