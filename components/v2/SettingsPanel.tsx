@@ -17,7 +17,8 @@ import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/compon
 import {
   Sun, Moon, Monitor, ShieldCheck, Users2, Ticket,
   Mail, UserX, ChevronRight, ChevronLeft, Camera, BadgeCheck, LogOut,
-  Lock, Download, Check,
+  Lock, Download, Check, User, Bell, AlertTriangle,
+  Paintbrush, Info, CreditCard,
 } from 'lucide-react'
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
 import BillingPanel from '@/components/v2/BillingPanel'
@@ -123,9 +124,33 @@ export default function SettingsPanel() {
   if (screen === 'billing') return <BillingPanel onBack={() => setScreen(null)} />
   if (screen === 'subscription') return <EmployerSubscriptionPanel onBack={() => setScreen(null)} />
 
+  const roleLabel = user.role === 'employer' ? 'Employer' : user.role === 'institution_staff' ? 'Institution staff' : user.role === 'provider_staff' ? 'Provider staff' : 'Student'
+
   return (
     <div className="max-w-2xl mx-auto pb-10">
       <p className="text-[22px] font-bold text-ink mb-5">Settings</p>
+
+      {/* Account summary -- a proper hub up top (avatar, name, email,
+          role) instead of the list starting straight into rows with no
+          identity anchor above it. Purely presentational -- every field
+          here is still edited via its own row below, this is just
+          somewhere to see it all at a glance first. */}
+      <div className="flex items-center gap-4 bg-gradient-to-br from-accent-bg to-surface border border-edge rounded-2xl px-5 py-5 mb-6">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="" className="w-16 h-16 rounded-full object-cover flex-shrink-0 border-2 border-surface shadow-sm" />
+        ) : (
+          <span className="w-16 h-16 rounded-full bg-brand text-white font-bold text-[22px] flex items-center justify-center flex-shrink-0 border-2 border-surface shadow-sm">
+            {user.full_name?.[0]?.toUpperCase() || 'U'}
+          </span>
+        )}
+        <div className="min-w-0">
+          <p className="font-bold text-ink text-[17px] truncate">{user.full_name}</p>
+          <p className="text-[13px] text-ink-secondary truncate">{user.email}</p>
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand bg-surface px-2 py-0.5 rounded-full mt-1.5">
+            {isOrgAdmin && org?.name ? `${roleLabel} · ${org.name}` : roleLabel}
+          </span>
+        </div>
+      </div>
 
       {/* ── Profile -- used to be two separate groups, "Organisation"
           and "Account", stacked one above the other. Two headed
@@ -137,7 +162,7 @@ export default function SettingsPanel() {
           to also carry a second "Join codes and staff" row that opened
           this exact same OrganisationScreen a click below -- removed,
           not merged, since it was a plain duplicate of the row above it. ── */}
-      <Group title="Profile">
+      <Group title="Profile" icon={User}>
         {isOrgAdmin && (
           <Row
             label={org?.name || 'Your organisation'}
@@ -171,18 +196,18 @@ export default function SettingsPanel() {
       </Group>
 
       {isOrgAdmin && (
-        <Group title="Billing">
+        <Group title="Billing" icon={CreditCard}>
           <Row label="Billing" onClick={() => setScreen('billing')} />
         </Group>
       )}
       {user.role === 'employer' && (
-        <Group title="Subscription">
+        <Group title="Subscription" icon={CreditCard}>
           <Row label="Subscription" onClick={() => setScreen('subscription')} />
         </Group>
       )}
 
       {/* ── Security and sign-in ── */}
-      <Group title="Security and sign-in">
+      <Group title="Security and sign-in" icon={ShieldCheck}>
         <Row label="Reset password by email" onClick={requestReset} busy={busyField === 'reset'} />
         <ToggleRow label="Two-step verification" value={!!user.two_step_enabled} busy={busyField === 'two_step'} onToggle={toggleTwoStep} />
         <Row label="Sign out of all devices" onClick={requestSignOutEverywhere} danger />
@@ -190,7 +215,7 @@ export default function SettingsPanel() {
       </Group>
 
       {/* ── Notifications ── */}
-      <Group title="Notifications">
+      <Group title="Notifications" icon={Bell}>
         <ToggleRow label="Push notifications" value={prefs.push_enabled !== false} busy={busyField === 'push_enabled'} onToggle={v => saveNotif('push_enabled', v)} />
         <ToggleRow label="Email notifications" value={prefs.email_enabled !== false} busy={busyField === 'email_enabled'} onToggle={v => saveNotif('email_enabled', v)} />
       </Group>
@@ -201,7 +226,7 @@ export default function SettingsPanel() {
       </Group>
 
       {/* ── Data and privacy ── */}
-      <Group title="Data and privacy">
+      <Group title="Data and privacy" icon={Lock}>
         <Row label="Download my data" onClick={async () => {
           const data = await exportMyData(user.id)
           const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -216,12 +241,12 @@ export default function SettingsPanel() {
       </Group>
 
       {/* ── Raise a concern ── */}
-      <Group title="Raise a concern">
+      <Group title="Raise a concern" icon={AlertTriangle}>
         <Row label="Report a problem or something that worries you" onClick={() => setScreen('report')} />
       </Group>
 
       {/* ── Appearance ── */}
-      <Group title="Appearance">
+      <Group title="Appearance" icon={Paintbrush}>
         <div className="px-4 py-3.5">
           <div className="flex gap-2">
             {([['light', 'Light', Sun], ['dark', 'Dark', Moon], ['system', 'System', Monitor]] as const).map(([key, label, Icon]) => (
@@ -239,7 +264,7 @@ export default function SettingsPanel() {
       </Group>
 
       {/* ── About and legal ── */}
-      <Group title="About and legal">
+      <Group title="About and legal" icon={Info}>
         <LinkRow label="Data Protection" href="/legal/privacy" />
         <LinkRow label="Cookie Policy" href="/legal/cookies" />
         <LinkRow label="Terms of Service" href="/legal/terms" />
@@ -264,11 +289,15 @@ export default function SettingsPanel() {
 // ── Shared row/group primitives -- org's own tokens (bg-surface/
 // text-ink/border-edge), same structural pattern as the student app's
 // Group/Row/ToggleRow. ──────────────────────────────────────────────
-function Group({ title, children }: { title?: string; children: React.ReactNode }) {
+function Group({ title, icon: Icon, children }: { title?: string; icon?: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
-    <div className="mb-4">
-      {title && <p className="text-[13px] font-semibold text-ink-secondary mb-2 px-1">{title}</p>}
-      <div className="bg-surface border border-edge rounded-2xl divide-y divide-edge-subtle overflow-hidden">
+    <div className="mb-5">
+      {title && (
+        <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2 px-1">
+          {Icon && <Icon className="w-3.5 h-3.5" />} {title}
+        </p>
+      )}
+      <div className="bg-surface border border-edge rounded-2xl divide-y divide-edge-subtle overflow-hidden shadow-sm">
         {children}
       </div>
     </div>
