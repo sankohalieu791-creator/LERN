@@ -20,6 +20,8 @@ import {
   Lock, Download, Check,
 } from 'lucide-react'
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
+import BillingPanel from '@/components/v2/BillingPanel'
+import EmployerSubscriptionPanel from '@/components/v2/EmployerSubscriptionPanel'
 
 // Rebuilt to the same grouped-row-list structure as the student app's
 // own Settings (Group/Row/ToggleRow, one flowing screen, sub-screens
@@ -36,7 +38,7 @@ const NOTIFICATION_LABELS: Record<string, string> = {
   reports: 'New reports',
 }
 
-type Screen = null | 'email' | 'password' | 'photo' | 'rename' | 'organisation' | 'blocked' | 'report' | 'delete' | 'consent'
+type Screen = null | 'email' | 'password' | 'photo' | 'rename' | 'organisation' | 'blocked' | 'report' | 'delete' | 'consent' | 'billing' | 'subscription'
 
 export default function SettingsPanel() {
   const { user, refreshUser } = useAuth()
@@ -118,6 +120,8 @@ export default function SettingsPanel() {
   if (screen === 'report') return <ReportScreen userId={user.id} organisationId={user.organisation_id || null} onBack={() => setScreen(null)} />
   if (screen === 'delete') return <DeleteAccountScreen email={user.email} onBack={() => setScreen(null)} />
   if (screen === 'consent') return <ConsentScreen consentedAt={user.consented_at} onBack={() => setScreen(null)} onDelete={() => setScreen('delete')} />
+  if (screen === 'billing') return <BillingPanel onBack={() => setScreen(null)} />
+  if (screen === 'subscription') return <EmployerSubscriptionPanel onBack={() => setScreen(null)} />
 
   return (
     <div className="max-w-2xl mx-auto pb-10">
@@ -165,6 +169,17 @@ export default function SettingsPanel() {
           />
         )}
       </Group>
+
+      {isOrgAdmin && (
+        <Group title="Billing">
+          <Row label="Billing" onClick={() => setScreen('billing')} />
+        </Group>
+      )}
+      {user.role === 'employer' && (
+        <Group title="Subscription">
+          <Row label="Subscription" onClick={() => setScreen('subscription')} />
+        </Group>
+      )}
 
       {/* ── Security and sign-in ── */}
       <Group title="Security and sign-in">

@@ -1154,6 +1154,32 @@ export const uploadOrgLogo = async (staffUserId: string, file: File) => {
   return { path: error ? null : path, error }
 }
 
+// ── Billing and Subscription — Complete Build Spec ──────────────────
+export const getOrgBilling = async (organisationId: string) => {
+  const { data, error } = await supabase.rpc('get_org_billing', { p_org_id: organisationId })
+  return { data, error }
+}
+
+export const setBootcampEvidence = async (organisationId: string, enabled: boolean) => {
+  const { error } = await supabase.rpc('set_bootcamp_evidence', { p_org_id: organisationId, p_enabled: enabled })
+  return { error }
+}
+
+export const getEmployerBilling = async (employerId: string) => {
+  const { data, error } = await supabase.rpc('get_employer_billing', { p_employer_id: employerId })
+  return { data, error }
+}
+
+export const setEmployerTier = async (employerId: string, tier: string) => {
+  const { error } = await supabase.rpc('set_employer_tier', { p_employer_id: employerId, p_tier: tier })
+  return { error }
+}
+
+export const cancelEmployerSubscription = async (employerId: string) => {
+  const { error } = await supabase.rpc('cancel_employer_subscription', { p_employer_id: employerId })
+  return { error }
+}
+
 export const getOrgStaff = async (organisationId: string) => {
   const { data, error } = await supabase
     .from('users')
