@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getEmployerBilling, setEmployerTier, cancelEmployerSubscription } from '@/lib/supabase'
+import {
+  getEmployerBilling, setEmployerTier,
+  createEmployerCheckoutSession, changeEmployerTierViaStripe, cancelEmployerSubscriptionViaStripe,
+} from '@/lib/supabase'
 import { EMPLOYER_TIERS, EMPLOYER_TIER_ORDER, employerTierForEmployeeCount, type EmployerTier } from '@/lib/billing'
 import { ChevronLeft, Check } from 'lucide-react'
 
@@ -31,21 +34,46 @@ export default function EmployerSubscriptionPanel({ onBack }: { onBack: () => vo
   }
   useEffect(load, [user?.id])
 
+  // Enterprise has no price (Complete Build Spec: "custom/on
+  // application") -- sales-led, so it keeps the old free/manual grant
+  // rather than going anywhere near Stripe. The three priced tiers
+  // (micro/growth/scale) now actually collect payment: a brand-new
+  // subscriber (or anyone without a real Stripe subscription yet, e.g.
+  // a pre-Stripe self-declared account) gets sent to Checkout; someone
+  // who already has a live subscription has its price changed in place.
   const pickTier = async (tier: EmployerTier) => {
     if (!user) return
     setError(''); setBusy(true)
-    const { error: err } = await setEmployerTier(user.id, tier)
+
+    if (tier === 'enterprise') {
+      const { error: err } = await setEmployerTier(user.id, tier)
+      setBusy(false)
+      if (err) { setError(err.message); return }
+      setView('overview')
+      load()
+      return
+    }
+
+    if (billing?.has_stripe_subscription) {
+      const { error: err } = await changeEmployerTierViaStripe(tier)
+      setBusy(false)
+      if (err) { setError(err.message); return }
+      setView('overview')
+      load()
+      return
+    }
+
+    const { data, error: err } = await createEmployerCheckoutSession(tier)
     setBusy(false)
     if (err) { setError(err.message); return }
-    setView('overview')
-    load()
+    if (data?.url) window.location.href = data.url
   }
 
   const cancel = async () => {
     if (!user) return
     if (!confirm('Cancel your subscription? You\'ll keep access until the end of your current billing period, then the account becomes restricted until you resubscribe.')) return
     setBusy(true)
-    const { error: err } = await cancelEmployerSubscription(user.id)
+    const { error: err } = await cancelEmployerSubscriptionViaStripe()
     setBusy(false)
     if (err) { setError(err.message); return }
     load()

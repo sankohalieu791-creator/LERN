@@ -1241,6 +1241,38 @@ export const cancelEmployerSubscription = async (employerId: string) => {
   return { error }
 }
 
+// ── Employer subscriptions via Stripe ────────────────────────────────
+// Real payment collection for the fixed-price tiers (micro/growth/
+// scale) -- set_employer_tier above is now only ever reached for
+// Enterprise (no price, sales-led) or as a manual ops override; a
+// self-serve employer choosing a paid tier goes through one of these
+// three instead, same bearer-token pattern as submitEmployerVerification.
+async function authedFetch(path: string, body: unknown) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) return { data: null, error: { message: 'Not signed in.' } }
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify(body),
+  })
+  const responseBody = await res.json().catch(() => ({}))
+  if (!res.ok) return { data: null, error: { message: responseBody.error || "Couldn't complete that — try again." } }
+  return { data: responseBody, error: null }
+}
+
+// Brand-new subscriber, or anyone with no real Stripe subscription yet
+// -- returns a Checkout URL to redirect the browser to.
+export const createEmployerCheckoutSession = async (tier: 'micro' | 'growth' | 'scale') =>
+  authedFetch('/api/stripe/create-checkout-session', { tier })
+
+// Already has a real, active Stripe subscription -- updates its price
+// in place (with proration) instead of a fresh checkout.
+export const changeEmployerTierViaStripe = async (tier: 'micro' | 'growth' | 'scale') =>
+  authedFetch('/api/stripe/change-tier', { tier })
+
+export const cancelEmployerSubscriptionViaStripe = async () =>
+  authedFetch('/api/stripe/cancel-subscription', {})
+
 export const getOrgStaff = async (organisationId: string) => {
   const { data, error } = await supabase
     .from('users')
