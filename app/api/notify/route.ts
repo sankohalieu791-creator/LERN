@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { renderEmailHtml } from '@/lib/email'
 
 // Called by a Postgres trigger (pg_net) the instant a row lands in
 // public.notifications — see 2026-08-28-email-notifications.sql. Sends
@@ -73,48 +74,105 @@ export async function POST(req: NextRequest) {
     offer: 'Offer', hired: 'Hired', not_progressing: 'Not progressing',
   }
 
-  const copy: Record<string, { subject: string; body: string }> = {
+  const workRef = workTitle ? ` for "${workTitle}"` : ''
+  const stage = STAGE_LABEL[application?.stage] || 'a new stage'
+
+  const copy: Record<string, { subject: string; heading: string; paragraphs: string[]; ctaLabel: string }> = {
     submission_received: {
       subject: 'New work submitted for review',
-      body: `Hi ${first},\n\nA student submitted work${workTitle ? ` for "${workTitle}"` : ''} — it's waiting in your review queue.\n\nReview it: ${APP_URL}`,
+      heading: 'New work is waiting in your review queue',
+      paragraphs: [
+        `Hi ${first},`,
+        `A student on your programme has just submitted new work${workRef}. It's now waiting in your review queue — take a look, leave feedback if anything needs changing, and verify it once it meets the criteria you set.`,
+        `The sooner it's reviewed, the sooner it can count toward that student's verified portfolio.`,
+      ],
+      ctaLabel: 'Review the submission',
     },
     work_verified: {
       subject: 'Your work has been verified',
-      body: `Hi ${first},\n\nGreat news — your work${workTitle ? ` for "${workTitle}"` : ''} has been verified. It now shows the green tick on your profile.\n\nSee it: ${APP_URL}`,
+      heading: 'Your work has just been verified',
+      paragraphs: [
+        `Hi ${first},`,
+        `Great news — your work${workRef} has been checked and verified by your organisation. It now shows the green verified tick on your profile.`,
+        `If you've chosen to make it public, employers browsing LERN can see it as real, checked proof of what you can do — exactly the kind of evidence that helps you stand out.`,
+      ],
+      ctaLabel: 'View your profile',
     },
     work_returned: {
       subject: 'Your work was returned for revision',
-      body: `Hi ${first},\n\nYour work${workTitle ? ` for "${workTitle}"` : ''} was returned with feedback — take a look and resubmit when ready.\n\nSee the feedback: ${APP_URL}`,
+      heading: 'Your work was sent back with feedback',
+      paragraphs: [
+        `Hi ${first},`,
+        `Your work${workRef} has been returned by your organisation with some feedback attached, rather than verified as-is. Nothing has been lost — take a look at what they've said, make the changes, and resubmit whenever you're ready.`,
+        `This is a completely normal part of getting your best work verified.`,
+      ],
+      ctaLabel: 'See the feedback',
     },
     employer_interest: {
       subject: 'An employer has shown interest',
-      body: `Hi ${first},\n\nAn employer has expressed interest in one of your students' verified work. This is routed through your organisation first — nothing is shared with the employer or the student directly.\n\nReview it: ${APP_URL}`,
+      heading: 'An employer would like to know more',
+      paragraphs: [
+        `Hi ${first},`,
+        `An employer has looked at one of your students' verified work and would like to know more. As always on LERN, this is routed through your organisation first — no contact details or personal information have been shared with the employer, and nothing will be, unless you decide to take it further.`,
+        `You can read the full message and respond from your dashboard.`,
+      ],
+      ctaLabel: 'Review the request',
     },
     report: {
       subject: 'A concern has been reported',
-      body: `Hi ${first},\n\nSomeone has raised a concern that needs your organisation's attention. It's already been auto-hidden pending review.\n\nReview it: ${APP_URL}`,
+      heading: 'A concern needs your attention',
+      paragraphs: [
+        `Hi ${first},`,
+        `Someone has raised a concern about a post on your organisation's feed. It's already been automatically hidden while this is looked into, so no one else can see it right now — but please review it as soon as you reasonably can.`,
+      ],
+      ctaLabel: 'Review the report',
     },
     session_started: {
       subject: `The session has started — join now${workTitle ? `: ${workTitle}` : ''}`,
-      body: `Hi ${first},\n\n${workTitle ? `"${workTitle}"` : 'Your session'} has started.\n\nJoin now: ${APP_URL}`,
+      heading: 'Your session has started',
+      paragraphs: [
+        `Hi ${first},`,
+        `${workTitle ? `"${workTitle}"` : 'A live session you are part of'} has just started. Join now to take part — the sooner you join, the more of it you will catch.`,
+      ],
+      ctaLabel: 'Join the session',
     },
     welcome: {
       subject: 'Thank you for choosing LERN',
-      body: `Hi ${first},\n\nThank you for choosing LERN — your account is ready. Verified work, safely.\n\nGet started: ${APP_URL}`,
+      heading: 'Welcome to LERN',
+      paragraphs: [
+        `Hi ${first},`,
+        `Thank you for choosing LERN — your account is now fully set up. LERN exists to turn the real work young people do (placements, projects, courses) into verified evidence they can actually use: on a profile, in applications, and in conversations with employers who are looking for exactly that.`,
+        `Take a look at your dashboard to see what's already there for you.`,
+      ],
+      ctaLabel: 'Go to your dashboard',
     },
     application_stage_changed: {
-      subject: `An employer moved a candidate to ${STAGE_LABEL[application?.stage] || 'a new stage'}`,
-      body: `Hi ${first},\n\n${application?.student?.full_name || 'A student'}'s application${application?.opportunity?.title ? ` for "${application.opportunity.title}"` : ''} has moved to ${STAGE_LABEL[application?.stage] || 'a new stage'}.\n\nSee it: ${APP_URL}`,
+      subject: `An employer moved a candidate to ${stage}`,
+      heading: 'An application has moved forward',
+      paragraphs: [
+        `Hi ${first},`,
+        `${application?.student?.full_name || 'A student'}'s application${application?.opportunity?.title ? ` for "${application.opportunity.title}"` : ''} has just moved to ${stage}.`,
+        `It's worth checking in with them directly so they hear it from you before it comes up anywhere else.`,
+      ],
+      ctaLabel: 'View the pipeline',
     },
   }
 
-  const { subject, body } = copy[notification.type] || { subject: 'LERN notification', body: `Hi ${first},\n\nYou have a new notification on LERN.\n\n${APP_URL}` }
+  const entry = copy[notification.type] || {
+    subject: 'LERN notification', heading: 'You have a new notification',
+    paragraphs: [`Hi ${first},`, `You have a new notification waiting for you on LERN.`], ctaLabel: 'Open LERN',
+  }
+  const { subject, heading, paragraphs, ctaLabel } = entry
+  const html = renderEmailHtml({ heading, paragraphs, ctaLabel, ctaUrl: APP_URL })
+  // Plain-text alternative for clients that don't render HTML -- kept
+  // in sync with the same paragraphs, not a separate, shorter message.
+  const text = `${paragraphs.join('\n\n')}\n\n${ctaLabel}: ${APP_URL}`
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: FROM, to: recipient.email, subject, text: body }),
+      body: JSON.stringify({ from: FROM, to: recipient.email, subject, html, text }),
     })
     if (!res.ok) {
       const errText = await res.text()

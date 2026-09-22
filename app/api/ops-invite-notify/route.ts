@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { renderEmailHtml } from '@/lib/email'
 
 // Called by a Postgres trigger (pg_net, on_ops_invite_created) the
 // instant a row lands in public.ops_invites -- same shape as
@@ -38,13 +39,20 @@ export async function POST(req: NextRequest) {
 
   const acceptUrl = `${APP_URL}/auth/ops-invite?token=${invite.token}`
   const subject = "You've been invited to LERN Ops"
-  const body = `Hi,\n\nYou've been invited to join the LERN internal ops tool.\n\nAccept your invite and set a password: ${acceptUrl}\n\nThis link expires in 7 days. If you weren't expecting this, you can ignore it.`
+  const paragraphs = [
+    'Hi,',
+    'You have been invited to join the LERN internal ops tool — the dashboard used to verify employers, review safeguarding reports, and manage who has access across the platform.',
+    'Because this gives access to real young people\'s data, every action taken inside it is logged against your name, and the invite below only works for the exact email address it was sent to.',
+    'Click below to accept your invite and set a password. This link expires in 7 days. If you were not expecting this invite, you can safely ignore this email — nobody will gain access unless you click through and set a password yourself.',
+  ]
+  const html = renderEmailHtml({ heading: 'You have been invited to LERN Ops', paragraphs, ctaLabel: 'Accept your invite', ctaUrl: acceptUrl })
+  const text = `${paragraphs.join('\n\n')}\n\nAccept your invite: ${acceptUrl}`
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: FROM, to: invite.email, subject, text: body }),
+      body: JSON.stringify({ from: FROM, to: invite.email, subject, html, text }),
     })
     if (!res.ok) {
       const errText = await res.text()
