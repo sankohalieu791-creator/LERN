@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
   getFeed, setPostReaction, getSignedFileUrl,
-  reportPost, deletePost, getVerifiedAuthorIds,
+  reportPost, deletePost, updatePostVisibility, getVerifiedAuthorIds,
   getWins, createWin, reportWin, deleteWin, uploadPostImage, uploadPostVideo,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
@@ -14,7 +14,7 @@ import PresenceBadge from '@/components/v2/PresenceBadge'
 import type { ReactionType } from '@/lib/types'
 import { MILESTONE_TYPES, MILESTONE_BY_KEY, STICKER_OPTIONS, type MilestoneType } from '@/lib/feedConstants'
 import {
-  X, MoreHorizontal, EyeOff, Check, Camera, BadgeCheck, Plus, Trash2,
+  X, MoreHorizontal, EyeOff, Check, Camera, BadgeCheck, Plus, Trash2, Globe, Users,
 } from 'lucide-react'
 
 // Max length for a win's own video, in seconds -- "as a win maximum is
@@ -544,11 +544,29 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
   const [reportOpen, setReportOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [changingVisibility, setChangingVisibility] = useState(false)
 
   const handleDelete = async () => {
     setDeleting(true)
     const { error } = await deletePost(post.id)
     if (error) { setDeleting(false); return }
+    onChanged()
+  }
+
+  // Same rule the composer uses: under-18s never get a public choice
+  // (the DB trigger blocks it outright either way, on create or edit),
+  // org accounts always do. Only relevant on your own post, so
+  // user.date_of_birth here is always the author's own.
+  const isAdult = user?.date_of_birth
+    ? (Date.now() - new Date(user.date_of_birth).getTime()) / (1000 * 60 * 60 * 24 * 365.25) >= 18
+    : false
+  const canChooseVisibility = isAdult || (!!user?.role && user.role !== 'student')
+  const toggleVisibility = async () => {
+    setChangingVisibility(true)
+    const { error } = await updatePostVisibility(post.id, post.visibility === 'public' ? 'organisation' : 'public')
+    setChangingVisibility(false)
+    if (error) return
+    setMenuOpen(false)
     onChanged()
   }
   const authorAvatarUrl = useAvatarUrl(post.author_avatar_path)
@@ -644,7 +662,25 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
               {menuOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 top-8 rounded-xl shadow-lg py-1.5 w-40 z-20" style={{ backgroundColor: 'var(--app-surface)' }}>
+                  <div className="absolute right-0 top-8 rounded-xl shadow-lg py-1.5 w-52 z-20" style={{ backgroundColor: 'var(--app-surface)' }}>
+                    {canChooseVisibility ? (
+                      <button
+                        onClick={toggleVisibility} disabled={changingVisibility}
+                        className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold hover:bg-[var(--app-overlay-1)] transition disabled:opacity-50"
+                        style={{ color: 'var(--app-text)' }}
+                      >
+                        {post.visibility === 'public' ? <Users className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
+                        {changingVisibility ? 'Updating…' : post.visibility === 'public' ? 'Make organisation-only' : 'Make public'}
+                      </button>
+                    ) : (
+                      <div
+                        title="Under-18 posts always stay organisation-only"
+                        className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold cursor-default"
+                        style={{ color: 'var(--app-text-tertiary)' }}
+                      >
+                        <Users className="w-3.5 h-3.5" /> Organisation only (under 18)
+                      </div>
+                    )}
                     <button
                       onClick={handleDelete} disabled={deleting}
                       className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold text-danger-text hover:bg-[var(--app-overlay-1)] transition disabled:opacity-50"

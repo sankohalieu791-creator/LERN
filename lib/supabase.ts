@@ -1012,6 +1012,16 @@ export const deletePost = async (postId: string) => {
   return { error }
 }
 
+// The author changing their mind after posting -- the DB's own
+// posts_visibility_check trigger (BEFORE INSERT OR UPDATE) is what
+// actually stops an under-18's post ever becoming public, on this path
+// exactly the same as on create, so there's nothing extra to enforce
+// here beyond passing the value through.
+export const updatePostVisibility = async (postId: string, visibility: 'organisation' | 'public') => {
+  const { data, error } = await supabase.from('posts').update({ visibility }).eq('id', postId).select().single()
+  return { data, error }
+}
+
 // ── Wins strip (Feed v2.0) -- ephemeral, achievement-only, expires
 // like a story. Same org-or-public visibility model as posts, but
 // scoped to roughly the last two days client-side rather than a
