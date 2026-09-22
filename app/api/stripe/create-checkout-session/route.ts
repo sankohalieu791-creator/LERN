@@ -53,6 +53,14 @@ export async function POST(req: NextRequest) {
     cancel_url: `${APP_URL}/employer/settings?checkout=cancelled`,
     metadata: { employer_id: profile.id, tier },
     subscription_data: { metadata: { employer_id: profile.id, tier } },
+    // This Stripe account has Managed Payments on by default, which
+    // requires a tax_code on every product before it'll let a session
+    // through -- the three tier products don't have one set. Turning
+    // it off per-session is Stripe's own documented way to proceed
+    // without that; if LERN wants Stripe to handle tax/VAT later, the
+    // real fix is setting a proper tax_code on each product instead of
+    // leaving this off indefinitely.
+    managed_payments: { enabled: false },
   })
 
   return NextResponse.json({ url: session.url })
