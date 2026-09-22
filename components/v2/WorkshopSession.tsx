@@ -9,7 +9,7 @@ import * as tus from 'tus-js-client'
 import {
   Mic, MicOff, Video, VideoOff, ScreenShare, PhoneOff, Users, Square,
   HelpCircle, Send, Hand, Circle, StopCircle, X, Download, Save, Loader2,
-  MoreVertical, UserX,
+  MoreVertical, UserX, UserCheck, Clock,
 } from 'lucide-react'
 
 const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!
@@ -68,8 +68,15 @@ type Participant = { uid: number; userId?: string; name: string; isHost: boolean
 // here to force a track off at the network level) and remove (the
 // same signal, plus a persisted workshop_removed_participants row so
 // it actually sticks past this one moment and blocks a rejoin).
-// Deliberately still not in this pass, flagged rather than rushed: a
-// waiting room / admit-to-join gate before someone can enter at all.
+//
+// Waiting room: a guest never calls join() (the real Agora connect)
+// until admitted. It runs entirely on its own lightweight Realtime
+// presence channel (`lobby-${channelName}`) -- a guest tracks itself
+// as waiting there and only proceeds to the actual call once it hears
+// an 'admit' broadcast naming its own user id; the host (already in
+// the real call) subscribes to that same channel purely to see who's
+// waiting and to send that broadcast. No separate table: unlike a
+// removal, there's nothing here that needs to survive a page reload.
 export default function WorkshopSession({
   workItemId, title, canEnd, onClose, onEnded,
 }: { workItemId: string; title: string; canEnd?: boolean; onClose: () => void; onEnded?: () => void }) {
@@ -129,6 +136,36 @@ export default function WorkshopSession({
   // that reason instead of closing straight to the outer page (see leave()).
   const [ended, setEnded] = useState(false)
   const stopResolveRef = useRef<((blob: Blob | null) => void) | null>(null)
+
+  // Waiting room -- see the big comment above the component for how
+  // this works. A host is never gated (canEnd => 'admitted' from the
+  // start); a guest starts 'waiting' and only flips to 'admitted' once
+  // the host lets them in, which is what actually triggers join().
+  const [lobbyStatus, setLobbyStatus] = useState<'waiting' | 'admitted'>(canEnd ? 'admitted' : 'waiting')
+  const [waitingPeople, setWaitingPeople] = useState<Record<string, { userId: string; name: string }>>({})
+  const [lobbyOpen, setLobbyOpen] = useState(false)
+  const lobbyChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+
+  // Mobile browsers' own address-bar collapse/expand -- and, more to
+  // the point, some in-app webviews -- don't always honour `dvh`
+  // reliably, which is exactly what left the control bar sitting near
+  // the top of the screen with dead black space below it ("way too
+  // high"). window.visualViewport is the one number that always
+  // matches what's actually visible right now regardless of dvh
+  // support, so it's used as the real source of truth here and dvh is
+  // kept only as the very first paint's fallback (before this effect
+  // has run once).
+  const [viewportH, setViewportH] = useState<number | null>(null)
+  useEffect(() => {
+    const update = () => setViewportH(window.visualViewport?.height ?? window.innerHeight)
+    update()
+    window.visualViewport?.addEventListener('resize', update)
+    window.addEventListener('resize', update)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [])
 
   const trackPresence = useCallback((extra?: Partial<Participant>) => {
     presenceRef.current?.track({ name: user?.full_name, userId: user?.id, isHost: !!canEnd, handRaised, muted: !micOn, ...extra })
@@ -215,7 +252,7 @@ export default function WorkshopSession({
   }, [channelName, myUid, user, canEnd, workItemId])
 
   useEffect(() => {
-    join()
+    if (canEnd) join() // a guest instead waits for the lobby effect below to flip lobbyStatus to 'admitted'
     return () => {
       cameraRef.current?.close()
       micRef.current?.close()
@@ -229,6 +266,56 @@ export default function WorkshopSession({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // The lobby channel is separate from (and lighter than) the main
+  // presence channel above -- a waiting guest hasn't joined Agora yet
+  // and has no camera/mic to publish, so it only ever carries "who's
+  // waiting" and the host's "let them in" signal.
+  useEffect(() => {
+    if (!user) return
+    const lobby = supabase.channel(`lobby-${channelName}`, { config: { presence: { key: user.id } } })
+    lobbyChannelRef.current = lobby
+
+    if (canEnd) {
+      lobby.on('presence', { event: 'sync' }, () => {
+        const state = lobby.presenceState()
+        const next: Record<string, { userId: string; name: string }> = {}
+        for (const key of Object.keys(state)) {
+          const entry: any = (state[key] as any[])[0]
+          if (entry?.waiting) next[key] = { userId: entry.userId, name: entry.name }
+        }
+        setWaitingPeople(next)
+      })
+      lobby.subscribe()
+    } else {
+      lobby.on('broadcast', { event: 'admit' }, ({ payload }: any) => {
+        if (payload?.userId !== user.id) return
+        setLobbyStatus('admitted')
+        lobby.untrack().catch(() => {})
+      })
+      lobby.subscribe(async status => {
+        if (status === 'SUBSCRIBED') await lobby.track({ userId: user.id, name: user.full_name, waiting: true })
+      })
+    }
+
+    return () => {
+      lobby.unsubscribe()
+      lobbyChannelRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelName, user?.id])
+
+  // The moment a guest is actually let in, this is what starts the
+  // real Agora connection -- join() itself is a no-op if it's already
+  // been called (clientRef.current guard), so there's no risk of a
+  // double-join if this effect ever re-runs.
+  useEffect(() => {
+    if (!canEnd && lobbyStatus === 'admitted') join()
+  }, [lobbyStatus, canEnd, join])
+
+  const admitFromLobby = (targetUserId: string) => {
+    lobbyChannelRef.current?.send({ type: 'broadcast', event: 'admit', payload: { userId: targetUserId } })
+  }
 
   useEffect(() => {
     if (!actionError) return
@@ -628,7 +715,29 @@ export default function WorkshopSession({
     // edge to edge" shape) inside this backdrop rather than stretched
     // across the whole monitor -- lg:max-w-5xl keeps every tile visible
     // and roughly square instead of stretched painfully wide.
-    <div className="fixed top-0 left-0 right-0 z-50 bg-black flex items-center justify-center" style={{ height: '100dvh' }}>
+    <div className="fixed top-0 left-0 right-0 z-50 bg-black flex items-center justify-center" style={{ height: viewportH ? `${viewportH}px` : '100dvh' }}>
+      {/* Outside the boxed call, in the black backdrop -- matches Teams'
+          own layout, where ending the meeting isn't a control that lives
+          inside the video area itself. Only meaningful on the desktop
+          boxed layout (lg:); on mobile the box already fills the whole
+          screen, so the header's own button below stays put there. */}
+      {canEnd && !ended && (
+        <button
+          onClick={endForEveryone}
+          className="hidden lg:flex items-center gap-1.5 fixed top-6 right-6 z-[60] bg-[#B3401E] hover:bg-[#9c3419] text-white text-[13px] font-semibold px-4 py-2.5 rounded-full transition shadow-lg"
+        >
+          <Square className="w-3.5 h-3.5 fill-current" /> End for everyone
+        </button>
+      )}
+      {/* Same idea, for the host's own waiting-room list -- sits beside
+          the end-call button outside the box on desktop, since it's a
+          call-level control too, not something tied to any one tile. */}
+      {canEnd && !ended && (
+        <div className="hidden lg:block fixed top-6 z-[60]" style={{ right: '13.5rem' }}>
+          <LobbyButton count={Object.keys(waitingPeople).length} open={lobbyOpen} onToggle={() => setLobbyOpen(v => !v)} />
+          {lobbyOpen && <LobbyList people={waitingPeople} onAdmit={admitFromLobby} />}
+        </div>
+      )}
       <div
         className="w-full h-full lg:max-w-5xl lg:h-[90dvh] lg:rounded-2xl lg:border lg:border-white/10 lg:overflow-hidden bg-[#141110] flex flex-col"
         style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
@@ -636,18 +745,26 @@ export default function WorkshopSession({
       <div className="flex items-center justify-between px-5 py-3.5 flex-shrink-0">
         <div>
           <p className="text-white font-bold text-[15px]">{title}</p>
-          {!ended && (
+          {!ended && (canEnd || lobbyStatus === 'admitted') && (
             <p className="text-[#8A8373] text-[12px] flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5" /> {allTiles.length} in the room
               {recording && <span className="flex items-center gap-1 text-[#FF6B4E] font-semibold ml-1"><Circle className="w-2 h-2 fill-current" /> Recording</span>}
             </p>
           )}
         </div>
-        {canEnd && !ended && (
-          <button onClick={endForEveryone} className="flex items-center gap-1.5 bg-[#B3401E] hover:bg-[#9c3419] text-white text-[12px] font-semibold px-3.5 py-2 rounded-full transition flex-shrink-0">
-            <Square className="w-3 h-3 fill-current" /> End for everyone
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {canEnd && !ended && (
+            <div className="relative lg:hidden">
+              <LobbyButton count={Object.keys(waitingPeople).length} open={lobbyOpen} onToggle={() => setLobbyOpen(v => !v)} />
+              {lobbyOpen && <LobbyList people={waitingPeople} onAdmit={admitFromLobby} align="right" />}
+            </div>
+          )}
+          {canEnd && !ended && (
+            <button onClick={endForEveryone} className="lg:hidden flex items-center gap-1.5 bg-[#B3401E] hover:bg-[#9c3419] text-white text-[12px] font-semibold px-3.5 py-2 rounded-full transition">
+              <Square className="w-3 h-3 fill-current" /> End for everyone
+            </button>
+          )}
+        </div>
       </div>
 
       {actionError && (
@@ -698,7 +815,15 @@ export default function WorkshopSession({
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col px-5 pb-4 min-w-0">
-          {ended ? (
+          {!canEnd && lobbyStatus === 'waiting' ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
+              <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-[#8A8373]" />
+              </div>
+              <p className="text-white font-semibold">Waiting for the host to let you in…</p>
+              <p className="text-[#8A8373] text-[13px] max-w-xs">You'll join automatically the moment they admit you.</p>
+            </div>
+          ) : ended ? (
             // The call itself is already over at this point (Agora client
             // left, host's endWorkshop already ran) -- this only exists
             // to hold the screen open long enough for the banner above to
@@ -845,7 +970,7 @@ export default function WorkshopSession({
           of stranded up in the header. Hidden once the call has actually
           ended (ended === true) -- toggling mic/camera/recording for a
           call that's already been left doesn't do anything meaningful. */}
-      {!ended && (
+      {!ended && (canEnd || lobbyStatus === 'admitted') && (
         <div className="flex items-center justify-center gap-3 px-5 py-4 flex-shrink-0 border-t border-white/10">
           <RoomButton active={micOn} onClick={toggleMic} onIcon={Mic} offIcon={MicOff} disabled={!joined} />
           <RoomButton active={cameraOn} onClick={toggleCamera} onIcon={Video} offIcon={VideoOff} disabled={!joined} />
@@ -891,6 +1016,46 @@ export default function WorkshopSession({
       </div>
     </div>
   ), document.body)
+}
+
+// The host-facing half of the waiting room: a badge (only rendered
+// while someone's actually waiting) that opens the admit list.
+function LobbyButton({ count, open, onToggle }: { count: number; open: boolean; onToggle: () => void }) {
+  if (count === 0) return null
+  return (
+    <button
+      onClick={onToggle}
+      className={`relative flex items-center gap-1.5 text-white text-[13px] font-semibold px-4 py-2.5 rounded-full transition shadow-lg ${open ? 'bg-brand' : 'bg-white/15 hover:bg-white/25'}`}
+    >
+      <Clock className="w-3.5 h-3.5" /> {count} waiting
+    </button>
+  )
+}
+
+function LobbyList({ people, onAdmit, align = 'left' }: { people: Record<string, { userId: string; name: string }>; onAdmit: (userId: string) => void; align?: 'left' | 'right' }) {
+  const entries = Object.values(people)
+  return (
+    <div className={`absolute top-full mt-2 ${align === 'right' ? 'right-0' : 'left-0'} w-64 bg-[#1E1A16] border border-white/10 rounded-xl shadow-xl overflow-hidden z-[70]`}>
+      <p className="px-4 py-2.5 text-[11px] font-semibold text-[#8A8373] uppercase tracking-wide border-b border-white/10">Waiting to join</p>
+      <div className="max-h-64 overflow-y-auto">
+        {entries.length === 0 ? (
+          <p className="px-4 py-3 text-[12px] text-[#8A8373]">Nobody's waiting.</p>
+        ) : (
+          entries.map(p => (
+            <div key={p.userId} className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-white/5 last:border-b-0">
+              <span className="text-[13px] text-white truncate">{p.name || 'Someone'}</span>
+              <button
+                onClick={() => onAdmit(p.userId)}
+                className="flex items-center gap-1 flex-shrink-0 bg-brand text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-full hover:opacity-90 transition"
+              >
+                <UserCheck className="w-3 h-3" /> Admit
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
 }
 
 function RoomButton({ active, onClick, onIcon: OnIcon, offIcon: OffIcon, disabled }: { active: boolean; onClick: () => void; onIcon: any; offIcon: any; disabled?: boolean }) {

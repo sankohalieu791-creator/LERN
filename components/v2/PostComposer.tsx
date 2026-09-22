@@ -226,7 +226,7 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
           </div>
         </div>
 
-        {canChooseVisibility && (
+        {canChooseVisibility ? (
           <button
             onClick={() => setVisibility(v => v === 'organisation' ? 'public' : 'organisation')}
             className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-2 rounded-lg border"
@@ -235,6 +235,18 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
             {visibility === 'public' ? <Globe className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
             {visibility === 'public' ? 'Public — anyone on LERN' : 'Organisation only'}
           </button>
+        ) : (
+          // Under-18s never get a toggle -- the database itself blocks any
+          // public post from a minor -- but the choice being invisible
+          // looked like a missing feature, so this shows the (locked)
+          // outcome instead of hiding it.
+          <div
+            className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-2 rounded-lg border w-fit"
+            style={{ color: 'var(--app-text-secondary)', backgroundColor: 'var(--app-overlay-2)', borderColor: 'var(--app-border)' }}
+          >
+            <Users className="w-3.5 h-3.5" />
+            Organisation only — under-18 posts can't be made public
+          </div>
         )}
       </div>
 
