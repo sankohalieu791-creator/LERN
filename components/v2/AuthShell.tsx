@@ -9,7 +9,7 @@ import Logo from '@/components/v2/Logo'
 // Shared layout for every auth/onboarding screen: desktop/laptop-first
 // (generous centered column, not a mobile card), paper/ink/orange theme.
 export default function AuthShell({
-  step, totalSteps, title, subtitle, children, wide = false, onBack,
+  step, totalSteps, title, subtitle, children, wide = false, onBack, bare = false, headerExtra,
 }: {
   step?: number
   totalSteps?: number
@@ -21,6 +21,15 @@ export default function AuthShell({
   // without one falls back to plain browser back, so this always does
   // something sensible without every call site needing to think about it.
   onBack?: () => void
+  // The role-picker landing screen in the reference isn't a form inside
+  // a card -- the title floats directly on the background art, and
+  // each choice is its own separate glass tile. Every other screen
+  // here is a real form and keeps the single glass card. headerExtra
+  // is that same reference's top-right "Already have an account?" —
+  // content-specific, so the page passes it rather than this shell
+  // hardcoding one link.
+  bare?: boolean
+  headerExtra?: React.ReactNode
 }) {
   const router = useRouter()
   const [cardIn, setCardIn] = useState(false)
@@ -132,40 +141,52 @@ export default function AuthShell({
           <ArrowLeft className="w-5 h-5" />
         </button>
         <Logo size="lg" />
+        {headerExtra && <div className="ml-auto">{headerExtra}</div>}
       </header>
 
-      <main className="flex-1 flex items-start justify-center px-6 pb-20 relative z-10">
-        {/* The reference's card is glass, not a flat white fill -- the
-            sky and ring behind it stay faintly visible through the
-            blur, which is the actual "texture" rather than a pattern
-            drawn on top of an opaque panel. */}
-        <div
-          className={`relative w-full ${wide ? 'max-w-3xl' : 'max-w-md'} mt-6 bg-white/65 backdrop-blur-2xl border border-white/60 rounded-[28px] shadow-[0_8px_40px_rgba(120,72,32,0.14)] px-8 py-10 sm:px-12 overflow-hidden transition-all duration-500 ease-out ${
-            cardIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
-          }`}
-        >
-          <div className="relative">
-            {step && totalSteps && (
-              <div className="flex items-center gap-1.5 mb-8">
-                {Array.from({ length: totalSteps }, (_, i) => (
-                  <div
-                    key={i}
-                    className={`h-1 flex-1 rounded-full transition-colors ${
-                      i < step ? 'bg-brand' : 'bg-[#EDE9E1]'
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
-
-            <h1 className="text-3xl font-bold text-ink mb-2 leading-tight text-center">{title}</h1>
-            {subtitle && <p className="text-[#6B6558] text-[15px] leading-relaxed mb-8 text-center">{subtitle}</p>}
-            {!subtitle && <div className="mb-8" />}
-
+      {bare ? (
+        <main className="flex-1 flex flex-col items-center px-6 pb-20 pt-4 relative z-10">
+          <div className={`w-full ${wide ? 'max-w-4xl' : 'max-w-md'} transition-all duration-500 ease-out ${cardIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`}>
+            <h1 className="text-3xl sm:text-4xl font-bold text-ink mb-3 leading-tight text-center">{title}</h1>
+            {subtitle && <p className="text-[#6B6558] text-[15px] leading-relaxed mb-10 text-center max-w-xl mx-auto">{subtitle}</p>}
+            {!subtitle && <div className="mb-10" />}
             {children}
           </div>
-        </div>
-      </main>
+        </main>
+      ) : (
+        <main className="flex-1 flex items-start justify-center px-6 pb-20 relative z-10">
+          {/* The reference's card is glass, not a flat white fill -- the
+              sky and ring behind it stay faintly visible through the
+              blur, which is the actual "texture" rather than a pattern
+              drawn on top of an opaque panel. */}
+          <div
+            className={`relative w-full ${wide ? 'max-w-3xl' : 'max-w-md'} mt-6 bg-white/65 backdrop-blur-2xl border border-white/60 rounded-[28px] shadow-[0_8px_40px_rgba(120,72,32,0.14)] px-8 py-10 sm:px-12 overflow-hidden transition-all duration-500 ease-out ${
+              cardIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
+            }`}
+          >
+            <div className="relative">
+              {step && totalSteps && (
+                <div className="flex items-center gap-1.5 mb-8">
+                  {Array.from({ length: totalSteps }, (_, i) => (
+                    <div
+                      key={i}
+                      className={`h-1 flex-1 rounded-full transition-colors ${
+                        i < step ? 'bg-brand' : 'bg-[#EDE9E1]'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+
+              <h1 className="text-3xl font-bold text-ink mb-2 leading-tight text-center">{title}</h1>
+              {subtitle && <p className="text-[#6B6558] text-[15px] leading-relaxed mb-8 text-center">{subtitle}</p>}
+              {!subtitle && <div className="mb-8" />}
+
+              {children}
+            </div>
+          </div>
+        </main>
+      )}
 
       {/* Bottom-left, per direct request -- so it's reachable from
           every sign-up/login screen without hunting for it. */}
