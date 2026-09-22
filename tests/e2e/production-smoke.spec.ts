@@ -37,7 +37,19 @@ async function confirmEmail(email: string) {
 
 async function deleteUserByEmail(email: string) {
   const user = await findUserByEmail(email)
-  if (user) await admin.auth.admin.deleteUser(user.id)
+  if (!user) return
+  // The institution/organisation signup test's own org (created fresh
+  // each run) was never cleaned up here -- only the user was, leaving
+  // an orphaned "Preview School" organisation behind every single time
+  // this suite ran. organisation_id has to be read BEFORE the user (and
+  // with it, the FK) is gone.
+  const { data: profile } = await admin.from('users').select('organisation_id').eq('id', user.id).single()
+  await admin.auth.admin.deleteUser(user.id)
+  if (profile?.organisation_id) {
+    await admin.from('work_items').delete().eq('organisation_id', profile.organisation_id)
+    await admin.from('join_codes').delete().eq('organisation_id', profile.organisation_id)
+    await admin.from('organisations').delete().eq('id', profile.organisation_id)
+  }
 }
 
 test.describe('Public pages', () => {

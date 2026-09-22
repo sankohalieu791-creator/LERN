@@ -207,6 +207,13 @@ function BriefCard({ item, onChanged, summary }: { item: any; onChanged: () => v
     if (error) { setActionError(error.message); return }
     onChanged()
   }
+  const publishNow = async () => {
+    setBusy(true); setActionError('')
+    const { error } = await publishWorkItemNow(item.id)
+    setBusy(false)
+    if (error) { setActionError(error.message); return }
+    onChanged()
+  }
 
   const isDraftOrScheduled = item.publish_state === 'draft' || item.publish_state === 'scheduled'
   const assigned = summary?.assigned ?? 0
@@ -240,8 +247,22 @@ function BriefCard({ item, onChanged, summary }: { item: any; onChanged: () => v
           <div className="flex items-start justify-between gap-2">
             <p className="font-medium text-ink text-[15px] leading-snug truncate">{item.title}</p>
             {isDraftOrScheduled ? (
-              <span className="flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-surface-muted text-ink-tertiary">
-                {item.publish_state === 'draft' ? 'Draft' : 'Scheduled'}
+              <span className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-surface-muted text-ink-tertiary">
+                  {item.publish_state === 'draft' ? 'Draft' : 'Scheduled'}
+                </span>
+                {/* This was the actual bug behind "save as draft doesn't
+                    work" -- a draft/scheduled brief had a badge and a
+                    Revoke button, but nothing anywhere that could ever
+                    move it OUT of that state and into a real, live
+                    brief. BriefCard is what Briefs actually renders
+                    (WorkItemCard, just below in this file, is the
+                    generic course/workshop card -- a near-identical
+                    twin that already got this fix, which is exactly
+                    why it was easy to miss that this one hadn't). */}
+                <button onClick={publishNow} disabled={busy} title="Post this now" className="flex items-center gap-1 text-[11px] font-semibold hover:underline disabled:opacity-50" style={{ color: '#185FA5' }}>
+                  <Send className="w-3 h-3" /> Publish now
+                </button>
               </span>
             ) : (
               <span className="flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: status.bg, color: status.text }}>
