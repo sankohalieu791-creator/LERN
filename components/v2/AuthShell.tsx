@@ -50,72 +50,18 @@ export default function AuthShell({
     //
     // The layout itself (no wrapping card anywhere, content straight on
     // the background) stays exactly as it was -- this only replaces the
-    // flat gradient with the reference's actual background art: a warm
-    // sky, a soft arcing ring, and a glossy horizon with a faint
-    // skyline. Texture, not structure.
+    // background with the actual reference image itself, not a
+    // hand-drawn approximation of it.
     <div
-      className="min-h-[100dvh] flex flex-col relative overflow-hidden bg-[#FBF3E9]"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      className="min-h-[100dvh] flex flex-col relative overflow-hidden bg-[#F3E4DA]"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        backgroundImage: 'url(/auth-bg.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
     >
-      <svg
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        preserveAspectRatio="xMidYMid slice"
-        viewBox="0 0 1600 1000"
-        aria-hidden
-      >
-        <defs>
-          <linearGradient id="auth-sky" x1="0" y1="0" x2="0.3" y2="1">
-            <stop offset="0%" stopColor="#FBE4CE" />
-            <stop offset="45%" stopColor="#F6D9BE" />
-            <stop offset="100%" stopColor="#FBF3E9" />
-          </linearGradient>
-          <linearGradient id="auth-ring" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#FFDCB0" />
-            <stop offset="55%" stopColor="#F0A868" />
-            <stop offset="100%" stopColor="#B9713A" />
-          </linearGradient>
-          <linearGradient id="auth-floor" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#EFCFA9" stopOpacity="0.85" />
-            <stop offset="100%" stopColor="#FBF3E9" stopOpacity="0" />
-          </linearGradient>
-          <filter id="auth-soft-blur" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="14" />
-          </filter>
-          <filter id="auth-skyline-blur" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="3" />
-          </filter>
-        </defs>
-
-        <rect width="1600" height="1000" fill="url(#auth-sky)" />
-
-        <circle
-          cx="1280" cy="60" r="430"
-          fill="none" stroke="url(#auth-ring)" strokeWidth="90"
-          opacity="0.55" transform="rotate(28 1280 60)"
-          filter="url(#auth-soft-blur)"
-        />
-        <circle
-          cx="1280" cy="60" r="430"
-          fill="none" stroke="url(#auth-ring)" strokeWidth="90"
-          opacity="0.4" transform="rotate(28 1280 60)"
-        />
-
-        <rect x="0" y="760" width="1600" height="240" fill="url(#auth-floor)" />
-        <g opacity="0.14" fill="#8A6440" filter="url(#auth-skyline-blur)">
-          <rect x="60" y="700" width="26" height="70" />
-          <rect x="100" y="670" width="34" height="100" />
-          <rect x="150" y="710" width="22" height="60" />
-          <rect x="190" y="655" width="40" height="115" />
-          <rect x="250" y="690" width="28" height="80" />
-          <rect x="1180" y="700" width="30" height="70" />
-          <rect x="1230" y="660" width="36" height="110" />
-          <rect x="1290" y="695" width="24" height="75" />
-          <rect x="1340" y="675" width="30" height="95" />
-          <rect x="1400" y="715" width="20" height="55" />
-        </g>
-        <line x1="0" y1="770" x2="1600" y2="770" stroke="#E8C7A0" strokeWidth="1.5" opacity="0.5" />
-      </svg>
-
       <header className="flex-shrink-0 px-10 py-7 flex items-center gap-4 relative z-10">
         <button
           onClick={() => (onBack ? onBack() : router.back())}
