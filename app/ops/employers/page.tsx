@@ -1,11 +1,29 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   getPendingEmployerVerifications, approveEmployerVerification, rejectEmployerVerification,
   requestMoreEmployerInfo, setEmployerManualCheck, setEmployerCheck5Notes,
 } from '@/lib/supabase'
-import { Check, X, HelpCircle, Building2, Mail, Globe, UserCheck, MessageCircle } from 'lucide-react'
+import { Check, X, HelpCircle, Building2, Mail, Globe, UserCheck, MessageCircle, Sparkles } from 'lucide-react'
+
+// Loose match, not exact -- Companies House lists officers as "SURNAME,
+// Firstname Middlenames, Title" (e.g. "BREEN, Michael Francis David,
+// Mr."), nothing like the "Firstname Surname" shape someone types at
+// signup, so a straight string-equality check would essentially never
+// fire on real data. Every word in the typed name has to appear
+// somewhere in the officer's name instead -- order and extra middle
+// names/titles don't matter, but it still won't match an unrelated
+// person who just happens to share one common word.
+function nameWords(s: string): Set<string> {
+  return new Set((s || '').toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(w => w.length > 1))
+}
+function officerNameMatches(typed: string, officer: string): boolean {
+  const typedWords = nameWords(typed)
+  if (typedWords.size === 0) return false
+  const officerWords = nameWords(officer)
+  return [...typedWords].every(w => officerWords.has(w))
+}
 
 // Build Spec: Internal Ops Tool v1.0, Part 1. One card per pending or
 // flagged employer application, the five checks each shown as pass/
@@ -49,6 +67,22 @@ function EmployerCard({ r, onChanged }: { r: any; onChanged: () => void }) {
     check4 !== 'pass' && '4. Officer match',
   ].filter(Boolean) as string[]
 
+  // Check 4 used to be a pure judgement call with nothing to go on --
+  // the officer list from Companies House was already fetched and
+  // displayed, just never actually compared against the name someone
+  // typed at signup. Auto-ticks the box the moment a match is found
+  // (once per card, so it never fights a deliberate manual uncheck
+  // afterward), but the checkbox stays the real source of truth --
+  // this assists the human call, it doesn't replace it.
+  const officerMatch = (r.employer_ch_officers || []).find((o: string) => officerNameMatches(r.full_name, o))
+  const autoCheckedRef = useRef(false)
+  useEffect(() => {
+    if (autoCheckedRef.current) return
+    autoCheckedRef.current = true
+    if (officerMatch && !r.employer_check_officer_confirmed) toggleCheck('officer', true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const toggleCheck = async (check: 'website' | 'officer', value: boolean) => { await setEmployerManualCheck(r.id, check, value); onChanged() }
   const saveNotes = async () => { await setEmployerCheck5Notes(r.id, notes); onChanged() }
 
@@ -86,7 +120,15 @@ function EmployerCard({ r, onChanged }: { r: any; onChanged: () => void }) {
               {anyFailed ? 'Flagged' : 'Pending'}
             </span>
           </div>
-          <p className="text-[13px] text-ink-tertiary truncate">{r.email} · signed up by {r.full_name}</p>
+          {/* "Signed up by" is whatever the applicant typed at signup --
+              nothing here has confirmed it against anything, unlike the
+              Companies House data elsewhere on this card. Italic + a
+              small tag is the whole fix: distinct at a glance, not
+              mistakable for verified output. */}
+          <p className="text-[13px] text-ink-tertiary truncate">
+            {r.email} · signed up by <span className="italic">{r.full_name}</span>{' '}
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-quaternary not-italic">self-declared</span>
+          </p>
         </div>
         <p className="text-[11px] text-ink-quaternary flex-shrink-0">
           {r.employer_verification_requested_at ? `Applied ${timeAgo(r.employer_verification_requested_at)}` : `Signed up ${timeAgo(r.created_at)}`}
@@ -126,12 +168,20 @@ function EmployerCard({ r, onChanged }: { r: any; onChanged: () => void }) {
             <input type="checkbox" checked={!!r.employer_check_officer_confirmed} onChange={e => toggleCheck('officer', e.target.checked)} /> <CheckIcon state={check4} />
           </label>
         </div>
+        {officerMatch && (
+          <p className="flex items-center gap-1.5 text-[11.5px] text-[#0F6E56] pl-5">
+            <Sparkles className="w-3 h-3 flex-shrink-0" /> Auto-matched against Companies House: "{officerMatch}"
+          </p>
+        )}
 
         <div>
-          <p className="flex items-center gap-1.5 text-[13px] text-ink-secondary mb-1"><HelpCircle className="w-3.5 h-3.5 text-ink-tertiary" /> 5. Judgement call</p>
+          <p className="flex items-center justify-between gap-2 mb-1">
+            <span className="flex items-center gap-1.5 text-[13px] text-ink-secondary"><HelpCircle className="w-3.5 h-3.5 text-ink-tertiary" /> 5. Judgement call</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-quaternary">Internal only</span>
+          </p>
           <textarea
             value={notes} onChange={e => setNotes(e.target.value)} onBlur={saveNotes} rows={2}
-            placeholder="Anything the first four checks didn't resolve cleanly…"
+            placeholder="Anything the first four checks didn't resolve cleanly — never shown to the employer…"
             className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2 text-[12.5px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
           />
         </div>
@@ -145,7 +195,17 @@ function EmployerCard({ r, onChanged }: { r: any; onChanged: () => void }) {
 
       {rejecting ? (
         <div className="mt-3 pt-3 border-t border-edge-subtle">
-          <textarea value={reason} onChange={e => setReason(e.target.value)} autoFocus rows={2} placeholder="Why isn't this approved? Shown to the employer." className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none" />
+          {/* Which checks failed is worked out server-side from the
+              live check state and attached automatically -- this is
+              just previewing that for whoever's about to reject, so
+              it's never a surprise what the applicant will see named. */}
+          {failedNames.length > 0 && (
+            <p className="text-[11.5px] text-ink-tertiary mb-1.5">
+              Will name to the employer: <span className="font-semibold text-ink-secondary">{failedNames.join(', ')}</span>
+            </p>
+          )}
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#B3401E] mb-1">Visible to the employer</p>
+          <textarea value={reason} onChange={e => setReason(e.target.value)} autoFocus rows={2} placeholder="Why isn't this approved?" className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none" />
           <div className="flex items-center gap-2 mt-2">
             <button onClick={reject} disabled={busy} className="text-[12px] font-semibold bg-danger-solid text-white px-3 py-1.5 rounded-lg disabled:opacity-40">{busy ? 'Rejecting…' : 'Confirm reject'}</button>
             <button onClick={() => { setRejecting(false); setReason('') }} className="text-[12px] font-semibold text-ink-tertiary px-2">Cancel</button>

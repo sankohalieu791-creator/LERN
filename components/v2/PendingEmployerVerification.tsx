@@ -3,9 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { signOut, submitMoreEmployerInfo } from '@/lib/supabase'
+import { signOut, submitMoreEmployerInfo, submitEmployerVerification } from '@/lib/supabase'
 import Logo from '@/components/v2/Logo'
-import { ShieldCheck, Clock, LogOut, XCircle, MessageCircle } from 'lucide-react'
+import { ShieldCheck, Clock, LogOut, XCircle, MessageCircle, X as XIcon } from 'lucide-react'
 
 // The employer vetting gate (Build Spec: Employer Vetting Gate v1.0):
 // an independent employer sees exactly this instead of full access
@@ -23,6 +23,11 @@ export default function PendingEmployerVerification() {
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [correcting, setCorrecting] = useState(false)
+  const [companyNumber, setCompanyNumber] = useState(user?.employer_company_number || '')
+  const [website, setWebsite] = useState(user?.employer_website || '')
+  const [resubmitting, setResubmitting] = useState(false)
+  const [resubmitError, setResubmitError] = useState('')
 
   const status = user?.employer_verification_status || 'pending'
   const rejected = status === 'rejected'
@@ -39,6 +44,21 @@ export default function PendingEmployerVerification() {
     const { error } = await submitMoreEmployerInfo(reply.trim())
     setSending(false)
     if (!error) { setSent(true); await refreshUser() }
+  }
+
+  // "A route to correct details and resubmit. The rejection screen
+  // currently offers only Sign out." submitEmployerVerification is the
+  // exact same route the original signup already uses -- it re-runs
+  // both automatic checks and puts the application back in front of
+  // ops as 'pending', so there was no need for a second mechanism here.
+  const handleResubmit = async () => {
+    if (!website.trim()) { setResubmitError('Company website is required.'); return }
+    setResubmitting(true); setResubmitError('')
+    const { error } = await submitEmployerVerification(companyNumber.trim(), website.trim())
+    setResubmitting(false)
+    if (error) { setResubmitError(error.message); return }
+    setCorrecting(false)
+    await refreshUser()
   }
 
   return (
@@ -62,10 +82,61 @@ export default function PendingEmployerVerification() {
           : 'We will notify you once it is approved.'}
       </p>
 
-      {rejected && user?.employer_rejected_reason && (
-        <div className="w-full max-w-sm bg-white border border-[#F3C9BC] rounded-2xl p-4 mb-6 text-left">
-          <p className="text-[12px] font-semibold text-[#B3401E] uppercase tracking-wide mb-1">Note from LERN</p>
-          <p className="text-[13px] text-[#4A453B] leading-relaxed">{user.employer_rejected_reason}</p>
+      {rejected && (
+        <div className="w-full max-w-sm text-left mb-6 space-y-3">
+          {/* "Give the applicant structured rejection reasons drawn from
+              the five checks. Name the check that failed." Computed and
+              stored server-side the moment this was rejected, not
+              recomputed live -- a stable record of why THAT decision
+              happened even if the checks get edited afterward. */}
+          {user?.employer_rejected_checks && user.employer_rejected_checks.length > 0 && (
+            <div className="bg-white border border-[#F3C9BC] rounded-2xl p-4">
+              <p className="text-[12px] font-semibold text-[#B3401E] uppercase tracking-wide mb-1.5">Checks we couldn't confirm</p>
+              <ul className="space-y-1">
+                {user.employer_rejected_checks.map((c: string) => (
+                  <li key={c} className="flex items-center gap-1.5 text-[13px] text-[#4A453B]">
+                    <XIcon className="w-3 h-3 text-[#B3401E] flex-shrink-0" /> {c}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {user?.employer_rejected_reason && (
+            <div className="bg-white border border-[#F3C9BC] rounded-2xl p-4">
+              <p className="text-[12px] font-semibold text-[#B3401E] uppercase tracking-wide mb-1">Note from LERN</p>
+              <p className="text-[13px] text-[#4A453B] leading-relaxed">{user.employer_rejected_reason}</p>
+            </div>
+          )}
+
+          {/* "A route to correct details and resubmit" -- was Sign out
+              or nothing. Same two fields the original signup collected,
+              pre-filled, going through the same check-and-save route. */}
+          {correcting ? (
+            <div className="bg-white border border-[#E2DDD1] rounded-2xl p-4">
+              <p className="text-[12px] font-semibold text-ink uppercase tracking-wide mb-2">Correct your details</p>
+              <label className="block text-[11.5px] font-semibold text-ink-secondary mb-1">Companies House number</label>
+              <input
+                value={companyNumber} onChange={e => setCompanyNumber(e.target.value)}
+                className="w-full bg-white border border-[#E2DDD1] rounded-xl px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition mb-2.5"
+              />
+              <label className="block text-[11.5px] font-semibold text-ink-secondary mb-1">Company website</label>
+              <input
+                value={website} onChange={e => setWebsite(e.target.value)}
+                className="w-full bg-white border border-[#E2DDD1] rounded-xl px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition mb-2.5"
+              />
+              {resubmitError && <p className="text-[12.5px] text-danger-text mb-2">{resubmitError}</p>}
+              <div className="flex gap-2">
+                <button onClick={handleResubmit} disabled={resubmitting} className="flex-1 bg-brand text-white text-[13px] font-semibold py-2.5 rounded-xl disabled:opacity-40">
+                  {resubmitting ? 'Resubmitting…' : 'Resubmit'}
+                </button>
+                <button onClick={() => setCorrecting(false)} className="text-[13px] font-semibold text-ink-secondary px-3">Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setCorrecting(true)} className="w-full bg-brand text-white text-[13px] font-semibold py-2.5 rounded-xl">
+              Correct details &amp; resubmit
+            </button>
+          )}
         </div>
       )}
 

@@ -253,6 +253,28 @@ export const getOpsInvites = async () => {
   return { data, error }
 }
 
+// ── Ops: who currently holds ops access ─────────────────────────────
+export const getOpsAdmins = async () => {
+  const { data, error } = await supabase.rpc('get_ops_admins')
+  return { data, error }
+}
+
+export const revokeOpsAccess = async (userId: string) => {
+  const { error } = await supabase.rpc('revoke_ops_access', { p_user_id: userId })
+  return { error }
+}
+
+// ── Ops: approved employers, with a route to reverse an approval ────
+export const getApprovedEmployers = async () => {
+  const { data, error } = await supabase.rpc('get_approved_employers')
+  return { data, error }
+}
+
+export const reverseEmployerApproval = async (employerId: string, reason: string) => {
+  const { error } = await supabase.rpc('reverse_employer_approval', { p_employer_id: employerId, p_reason: reason })
+  return { error }
+}
+
 // Public -- no session required, called from the accept-invite screen
 // before the invitee even has an account.
 export const getOpsInviteByToken = async (token: string) => {

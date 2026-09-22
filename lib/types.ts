@@ -53,6 +53,7 @@ export interface User {
   employer_website?: string
   employer_verification_requested_at?: string
   employer_rejected_reason?: string
+  employer_rejected_checks?: string[]
   // Employer Vetting Gate v1.0 -- the five named checks, stored so
   // approve_employer_verification() can enforce zero-tolerance itself
   // rather than trusting whatever the admin UI happens to show.
