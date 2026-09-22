@@ -93,6 +93,25 @@ export default function StudentSignupPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Clicking the emailed confirmation link necessarily opens somewhere
+  // else -- a new tab, or the system browser if this tab is an
+  // installed PWA -- no website's own code can prevent that; it's how
+  // every email client hands off an external link. What WAS a genuine
+  // bug: this original tab, left sitting on "check your email", never
+  // noticed the other tab had actually confirmed, so someone who kept
+  // this tab around found it permanently stuck. Supabase's client
+  // already syncs auth state across tabs on the same origin via
+  // localStorage -- this just listens for that and resumes the moment
+  // it happens, so whichever tab they end up using, both move forward
+  // together instead of one being silently dead.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) await resumeFromSession(session.user)
+    })
+    return () => subscription.unsubscribe()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleA1Submit = async () => {
     setError('')
     if (!fullName.trim()) return setError('Enter your full name.')

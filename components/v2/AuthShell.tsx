@@ -40,18 +40,6 @@ export default function AuthShell({
     // shell in the app has had this same fix today; this one was
     // still missing it.
     //
-    // A flat white page read as cold/unfinished next to everything
-    // else in this app that already has real warmth to it -- a soft
-    // gradient using the SAME peach/cream tokens the rest of the app's
-    // accent surfaces already use, not new colours invented for this
-    // one screen. First pass held the colour back until 45% down the
-    // page, past where a normal-height form actually sits, so it was
-    // never actually visible without scrolling -- "still white."
-    // --accent-bg-soft (a deeper peach than --accent-bg) now shows
-    // immediately at the top where the logo and form both live, fading
-    // to --paper further down. Instagram-adjacent without borrowing
-    // anything literal: warm, not saturated, still this app's own
-    // paper/ink/orange identity.
     // min-h-[100dvh], not min-h-screen (100vh) -- 100vh is a fixed number
     // baked in from whatever the viewport was on load, so on phone it
     // doesn't shrink/grow as the browser's own address bar collapses or
@@ -59,11 +47,76 @@ export default function AuthShell({
     // stick down, it stays up where the bigger address-bar-visible
     // viewport put it" -- dvh recalculates against whatever's actually
     // visible right now instead.
+    //
+    // The layout itself (no wrapping card anywhere, content straight on
+    // the background) stays exactly as it was -- this only replaces the
+    // flat gradient with the reference's actual background art: a warm
+    // sky, a soft arcing ring, and a glossy horizon with a faint
+    // skyline. Texture, not structure.
     <div
-      className="min-h-[100dvh] flex flex-col"
-      style={{ paddingTop: 'env(safe-area-inset-top)', background: 'linear-gradient(180deg, var(--accent-bg-soft) 0%, var(--accent-bg) 30%, var(--paper) 75%)' }}
+      className="min-h-[100dvh] flex flex-col relative overflow-hidden bg-[#FBF3E9]"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <header className="flex-shrink-0 px-10 py-7 flex items-center gap-4">
+      <svg
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        preserveAspectRatio="xMidYMid slice"
+        viewBox="0 0 1600 1000"
+        aria-hidden
+      >
+        <defs>
+          <linearGradient id="auth-sky" x1="0" y1="0" x2="0.3" y2="1">
+            <stop offset="0%" stopColor="#FBE4CE" />
+            <stop offset="45%" stopColor="#F6D9BE" />
+            <stop offset="100%" stopColor="#FBF3E9" />
+          </linearGradient>
+          <linearGradient id="auth-ring" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#FFDCB0" />
+            <stop offset="55%" stopColor="#F0A868" />
+            <stop offset="100%" stopColor="#B9713A" />
+          </linearGradient>
+          <linearGradient id="auth-floor" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#EFCFA9" stopOpacity="0.85" />
+            <stop offset="100%" stopColor="#FBF3E9" stopOpacity="0" />
+          </linearGradient>
+          <filter id="auth-soft-blur" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="14" />
+          </filter>
+          <filter id="auth-skyline-blur" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" />
+          </filter>
+        </defs>
+
+        <rect width="1600" height="1000" fill="url(#auth-sky)" />
+
+        <circle
+          cx="1280" cy="60" r="430"
+          fill="none" stroke="url(#auth-ring)" strokeWidth="90"
+          opacity="0.55" transform="rotate(28 1280 60)"
+          filter="url(#auth-soft-blur)"
+        />
+        <circle
+          cx="1280" cy="60" r="430"
+          fill="none" stroke="url(#auth-ring)" strokeWidth="90"
+          opacity="0.4" transform="rotate(28 1280 60)"
+        />
+
+        <rect x="0" y="760" width="1600" height="240" fill="url(#auth-floor)" />
+        <g opacity="0.14" fill="#8A6440" filter="url(#auth-skyline-blur)">
+          <rect x="60" y="700" width="26" height="70" />
+          <rect x="100" y="670" width="34" height="100" />
+          <rect x="150" y="710" width="22" height="60" />
+          <rect x="190" y="655" width="40" height="115" />
+          <rect x="250" y="690" width="28" height="80" />
+          <rect x="1180" y="700" width="30" height="70" />
+          <rect x="1230" y="660" width="36" height="110" />
+          <rect x="1290" y="695" width="24" height="75" />
+          <rect x="1340" y="675" width="30" height="95" />
+          <rect x="1400" y="715" width="20" height="55" />
+        </g>
+        <line x1="0" y1="770" x2="1600" y2="770" stroke="#E8C7A0" strokeWidth="1.5" opacity="0.5" />
+      </svg>
+
+      <header className="flex-shrink-0 px-10 py-7 flex items-center gap-4 relative z-10">
         <button
           onClick={() => (onBack ? onBack() : router.back())}
           aria-label="Back"
@@ -74,7 +127,7 @@ export default function AuthShell({
         <Logo size="lg" />
       </header>
 
-      <main className="flex-1 flex items-start justify-center px-6 pb-20">
+      <main className="flex-1 flex items-start justify-center px-6 pb-20 relative z-10">
         <div className={`w-full ${wide ? 'max-w-3xl' : 'max-w-md'} pt-6`}>
           {step && totalSteps && (
             <div className="flex items-center gap-1.5 mb-8">
@@ -99,7 +152,7 @@ export default function AuthShell({
 
       {/* Bottom-left, per direct request -- so it's reachable from
           every sign-up/login screen without hunting for it. */}
-      <footer className="flex-shrink-0 px-6 pb-6 flex items-center gap-4">
+      <footer className="flex-shrink-0 px-6 pb-6 flex items-center gap-4 relative z-10">
         <Link href="/legal/privacy" className="text-[12.5px] font-medium text-[#8A8373] hover:text-ink transition">Privacy</Link>
         <Link href="/legal/terms" className="text-[12.5px] font-medium text-[#8A8373] hover:text-ink transition">Terms</Link>
       </footer>

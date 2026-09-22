@@ -43,7 +43,13 @@ export function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={disabled || loading}
-      className="w-full bg-brand text-white font-bold text-[15px] py-3.5 rounded-xl hover:bg-brand-hover active:scale-[0.99] transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      // A translucent disabled state (opacity-40 on the whole button)
+      // let whatever sits behind it -- a busy background, an image,
+      // anything non-flat -- bleed through visibly, which read as a
+      // rendering glitch rather than "this button is off." A solid,
+      // desaturated fill reads as disabled just as clearly without ever
+      // exposing what's underneath, regardless of what that is.
+      className="w-full bg-brand text-white font-bold text-[15px] py-3.5 rounded-xl hover:bg-brand-hover active:scale-[0.99] transition disabled:bg-[#F0C9A6] disabled:text-white/80 disabled:cursor-not-allowed flex items-center justify-center gap-2"
     >
       {loading ? <Spinner /> : null}
       {children}
@@ -57,7 +63,7 @@ export function SecondaryButton({ children, onClick, disabled }: { children: Rea
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="w-full bg-surface border border-edge text-ink font-semibold text-[15px] py-3.5 rounded-xl hover:border-edge-input active:scale-[0.99] transition disabled:opacity-40"
+      className="w-full bg-surface border border-edge text-ink font-semibold text-[15px] py-3.5 rounded-xl hover:border-edge-input active:scale-[0.99] transition disabled:text-ink-quaternary disabled:cursor-not-allowed"
     >
       {children}
     </button>
@@ -80,7 +86,7 @@ export function GoogleButton({ onClick, loading, label = 'Continue with Google' 
       type="button"
       onClick={onClick}
       disabled={loading}
-      className="w-full flex items-center justify-center gap-2.5 bg-white border border-edge text-ink font-semibold text-[15px] py-3.5 rounded-xl hover:border-edge-input active:scale-[0.99] transition disabled:opacity-40"
+      className="w-full flex items-center justify-center gap-2.5 bg-white border border-edge text-ink font-semibold text-[15px] py-3.5 rounded-xl hover:border-edge-input active:scale-[0.99] transition disabled:text-ink-quaternary disabled:cursor-not-allowed"
     >
       {loading ? <Spinner /> : (
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">

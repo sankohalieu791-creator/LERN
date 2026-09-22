@@ -59,30 +59,52 @@ function OrganisationSignupInner() {
   // link, or right after a Google sign-in -- both are a fresh page
   // load with a brand-new live session, same pattern as the student
   // wizard's resumeFromSession.
+  const resumeFromUser = async (user: { id: string; email?: string; user_metadata?: any }) => {
+    const { data: profile } = await getUserProfile(user.id)
+    if (profile?.organisation_id && (profile.role === 'institution_staff' || profile.role === 'provider_staff')) {
+      router.replace(profile.role === 'institution_staff' ? '/institution' : '/provider')
+      return
+    }
+    if (profile?.role === 'student' && !profile.organisation_id) {
+      setFullName(profile.full_name || '')
+      setEmail(profile.email || '')
+      const savedOrgName = (user.user_metadata?.org_name as string) || ''
+      const savedMode = (user.user_metadata?.signup_mode as string) || 'create'
+      setMode(savedMode === 'join' ? 'join' : 'create')
+      setOrgName(savedOrgName)
+      if (savedMode === 'join') { setStep(2); return }
+      // org_name only exists in metadata for the email/password path
+      // (set on step 1, before any confirmation link was clicked) --
+      // a Google sign-in never had a step 1 at all, so there's no
+      // name to resume with yet.
+      setStep(savedOrgName ? 2 : 'orgname')
+    }
+  }
+
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: profile } = await getUserProfile(user.id)
-      if (profile?.organisation_id && (profile.role === 'institution_staff' || profile.role === 'provider_staff')) {
-        router.replace(profile.role === 'institution_staff' ? '/institution' : '/provider')
-        return
-      }
-      if (profile?.role === 'student' && !profile.organisation_id) {
-        setFullName(profile.full_name || '')
-        setEmail(profile.email || '')
-        const savedOrgName = (user.user_metadata?.org_name as string) || ''
-        const savedMode = (user.user_metadata?.signup_mode as string) || 'create'
-        setMode(savedMode === 'join' ? 'join' : 'create')
-        setOrgName(savedOrgName)
-        if (savedMode === 'join') { setStep(2); return }
-        // org_name only exists in metadata for the email/password path
-        // (set on step 1, before any confirmation link was clicked) --
-        // a Google sign-in never had a step 1 at all, so there's no
-        // name to resume with yet.
-        setStep(savedOrgName ? 2 : 'orgname')
-      }
+      if (user) await resumeFromUser(user)
     })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Clicking the emailed confirmation link necessarily opens somewhere
+  // else -- a new tab, or the system browser if this tab is an
+  // installed PWA -- no website's own code can prevent that; it's how
+  // every email client hands off an external link. What WAS a genuine
+  // bug: this original tab, left sitting on "check your email", never
+  // noticed the other tab had actually confirmed, so someone who kept
+  // this tab around found it permanently stuck. Supabase's client
+  // already syncs auth state across tabs on the same origin via
+  // localStorage -- this just listens for that and resumes the moment
+  // it happens, so whichever tab they end up using, both move forward
+  // together instead of one being silently dead.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) await resumeFromUser(session.user)
+    })
+    return () => subscription.unsubscribe()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

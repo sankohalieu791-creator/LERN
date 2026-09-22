@@ -38,31 +38,53 @@ export default function EmployerSignupPage() {
   // corrects that once, before this page ever shows step 2. It's a
   // no-op (and harmless) for the email/password path, which already
   // has the right role from signUp() metadata.
+  const resumeFromUser = async (user: { id: string; email?: string }) => {
+    const { data: profile } = await supabase.from('users').select('consented_at, full_name, role, employer_verification_requested_at').eq('id', user.id).single()
+    if (!profile) return
+    // A Google sign-in skips the domain check handleStep1 does for
+    // email/password, since Google supplies the email directly --
+    // still enforced here, on whichever address they actually
+    // authenticated with, for a brand-new (not-yet-consented,
+    // still-default-role) account.
+    if (profile.role === 'student' && !profile.consented_at) {
+      const domainError = employerEmailError(user.email || '')
+      if (domainError) {
+        await supabase.auth.signOut()
+        setError(domainError)
+        return
+      }
+      await claimEmployerRole()
+    }
+    setFullName(profile.full_name || '')
+    if (!profile.employer_verification_requested_at) setStep(2)
+    else if (!profile.consented_at) setStep(3)
+    else setShowGreeting(true)
+  }
+
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: profile } = await supabase.from('users').select('consented_at, full_name, role, employer_verification_requested_at').eq('id', user.id).single()
-      if (!profile) return
-      // A Google sign-in skips the domain check handleStep1 does for
-      // email/password, since Google supplies the email directly --
-      // still enforced here, on whichever address they actually
-      // authenticated with, for a brand-new (not-yet-consented,
-      // still-default-role) account.
-      if (profile.role === 'student' && !profile.consented_at) {
-        const domainError = employerEmailError(user.email || '')
-        if (domainError) {
-          await supabase.auth.signOut()
-          setError(domainError)
-          return
-        }
-        await claimEmployerRole()
-      }
-      setFullName(profile.full_name || '')
-      if (!profile.employer_verification_requested_at) setStep(2)
-      else if (!profile.consented_at) setStep(3)
-      else setShowGreeting(true)
+      if (user) await resumeFromUser(user)
     })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Clicking the emailed confirmation link necessarily opens somewhere
+  // else -- a new tab, or the system browser if this tab is an
+  // installed PWA -- no website's own code can prevent that; it's how
+  // every email client hands off an external link. What WAS a genuine
+  // bug: this original tab, left sitting on "check your email", never
+  // noticed the other tab had actually confirmed, so someone who kept
+  // this tab around found it permanently stuck. Supabase's client
+  // already syncs auth state across tabs on the same origin via
+  // localStorage -- this just listens for that and resumes the moment
+  // it happens, so whichever tab they end up using, both move forward
+  // together instead of one being silently dead.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) await resumeFromUser(session.user)
+    })
+    return () => subscription.unsubscribe()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
