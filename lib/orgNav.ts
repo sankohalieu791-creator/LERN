@@ -12,30 +12,30 @@ import type { NavItem } from '@/components/v2/OrgShell'
 // so the two navs structurally can't drift apart again the way
 // providerSections missing Students did before this.
 //
-// Final Build Spec, 23 Sep 2026: Work Experience is institution-only
-// ("Feed, Review, Work Experience..., Guest invite, Briefs, Workshops,
-// Interest received, Job tracking, Dashboard" -- no equivalent on the
-// provider list). Bootcamp Evidence is provider-only, and only ever the
-// named reason that customer type buys -- neither appears on the other
-// role's nav at all, not just hidden/disabled.
+// Final Build Spec, 23 Sep 2026: Work Experience is institution-only,
+// Bootcamp Evidence is provider-only -- neither appears on the other
+// role's nav at all, not just hidden/disabled. Ordered most to least
+// useful per direct feedback, 23 Sep 2026: Feed stays first, then the
+// named reason that customer type buys (Work Experience / Bootcamp
+// Evidence) straight after it, ahead of the day-to-day admin screens.
 function buildOrgSections(kind: 'institution' | 'provider'): NavItem[] {
   const base = `/${kind}`
   const workSection: NavItem = kind === 'institution'
     ? { key: 'briefs', label: 'Briefs', icon: FileText, href: `${base}/briefs` }
     : { key: 'courses', label: 'Courses', icon: BookOpen, href: `${base}/courses` }
-  const roleSpecific: NavItem[] = kind === 'institution'
-    ? [{ key: 'work-experience', label: 'Work Experience', icon: HardHat, href: `${base}/work-experience` }]
-    : [{ key: 'bootcamp-evidence', label: 'Bootcamp Evidence', icon: Award, href: `${base}/bootcamp-evidence` }]
+  const roleSpecific: NavItem = kind === 'institution'
+    ? { key: 'work-experience', label: 'Work Experience', icon: HardHat, href: `${base}/work-experience` }
+    : { key: 'bootcamp-evidence', label: 'Bootcamp Evidence', icon: Award, href: `${base}/bootcamp-evidence` }
 
   return [
     { key: 'feed',      label: 'Feed',      icon: Home,            href: `${base}/feed` },
+    roleSpecific,
     { key: 'review',    label: 'Review',    icon: ClipboardCheck,  href: `${base}/review` },
     { key: 'students',  label: 'Students',  icon: Users,           href: `${base}/students` },
     workSection,
     { key: 'workshops', label: 'Workshops', icon: Presentation,    href: `${base}/workshops` },
     { key: 'interest',  label: 'Interest received', icon: HeartHandshake, href: `${base}/interest` },
     { key: 'jobs',      label: 'Job tracking', icon: Briefcase,    href: `${base}/jobs` },
-    ...roleSpecific,
     { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: `${base}/dashboard` },
   ]
 }
@@ -43,14 +43,14 @@ function buildOrgSections(kind: 'institution' | 'provider'): NavItem[] {
 export const institutionSections: NavItem[] = buildOrgSections('institution')
 export const institutionPhoneItems: [NavItem, NavItem, NavItem] = [
   institutionSections[0], // Feed
-  institutionSections[3], // Briefs
+  institutionSections[4], // Briefs
   institutionSections[8], // Dashboard
 ]
 
 export const providerSections: NavItem[] = buildOrgSections('provider')
 export const providerPhoneItems: [NavItem, NavItem, NavItem] = [
   providerSections[0], // Feed
-  providerSections[3], // Courses
+  providerSections[4], // Courses
   providerSections[8], // Dashboard
 ]
 
@@ -71,18 +71,21 @@ export const providerPhoneItems: [NavItem, NavItem, NavItem] = [
 // is exactly the "guest link opens the full feed" bug he found.
 // Discover (verified public work, individually vetted per row) is the
 // only browsing surface an employer is meant to have at all.
+// Ordered most to least useful per direct feedback, 23 Sep 2026: Discover
+// stays first, Talent pools (the fully-automatic, named reason to keep
+// coming back) straight after it, ahead of the day-to-day admin screens.
 export const employerSections: NavItem[] = [
   { key: 'discover',      label: 'Discover',     icon: Search,          href: '/employer/discover' },
+  { key: 'talent-pools',  label: 'Talent pools', icon: Bookmark,        href: '/employer/talent-pools' },
   { key: 'jobs',          label: 'Jobs',         icon: Megaphone,       href: '/employer/opportunities' },
   { key: 'candidates',    label: 'Candidates',   icon: Briefcase,       href: '/employer/candidates' },
   { key: 'inbox',         label: 'Inbox',        icon: Inbox,           href: '/employer/inbox' },
-  { key: 'talent-pools',  label: 'Talent pools', icon: Bookmark,        href: '/employer/talent-pools' },
   { key: 'partners',      label: 'Partners',     icon: Building2,       href: '/employer/partners' },
   { key: 'dashboard',     label: 'Dashboard',    icon: LayoutDashboard, href: '/employer/dashboard' },
 ]
 
 export const employerPhoneItems: [NavItem, NavItem, NavItem] = [
   employerSections[0], // Discover
-  employerSections[2], // Candidates
+  employerSections[3], // Candidates
   employerSections[6], // Dashboard
 ]
