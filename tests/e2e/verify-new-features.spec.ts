@@ -49,13 +49,19 @@ test.describe('Bootcamp Evidence (provider)', () => {
     await page.goto('/provider/bootcamp-evidence')
     await expect(page.getByRole('main').getByText('Bootcamp Evidence')).toBeVisible()
 
-    // Seeded: Noah Bennett meets both thresholds and has an interview
-    // booked; Amelia Clarke meets neither.
-    await expect(page.getByText('Noah Bennett')).toBeVisible()
-    await expect(page.getByText('12/10 days')).toBeVisible()
+    // Seeded so Noah meets both thresholds and has an interview booked,
+    // Amelia meets neither -- checked as pass/fail against the 10-day
+    // threshold (what the feature actually gates on), not an exact day
+    // count, since real attendance-marking during testing legitimately
+    // moves the count day to day.
+    const noahCard = page.getByText('Noah Bennett', { exact: true }).locator('xpath=../..')
+    const noahDays = Number((await noahCard.getByText(/\/10 days/).innerText()).split('/')[0])
+    expect(noahDays).toBeGreaterThanOrEqual(10)
     await expect(page.getByText('Interview booked', { exact: false })).toBeVisible()
-    await expect(page.getByText('Amelia Clarke')).toBeVisible()
-    await expect(page.getByText('8/10 days')).toBeVisible()
+
+    const ameliaCard = page.getByText('Amelia Clarke', { exact: true }).locator('xpath=../..')
+    const ameliaDays = Number((await ameliaCard.getByText(/\/10 days/).innerText()).split('/')[0])
+    expect(ameliaDays).toBeLessThan(10)
 
     await expect(page.getByRole('button', { name: /export funding evidence/i })).toBeVisible()
   })

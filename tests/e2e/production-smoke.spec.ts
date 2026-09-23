@@ -388,6 +388,11 @@ test.describe('Employer inbox placeholder text', () => {
     const { error: approveErr } = await opsClient.rpc('approve_employer_verification', { p_employer_id: employerId })
     if (approveErr) throw approveErr
 
+    // This test is about the inbox placeholder text, not billing -- give
+    // it a tier directly rather than running a real Stripe checkout, the
+    // same bypass pattern already used above for verification.
+    await admin.from('users').update({ employer_tier: 'micro', employer_subscription_status: 'active' }).eq('id', employerId)
+
     const { data: studData, error: studErr } = await admin.auth.admin.createUser({
       email: studentEmail, password, email_confirm: true,
       user_metadata: { role: 'student', full_name: 'placeholder', date_of_birth: '2008-01-01' },

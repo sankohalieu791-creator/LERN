@@ -4,6 +4,7 @@ import RoleGate from '@/components/v2/RoleGate'
 import OrgShell from '@/components/v2/OrgShell'
 import GuestEmployerShell from '@/components/v2/GuestEmployerShell'
 import PendingEmployerVerification from '@/components/v2/PendingEmployerVerification'
+import EmployerBillingGate from '@/components/v2/EmployerBillingGate'
 import { employerSections, employerPhoneItems } from '@/lib/orgNav'
 import { useAuth } from '@/context/AuthContext'
 
@@ -27,10 +28,18 @@ function EmployerShellSwitch({ children }: { children: React.ReactNode }) {
   // fires again for this account.
   if (!user?.employer_verified) return <PendingEmployerVerification />
 
+  // Payment verification fix, 23 Sep 2026 -- access to the real app was
+  // previously granted the moment employer_verified was true, with
+  // nothing checking whether a plan had ever been chosen or paid for.
+  // EmployerBillingGate reads the real subscription state from the
+  // database (never the Checkout redirect alone) and only renders
+  // children once it's genuinely confirmed.
   return (
-    <OrgShell sections={employerSections} phoneItems={employerPhoneItems}>
-      {children}
-    </OrgShell>
+    <EmployerBillingGate>
+      <OrgShell sections={employerSections} phoneItems={employerPhoneItems}>
+        {children}
+      </OrgShell>
+    </EmployerBillingGate>
   )
 }
 
