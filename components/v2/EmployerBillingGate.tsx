@@ -43,13 +43,22 @@ function EmployerBillingGateInner({ children }: { children: React.ReactNode }) {
   const [employeeCount, setEmployeeCount] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState(false)
   const pollStart = useRef<number | null>(null)
 
   const checkoutParam = searchParams.get('checkout')
 
+  // A transient failure here (network blip, a cold serverless function)
+  // used to leave `billing` at null forever with nothing checking for
+  // that being an error rather than "still loading" -- the gate's own
+  // "not loaded yet" guard below then never clears, stranding a real,
+  // already-paying employer behind a permanent blank white screen.
+  // Surfaced explicitly now, with a retry, instead of silently hanging.
   const fetchBilling = async () => {
     if (!user) return null
-    const { data } = await getEmployerBilling(user.id)
+    const { data, error: err } = await getEmployerBilling(user.id)
+    if (err || !data) { setLoadError(true); return null }
+    setLoadError(false)
     setBilling(data)
     return data as any
   }
@@ -123,6 +132,26 @@ function EmployerBillingGateInner({ children }: { children: React.ReactNode }) {
     setBusy(false)
     if (err) { setError(err.message); return }
     if (data?.url) window.location.href = data.url
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-paper flex flex-col items-center justify-center px-6 text-center">
+        <div className="mb-6 text-ink"><Logo size="lg" /></div>
+        <h1 className="text-2xl font-bold text-ink mb-2">Couldn't load your account</h1>
+        <p className="text-[14px] text-[#6B6558] max-w-sm leading-relaxed mb-6">Check your connection and try again.</p>
+        <button
+          onClick={() => fetchBilling()}
+          className="text-white font-semibold text-[14px] px-6 py-3 rounded-xl transition mb-4"
+          style={{ backgroundColor: '#D4551A' }}
+        >
+          Try again
+        </button>
+        <button onClick={handleSignOut} className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-tertiary hover:text-ink transition">
+          <LogOut className="w-3.5 h-3.5" /> Log out
+        </button>
+      </div>
+    )
   }
 
   if (state === 'loading' || !billing) {

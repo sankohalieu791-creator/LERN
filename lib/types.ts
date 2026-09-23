@@ -76,6 +76,12 @@ export interface User {
   following_visible?: boolean
   two_step_enabled?: boolean
   cookie_consent?: { essential: true; analytics: boolean; consented_at: string }
+  // Onboarding tour ("take a tour or skip") -- set the moment an org
+  // account finishes or explicitly skips it, so it only ever shows
+  // itself once. "Replay tutorial" in Settings reopens it without
+  // touching this, so a deliberate replay never gets mistaken for a
+  // first-time prompt.
+  onboarding_completed_at?: string
   created_at: string
 }
 

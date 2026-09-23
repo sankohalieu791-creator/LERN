@@ -5,6 +5,7 @@ import OrgShell from '@/components/v2/OrgShell'
 import GuestEmployerShell from '@/components/v2/GuestEmployerShell'
 import PendingEmployerVerification from '@/components/v2/PendingEmployerVerification'
 import EmployerBillingGate from '@/components/v2/EmployerBillingGate'
+import OnboardingTour from '@/components/v2/OnboardingTour'
 import { employerSections, employerPhoneItems } from '@/lib/orgNav'
 import { useAuth } from '@/context/AuthContext'
 
@@ -37,6 +38,7 @@ function EmployerShellSwitch({ children }: { children: React.ReactNode }) {
   return (
     <EmployerBillingGate>
       <OrgShell sections={employerSections} phoneItems={employerPhoneItems}>
+        <OnboardingTour role="employer" />
         {children}
       </OrgShell>
     </EmployerBillingGate>

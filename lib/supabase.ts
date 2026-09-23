@@ -296,6 +296,16 @@ export const recordConsent = async (userId: string) => {
   return { error }
 }
 
+// Onboarding tour -- set once, whether the account took the tour or
+// explicitly skipped it, so it never shows itself automatically twice.
+export const markOnboardingSeen = async (userId: string) => {
+  const { error } = await supabase
+    .from('users')
+    .update({ onboarding_completed_at: new Date().toISOString() })
+    .eq('id', userId)
+  return { error }
+}
+
 // Used only to bootstrap an organisation's very first code at signup,
 // before staff have had a chance to pick their own — JoinCodesPanel
 // itself always takes a staff-chosen code, never calls this.

@@ -18,11 +18,12 @@ import {
   Sun, Moon, Monitor, ShieldCheck, Users2, Ticket,
   Mail, UserX, ChevronRight, ChevronLeft, Camera, BadgeCheck, LogOut,
   Lock, Download, Check, User, Bell, AlertTriangle,
-  Paintbrush, Info, CreditCard,
+  Paintbrush, Info, CreditCard, HelpCircle,
 } from 'lucide-react'
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
 import BillingPanel from '@/components/v2/BillingPanel'
 import EmployerSubscriptionPanel from '@/components/v2/EmployerSubscriptionPanel'
+import { replayOnboarding } from '@/components/v2/OnboardingTour'
 
 // Rebuilt to the same grouped-row-list structure as the student app's
 // own Settings (Group/Row/ToggleRow, one flowing screen, sub-screens
@@ -203,6 +204,12 @@ export default function SettingsPanel() {
       {user.role === 'employer' && (
         <Group title="Subscription" icon={CreditCard}>
           <Row label="Subscription" onClick={() => setScreen('subscription')} />
+        </Group>
+      )}
+
+      {(isOrgAdmin || user.role === 'employer') && (
+        <Group title="Help" icon={HelpCircle}>
+          <Row label="Replay tutorial" onClick={replayOnboarding} />
         </Group>
       )}
 
