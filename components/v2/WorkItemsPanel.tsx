@@ -669,6 +669,7 @@ function CreateWorkItemForm({ type, onClose, onCreated }: { type: ItemType; onCl
   const [mode, setMode] = useState<'online' | 'in_person'>('online')
   const [location, setLocation] = useState('')
   const [startsAt, setStartsAt] = useState('')
+  const [groupId, setGroupId] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -690,10 +691,11 @@ function CreateWorkItemForm({ type, onClose, onCreated }: { type: ItemType; onCl
       criteria: criteria.trim(), visibility: 'public', deadline: deadline || null,
       mode, location: mode === 'in_person' ? location.trim() : undefined,
       starts_at: mode === 'online' && startsAt ? new Date(startsAt).toISOString() : null,
+      group_id: type === 'course' ? (groupId || null) : null,
     })
     setLoading(false)
     if (createError) return setError(createError.message)
-    setTitle(''); setTopic(''); setDescription(''); setCriteria(''); setDeadline(''); setLocation(''); setStartsAt('')
+    setTitle(''); setTopic(''); setDescription(''); setCriteria(''); setDeadline(''); setLocation(''); setStartsAt(''); setGroupId('')
     onCreated()
   }
 
@@ -720,6 +722,12 @@ function CreateWorkItemForm({ type, onClose, onCreated }: { type: ItemType; onCl
         placeholder="e.g. Original, scalable to 16px, with a one-paragraph rationale"
         hint="Visible to students too. This is what a tutor checks the work against when they verify it."
       />
+      {type === 'course' && (
+        <GroupPicker organisationId={user?.organisation_id} value={groupId} onChange={setGroupId} />
+      )}
+      {type === 'course' && (
+        <p className="text-[11px] text-ink-tertiary -mt-3 mb-4">Assigning a group turns this course into a trackable cohort in Bootcamp Evidence, if that add-on is on.</p>
+      )}
       <label className="block mb-4">
         <span className="block text-[13px] font-semibold text-ink mb-1.5">Deadline (optional)</span>
         <input

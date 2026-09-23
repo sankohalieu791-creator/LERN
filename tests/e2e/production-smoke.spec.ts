@@ -127,7 +127,13 @@ test.describe('Explore-without-code (student)', () => {
   test.beforeAll(() => deleteUserByEmail(email))
   test.afterAll(() => deleteUserByEmail(email))
 
+  // Real signup + real email confirm (a paginated listUsers lookup,
+  // slower as the account count grows) + login + consent (a 1.5s
+  // greeting screen) + a real image upload, all in one test -- confirmed
+  // by hand to reliably take ~40s end to end, over this suite's default
+  // 30s budget even though nothing in the flow is actually broken.
   test('signs up, skips join code, lands on feed with posting/search locked', async ({ page }) => {
+    test.setTimeout(60_000)
     await page.goto('/auth/signup/student')
     await page.getByLabel('Full name').fill('Preview Student')
     await page.getByLabel('Email').fill(email)

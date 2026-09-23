@@ -1,4 +1,4 @@
-import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase, Search, Megaphone, HeartHandshake, Inbox, Building2, Bookmark } from 'lucide-react'
+import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase, Search, Megaphone, HeartHandshake, Inbox, Building2, Bookmark, HardHat, Award } from 'lucide-react'
 import type { NavItem } from '@/components/v2/OrgShell'
 
 // Institutions and providers are the SAME shell now -- one org layout,
@@ -11,11 +11,21 @@ import type { NavItem } from '@/components/v2/OrgShell'
 // Dashboard -- is identical for both, generated from the same array
 // so the two navs structurally can't drift apart again the way
 // providerSections missing Students did before this.
+//
+// Final Build Spec, 23 Sep 2026: Work Experience is institution-only
+// ("Feed, Review, Work Experience..., Guest invite, Briefs, Workshops,
+// Interest received, Job tracking, Dashboard" -- no equivalent on the
+// provider list). Bootcamp Evidence is provider-only, and only ever the
+// named reason that customer type buys -- neither appears on the other
+// role's nav at all, not just hidden/disabled.
 function buildOrgSections(kind: 'institution' | 'provider'): NavItem[] {
   const base = `/${kind}`
   const workSection: NavItem = kind === 'institution'
     ? { key: 'briefs', label: 'Briefs', icon: FileText, href: `${base}/briefs` }
     : { key: 'courses', label: 'Courses', icon: BookOpen, href: `${base}/courses` }
+  const roleSpecific: NavItem[] = kind === 'institution'
+    ? [{ key: 'work-experience', label: 'Work Experience', icon: HardHat, href: `${base}/work-experience` }]
+    : [{ key: 'bootcamp-evidence', label: 'Bootcamp Evidence', icon: Award, href: `${base}/bootcamp-evidence` }]
 
   return [
     { key: 'feed',      label: 'Feed',      icon: Home,            href: `${base}/feed` },
@@ -25,6 +35,7 @@ function buildOrgSections(kind: 'institution' | 'provider'): NavItem[] {
     { key: 'workshops', label: 'Workshops', icon: Presentation,    href: `${base}/workshops` },
     { key: 'interest',  label: 'Interest received', icon: HeartHandshake, href: `${base}/interest` },
     { key: 'jobs',      label: 'Job tracking', icon: Briefcase,    href: `${base}/jobs` },
+    ...roleSpecific,
     { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: `${base}/dashboard` },
   ]
 }
@@ -33,14 +44,14 @@ export const institutionSections: NavItem[] = buildOrgSections('institution')
 export const institutionPhoneItems: [NavItem, NavItem, NavItem] = [
   institutionSections[0], // Feed
   institutionSections[3], // Briefs
-  institutionSections[7], // Dashboard
+  institutionSections[8], // Dashboard
 ]
 
 export const providerSections: NavItem[] = buildOrgSections('provider')
 export const providerPhoneItems: [NavItem, NavItem, NavItem] = [
   providerSections[0], // Feed
   providerSections[3], // Courses
-  providerSections[7], // Dashboard
+  providerSections[8], // Dashboard
 ]
 
 // Independent employer sidebar -- corrected per direct feedback: Briefs

@@ -838,6 +838,76 @@ export const getStudentAttendanceSummary = async (studentId: string) => {
   return { data: { total, present, late, absent: total - present - late, percentPresent: total ? Math.round(((present + late) / total) * 100) : null }, error: null }
 }
 
+// ── Work Experience (institutions only) -- placements + their own,
+// employer-scoped day-by-day attendance. Entirely separate from the
+// classroom attendance register above: a placement has one employer
+// and a fixed date range, not a recurring weekly class.
+export const getPlacements = async (organisationId: string, groupId?: string | null) => {
+  let query = supabase
+    .from('placements')
+    .select('*, student:users!placements_student_id_fkey(id, full_name, group_id)')
+    .eq('organisation_id', organisationId)
+    .order('starts_on', { ascending: false })
+  if (groupId) query = query.eq('group_id', groupId)
+  const { data, error } = await query
+  return { data, error }
+}
+
+export const createPlacement = async (
+  organisationId: string, createdBy: string,
+  fields: { student_id: string; group_id?: string | null; employer_name: string; starts_on: string; ends_on: string },
+) => {
+  const { data, error } = await supabase
+    .from('placements')
+    .insert([{ organisation_id: organisationId, created_by: createdBy, ...fields }])
+    .select('*, student:users!placements_student_id_fkey(id, full_name, group_id)')
+    .single()
+  return { data, error }
+}
+
+export const setPlacementStatus = async (id: string, status: 'active' | 'completed' | 'cancelled') => {
+  const { error } = await supabase.from('placements').update({ status }).eq('id', id)
+  return { error }
+}
+
+export const getPlacementAttendance = async (placementId: string) => {
+  const { data, error } = await supabase
+    .from('placement_attendance')
+    .select('*')
+    .eq('placement_id', placementId)
+    .order('session_date', { ascending: true })
+  return { data, error }
+}
+
+export const markPlacementAttendance = async (placementId: string, sessionDate: string, status: 'present' | 'absent', markedBy: string) => {
+  const { data, error } = await supabase
+    .from('placement_attendance')
+    .upsert([{ placement_id: placementId, session_date: sessionDate, status, marked_by: markedBy }], { onConflict: 'placement_id,session_date' })
+    .select()
+    .single()
+  return { data, error }
+}
+
+// Attendance for every currently-active placement in one round trip --
+// powers the year-group aggregate percentage on the overview.
+export const getPlacementAttendanceForOrg = async (organisationId: string) => {
+  const { data: placements, error } = await supabase.from('placements').select('id').eq('organisation_id', organisationId).eq('status', 'active')
+  if (error || !placements || placements.length === 0) return { data: [], error }
+  const { data, error: attError } = await supabase
+    .from('placement_attendance')
+    .select('placement_id, status')
+    .in('placement_id', placements.map(p => p.id))
+  return { data, error: attError }
+}
+
+// ── Bootcamp Evidence (providers, add-on gated) -- a summary over data
+// already entered elsewhere (Workshops/Students attendance, Review, Job
+// tracking), computed server-side since it spans several tables' RLS.
+export const getBootcampEvidence = async (organisationId: string) => {
+  const { data, error } = await supabase.rpc('get_bootcamp_evidence', { p_organisation_id: organisationId })
+  return { data, error }
+}
+
 // Sidebar collapsed/expanded state — remembered server-side per the org
 // layout spec, not browser-only (localStorage), so it follows the user
 // across devices/logins.
@@ -2093,6 +2163,35 @@ export const addToTalentPool = async (poolId: string, studentId: string) => {
 export const removeFromTalentPool = async (memberRowId: string) => {
   const { error } = await supabase.from('talent_pool_members').delete().eq('id', memberRowId)
   return { error }
+}
+
+// "The employer's only two actions are adding a candidate to a pool and
+// removing them, or marking a role filled" -- filling stops the
+// automatic cadence for every member of this pool (checked by the cron
+// route before it sends anything), not just a visual label.
+export const setPoolRoleFilled = async (poolId: string, filled: boolean) => {
+  const { error } = await supabase.from('talent_pools').update({ role_filled_at: filled ? new Date().toISOString() : null }).eq('id', poolId)
+  return { error }
+}
+
+// Scale/Enterprise only -- /api/talent-pool/set-cadence re-checks the
+// employer's real tier server-side rather than trusting the client.
+// null clears back to the fixed default cadence.
+export const setPoolCustomCadence = async (poolId: string, cadence: { day: number; label: string; message: string }[] | null) =>
+  authedFetch('/api/talent-pool/set-cadence', { poolId, cadence })
+
+// Every stage actually sent for a set of members -- automatic (the
+// cron route) and manual ("Send now") alike, since both write through
+// the same /api/talent-pool-cadence/send-now endpoint. Powers the "Week
+// 1: sent automatically ✓ / Week 2: sends itself" log on each card.
+export const getCadenceSends = async (memberIds: string[]) => {
+  if (memberIds.length === 0) return { data: [], error: null }
+  const { data, error } = await supabase
+    .from('talent_pool_cadence_sends')
+    .select('*')
+    .in('member_id', memberIds)
+    .order('stage', { ascending: true })
+  return { data, error }
 }
 
 // ── Employer side (Part 3): Partners -- derived, not a separate
