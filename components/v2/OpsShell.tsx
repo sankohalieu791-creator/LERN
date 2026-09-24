@@ -6,12 +6,13 @@ import { usePathname, useRouter } from 'next/navigation'
 import { signOut } from '@/lib/supabase'
 import { useResolvedTheme } from '@/context/ThemeProvider'
 import Logo from '@/components/v2/Logo'
-import { LayoutDashboard, Building2, Flag, ShieldAlert, ClipboardList, ScrollText, Settings, LogOut, Menu, X, UserPlus, ShieldCheck, BadgeCheck } from 'lucide-react'
+import { LayoutDashboard, Building2, Flag, ShieldAlert, ClipboardList, ScrollText, Settings, LogOut, Menu, X, UserPlus, ShieldCheck, BadgeCheck, School } from 'lucide-react'
 
 const NAV = [
   { href: '/ops', label: 'Overview', icon: LayoutDashboard },
   { href: '/ops/employers', label: 'Employer verification', icon: Building2 },
   { href: '/ops/approved-employers', label: 'Approved employers', icon: BadgeCheck },
+  { href: '/ops/organisations', label: 'Institution & provider verification', icon: School },
   { href: '/ops/reports', label: 'Content reports', icon: Flag },
   { href: '/ops/concerns', label: 'Safeguarding concerns', icon: ShieldAlert },
   { href: '/ops/dbs', label: 'DBS & sessions', icon: ClipboardList },

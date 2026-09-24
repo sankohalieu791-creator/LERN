@@ -167,6 +167,27 @@ export const requestMoreEmployerInfo = async (employerId: string, message: strin
   return { error }
 }
 
+// ── Institution/provider vetting gate ────────────────────────────────
+// Same shape as employer_verified, no automated check behind it (there's
+// no Companies-House equivalent for a school/training provider) -- an
+// ops admin approves manually. organisations: staff of own org read
+// already covers this select, no new RPC needed.
+export const getMyOrganisation = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('organisations').select('id, name, type, verified').eq('id', organisationId).single()
+  return { data, error }
+}
+
+export const getPendingOrganisations = async () => {
+  const { data, error } = await supabase.rpc('get_pending_organisations')
+  return { data, error }
+}
+
+export const approveOrganisation = async (organisationId: string) => {
+  const { error } = await supabase.rpc('approve_organisation', { p_org_id: organisationId })
+  return { error }
+}
+
 export const setEmployerManualCheck = async (employerId: string, check: 'website' | 'officer', value: boolean) => {
   const { error } = await supabase.rpc('set_employer_manual_check', { p_employer_id: employerId, p_check: check, p_value: value })
   return { error }
@@ -1352,6 +1373,16 @@ export const changeEmployerTierViaStripe = async (tier: 'micro' | 'growth' | 'sc
 
 export const cancelEmployerSubscriptionViaStripe = async () =>
   authedFetch('/api/stripe/cancel-subscription', {})
+
+// ── Institution/provider subscriptions via Stripe ────────────────────
+// Same real-payment pattern as the employer trio above, except there's
+// no fixed tier to choose -- the price is computed server-side from the
+// organisation's own headcount (see get_org_billing_for_checkout).
+export const createOrgCheckoutSession = async () =>
+  authedFetch('/api/stripe/org/create-checkout-session', {})
+
+export const cancelOrgSubscriptionViaStripe = async () =>
+  authedFetch('/api/stripe/org/cancel-subscription', {})
 
 export const getOrgStaff = async (organisationId: string) => {
   const { data, error } = await supabase

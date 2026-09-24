@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner, OrDivider, GoogleButton } from '@/components/v2/Field'
@@ -210,6 +211,10 @@ export default function EmployerSignupPage() {
           <TextField label="Email" type="email" value={email} onChange={setEmail} placeholder="you@company.com" />
           <TextField label="Password" type="password" value={password} onChange={setPassword} placeholder="At least 8 characters" hint="Minimum 8 characters." />
           <PrimaryButton onClick={handleStep1} loading={loading}>Continue</PrimaryButton>
+          <p className="text-[12.5px] text-[#8A8373] text-center mt-3 leading-relaxed">
+            By continuing, you agree to LERN's <Link href="/legal/terms" className="underline hover:text-ink">Terms</Link> and{' '}
+            <Link href="/legal/privacy" className="underline hover:text-ink">Privacy Policy</Link>.
+          </p>
           <div className="mt-6">
             <OrDivider />
             <GoogleButton onClick={handleGoogle} loading={googleLoading} />

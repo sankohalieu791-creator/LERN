@@ -143,7 +143,9 @@ export default function EmployerSubscriptionPanel({ onBack }: { onBack: () => vo
         <div className={`rounded-xl px-4 py-3 mb-4 text-[13px] ${billing.subscription_status === 'restricted' ? 'bg-danger-bg text-danger-text' : 'bg-accent-bg text-ink'}`}>
           {billing.subscription_status === 'restricted'
             ? 'Your subscription was cancelled and your access period has ended. Pick a plan below to reactivate.'
-            : `Cancelled — you'll keep access until ${new Date(billing.subscription_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`}
+            : billing.subscription_period_end
+              ? `Cancelled — you'll keep access until ${new Date(billing.subscription_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`
+              : "Cancelled — your access ends at the close of your current billing period."}
         </div>
       )}
 

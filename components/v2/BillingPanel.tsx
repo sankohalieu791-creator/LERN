@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getOrgBilling, setBootcampEvidence } from '@/lib/supabase'
+import { getOrgBilling, setBootcampEvidence, createOrgCheckoutSession, cancelOrgSubscriptionViaStripe } from '@/lib/supabase'
 import { providerBandFor, PROVIDER_BAND_LABEL, BOOTCAMP_EVIDENCE_MONTHLY, INSTITUTION_MAX_PRICE } from '@/lib/billing'
 import { ChevronLeft, TrendingUp } from 'lucide-react'
 
@@ -19,6 +19,7 @@ export default function BillingPanel({ onBack }: { onBack: () => void }) {
   const [billing, setBilling] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [togglingBootcamp, setTogglingBootcamp] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   const load = () => {
@@ -40,6 +41,23 @@ export default function BillingPanel({ onBack }: { onBack: () => void }) {
     load()
   }
 
+  const subscribe = async () => {
+    setError(''); setBusy(true)
+    const { data, error: err } = await createOrgCheckoutSession()
+    setBusy(false)
+    if (err) { setError(err.message); return }
+    if (data?.url) window.location.href = data.url
+  }
+
+  const cancel = async () => {
+    if (!confirm("Cancel your subscription? You'll keep access until the end of your current billing period, then the account becomes restricted until you resubscribe.")) return
+    setBusy(true)
+    const { error: err } = await cancelOrgSubscriptionViaStripe()
+    setBusy(false)
+    if (err) { setError(err.message); return }
+    load()
+  }
+
   return (
     <div className="max-w-lg mx-auto">
       <button onClick={onBack} className="flex items-center gap-1 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
@@ -51,14 +69,18 @@ export default function BillingPanel({ onBack }: { onBack: () => void }) {
       ) : !billing ? (
         <p className="text-[14px] text-danger-text">{error || 'Could not load billing.'}</p>
       ) : (
-        <BillingContent billing={billing} onToggleBootcamp={toggleBootcamp} togglingBootcamp={togglingBootcamp} error={error} />
+        <BillingContent
+          billing={billing} onToggleBootcamp={toggleBootcamp} togglingBootcamp={togglingBootcamp}
+          error={error} busy={busy} onSubscribe={subscribe} onCancel={cancel}
+        />
       )}
     </div>
   )
 }
 
-function BillingContent({ billing, onToggleBootcamp, togglingBootcamp, error }: {
+function BillingContent({ billing, onToggleBootcamp, togglingBootcamp, error, busy, onSubscribe, onCancel }: {
   billing: any; onToggleBootcamp: (v: boolean) => void; togglingBootcamp: boolean; error: string
+  busy: boolean; onSubscribe: () => void; onCancel: () => void
 }) {
   const isProvider = billing.org_type === 'provider'
   const band = isProvider ? providerBandFor(billing.headcount) : null
@@ -66,6 +88,16 @@ function BillingContent({ billing, onToggleBootcamp, togglingBootcamp, error }: 
 
   return (
     <div className="space-y-4">
+      {billing.subscription_status && billing.subscription_status !== 'active' && (
+        <div className={`rounded-xl px-4 py-3 text-[13px] ${billing.subscription_status === 'restricted' ? 'bg-danger-bg text-danger-text' : 'bg-accent-bg text-ink'}`}>
+          {billing.subscription_status === 'restricted'
+            ? 'Your subscription was cancelled and your access period has ended. Subscribe below to reactivate.'
+            : billing.subscription_period_end
+              ? `Cancelled — you'll keep access until ${new Date(billing.subscription_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`
+              : "Cancelled — your access ends at the close of your current billing period."}
+        </div>
+      )}
+
       {/* ── Headcount card ── */}
       <div className="bg-surface border border-edge rounded-2xl p-5">
         <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2">
@@ -154,6 +186,25 @@ function BillingContent({ billing, onToggleBootcamp, togglingBootcamp, error }: 
       )}
 
       {error && <p className="text-[12.5px] text-danger-text">{error}</p>}
+
+      {!billing.is_custom_pricing && billing.subscription_status !== 'active' && (
+        <button
+          onClick={onSubscribe} disabled={busy}
+          className="w-full text-white font-semibold text-[14px] py-3 rounded-xl disabled:opacity-40 transition"
+          style={{ backgroundColor: '#D4551A' }}
+        >
+          {busy ? 'Setting up…' : billing.subscription_status === 'restricted' ? 'Reactivate' : 'Subscribe'}
+        </button>
+      )}
+
+      {billing.subscription_status === 'active' && (
+        <button
+          onClick={onCancel} disabled={busy}
+          className="w-full bg-surface border border-edge text-ink-secondary font-semibold text-[13px] py-2.5 rounded-lg hover:border-danger-text hover:text-danger-text transition disabled:opacity-50"
+        >
+          Cancel subscription
+        </button>
+      )}
     </div>
   )
 }

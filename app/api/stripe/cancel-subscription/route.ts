@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
   if (profile.employer_stripe_subscription_id && stripe) {
     const subscription = await stripe.subscriptions.update(profile.employer_stripe_subscription_id, { cancel_at_period_end: true })
-    const periodEndUnix = (subscription as any).current_period_end as number | undefined
+    const periodEndUnix = subscription.items.data[0]?.current_period_end as number | undefined
     await supabaseAdmin.from('users').update({
       employer_subscription_status: 'canceled',
       employer_subscription_period_end: periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),

@@ -26,6 +26,14 @@ async function findEmployerId(customerId: string, metadataEmployerId?: string): 
   return data?.id || null
 }
 
+// Institutions/providers pay via organisations.stripe_customer_id, not
+// a users row -- same lookup shape as findEmployerId, different table.
+async function findOrganisationId(customerId: string, metadataOrgId?: string): Promise<string | null> {
+  if (metadataOrgId) return metadataOrgId
+  const { data } = await supabaseAdmin.from('organisations').select('id').eq('stripe_customer_id', customerId).single()
+  return data?.id || null
+}
+
 export async function POST(req: NextRequest) {
   if (!stripe) return NextResponse.json({ error: 'Payments are not configured yet.' }, { status: 503 })
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
@@ -49,6 +57,17 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session
         const employerId = session.metadata?.employer_id
         const tier = session.metadata?.tier
+        const organisationId = session.metadata?.organisation_id
+        if (organisationId && session.subscription) {
+          const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
+          await supabaseAdmin.from('organisations').update({
+            subscription_status: 'active',
+            subscription_period_end: null,
+            stripe_customer_id: session.customer as string,
+            stripe_subscription_id: subscription.id,
+          }).eq('id', organisationId)
+          break
+        }
         if (!employerId || !tier || !session.subscription) break
         const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
         await supabaseAdmin.from('users').update({
@@ -68,19 +87,31 @@ export async function POST(req: NextRequest) {
       // actually ending, which subscription.deleted covers instead.
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription
-        const employerId = await findEmployerId(subscription.customer as string, subscription.metadata?.employer_id)
-        if (!employerId) break
-        const priceId = subscription.items.data[0]?.price?.id
-        const tier = tierFromPriceId(priceId)
         const cancelling = subscription.cancel_at_period_end
         const status = subscription.status === 'active' || subscription.status === 'trialing'
           ? (cancelling ? 'canceled' : 'active')
           : 'restricted'
-        const periodEndUnix = (subscription as any).current_period_end as number | undefined
+        const periodEndUnix = subscription.items.data[0]?.current_period_end as number | undefined
+        const periodEndIso = status === 'canceled' && periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null
+
+        const organisationId = await findOrganisationId(subscription.customer as string, subscription.metadata?.organisation_id)
+        if (organisationId) {
+          await supabaseAdmin.from('organisations').update({
+            subscription_status: status,
+            subscription_period_end: periodEndIso,
+            stripe_subscription_id: subscription.id,
+          }).eq('id', organisationId)
+          break
+        }
+
+        const employerId = await findEmployerId(subscription.customer as string, subscription.metadata?.employer_id)
+        if (!employerId) break
+        const priceId = subscription.items.data[0]?.price?.id
+        const tier = tierFromPriceId(priceId)
         await supabaseAdmin.from('users').update({
           ...(tier ? { employer_tier: tier } : {}),
           employer_subscription_status: status,
-          employer_subscription_period_end: status === 'canceled' && periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null,
+          employer_subscription_period_end: periodEndIso,
           employer_stripe_subscription_id: subscription.id,
         }).eq('id', employerId)
         break
@@ -92,6 +123,11 @@ export async function POST(req: NextRequest) {
       // a self-managed cancellation's period end has passed.
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription
+        const organisationId = await findOrganisationId(subscription.customer as string, subscription.metadata?.organisation_id)
+        if (organisationId) {
+          await supabaseAdmin.from('organisations').update({ subscription_status: 'restricted' }).eq('id', organisationId)
+          break
+        }
         const employerId = await findEmployerId(subscription.customer as string, subscription.metadata?.employer_id)
         if (!employerId) break
         await supabaseAdmin.from('users').update({
