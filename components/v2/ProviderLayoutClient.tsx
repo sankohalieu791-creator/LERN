@@ -2,7 +2,7 @@
 
 import RoleGate from '@/components/v2/RoleGate'
 import OrgShell from '@/components/v2/OrgShell'
-import OnboardingTour from '@/components/v2/OnboardingTour'
+import OnboardingChecklist from '@/components/v2/OnboardingChecklist'
 import OrgBillingGate from '@/components/v2/OrgBillingGate'
 import OrgVerificationGate from '@/components/v2/OrgVerificationGate'
 import { providerSections, providerPhoneItems } from '@/lib/orgNav'
@@ -13,7 +13,7 @@ export default function ProviderLayoutClient({ children }: { children: React.Rea
       <OrgVerificationGate>
         <OrgBillingGate>
           <OrgShell sections={providerSections} phoneItems={providerPhoneItems}>
-            <OnboardingTour role="provider" />
+            <OnboardingChecklist role="provider" />
             {children}
           </OrgShell>
         </OrgBillingGate>

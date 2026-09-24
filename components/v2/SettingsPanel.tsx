@@ -23,7 +23,7 @@ import {
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
 import BillingPanel from '@/components/v2/BillingPanel'
 import EmployerSubscriptionPanel from '@/components/v2/EmployerSubscriptionPanel'
-import { replayOnboarding } from '@/components/v2/OnboardingTour'
+import { showOnboardingChecklist } from '@/components/v2/OnboardingChecklist'
 
 // Rebuilt to the same grouped-row-list structure as the student app's
 // own Settings (Group/Row/ToggleRow, one flowing screen, sub-screens
@@ -209,7 +209,7 @@ export default function SettingsPanel() {
 
       {(isOrgAdmin || user.role === 'employer') && (
         <Group title="Help" icon={HelpCircle}>
-          <Row label="Replay tutorial" onClick={replayOnboarding} />
+          <Row label="Show setup checklist" onClick={showOnboardingChecklist} />
         </Group>
       )}
 

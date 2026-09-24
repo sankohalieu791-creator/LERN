@@ -188,6 +188,19 @@ export const approveOrganisation = async (organisationId: string) => {
   return { error }
 }
 
+// ── Onboarding checklist ──────────────────────────────────────────────
+// Real task completion, computed live from real data -- replaces the
+// old click-through OnboardingTour. See OnboardingChecklist.tsx.
+export const getOrgOnboardingProgress = async (organisationId: string) => {
+  const { data, error } = await supabase.rpc('get_org_onboarding_progress', { p_org_id: organisationId })
+  return { data, error }
+}
+
+export const getEmployerOnboardingProgress = async (employerId: string) => {
+  const { data, error } = await supabase.rpc('get_employer_onboarding_progress', { p_employer_id: employerId })
+  return { data, error }
+}
+
 export const setEmployerManualCheck = async (employerId: string, check: 'website' | 'officer', value: boolean) => {
   const { error } = await supabase.rpc('set_employer_manual_check', { p_employer_id: employerId, p_check: check, p_value: value })
   return { error }
