@@ -55,7 +55,21 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   })
 
   return (
-    <div data-theme={theme} className="h-screen overflow-hidden bg-paper flex">
+    <div
+      data-theme={theme} className="h-[100dvh] overflow-hidden bg-paper flex"
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      {/* h-[100dvh], not h-screen (100vh) -- 100vh on mobile Safari can sit
+          taller than what's actually visible while the address bar shows,
+          which is exactly "everything pushed upwards, can't reach the top
+          bar" (the real fix, not just the padding below): dvh recalculates
+          against whatever's actually visible. paddingTop/Bottom here for
+          the status bar/notch and home indicator -- this shell never had
+          it (OrgShell/AuthShell already do), so the mobile header sat
+          underneath the status bar with its menu button unreachable.
+          box-sizing:border-box (global reset) means this padding eats into
+          the existing h-[100dvh] box rather than adding to it, so it can't
+          push the shell taller than the real viewport. */}
       {/* h-screen + overflow-hidden here, not min-h-screen -- a min-height
           lets this whole row grow taller than the viewport to match a
           long page (a big table, say), which drags the sidebar's own
