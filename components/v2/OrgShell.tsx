@@ -97,20 +97,39 @@ export default function OrgShell({
   // This is the same fix with no dependency on browser support at all:
   // while any text field on the page is genuinely focused, hide the
   // fixed "+" FAB outright rather than trust it'll reposition itself
-  // correctly. Real focus tracking (focusin/focusout bubble to
-  // document), not a guess based on viewport size changing, which can
-  // also fire from address-bar show/hide with nothing to do with a
-  // keyboard at all.
+  // correctly. Real focus tracking (focusin bubbles to document) drives
+  // the hide, immediate and lag-free while the keyboard animates in.
+  //
+  // The un-hide used to be the matching focusout instead -- wrong
+  // signal. focusout fires the instant a field loses focus, well before
+  // the keyboard has actually finished animating away and the real
+  // viewport has settled back to full height. Removing keyboard-open
+  // right then re-showed the FAB against the still-shrunken layout,
+  // which read as "type something, look away, and it shoots up and
+  // stays there" -- it wasn't stuck, it was correctly placed for a
+  // viewport that hadn't finished resizing back yet, with nothing to
+  // ever re-trigger a layout once it did. visualViewport's resize event
+  // fires with the browser's own ACTUAL current height, so the un-hide
+  // now waits for "height is back to (near) full" instead of "a field
+  // lost focus" -- it only ever comes back once it has somewhere
+  // correct to reappear to.
   useEffect(() => {
     const isTextInput = (el: EventTarget | null) =>
       el instanceof HTMLElement && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
     const onFocusIn = (e: FocusEvent) => { if (isTextInput(e.target)) document.body.classList.add('keyboard-open') }
-    const onFocusOut = (e: FocusEvent) => { if (isTextInput(e.target)) document.body.classList.remove('keyboard-open') }
+
+    const vv = window.visualViewport
+    const fullHeight = window.innerHeight
+    const onViewportResize = () => {
+      if (!vv) return
+      if (vv.height >= fullHeight * 0.9) document.body.classList.remove('keyboard-open')
+    }
+
     document.addEventListener('focusin', onFocusIn)
-    document.addEventListener('focusout', onFocusOut)
+    vv?.addEventListener('resize', onViewportResize)
     return () => {
       document.removeEventListener('focusin', onFocusIn)
-      document.removeEventListener('focusout', onFocusOut)
+      vv?.removeEventListener('resize', onViewportResize)
       document.body.classList.remove('keyboard-open')
     }
   }, [])

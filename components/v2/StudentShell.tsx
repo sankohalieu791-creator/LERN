@@ -83,16 +83,44 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   // nav outright the moment a real text field is focused, independent
   // of whether the browser actually shrank the layout viewport for the
   // keyboard or not.
+  //
+  // Un-hiding used to happen on the input's own focusout instead of
+  // here -- wrong signal. focusout fires the instant the field loses
+  // focus, which is well BEFORE the keyboard has actually finished
+  // animating away and the real viewport has settled back to full
+  // height. Removing keyboard-open right then re-showed the nav against
+  // the still-shrunken (keyboard-open) layout, which is exactly "type
+  // something, look away, and the nav shoots up and stays there" --
+  // it wasn't stuck, it was correctly positioned for a viewport that
+  // hadn't finished resizing back yet, and nothing ever re-triggered a
+  // layout after it did. visualViewport's own resize event fires once
+  // the browser reports the ACTUAL current height, so gating the
+  // un-hide on "height is back to (near) full" instead of "an input
+  // lost focus" means the nav only ever reappears once it has somewhere
+  // correct to reappear TO. Focus is still what triggers the immediate
+  // hide (no lag while the keyboard is animating in); the viewport is
+  // what's trusted to say it's safe to bring the nav back.
   useEffect(() => {
     const isTextInput = (el: EventTarget | null) =>
       el instanceof HTMLElement && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
     const onFocusIn = (e: FocusEvent) => { if (isTextInput(e.target)) document.body.classList.add('keyboard-open') }
-    const onFocusOut = (e: FocusEvent) => { if (isTextInput(e.target)) document.body.classList.remove('keyboard-open') }
+
+    const vv = window.visualViewport
+    const fullHeight = window.innerHeight
+    const onViewportResize = () => {
+      if (!vv) return
+      // >90% of the full layout height back -- comfortably past any
+      // address-bar show/hide chrome changes, which only ever eat a
+      // small fraction of the screen, while a real keyboard takes a
+      // third or more.
+      if (vv.height >= fullHeight * 0.9) document.body.classList.remove('keyboard-open')
+    }
+
     document.addEventListener('focusin', onFocusIn)
-    document.addEventListener('focusout', onFocusOut)
+    vv?.addEventListener('resize', onViewportResize)
     return () => {
       document.removeEventListener('focusin', onFocusIn)
-      document.removeEventListener('focusout', onFocusOut)
+      vv?.removeEventListener('resize', onViewportResize)
       document.body.classList.remove('keyboard-open')
     }
   }, [])
