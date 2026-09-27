@@ -41,7 +41,17 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
   // (a viewport-resize flash, not a plain z-index problem).
   useEffect(() => {
     document.body.classList.add('modal-open')
-    return () => document.body.classList.remove('modal-open')
+    return () => {
+      document.body.classList.remove('modal-open')
+      // The caption textarea below is autoFocus -- tapping "Post"
+      // straight after typing (without tapping away first) removes it
+      // from the DOM while still focused. A native blur/focusout isn't
+      // guaranteed to fire in that case, which left StudentShell's own
+      // focusin/focusout tracking stuck with body.keyboard-open still
+      // set, permanently hiding the bottom nav (a blank bar-shaped gap
+      // where it should be) until something else happened to reset it.
+      document.body.classList.remove('keyboard-open')
+    }
   }, [])
 
   const isAdult = user?.date_of_birth

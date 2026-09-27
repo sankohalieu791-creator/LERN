@@ -104,18 +104,15 @@ export default function FeedPanel() {
     <div className="pb-2">
       {user?.organisation_id && <WinsStrip userId={user.id} organisationId={user.organisation_id} />}
 
-      {exploring && (
-        <div className="px-4 mb-4">
-          <p className="text-[12.5px] text-[var(--app-text-secondary)]">
-            Link to your organisation in My Work to start posting your own wins and updates.
-          </p>
-        </div>
-      )}
-
       {posts.length === 0 ? (
         <div className="flex flex-col items-center text-center py-20 px-6">
           <p className="font-semibold text-[var(--app-text)] text-[15px] mb-1">Nothing here yet</p>
           <p className="text-[13px] text-[var(--app-text-tertiary)]">Wins and updates will show up here.</p>
+          {exploring && (
+            <p className="text-[12.5px] text-[var(--app-text-secondary)] mt-3">
+              Link to your organisation in My Work to start posting your own wins and updates.
+            </p>
+          )}
         </div>
       ) : (
         // Edge-to-edge, Instagram-style -- no side padding here any
@@ -239,10 +236,17 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Same fix as PostComposer -- see the body.modal-open rule in
-  // globals.css.
+  // globals.css. Also clears body.keyboard-open on unmount -- this
+  // sheet has its own focused caption field, and closing it while that
+  // field is still focused isn't guaranteed to fire a native blur, which
+  // is what StudentShell's focusin/focusout tracking relies on to clear
+  // that class itself.
   useEffect(() => {
     document.body.classList.add('modal-open')
-    return () => document.body.classList.remove('modal-open')
+    return () => {
+      document.body.classList.remove('modal-open')
+      document.body.classList.remove('keyboard-open')
+    }
   }, [])
 
   // Insta-story-style: photo or a short video, author's choice. Video
@@ -769,6 +773,15 @@ function ReportSheet({ onClose, onSend, onSent }: {
   const [note, setNote] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+
+  // Closing this while the optional note field is still focused isn't
+  // guaranteed to fire a native blur, which is what StudentShell's own
+  // focusin/focusout tracking relies on -- same class of bug as
+  // PostComposer/AddWinSheet, just without a modal-open class of its
+  // own to piggyback the fix onto.
+  useEffect(() => {
+    return () => { document.body.classList.remove('keyboard-open') }
+  }, [])
 
   const send = async () => {
     setSending(true); setError('')

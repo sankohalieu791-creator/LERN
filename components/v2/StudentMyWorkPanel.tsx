@@ -441,6 +441,16 @@ function WorkItemDetail({
   const [memberCount, setMemberCount] = useState<number | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const hostName = (item as any).users?.full_name
+
+  // Same fix as PostComposer/EditProfileScreen -- this portal has its
+  // own focused text field (the submission textarea below), and
+  // removing it from the DOM while still focused isn't guaranteed to
+  // fire a native blur/focusout, which is what StudentShell's own
+  // focusin/focusout tracking relies on. Left unfixed, body.keyboard-
+  // open can get stuck permanently, hiding the bottom nav.
+  useEffect(() => {
+    return () => { document.body.classList.remove('keyboard-open') }
+  }, [])
   const canSubmit = (item.type === 'brief' || item.type === 'assignment') && (!latest || latest.status === 'returned')
   // My Work: Brief-Completion Screen spec -- "WHAT GOOD LOOKS LIKE...
   // the same underlying data as the brief's verification criteria",

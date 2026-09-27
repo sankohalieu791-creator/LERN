@@ -597,6 +597,18 @@ export function EditProfileScreen({ profile, onDone, onClose }: { profile: any; 
   const [error, setError] = useState('')
   const photoRef = useRef<HTMLInputElement>(null)
 
+  // Tapping "Save" straight after typing in a field (Bio especially --
+  // the last one most people edit) removes this whole portal, inputs
+  // included, while one is still focused. A native blur/focusout isn't
+  // guaranteed to fire when the focused node is removed like that,
+  // which left StudentShell's/OrgShell's own focusin/focusout tracking
+  // stuck with body.keyboard-open still set -- permanently hiding the
+  // bottom nav (reads as a blank bar-shaped gap where it should be)
+  // until something else happened to reset it.
+  useEffect(() => {
+    return () => { document.body.classList.remove('keyboard-open') }
+  }, [])
+
   const pickPhoto = () => photoRef.current?.click()
 
   const onPhotoChosen = async (file: File | null) => {

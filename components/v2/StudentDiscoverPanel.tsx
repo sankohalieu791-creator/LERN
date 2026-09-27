@@ -217,7 +217,6 @@ export default function StudentDiscoverPanel() {
           at the cost of a layout shift between tabs. */}
       <div className="px-4 pt-4 pb-3">
         <h1 className="text-[var(--app-text)] text-2xl font-bold">Discover</h1>
-        {tab === 'received' && <p className="text-[var(--app-text-tertiary)] text-sm mt-0.5">Employers who've expressed interest in you</p>}
         {tab === 'tracking' && <p className="text-[var(--app-text-tertiary)] text-sm mt-0.5">Where each application actually stands</p>}
       </div>
 
@@ -307,13 +306,13 @@ export default function StudentDiscoverPanel() {
           })()
         ) : tab === 'tracking' ? (
           applications.length === 0 ? (
-            <EmptyState label="Nothing yet — apply to a role or accept an employer's interest to start tracking it here." icon={<LineChart className="w-8 h-8 text-[var(--app-text-quaternary)] mb-2" />} />
+            <EmptyState label="Nothing yet — apply to a role or accept an employer's interest to start tracking it here." icon={<LineChart className="w-8 h-8 text-[var(--app-text-quaternary)] mx-auto mb-2" />} />
           ) : applications.map(a => <TrackingCard key={a.id} application={a} />)
         ) : (
           opportunities.length === 0 ? (
             <EmptyState
               label={tab === 'explore' ? 'No jobs, apprenticeships or internships posted yet.' : `No ${tab === 'job' ? 'jobs' : tab === 'apprenticeship' ? 'apprenticeships' : 'internships'} posted yet.`}
-              icon={<Briefcase className="w-8 h-8 text-[var(--app-text-quaternary)] mb-2" />}
+              icon={<Briefcase className="w-8 h-8 text-[var(--app-text-quaternary)] mx-auto mb-2" />}
             />
           ) : opportunities.map(o => {
             const status = applicationByOpp[o.id]
