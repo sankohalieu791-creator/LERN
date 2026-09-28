@@ -38,15 +38,24 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: 'cover',
   themeColor: '#FFFDF9',
-  // Without this, the on-screen keyboard opening only shrinks the
-  // VISUAL viewport, not the layout one -- fixed-positioned bottom UI
-  // (the student bottom nav, any dvh-capped dialog) keeps sizing
-  // itself against the old, taller layout viewport and can end up
-  // floating up into view over whatever's being typed into, instead of
-  // staying pinned below the keyboard or hidden. This makes the layout
-  // viewport itself shrink with the keyboard, which is what "the nav
-  // comes up when I tap a text box" actually needed.
-  interactiveWidget: 'resizes-content',
+  // Was 'resizes-content' -- correct in an ordinary Safari tab, but a
+  // well-documented WebKit bug specifically in standalone/home-screen
+  // PWA mode: resizing the LAYOUT viewport down when the keyboard opens
+  // is not reliably reversed when it closes, leaving window.innerHeight/
+  // 100dvh permanently reporting the shrunken size with nothing able to
+  // force it back short of backgrounding and refocusing the app. Every
+  // fixed-positioned bottom element sized against that (the student
+  // bottom nav, the org FAB, any dvh-capped dialog) then genuinely,
+  // permanently sits too high -- not a timing bug in when a class gets
+  // toggled (three prior attempts here all assumed that), the viewport
+  // itself was actually still the wrong size. 'overlays-content' keeps
+  // the layout viewport fixed regardless of the keyboard -- the keyboard
+  // simply floats on top of whatever's underneath instead, which mobile
+  // browsers already scroll a focused field clear of on their own. The
+  // JS-driven hide (StudentShell's/OrgShell's own keyboard-open class)
+  // still exists on top of this for the nav/FAB specifically, but no
+  // longer depends on the layout viewport ever resizing at all.
+  interactiveWidget: 'overlays-content',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
