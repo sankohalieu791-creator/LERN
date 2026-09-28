@@ -119,17 +119,29 @@ export default function OrgShell({
     const onFocusIn = (e: FocusEvent) => { if (isTextInput(e.target)) document.body.classList.add('keyboard-open') }
 
     const vv = window.visualViewport
-    const fullHeight = window.innerHeight
-    const onViewportResize = () => {
+    // A one-time window.innerHeight snapshot (the previous version of
+    // this fix) goes stale if Safari's own toolbar changes size for any
+    // reason unrelated to the keyboard, permanently stopping "90% of
+    // it" from ever being reachable again -- indistinguishable from
+    // "shoots up and stays there". Tracking the tallest height actually
+    // observed, continuously, keeps the comparison live instead.
+    let maxHeight = vv?.height ?? window.innerHeight
+    const checkSettled = () => {
       if (!vv) return
-      if (vv.height >= fullHeight * 0.9) document.body.classList.remove('keyboard-open')
+      if (vv.height > maxHeight) maxHeight = vv.height
+      if (vv.height >= maxHeight - 2) document.body.classList.remove('keyboard-open')
     }
+    // Belt and suspenders: a dropped resize event (some WebViews are
+    // inconsistent here) would otherwise leave this stuck indefinitely
+    // with nothing to ever re-check it.
+    const poll = window.setInterval(checkSettled, 300)
 
     document.addEventListener('focusin', onFocusIn)
-    vv?.addEventListener('resize', onViewportResize)
+    vv?.addEventListener('resize', checkSettled)
     return () => {
       document.removeEventListener('focusin', onFocusIn)
-      vv?.removeEventListener('resize', onViewportResize)
+      vv?.removeEventListener('resize', checkSettled)
+      window.clearInterval(poll)
       document.body.classList.remove('keyboard-open')
     }
   }, [])

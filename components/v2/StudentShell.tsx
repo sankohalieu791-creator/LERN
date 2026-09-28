@@ -106,21 +106,35 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
     const onFocusIn = (e: FocusEvent) => { if (isTextInput(e.target)) document.body.classList.add('keyboard-open') }
 
     const vv = window.visualViewport
-    const fullHeight = window.innerHeight
-    const onViewportResize = () => {
+    // A one-time window.innerHeight snapshot was the previous version
+    // of this fix -- still wrong, just wrong more subtly: if Safari's
+    // own toolbar changes size for any reason unrelated to the keyboard
+    // (scroll direction, orientation), that snapshot goes stale and
+    // "90% of it" can permanently stop being reachable, leaving
+    // keyboard-open stuck forever after -- indistinguishable from
+    // "shoots up and stays there". Tracking the tallest height actually
+    // observed, continuously, means the bar being compared against is
+    // never stale -- it adapts to whatever the chrome is doing instead
+    // of assuming it never changes.
+    let maxHeight = vv?.height ?? window.innerHeight
+    const checkSettled = () => {
       if (!vv) return
-      // >90% of the full layout height back -- comfortably past any
-      // address-bar show/hide chrome changes, which only ever eat a
-      // small fraction of the screen, while a real keyboard takes a
-      // third or more.
-      if (vv.height >= fullHeight * 0.9) document.body.classList.remove('keyboard-open')
+      if (vv.height > maxHeight) maxHeight = vv.height
+      if (vv.height >= maxHeight - 2) document.body.classList.remove('keyboard-open')
     }
+    // Belt and suspenders: a resize event getting dropped (some
+    // WebViews are inconsistent here) would otherwise leave the nav
+    // stuck hidden/mispositioned indefinitely with nothing to ever
+    // re-check it. Polling costs nothing while idle and guarantees this
+    // self-corrects within a third of a second regardless.
+    const poll = window.setInterval(checkSettled, 300)
 
     document.addEventListener('focusin', onFocusIn)
-    vv?.addEventListener('resize', onViewportResize)
+    vv?.addEventListener('resize', checkSettled)
     return () => {
       document.removeEventListener('focusin', onFocusIn)
-      vv?.removeEventListener('resize', onViewportResize)
+      vv?.removeEventListener('resize', checkSettled)
+      window.clearInterval(poll)
       document.body.classList.remove('keyboard-open')
     }
   }, [])
