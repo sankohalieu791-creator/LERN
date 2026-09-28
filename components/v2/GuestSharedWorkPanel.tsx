@@ -50,12 +50,14 @@ export default function GuestSharedWorkPanel() {
     })
   }, [user])
 
+  const [expressError, setExpressError] = useState<string | null>(null)
   const handleExpress = async (studentId: string) => {
     if (!user) return
-    setSending(studentId)
+    setSending(studentId); setExpressError(null)
     const { error } = await expressInterest(user.id, studentId)
     setSending(null)
-    if (!error) setInterestByStudent(prev => ({ ...prev, [studentId]: 'pending' }))
+    if (error) { setExpressError("Couldn't send — please try again."); return }
+    setInterestByStudent(prev => ({ ...prev, [studentId]: 'pending' }))
   }
 
   const studentHeading = context?.studentNames.length
@@ -82,6 +84,10 @@ export default function GuestSharedWorkPanel() {
           You are viewing shared work only. You cannot see any other students or content on LERN.
         </p>
       </div>
+
+      {expressError && (
+        <p className="text-[13px] text-danger-text bg-danger-bg rounded-xl px-4 py-2.5">{expressError}</p>
+      )}
 
       {loading ? (
         <p className="text-ink-tertiary text-[14px]">Loading…</p>

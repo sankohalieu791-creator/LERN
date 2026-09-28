@@ -50,12 +50,14 @@ export default function EmployerDiscoverPanel() {
     })
   }, [user])
 
+  const [composerError, setComposerError] = useState('')
   const handleExpress = async (message: string) => {
     if (!user || !composer) return
-    setSending(composer.studentId)
+    setSending(composer.studentId); setComposerError('')
     const { error } = await expressInterest(user.id, composer.studentId, { message, opportunity_label: composer.label })
     setSending(null)
-    if (!error) { setInterestByStudent(prev => ({ ...prev, [composer.studentId]: 'pending' })); setComposer(null) }
+    if (error) { setComposerError(error.message || "Couldn't send — try again."); return }
+    setInterestByStudent(prev => ({ ...prev, [composer.studentId]: 'pending' })); setComposer(null)
   }
 
   return (
@@ -176,6 +178,7 @@ export default function EmployerDiscoverPanel() {
         <OfferComposer
           studentName={composer.studentName}
           sending={sending === composer.studentId}
+          error={composerError}
           onClose={() => setComposer(null)}
           onSend={handleExpress}
         />
@@ -273,7 +276,7 @@ function PoolPicker({ studentId, onClose }: { studentId: string; onClose: () => 
 // The org sees this message verbatim on their side (Interest received)
 // -- a few sentences saying what the employer's actually after, not
 // just a bare "interested" flag with nothing to respond to.
-function OfferComposer({ studentName, sending, onClose, onSend }: { studentName: string; sending: boolean; onClose: () => void; onSend: (message: string) => void }) {
+function OfferComposer({ studentName, sending, error, onClose, onSend }: { studentName: string; sending: boolean; error?: string; onClose: () => void; onSend: (message: string) => void }) {
   const [message, setMessage] = useState('')
   return createPortal((
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4">
@@ -288,6 +291,7 @@ function OfferComposer({ studentName, sending, onClose, onSend }: { studentName:
           rows={4}
           className="w-full bg-surface-subtle border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none mb-4"
         />
+        {error && <p className="text-[12.5px] text-danger-text mb-3">{error}</p>}
         <div className="flex items-center justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2.5 rounded-lg text-[13px] font-semibold text-ink-secondary hover:bg-surface-muted transition">Cancel</button>
           <button

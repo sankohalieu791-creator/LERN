@@ -211,6 +211,7 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged, onNoteSav
   const [noteSaved, setNoteSaved] = useState(false)
   const [noteError, setNoteError] = useState('')
   const [notProgressingReason, setNotProgressingReason] = useState<string | null>(null)
+  const [moveError, setMoveError] = useState('')
 
   useEffect(() => { getApplicationActivity(app.id).then(({ data }) => setActivity(data || [])) }, [app.id])
 
@@ -225,9 +226,10 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged, onNoteSav
     // the next time anyone (employer or org) looks at this candidate's
     // activity log.
     if (stage === 'not_progressing' && notProgressingReason === null) { setNotProgressingReason(''); return }
-    setMoving(true)
-    await moveApplicationStage(app.id, stage, actorId, reason)
+    setMoving(true); setMoveError('')
+    const { error } = await moveApplicationStage(app.id, stage, actorId, reason)
     setMoving(false)
+    if (error) { setMoveError(error.message || "Couldn't move this candidate — try again."); return }
     setNotProgressingReason(null)
     onChanged()
   }
@@ -276,6 +278,7 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged, onNoteSav
                   </button>
                 ))}
               </div>
+              {moveError && <p className="text-[12px] text-danger-text mt-1.5">{moveError}</p>}
               {notProgressingReason !== null && (
                 <div className="mt-2.5 pt-2.5 border-t border-edge-subtle">
                   <p className="text-[12px] text-ink-tertiary mb-1.5">Why aren't they progressing? (optional, but shows up in the activity log for you and the school/provider to see)</p>

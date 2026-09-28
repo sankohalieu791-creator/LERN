@@ -343,7 +343,11 @@ function WorkItemCard({ item, onChanged, summary }: { item: any; onChanged: () =
   }, [item.id, inSession])
 
   const start = async () => {
-    await startWorkItemSession(item.id) // fans out "session has started, join now" the first time only
+    if (busy) return
+    setBusy(true); setActionError('')
+    const { error } = await startWorkItemSession(item.id) // fans out "session has started, join now" the first time only
+    setBusy(false)
+    if (error) { setActionError(error.message); return }
     setInSession(true)
     onChanged()
   }
@@ -464,10 +468,10 @@ function WorkItemCard({ item, onChanged, summary }: { item: any; onChanged: () =
           </span>
         ) : (
           <button
-            onClick={start}
-            className="flex items-center gap-1.5 bg-success-solid text-white font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3 hover:bg-success-solid-hover transition"
+            onClick={start} disabled={busy}
+            className="flex items-center gap-1.5 bg-success-solid text-white font-semibold text-[12px] px-3.5 py-2 rounded-lg mt-3 hover:bg-success-solid-hover transition disabled:opacity-50"
           >
-            <Video className="w-3.5 h-3.5" /> {item.started_at ? 'Join session' : 'Start session'}
+            <Video className="w-3.5 h-3.5" /> {busy ? 'Starting…' : item.started_at ? 'Join session' : 'Start session'}
           </button>
         )
       )}

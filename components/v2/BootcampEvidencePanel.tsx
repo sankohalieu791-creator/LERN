@@ -40,13 +40,16 @@ export default function BootcampEvidencePanel() {
   const [cohorts, setCohorts] = useState<any[]>([])
   const [cohortId, setCohortId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(false)
 
   useEffect(() => {
     if (!user?.organisation_id) return
-    getOrgBilling(user.organisation_id).then(({ data }) => {
+    getOrgBilling(user.organisation_id).then(({ data, error }) => {
+      if (error) { setFetchError(true); setLoading(false); return }
       setEnabled(!!(data as any)?.bootcamp_evidence_enabled)
       if (!(data as any)?.bootcamp_evidence_enabled) { setLoading(false); return }
-      getBootcampEvidence(user.organisation_id!).then(({ data: ev }) => {
+      getBootcampEvidence(user.organisation_id!).then(({ data: ev, error: evErr }) => {
+        if (evErr) { setFetchError(true); setLoading(false); return }
         const rows = (ev as any[]) || []
         setCohorts(rows)
         if (rows.length > 0) setCohortId(rows[0].work_item_id)
@@ -55,8 +58,17 @@ export default function BootcampEvidencePanel() {
     })
   }, [user?.organisation_id])
 
-  if (loading || enabled === null) {
+  if (loading || (enabled === null && !fetchError)) {
     return <div className="h-40 rounded-2xl bg-surface animate-pulse" />
+  }
+
+  if (fetchError) {
+    return (
+      <div className="text-center py-16 bg-surface border border-edge-subtle rounded-2xl">
+        <p className="text-[15px] font-bold text-ink mb-1.5">Couldn't load Bootcamp Evidence</p>
+        <p className="text-[13px] text-ink-tertiary max-w-sm mx-auto">Something went wrong fetching this — try refreshing the page.</p>
+      </div>
+    )
   }
 
   if (!enabled) {

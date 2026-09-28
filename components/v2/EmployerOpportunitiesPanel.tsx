@@ -22,6 +22,7 @@ export default function EmployerOpportunitiesPanel() {
   const [salary, setSalary] = useState('')
   const [location, setLocation] = useState('')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const avatarUrl = useAvatarUrl(user?.avatar_path)
 
   const load = () => {
@@ -31,7 +32,7 @@ export default function EmployerOpportunitiesPanel() {
   useEffect(load, [user])
 
   const reset = () => {
-    setTitle(''); setDescription(''); setRequirements(''); setSalary(''); setLocation(''); setType('job'); setShowForm(false); setEditingId(null)
+    setTitle(''); setDescription(''); setRequirements(''); setSalary(''); setLocation(''); setType('job'); setShowForm(false); setEditingId(null); setSaveError('')
   }
 
   const startEdit = (o: any) => {
@@ -43,7 +44,7 @@ export default function EmployerOpportunitiesPanel() {
 
   const handleSave = async () => {
     if (!user || !title.trim()) return
-    setSaving(true)
+    setSaving(true); setSaveError('')
     const fields = {
       title: title.trim(), type, description: description.trim() || undefined,
       requirements: requirements.trim() || undefined, salary: salary.trim() || undefined,
@@ -51,7 +52,8 @@ export default function EmployerOpportunitiesPanel() {
     }
     const { error } = editingId ? await updateOpportunity(editingId, fields) : await createOpportunity(user.id, fields)
     setSaving(false)
-    if (!error) { reset(); load() }
+    if (error) { setSaveError(error.message || "Couldn't save — try again."); return }
+    reset(); load()
   }
 
   const handleDelete = async (id: string) => {
@@ -129,6 +131,7 @@ export default function EmployerOpportunitiesPanel() {
             className="w-full bg-surface border border-edge rounded-lg px-3.5 py-2.5 text-[14px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition resize-none"
           />
 
+          {saveError && <p className="text-[12.5px] text-danger-text">{saveError}</p>}
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={!title.trim() || saving} className="px-4 py-2 rounded-lg bg-brand text-white text-[13px] font-semibold disabled:opacity-40">
               {saving ? 'Saving…' : editingId ? 'Save changes' : 'Post'}

@@ -566,7 +566,15 @@ export default function WorkshopSession({
   const kickParticipant = async (targetUid: number) => {
     presenceRef.current?.send({ type: 'broadcast', event: 'control', payload: { action: 'kick', targetUid } })
     const targetUserId = participants[targetUid]?.userId
-    if (user && targetUserId) await removeWorkshopParticipant(workItemId, targetUserId, user.id)
+    if (user && targetUserId) {
+      const { error } = await removeWorkshopParticipant(workItemId, targetUserId, user.id)
+      // The broadcast above only disconnects them from this moment --
+      // this persisted record is what actually stops them rejoining
+      // (see join()'s isParticipantRemoved check above). If it fails to
+      // save, the host needs to know now, not discover it when the
+      // person they just removed walks straight back in.
+      if (error) alert('Removed them from the call, but could not save the removal — they may be able to rejoin. Try removing them again.')
+    }
   }
 
   const startRecording = async () => {

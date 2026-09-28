@@ -436,7 +436,7 @@ function ReviewPiece({ submission, onBack, onDecided }: { submission: any; onBac
           <p className="text-[13px] text-ink">Some criteria are not ticked. Verify anyway?</p>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button onClick={() => setConfirmVerify(false)} className="text-[13px] font-semibold text-ink-secondary px-3 py-1.5">Cancel</button>
-            <button onClick={verify} className="text-[13px] font-semibold text-white px-3 py-1.5 rounded-lg" style={{ backgroundColor: '#0F6E56' }}>Verify</button>
+            <button onClick={verify} disabled={loading} className="text-[13px] font-semibold text-white px-3 py-1.5 rounded-lg disabled:opacity-50" style={{ backgroundColor: '#0F6E56' }}>Verify</button>
           </div>
         </div>
       )}

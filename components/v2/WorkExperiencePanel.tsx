@@ -291,11 +291,19 @@ function PlacementDetail({ placement, onBack }: { placement: any; onBack: () => 
 
   const mark = async (date: string, status: 'present' | 'absent') => {
     if (!user) return
+    const previous = byDate.get(date)
     setRecords(prev => {
       const next = prev.filter(r => r.session_date !== date)
       return [...next, { session_date: date, status }]
     })
-    await markPlacementAttendance(placement.id, date, status, user.id)
+    const { error } = await markPlacementAttendance(placement.id, date, status, user.id)
+    if (error) {
+      setRecords(prev => {
+        const next = prev.filter(r => r.session_date !== date)
+        return previous ? [...next, { session_date: date, status: previous }] : next
+      })
+      alert('Could not save attendance — please try again.')
+    }
   }
 
   const present = records.filter(r => r.status === 'present').length
@@ -347,7 +355,11 @@ function PlacementDetail({ placement, onBack }: { placement: any; onBack: () => 
       </div>
 
       <button
-        onClick={async () => { await setPlacementStatus(placement.id, 'completed'); onBack() }}
+        onClick={async () => {
+          const { error } = await setPlacementStatus(placement.id, 'completed')
+          if (error) { alert('Could not mark this placement as ended — please try again.'); return }
+          onBack()
+        }}
         className="text-[12.5px] font-semibold text-ink-tertiary hover:text-danger-text transition"
       >
         Mark placement ended
