@@ -146,6 +146,16 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
     })
     setPosting(false)
     if (postErr) { setError(postErr.message); return }
+    // Tapping Post moves focus to that button, not off the page --
+    // the on-screen keyboard doesn't always dismiss synchronously just
+    // because a plain button was tapped, especially inside a portal. If
+    // the autoFocus caption field is still (or briefly) focused the
+    // instant this whole composer unmounts, the keyboard can stay up
+    // over the Feed revealed underneath with nothing having told it to
+    // close. Explicit here rather than waiting on the resize/poll
+    // safety net in StudentShell to notice on its own.
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    document.body.classList.remove('keyboard-open')
     onPosted()
   }
 
