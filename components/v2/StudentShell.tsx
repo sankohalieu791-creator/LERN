@@ -144,7 +144,15 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   // keyboard closed) that's 0px and this is a no-op; when standalone
   // mode's layout viewport is stuck wrong, this corrects for it
   // directly rather than hoping the browser gets it right.
+  //
+  // Standalone-only, on purpose -- shipping this unscoped pushed the
+  // nav UP in an ordinary Safari tab too (a real gap this same
+  // comparison sees there too, from Safari's own toolbar chrome, that
+  // isn't a bug and needs no correction). The confirmed bug only ever
+  // existed in standalone/Home-Screen mode, so the fix only runs there.
   useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true
+    if (!isStandalone) return
     const vv = window.visualViewport
     const nav = document.getElementById('student-bottom-nav')
     if (!vv || !nav) return

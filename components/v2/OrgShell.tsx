@@ -146,7 +146,14 @@ export default function OrgShell({
   // and the layout viewport's bottom edge and translates the FAB by
   // exactly that amount, correcting for a wrong measurement directly
   // instead of hoping the browser recalculates it right.
+  //
+  // Standalone-only, on purpose -- shipping this unscoped pushed the
+  // FAB UP in an ordinary Safari tab too (a real gap this same
+  // comparison sees there too, from Safari's own toolbar chrome, that
+  // isn't a bug and needs no correction).
   useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true
+    if (!isStandalone) return
     const vv = window.visualViewport
     const fab = document.getElementById('org-fab')
     if (!vv || !fab) return

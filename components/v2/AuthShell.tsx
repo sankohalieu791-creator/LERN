@@ -33,6 +33,37 @@ export default function AuthShell({
     return () => document.body.classList.remove('auth-scroll')
   }, [])
 
+  // min-h-[100dvh] below is a floor, not a lock -- content taller than
+  // one screen is meant to push it taller (that's the whole point of
+  // min, not a fixed height, for a long signup wizard). The actual bug
+  // report: a real black band showing beneath a SHORT page (the plain
+  // login screen) in an ordinary Safari tab, above Safari's own
+  // toolbar -- body's raw dark background (see app/layout.tsx's own
+  // comment on why bg-paper isn't set globally) showing through a gap
+  // where this shell's own painted background fell short of the truly
+  // visible area. dvh is meant to track the live viewport continuously,
+  // but isn't reliably doing that here in practice. visualViewport.height
+  // is the one number that always reflects what's REALLY visible right
+  // now -- syncing an explicit min-height from it directly closes that
+  // gap without touching the "grow for tall content" behaviour at all.
+  useEffect(() => {
+    const vv = window.visualViewport
+    const el = document.getElementById('auth-shell-root')
+    if (!vv || !el) return
+    const sync = () => {
+      const live = vv.height + vv.offsetTop
+      el.style.minHeight = `${Math.max(live, document.documentElement.clientHeight)}px`
+    }
+    vv.addEventListener('resize', sync)
+    vv.addEventListener('scroll', sync)
+    sync()
+    return () => {
+      vv.removeEventListener('resize', sync)
+      vv.removeEventListener('scroll', sync)
+      el.style.minHeight = ''
+    }
+  }, [])
+
   return (
     // paddingTop: env(safe-area-inset-top) -- missing entirely before,
     // so on a standalone PWA the LERN logo sat right at the true top
@@ -53,6 +84,7 @@ export default function AuthShell({
     // background with the actual reference image itself, not a
     // hand-drawn approximation of it.
     <div
+      id="auth-shell-root"
       className="min-h-[100dvh] flex flex-col relative overflow-hidden bg-[#F3E4DA]"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
