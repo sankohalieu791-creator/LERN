@@ -33,6 +33,20 @@ export default function AuthShell({
     return () => document.body.classList.remove('auth-scroll')
   }, [])
 
+  // The real cause of "a dark thing showing at the bottom" -- more
+  // direct than the sizing fix below. body's background (globals.css)
+  // resolves off html[data-body-theme], and StudentShell/OrgShell both
+  // set that explicitly the moment they mount. AuthShell never did --
+  // so on a phone whose OS is in dark mode, body fell back to its own
+  // prefers-color-scheme default (dark, #131110) despite this page
+  // always being the light peachy theme, regardless of OS setting. Any
+  // gap at all, even a one-pixel one, was always going to show that
+  // wrong colour through. Same attribute, same mechanism the other
+  // shells already use -- this page just never set it.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-body-theme', 'light')
+  }, [])
+
   // min-h-[100dvh] below is a floor, not a lock -- content taller than
   // one screen is meant to push it taller (that's the whole point of
   // min, not a fixed height, for a long signup wizard). The actual bug
