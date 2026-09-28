@@ -122,6 +122,46 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
     }
   }, [])
 
+  // The interactive-widget=overlays-content fix (app/layout.tsx +
+  // app/student/layout.tsx) turned out not to be enough on its own --
+  // confirmed on a real iOS 26 device that a plain Safari tab is fine,
+  // but the SAME page added to the Home Screen still leaves the nav
+  // stuck too high after the keyboard closes. That means standalone
+  // display mode isn't actually honouring interactive-widget the way a
+  // normal tab does (or has some other layout-viewport quirk normal
+  // tabs don't) -- the nav's own fixed/bottom-0/dvh positioning is
+  // trusting a layout-viewport measurement that's wrong in that one
+  // context specifically, and no amount of toggling a CSS class fixes
+  // a genuinely wrong measurement underneath it.
+  //
+  // visualViewport is the one API that stays accurate regardless of
+  // whatever the layout viewport is doing -- it always reports the
+  // REAL currently-visible area, live, on a real device. Instead of
+  // trusting fixed+dvh to have recalculated correctly, this measures
+  // the gap between the layout viewport's bottom edge and the visual
+  // viewport's actual bottom edge on every change and translates the
+  // nav by exactly that amount -- when they agree (the normal case,
+  // keyboard closed) that's 0px and this is a no-op; when standalone
+  // mode's layout viewport is stuck wrong, this corrects for it
+  // directly rather than hoping the browser gets it right.
+  useEffect(() => {
+    const vv = window.visualViewport
+    const nav = document.getElementById('student-bottom-nav')
+    if (!vv || !nav) return
+    const reposition = () => {
+      const gap = document.documentElement.clientHeight - (vv.height + vv.offsetTop)
+      nav.style.transform = gap > 1 ? `translateY(-${gap}px)` : ''
+    }
+    vv.addEventListener('resize', reposition)
+    vv.addEventListener('scroll', reposition)
+    reposition()
+    return () => {
+      vv.removeEventListener('resize', reposition)
+      vv.removeEventListener('scroll', reposition)
+      nav.style.transform = ''
+    }
+  }, [])
+
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
   // The real v1 Feed page has its own header (LERN + search + bell);
   // Courses/Workshops (app/courses/page.tsx) has none at all -- its

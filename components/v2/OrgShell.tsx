@@ -135,6 +135,34 @@ export default function OrgShell({
       document.body.classList.remove('keyboard-open')
     }
   }, [])
+
+  // See StudentShell's identical effect for the full story: interactive-
+  // widget=overlays-content isn't actually honoured by standalone
+  // Home-Screen mode on a real iOS 26 device (confirmed -- a plain
+  // Safari tab is fine, only the installed app leaves the FAB stuck
+  // too high after the keyboard closes), so the fix can't rely on the
+  // layout viewport ever being correct in that context. visualViewport
+  // stays accurate regardless -- this measures the live gap between it
+  // and the layout viewport's bottom edge and translates the FAB by
+  // exactly that amount, correcting for a wrong measurement directly
+  // instead of hoping the browser recalculates it right.
+  useEffect(() => {
+    const vv = window.visualViewport
+    const fab = document.getElementById('org-fab')
+    if (!vv || !fab) return
+    const reposition = () => {
+      const gap = document.documentElement.clientHeight - (vv.height + vv.offsetTop)
+      fab.style.transform = gap > 1 ? `translateY(-${gap}px)` : ''
+    }
+    vv.addEventListener('resize', reposition)
+    vv.addEventListener('scroll', reposition)
+    reposition()
+    return () => {
+      vv.removeEventListener('resize', reposition)
+      vv.removeEventListener('scroll', reposition)
+      fab.style.transform = ''
+    }
+  }, [])
   useEffect(() => {
     if (!user?.organisation_id) return
     supabase.from('organisations').select('name, logo_path').eq('id', user.organisation_id).single()
