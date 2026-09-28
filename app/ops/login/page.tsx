@@ -33,7 +33,14 @@ export default function OpsLoginPage() {
   }
 
   return (
-    <AuthShell title="LERN Ops" subtitle="Internal tool — LERN team only." onBack={() => router.push('/')}>
+    <AuthShell title="LERN Ops" subtitle="Internal tool — LERN team only.">
+      {/* No onBack override -- this used to push('/'), which runs the
+          customer root redirect (routeForRole / hasAccountOnThisDevice)
+          and lands an ops admin straight in the customer sign-up
+          chooser, the exact thing OpsGate's own comment says this tool
+          is meant to stay away from. Omitting it falls back to
+          AuthShell's plain router.back() -- wherever they actually came
+          from, never a forced customer-facing destination. */}
       <ErrorBanner message={error} />
       <TextField label="Email" type="email" value={email} onChange={setEmail} placeholder="you@opstool.co.uk" autoFocus />
       <TextField label="Password" type="password" value={password} onChange={setPassword} placeholder="Password" />
