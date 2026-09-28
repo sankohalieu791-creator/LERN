@@ -31,11 +31,16 @@ export async function generateViewport(): Promise<Viewport> {
     userScalable: false,
     viewportFit: 'cover',
     themeColor: theme === 'light' ? '#fafafa' : '#0f0f0f',
-    // See the root layout's own comment -- without this, the keyboard
-    // opening left the bottom nav sized against the pre-keyboard
-    // viewport, so it could float up over whatever was just tapped
-    // into instead of staying out of the way.
-    interactiveWidget: 'resizes-content',
+    // Per-segment generateViewport() REPLACES the root layout's
+    // viewport, it doesn't merge with it -- so this was silently
+    // undoing the root layout's own interactiveWidget fix (see its
+    // comment) on every /student/* route the entire time. It used to
+    // say resizes-content "so the nav stays out of the way of the
+    // keyboard", which is backwards: resizes-content is the setting
+    // with the standalone-PWA bug that leaves the nav permanently
+    // mis-positioned after the keyboard closes. overlays-content keeps
+    // this route's viewport height fixed, same as root.
+    interactiveWidget: 'overlays-content',
   }
 }
 

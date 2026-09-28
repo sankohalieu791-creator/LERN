@@ -15,7 +15,12 @@ export async function generateViewport(): Promise<Viewport> {
     userScalable: false,
     viewportFit: 'cover',
     themeColor: theme === 'dark' ? '#131110' : '#FFFDF9',
-    interactiveWidget: 'resizes-content',
+    // Was resizes-content -- per-segment generateViewport() REPLACES
+    // the root layout's viewport rather than merging with it, so this
+    // was silently undoing the root layout's own interactiveWidget fix
+    // (its standalone-PWA keyboard bug comment) on every /employer/*
+    // route. overlays-content matches root.
+    interactiveWidget: 'overlays-content',
   }
 }
 
