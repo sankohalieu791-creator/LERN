@@ -84,57 +84,40 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   // of whether the browser actually shrank the layout viewport for the
   // keyboard or not.
   //
-  // Un-hiding used to happen on the input's own focusout instead of
-  // here -- wrong signal. focusout fires the instant the field loses
-  // focus, which is well BEFORE the keyboard has actually finished
-  // animating away and the real viewport has settled back to full
-  // height. Removing keyboard-open right then re-showed the nav against
-  // the still-shrunken (keyboard-open) layout, which is exactly "type
-  // something, look away, and the nav shoots up and stays there" --
-  // it wasn't stuck, it was correctly positioned for a viewport that
-  // hadn't finished resizing back yet, and nothing ever re-triggered a
-  // layout after it did. visualViewport's own resize event fires once
-  // the browser reports the ACTUAL current height, so gating the
-  // un-hide on "height is back to (near) full" instead of "an input
-  // lost focus" means the nav only ever reappears once it has somewhere
-  // correct to reappear TO. Focus is still what triggers the immediate
-  // hide (no lag while the keyboard is animating in); the viewport is
-  // what's trusted to say it's safe to bring the nav back.
+  // History of getting the un-hide side of this wrong, twice: (1) tying
+  // it to the input's own focusout fires well before the keyboard has
+  // actually finished animating away, showing the nav against a
+  // viewport that hadn't resized back yet. (2) Gating it on visual
+  // Viewport reporting "height is back to near-full" sounds more
+  // correct, but a browser can report several closely-spaced resize
+  // events while the keyboard animates, and reacting to an early one
+  // that LOOKS like "settled" (a toolbar flicker, a rounding blip)
+  // reintroduces the exact same bug in a subtler shape -- which is what
+  // kept happening. A fixed delay has no such failure mode: it doesn't
+  // trust any one signal to mean "definitely settled", it just waits
+  // comfortably past how long the animation can possibly take (iOS/
+  // Android keyboard dismiss is well under 300ms) before ever looking
+  // again. Simpler, and every prior version's bug was a variant of
+  // "reacted before the keyboard was actually, fully gone".
   useEffect(() => {
     const isTextInput = (el: EventTarget | null) =>
       el instanceof HTMLElement && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
-    const onFocusIn = (e: FocusEvent) => { if (isTextInput(e.target)) document.body.classList.add('keyboard-open') }
-
-    const vv = window.visualViewport
-    // A one-time window.innerHeight snapshot was the previous version
-    // of this fix -- still wrong, just wrong more subtly: if Safari's
-    // own toolbar changes size for any reason unrelated to the keyboard
-    // (scroll direction, orientation), that snapshot goes stale and
-    // "90% of it" can permanently stop being reachable, leaving
-    // keyboard-open stuck forever after -- indistinguishable from
-    // "shoots up and stays there". Tracking the tallest height actually
-    // observed, continuously, means the bar being compared against is
-    // never stale -- it adapts to whatever the chrome is doing instead
-    // of assuming it never changes.
-    let maxHeight = vv?.height ?? window.innerHeight
-    const checkSettled = () => {
-      if (!vv) return
-      if (vv.height > maxHeight) maxHeight = vv.height
-      if (vv.height >= maxHeight - 2) document.body.classList.remove('keyboard-open')
+    let hideTimer: number | null = null
+    const onFocusIn = (e: FocusEvent) => {
+      if (!isTextInput(e.target)) return
+      if (hideTimer !== null) { window.clearTimeout(hideTimer); hideTimer = null }
+      document.body.classList.add('keyboard-open')
     }
-    // Belt and suspenders: a resize event getting dropped (some
-    // WebViews are inconsistent here) would otherwise leave the nav
-    // stuck hidden/mispositioned indefinitely with nothing to ever
-    // re-check it. Polling costs nothing while idle and guarantees this
-    // self-corrects within a third of a second regardless.
-    const poll = window.setInterval(checkSettled, 300)
-
+    const onFocusOut = (e: FocusEvent) => {
+      if (!isTextInput(e.target)) return
+      hideTimer = window.setTimeout(() => { document.body.classList.remove('keyboard-open') }, 400)
+    }
     document.addEventListener('focusin', onFocusIn)
-    vv?.addEventListener('resize', checkSettled)
+    document.addEventListener('focusout', onFocusOut)
     return () => {
       document.removeEventListener('focusin', onFocusIn)
-      vv?.removeEventListener('resize', checkSettled)
-      window.clearInterval(poll)
+      document.removeEventListener('focusout', onFocusOut)
+      if (hideTimer !== null) window.clearTimeout(hideTimer)
       document.body.classList.remove('keyboard-open')
     }
   }, [])

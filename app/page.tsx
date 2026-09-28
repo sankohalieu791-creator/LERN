@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { routeForRole } from '@/lib/roleRouting'
+import { hasAccountOnThisDevice } from '@/lib/deviceAccount'
 
 export default function HomePage() {
   const { user, loading } = useAuth()
@@ -11,7 +12,14 @@ export default function HomePage() {
 
   useEffect(() => {
     if (loading) return
-    router.replace(user ? routeForRole(user.role) : '/auth/start')
+    // A logged-out visit here used to always mean "/auth/start" (the
+    // sign-up role chooser) -- correct for a genuinely new visitor, but
+    // wrong for someone who already has an account and just signed
+    // out, since a PWA/home-screen icon always opens at "/". This is
+    // exactly "log out, and it sends you back to sign up instead of
+    // welcoming you back to log in". hasAccountOnThisDevice persists
+    // across sign-out on purpose, so a returning device goes to login.
+    router.replace(user ? routeForRole(user.role) : (hasAccountOnThisDevice() ? '/auth/login' : '/auth/start'))
   }, [user, loading, router])
 
   return (

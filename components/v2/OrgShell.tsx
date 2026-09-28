@@ -100,48 +100,38 @@ export default function OrgShell({
   // correctly. Real focus tracking (focusin bubbles to document) drives
   // the hide, immediate and lag-free while the keyboard animates in.
   //
-  // The un-hide used to be the matching focusout instead -- wrong
-  // signal. focusout fires the instant a field loses focus, well before
-  // the keyboard has actually finished animating away and the real
-  // viewport has settled back to full height. Removing keyboard-open
-  // right then re-showed the FAB against the still-shrunken layout,
-  // which read as "type something, look away, and it shoots up and
-  // stays there" -- it wasn't stuck, it was correctly placed for a
-  // viewport that hadn't finished resizing back yet, with nothing to
-  // ever re-trigger a layout once it did. visualViewport's resize event
-  // fires with the browser's own ACTUAL current height, so the un-hide
-  // now waits for "height is back to (near) full" instead of "a field
-  // lost focus" -- it only ever comes back once it has somewhere
-  // correct to reappear to.
+  // History of getting the un-hide side of this wrong, twice: (1) tying
+  // it to a field's own focusout fires well before the keyboard has
+  // actually finished animating away, showing the FAB against a
+  // viewport that hadn't resized back yet. (2) Gating it on
+  // visualViewport reporting "height is back to near-full" sounds more
+  // correct, but a browser can report several closely-spaced resize
+  // events while the keyboard animates, and reacting to an early one
+  // that LOOKS settled (a toolbar flicker, a rounding blip) reintroduces
+  // the same bug in a subtler shape -- which is what kept happening. A
+  // fixed delay has no such failure mode: it doesn't trust any one
+  // signal to mean "definitely settled", it just waits comfortably past
+  // how long the animation can possibly take (iOS/Android keyboard
+  // dismiss is well under 300ms) before ever looking again.
   useEffect(() => {
     const isTextInput = (el: EventTarget | null) =>
       el instanceof HTMLElement && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
-    const onFocusIn = (e: FocusEvent) => { if (isTextInput(e.target)) document.body.classList.add('keyboard-open') }
-
-    const vv = window.visualViewport
-    // A one-time window.innerHeight snapshot (the previous version of
-    // this fix) goes stale if Safari's own toolbar changes size for any
-    // reason unrelated to the keyboard, permanently stopping "90% of
-    // it" from ever being reachable again -- indistinguishable from
-    // "shoots up and stays there". Tracking the tallest height actually
-    // observed, continuously, keeps the comparison live instead.
-    let maxHeight = vv?.height ?? window.innerHeight
-    const checkSettled = () => {
-      if (!vv) return
-      if (vv.height > maxHeight) maxHeight = vv.height
-      if (vv.height >= maxHeight - 2) document.body.classList.remove('keyboard-open')
+    let hideTimer: number | null = null
+    const onFocusIn = (e: FocusEvent) => {
+      if (!isTextInput(e.target)) return
+      if (hideTimer !== null) { window.clearTimeout(hideTimer); hideTimer = null }
+      document.body.classList.add('keyboard-open')
     }
-    // Belt and suspenders: a dropped resize event (some WebViews are
-    // inconsistent here) would otherwise leave this stuck indefinitely
-    // with nothing to ever re-check it.
-    const poll = window.setInterval(checkSettled, 300)
-
+    const onFocusOut = (e: FocusEvent) => {
+      if (!isTextInput(e.target)) return
+      hideTimer = window.setTimeout(() => { document.body.classList.remove('keyboard-open') }, 400)
+    }
     document.addEventListener('focusin', onFocusIn)
-    vv?.addEventListener('resize', checkSettled)
+    document.addEventListener('focusout', onFocusOut)
     return () => {
       document.removeEventListener('focusin', onFocusIn)
-      vv?.removeEventListener('resize', checkSettled)
-      window.clearInterval(poll)
+      document.removeEventListener('focusout', onFocusOut)
+      if (hideTimer !== null) window.clearTimeout(hideTimer)
       document.body.classList.remove('keyboard-open')
     }
   }, [])

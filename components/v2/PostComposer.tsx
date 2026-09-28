@@ -146,16 +146,15 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
     })
     setPosting(false)
     if (postErr) { setError(postErr.message); return }
-    // Tapping Post moves focus to that button, not off the page --
-    // the on-screen keyboard doesn't always dismiss synchronously just
-    // because a plain button was tapped, especially inside a portal. If
-    // the autoFocus caption field is still (or briefly) focused the
-    // instant this whole composer unmounts, the keyboard can stay up
-    // over the Feed revealed underneath with nothing having told it to
-    // close. Explicit here rather than waiting on the resize/poll
-    // safety net in StudentShell to notice on its own.
+    // Tapping Post moves focus to that button, not off the page -- an
+    // on-screen keyboard doesn't always dismiss just because a plain
+    // button was tapped, especially inside a portal. This only forces
+    // the actual blur (which fires StudentShell's own focusout, starting
+    // its fixed un-hide delay); it deliberately does not also clear
+    // keyboard-open here -- the keyboard can still be mid-animation when
+    // this composer unmounts, and revealing the nav that early showed it
+    // against a viewport that hadn't resized back yet.
     ;(document.activeElement as HTMLElement | null)?.blur()
-    document.body.classList.remove('keyboard-open')
     onPosted()
   }
 

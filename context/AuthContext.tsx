@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User } from '@/lib/types'
 import { supabase, getUser, getUserProfile } from '@/lib/supabase'
+import { markHasAccount } from '@/lib/deviceAccount'
 
 interface AuthContextType {
   user: User | null
@@ -81,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data) {
           setUser(data)
           setCachedProfile(data)
+          markHasAccount()
         }
         setLoading(false)
       } catch (error) {
@@ -100,6 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data) {
           setUser(data)
           setCachedProfile(data)
+          markHasAccount()
         }
       } else {
         setAuthUser(null)

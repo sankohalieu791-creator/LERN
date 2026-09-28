@@ -499,7 +499,6 @@ function WorkItemDetail({
     if (submitError) return setError(submitError.message)
     setContent(''); setFiles([]); setCheckedCriteria(new Set())
     ;(document.activeElement as HTMLElement | null)?.blur()
-    document.body.classList.remove('keyboard-open')
     onChanged()
   }
 
@@ -518,7 +517,7 @@ function WorkItemDetail({
     <div className="fixed inset-0 z-50 bg-paper overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-paper/95 backdrop-blur border-b border-edge-subtle">
         <button
-          onClick={() => { (document.activeElement as HTMLElement | null)?.blur(); document.body.classList.remove('keyboard-open'); onClose() }}
+          onClick={() => { (document.activeElement as HTMLElement | null)?.blur(); onClose() }}
           aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-muted text-ink"
         >
           <ArrowLeft className="w-5 h-5" />

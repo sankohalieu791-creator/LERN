@@ -652,26 +652,23 @@ export function EditProfileScreen({ profile, onDone, onClose }: { profile: any; 
     setSaving(false)
     const saveError = profileErr || bioErr
     if (saveError) { setError(saveError.message || "Couldn't save — try again."); return }
-    closeKeyboardNow()
+    forceBlur()
     onDone()
   }
 
-  // Tapping Cancel/Save moves focus to that button, not out of the
-  // page entirely -- on-screen keyboards don't always dismiss
-  // synchronously just because a plain button was tapped, especially
-  // inside a portal. If the field is still (or briefly) focused the
-  // instant this whole screen unmounts, the keyboard can stay up over
-  // the Profile page revealed underneath for a beat with nothing having
-  // told it to close. Explicitly blurring whatever's focused, and
-  // clearing keyboard-open immediately rather than waiting on the
-  // resize/poll safety net to notice, means closing this screen is
-  // itself the moment the keyboard is told to go, synchronised with the
-  // screen actually disappearing instead of racing it.
-  const closeKeyboardNow = () => {
-    (document.activeElement as HTMLElement | null)?.blur()
-    document.body.classList.remove('keyboard-open')
-  }
-  const handleCancel = () => { closeKeyboardNow(); onClose() }
+  // Tapping Cancel/Save moves focus to that button, not out of the page
+  // entirely -- an on-screen keyboard doesn't always dismiss just
+  // because a plain button was tapped, especially inside a portal. This
+  // only forces the actual blur (which fires StudentShell's/OrgShell's
+  // own focusout, starting its fixed un-hide delay); it deliberately
+  // does NOT also clear keyboard-open here itself -- an earlier version
+  // did, on the theory that closing this screen is a safe moment to
+  // reveal the nav immediately, and that was itself the bug: the
+  // keyboard can still be mid-animation when this screen unmounts, so
+  // revealing the nav that early showed it against a viewport that
+  // hadn't resized back yet.
+  const forceBlur = () => { (document.activeElement as HTMLElement | null)?.blur() }
+  const handleCancel = () => { forceBlur(); onClose() }
 
   return createPortal((
     <div className="fixed inset-0 z-50 bg-[var(--app-bg)] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
