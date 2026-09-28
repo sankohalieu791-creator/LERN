@@ -24,6 +24,20 @@ html, body {
 body.auth-scroll {
   overscroll-behavior: auto;
 }
+/* The class above is set by a useEffect in AuthShell.tsx -- confirmed
+   on a real device that it (and every other client effect in that
+   component) simply never runs on a fresh/cold page load, so the page
+   never bounced at all, ever, not just once. Rather than keep
+   chasing why a client effect isn't firing, :has() gets the exact same
+   result with zero JS dependency -- it's true the instant the page's
+   own server-rendered HTML contains #auth-shell-root, before any
+   hydration happens at all. Specificity (an ID inside :has(), same as
+   an ID selector) already beats the plain html/body rule above and
+   the data-body-theme rules below without needing !important. */
+body:has(#auth-shell-root) {
+  overscroll-behavior: auto;
+  background-color: #F7F3EA;
+}
 
 /* Every real screen paints its own full-bleed background (bg-paper on
    light shells, bg-[var(--app-bg)] on the student shell), so body's
