@@ -9,7 +9,7 @@ import Logo from '@/components/v2/Logo'
 // Shared layout for every auth/onboarding screen: desktop/laptop-first
 // (generous centered column, not a mobile card), paper/ink/orange theme.
 export default function AuthShell({
-  step, totalSteps, title, subtitle, children, wide = false, onBack,
+  step, totalSteps, title, subtitle, children, wide = false, onBack, hideBack = false,
 }: {
   step?: number
   totalSteps?: number
@@ -21,6 +21,12 @@ export default function AuthShell({
   // without one falls back to plain browser back, so this always does
   // something sensible without every call site needing to think about it.
   onBack?: () => void
+  // The login page sets this -- "log out shows Welcome back, log in"
+  // only actually holds if there's no way OFF that page except the
+  // explicit "New to LERN? Sign up" link. A back button (any
+  // destination -- '/', browser history, anything) is one more way
+  // back into a signed-out state that isn't that deliberate choice.
+  hideBack?: boolean
 }) {
   const router = useRouter()
 
@@ -109,13 +115,15 @@ export default function AuthShell({
       }}
     >
       <header className="flex-shrink-0 px-10 py-7 flex items-center gap-4 relative z-10">
-        <button
-          onClick={() => (onBack ? onBack() : router.back())}
-          aria-label="Back"
-          className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-full hover:bg-black/5 text-ink transition flex-shrink-0"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
+        {!hideBack && (
+          <button
+            onClick={() => (onBack ? onBack() : router.back())}
+            aria-label="Back"
+            className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-full hover:bg-black/5 text-ink transition flex-shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        )}
         <Logo size="lg" />
       </header>
 

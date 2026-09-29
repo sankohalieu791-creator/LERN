@@ -1,9 +1,7 @@
 'use client'
 
-import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
-import { hasAccountOnThisDevice } from '@/lib/deviceAccount'
 import { GraduationCap, School, Building2, Briefcase, ChevronRight } from 'lucide-react'
 
 // Real role chooser -- restored to what it was before the "Being built"
@@ -44,16 +42,16 @@ const CHOICES = [
 export default function ChooseRolePage() {
   const router = useRouter()
 
-  // A device that's already had an account sign in here shouldn't land
-  // back on "who's signing up" -- via the back button, a stale bookmark,
-  // whatever route got them here -- it should always mean "welcome
-  // back, log in" instead. The root page already redirects a fresh
-  // logged-out visit straight to /auth/login for exactly this case;
-  // this covers reaching this URL directly, at all, some other way.
-  useEffect(() => {
-    if (hasAccountOnThisDevice()) router.replace('/auth/login')
-  }, [router])
-
+  // Used to also redirect straight to /auth/login whenever this device
+  // had ever had an account -- meant to stop a stale bookmark or cold
+  // launch from landing here instead of "welcome back". It didn't
+  // distinguish that from someone who just deliberately tapped "New to
+  // LERN? Sign up" on the login page itself, so it bounced that
+  // straight back to where they came from -- reading as "sign up does
+  // nothing". The root page (app/page.tsx) already sends a fresh,
+  // no-specific-intent visit to /auth/login for exactly the cold-launch
+  // case; this page no longer needs its own copy of that guard, and an
+  // explicit navigation here now always actually gets here.
   return (
     <AuthShell wide title="Who's signing up?" subtitle="Pick the option that describes you — each one leads somewhere different." onBack={() => router.push('/')}>
       {/* Two columns once there's room (matches the reference's grid),
