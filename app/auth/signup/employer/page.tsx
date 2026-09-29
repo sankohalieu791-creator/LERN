@@ -162,7 +162,10 @@ export default function EmployerSignupPage() {
     setLoading(true)
     setError('')
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) await recordConsent(user.id)
+    if (user) {
+      const { error: consentError } = await recordConsent(user.id)
+      if (consentError) { setLoading(false); setError('Could not save that — try again.'); return }
+    }
     await refreshUser()
     setLoading(false)
     setShowGreeting(true)
@@ -254,7 +257,7 @@ export default function EmployerSignupPage() {
             </ul>
           </div>
           <div className="flex gap-3">
-            <SecondaryButton onClick={() => handleConsent(false)}>Decline</SecondaryButton>
+            <SecondaryButton onClick={() => handleConsent(false)} disabled={loading}>Decline</SecondaryButton>
             <PrimaryButton onClick={() => handleConsent(true)} loading={loading}>I understand, accept</PrimaryButton>
           </div>
         </div>

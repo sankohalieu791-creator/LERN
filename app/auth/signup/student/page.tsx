@@ -46,8 +46,17 @@ export default function StudentSignupPage() {
 
   // Resume an unfinished signup instead of re-running it -- e.g. an account
   // was created but never accepted the safeguarding step. A join code is
-  // optional (explore-without-code), so it's no longer what decides
-  // whether the signup is "finished" -- only consent is.
+  // optional (explore-without-code, step 2 has its own "skip for now"),
+  // so it's no longer what decides whether the signup is "finished" --
+  // only consent is. That's a completion rule, though, not licence to
+  // skip ever SHOWING step 2 -- this used to jump straight from DOB to
+  // consent with no branch for it at all, meaning every non-Google
+  // signup (DOB is already collected in step 1, so profile.date_of_birth
+  // is set the moment they come back via the emailed confirmation link)
+  // never saw the join-code screen, full stop, not even with the option
+  // to skip it. Landing on step 2 here doesn't force anything -- they
+  // can still tap straight through -- it just means that choice is
+  // actually offered instead of silently made for them.
   const resumeFromSession = async (authUser: { id: string }) => {
     const { data: profile } = await getUserProfile(authUser.id)
     if (!profile || profile.role !== 'student') return false
@@ -60,6 +69,7 @@ export default function StudentSignupPage() {
     // though name/email/password (or lack of a password entirely) are
     // already settled.
     if (!profile.date_of_birth) setStep('dob')
+    else if (!profile.organisation_id) setStep(2)
     else if (!profile.consented_at) setStep(3)
     else router.replace('/student')
     return true
@@ -185,7 +195,10 @@ export default function StudentSignupPage() {
     setLoading(true)
     setError('')
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) await recordConsent(user.id)
+    if (user) {
+      const { error: consentError } = await recordConsent(user.id)
+      if (consentError) { setLoading(false); setError('Could not save that — try again.'); return }
+    }
     await refreshUser()
     setLoading(false)
     setShowGreeting(true)
@@ -292,7 +305,7 @@ export default function StudentSignupPage() {
             </ul>
           </div>
           <div className="flex gap-3">
-            <SecondaryButton onClick={() => handleConsent(false)}>Decline</SecondaryButton>
+            <SecondaryButton onClick={() => handleConsent(false)} disabled={loading}>Decline</SecondaryButton>
             <PrimaryButton onClick={() => handleConsent(true)} loading={loading}>I understand, accept</PrimaryButton>
           </div>
         </div>

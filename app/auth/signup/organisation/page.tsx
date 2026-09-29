@@ -73,7 +73,13 @@ function OrganisationSignupInner() {
       const savedMode = (user.user_metadata?.signup_mode as string) || 'create'
       setMode(savedMode === 'join' ? 'join' : 'create')
       setOrgName(savedOrgName)
-      if (savedMode === 'join') { setStep(2); return }
+      setLeadName((user.user_metadata?.lead_name as string) || '')
+      setLeadEmail((user.user_metadata?.lead_email as string) || '')
+      if (savedMode === 'join') {
+        setJoinCode((user.user_metadata?.join_code as string) || '')
+        setStep(2)
+        return
+      }
       // org_name only exists in metadata for the email/password path
       // (set on step 1, before any confirmation link was clicked) --
       // a Google sign-in never had a step 1 at all, so there's no
@@ -148,8 +154,16 @@ function OrganisationSignupInner() {
     // org_type specifically is also what lets a plain /auth/login sign-in
     // (as opposed to clicking the emailed link) send this account back to
     // the right flavour of the signup wizard instead of guessing institution.
+    // join_code/lead_name/lead_email ride along the same way -- without
+    // this, resuming after clicking the confirmation link reset those to
+    // '' and the "accept" step would silently submit an empty staff join
+    // code, or silently drop the actually-designated safeguarding lead
+    // in favour of whoever's accepting.
     const { data: signUpData, error: signUpError } = await signUp(email.trim(), password, {
       role: 'student', full_name: fullName.trim(), org_name: mode === 'create' ? orgName.trim() : undefined, signup_mode: mode, org_type: orgType,
+      join_code: mode === 'join' ? joinCode.trim() : undefined,
+      lead_name: mode === 'create' ? leadName.trim() : undefined,
+      lead_email: mode === 'create' ? leadEmail.trim() : undefined,
     } as any, redirectTo)
     // role is a placeholder here — create_organisation_and_join or
     // redeem_staff_join_code (step 1->2) overwrites it once the org
@@ -211,7 +225,10 @@ function OrganisationSignupInner() {
       const { error: joinError } = await redeemStaffJoinCode(joinCode.trim())
       if (joinError) { setLoading(false); return setError(joinError.message) }
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) await recordConsent(user.id)
+      if (user) {
+        const { error: consentError } = await recordConsent(user.id)
+        if (consentError) { setLoading(false); setError('Could not save that — try again.'); return }
+      }
       await refreshUser()
       setLoading(false)
       setShowGreeting(true)
@@ -222,7 +239,10 @@ function OrganisationSignupInner() {
     if (orgError || !newOrgId) { setLoading(false); return setError(orgError?.message || 'Could not create your organisation.') }
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) await recordConsent(user.id)
+    if (user) {
+      const { error: consentError } = await recordConsent(user.id)
+      if (consentError) { setLoading(false); setError('Could not save that — try again.'); return }
+    }
     await refreshUser()
 
     const { data: codeRow, error: codeError } = await generateJoinCode(newOrgId, user!.id, randomJoinCode())
@@ -373,7 +393,7 @@ function OrganisationSignupInner() {
             </ul>
           </div>
           <div className="flex gap-3">
-            <SecondaryButton onClick={() => handleAgreement(false)}>Decline</SecondaryButton>
+            <SecondaryButton onClick={() => handleAgreement(false)} disabled={loading}>Decline</SecondaryButton>
             <PrimaryButton onClick={() => handleAgreement(true)} loading={loading}>I agree, accept</PrimaryButton>
           </div>
         </div>
