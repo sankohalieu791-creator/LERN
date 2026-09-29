@@ -406,6 +406,17 @@ body.auth-scroll::-webkit-scrollbar-thumb:hover { background: #D9601C; }
   }
 }
 
+/* Splash screen's letter-by-letter wordmark reveal + underline draw --
+   SplashScreen.tsx applies these with a per-letter animation-delay. */
+@keyframes splashLetterIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes splashUnderlineIn {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 1;

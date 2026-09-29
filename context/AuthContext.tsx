@@ -131,8 +131,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // reliable fix -- it's exactly what manually refreshing already does, just
     // automatic. A quick tab-switch (seconds) stays silent and seamless; only
     // a genuine "left it for a while" gets the reload.
+    //
+    // 3 minutes was too short in practice -- a normal phone's own screen
+    // auto-lock (often 30s-2min) fires this on completely ordinary use
+    // (read something for a bit, phone locks, unlock and keep going),
+    // which read as "it reloads randomly every couple of minutes" and, on
+    // a PWA, a visible flash of the splash screen every time. 10 minutes
+    // still catches a genuinely stale session/screen without punishing
+    // normal reading pauses or brief native-picker interactions (photo
+    // upload, etc.) that also toggle visibility.
     let hiddenAt: number | null = null
-    const STALE_AFTER_MS = 3 * 60 * 1000
+    const STALE_AFTER_MS = 10 * 60 * 1000
     const handleVisibility = async () => {
       if (document.visibilityState !== 'visible') {
         hiddenAt = Date.now()
