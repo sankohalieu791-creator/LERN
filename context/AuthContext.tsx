@@ -118,8 +118,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // explicitly — not getSession() — so the SDK fetches a fresh token from the
     // server before any page-level queries run. This prevents the "no internet"
     // blank-page symptom caused by stale tokens silently failing.
+    //
+    // That fixes the SESSION, but not what was already on screen -- every panel
+    // in this app fetches its own data with useEffect(load, []), which only
+    // ever runs once on mount and has no way to know the session it fetched
+    // with has since gone stale. Refreshing the token doesn't make a feed list
+    // that already rendered (or a request that was silently failing this whole
+    // time) go re-fetch itself -- nothing was ever wired to react to that. This
+    // is the actual "acts weird until I refresh" bug: the auth layer quietly
+    // recovers, the screen doesn't. Tracking how long the tab was actually
+    // hidden and forcing a real reload past a threshold is the blunt but
+    // reliable fix -- it's exactly what manually refreshing already does, just
+    // automatic. A quick tab-switch (seconds) stays silent and seamless; only
+    // a genuine "left it for a while" gets the reload.
+    let hiddenAt: number | null = null
+    const STALE_AFTER_MS = 3 * 60 * 1000
     const handleVisibility = async () => {
-      if (document.visibilityState !== 'visible') return
+      if (document.visibilityState !== 'visible') {
+        hiddenAt = Date.now()
+        return
+      }
+      const wasHiddenFor = hiddenAt ? Date.now() - hiddenAt : 0
+      hiddenAt = null
+      if (wasHiddenFor > STALE_AFTER_MS) {
+        window.location.reload()
+        return
+      }
       const { data: refreshed } = await supabase.auth.refreshSession()
       if (refreshed.session?.user) {
         const { data } = await getUserProfile(refreshed.session.user.id)
