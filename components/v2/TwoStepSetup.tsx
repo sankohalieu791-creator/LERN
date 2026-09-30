@@ -91,7 +91,9 @@ export default function TwoStepSetup({ onClose, onEnabled }: { onClose: () => vo
           {stage === 'qr' && (
             <>
               <p className="text-[13px] text-ink-secondary mb-3">Scan this with your authenticator app:</p>
-              <div className="bg-white rounded-xl p-3 mb-3 flex items-center justify-center" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+              <div className="bg-white rounded-xl p-3 mb-3 flex items-center justify-center">
+                <img src={qrSvg} alt="Two-step verification QR code" width={180} height={180} />
+              </div>
               <p className="text-[11.5px] text-ink-quaternary text-center mb-4 break-all">Can't scan it? Enter this code manually: <span className="font-mono">{secret}</span></p>
               <input
                 value={code}
