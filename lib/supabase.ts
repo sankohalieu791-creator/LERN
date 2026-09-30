@@ -330,6 +330,92 @@ export const recordConsent = async (userId: string) => {
   return { error }
 }
 
+// ── Two-step verification (real TOTP, via Supabase Auth's own native
+// MFA -- not the old two_step_enabled column, which was a toggle wired
+// to nothing). listFactors()/getAAL() are the actual source of truth
+// for whether a challenge is required; two_step_enabled is kept only
+// as a cheap display cache Settings can read without an extra round
+// trip, updated by enrollTwoStep/disableTwoStep below.
+export const listMfaFactors = async () => {
+  const { data, error } = await supabase.auth.mfa.listFactors()
+  return { data, error }
+}
+
+export const getAuthenticatorAssuranceLevel = async () => {
+  const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  return { data, error }
+}
+
+export const enrollTotpFactor = async () => {
+  const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' })
+  return { data, error }
+}
+
+export const verifyTotpEnrollment = async (factorId: string, code: string) => {
+  const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId })
+  if (challengeError) return { error: challengeError }
+  const { data, error } = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.id, code })
+  if (error) return { error }
+  const { data: recoveryCodes, error: codesError } = await supabase.rpc('generate_mfa_recovery_codes')
+  if (codesError) return { error: codesError }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) await supabase.from('users').update({ two_step_enabled: true }).eq('id', user.id)
+  return { data: { recoveryCodes: recoveryCodes as string[] }, error: null }
+}
+
+export const verifyTotpChallenge = async (factorId: string, code: string) => {
+  const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId })
+  if (challengeError) return { error: challengeError }
+  const { error } = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.id, code })
+  return { error }
+}
+
+export const hasUnusedRecoveryCodes = async () => {
+  const { data, error } = await supabase.rpc('has_unused_recovery_codes')
+  return { data: (data as number) || 0, error }
+}
+
+// Doesn't elevate the real session AAL (a plain code check can't --
+// Supabase's own MFA verify() is the only thing that does that) -- it
+// verifies the code server-side, then app/api/mfa/recover deletes the
+// lost factor via the admin API so getAuthenticatorAssuranceLevel()
+// naturally reports no challenge needed, and refetches a session that
+// reflects that. Consuming a code always means "your 2FA got reset,
+// set it up again when you get a chance", the same shape most real
+// recovery-code systems use (GitHub, Google, etc).
+export const recoverWithCode = async (code: string) => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return { error: { message: 'No active session.' } as any }
+  const res = await fetch('/api/mfa/recover', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ code }),
+  })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) return { error: { message: body?.error || 'Could not verify that code.' } as any }
+  await supabase.auth.refreshSession()
+  return { error: null }
+}
+
+export const disableTwoStep = async (code: string) => {
+  const { data: factors, error: listError } = await supabase.auth.mfa.listFactors()
+  if (listError) return { error: listError }
+  const factor = factors?.totp?.find(f => f.status === 'verified')
+  if (!factor) return { error: null }
+  const { error: verifyError } = await verifyTotpChallenge(factor.id, code)
+  if (verifyError) return { error: verifyError }
+  const { error: unenrollError } = await supabase.auth.mfa.unenroll({ factorId: factor.id })
+  if (unenrollError) return { error: unenrollError }
+  // Old recovery codes are left in place, not deleted -- they're inert
+  // without a factor requiring them (the login challenge that would
+  // ever ask for one only shows up when getAuthenticatorAssuranceLevel
+  // says a challenge is actually needed), and generate_mfa_recovery_
+  // codes() already wipes them fresh the next time 2FA gets set up.
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) await supabase.from('users').update({ two_step_enabled: false }).eq('id', user.id)
+  return { error: null }
+}
+
 // Onboarding tour -- set once, whether the account took the tour or
 // explicitly skipped it, so it never shows itself automatically twice.
 export const markOnboardingSeen = async (userId: string) => {

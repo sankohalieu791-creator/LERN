@@ -4,10 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
+import TwoStepChallenge from '@/components/v2/TwoStepChallenge'
 import { TextField, PrimaryButton, ErrorBanner, OrDivider, GoogleButton } from '@/components/v2/Field'
-import { signIn, signInWithGoogle, getUserProfile, resendConfirmation } from '@/lib/supabase'
+import { signIn, signInWithGoogle, getUserProfile, resendConfirmation, getAuthenticatorAssuranceLevel, listMfaFactors } from '@/lib/supabase'
 import { routeForRole } from '@/lib/roleRouting'
 import { useAuth } from '@/context/AuthContext'
+import type { User } from '@supabase/supabase-js'
 
 // The "sign in with one shared credential, then pick which role to look
 // around as" preview flow (a "Choose a view" screen after login) has
@@ -25,8 +27,38 @@ export default function LoginPage() {
   const [unconfirmed, setUnconfirmed] = useState(false)
   const [resent, setResent] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [challengeFactorId, setChallengeFactorId] = useState('')
+  const [pendingUser, setPendingUser] = useState<User | null>(null)
   const router = useRouter()
   const { refreshUser } = useAuth()
+
+  // The actual profile-fetch/routing continuation, shared by the plain
+  // password-only path and the "password + verified second factor"
+  // path -- AuthContext is the real gate (it won't populate `user` at
+  // all until getAuthenticatorAssuranceLevel says no challenge is
+  // outstanding), this just decides where THIS page sends someone once
+  // that's genuinely true.
+  const proceedAfterAuth = async (user: User) => {
+    const { data: profile } = await getUserProfile(user.id)
+    await refreshUser()
+    setLoading(false)
+
+    // An organisation signup uses role: 'student' as a placeholder until
+    // the org actually gets created -- signup_mode only ever gets set by
+    // that flow. Without this check, confirming the email and then just
+    // logging in normally (rather than remembering to click the emailed
+    // link specifically) dropped someone mid-way through setting up a
+    // school straight into the student app instead of back into their
+    // own unfinished signup.
+    const signupMode = user.user_metadata?.signup_mode
+    if (profile?.role === 'student' && !profile.organisation_id && signupMode) {
+      const orgType = user.user_metadata?.org_type === 'provider' ? 'provider' : 'institution'
+      setGreeting({ name: profile?.full_name || '', dest: `/auth/signup/organisation?type=${orgType}` })
+      return
+    }
+
+    setGreeting({ name: profile?.full_name || '', dest: routeForRole(profile?.role) })
+  }
 
   const handleGoogle = async () => {
     setGoogleLoading(true)
@@ -56,31 +88,37 @@ export default function LoginPage() {
       setError(signInError?.message || 'Could not sign in.')
       return
     }
-    // Role/org routing reads from the verified database row, not
-    // anything client-side — a student can't reach an org view by
-    // guessing a URL, since that destination page checks role itself too.
-    const { data: profile } = await getUserProfile(data.user.id)
-    await refreshUser()
-    setLoading(false)
-
-    // An organisation signup uses role: 'student' as a placeholder until
-    // the org actually gets created -- signup_mode only ever gets set by
-    // that flow. Without this check, confirming the email and then just
-    // logging in normally (rather than remembering to click the emailed
-    // link specifically) dropped someone mid-way through setting up a
-    // school straight into the student app instead of back into their
-    // own unfinished signup.
-    const signupMode = data.user.user_metadata?.signup_mode
-    if (profile?.role === 'student' && !profile.organisation_id && signupMode) {
-      const orgType = data.user.user_metadata?.org_type === 'provider' ? 'provider' : 'institution'
-      setGreeting({ name: profile?.full_name || '', dest: `/auth/signup/organisation?type=${orgType}` })
-      return
+    // A correct password isn't the whole story for an account with two-
+    // step verification on -- getAuthenticatorAssuranceLevel() is the
+    // real, server-backed signal for whether a second factor is still
+    // outstanding on this session (not the two_step_enabled column,
+    // which is only ever a display cache). AuthContext checks this same
+    // thing independently, so there's no route that skips it even if
+    // someone navigated straight past this page.
+    const { data: aal } = await getAuthenticatorAssuranceLevel()
+    if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
+      const { data: factors } = await listMfaFactors()
+      const factor = factors?.totp?.find(f => f.status === 'verified')
+      if (factor) {
+        setLoading(false)
+        setPendingUser(data.user)
+        setChallengeFactorId(factor.id)
+        return
+      }
     }
 
-    setGreeting({ name: profile?.full_name || '', dest: routeForRole(profile?.role) })
+    await proceedAfterAuth(data.user)
   }
 
   if (greeting) return <LoginGreeting name={greeting.name} onDone={() => router.replace(greeting.dest)} />
+
+  if (challengeFactorId && pendingUser) {
+    return (
+      <AuthShell title="Verify it's you" subtitle="Enter the code from your authenticator app." hideBack>
+        <TwoStepChallenge factorId={challengeFactorId} onVerified={() => proceedAfterAuth(pendingUser)} />
+      </AuthShell>
+    )
+  }
 
   return (
     <AuthShell title="Welcome back" subtitle="Log in to your LERN account." hideBack>

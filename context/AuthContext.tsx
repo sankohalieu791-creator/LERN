@@ -77,6 +77,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           activeUser = refreshed.session.user
         }
 
+        // The real gate for two-step verification, not just the login
+        // page's own component state -- a password-only (aal1) session
+        // on an account with a verified second factor stays signed-out
+        // as far as the rest of the app is concerned until that factor
+        // is actually challenged. Without this check here, someone
+        // could skip the login page's own TwoStepChallenge entirely by
+        // just navigating straight to a protected route with a session
+        // that only ever passed the first factor.
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+        if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
+          setUser(null)
+          setAuthUser(null)
+          setCachedProfile(null)
+          setLoading(false)
+          return
+        }
+
         setAuthUser(activeUser)
         const { data } = await getUserProfile(activeUser.id)
         if (data) {
@@ -97,6 +114,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'INITIAL_SESSION') return   // handled by initAuth above
       if (event === 'TOKEN_REFRESHED') return   // handled by handleVisibility above
       if (session?.user) {
+        // signInWithPassword() fires SIGNED_IN the moment the password
+        // checks out, at aal1, regardless of whether the account still
+        // has a second factor outstanding -- without this same check
+        // here (not just in initAuth above), this handler would treat
+        // someone as fully signed in before the login page's own
+        // TwoStepChallenge ever ran, defeating it entirely for the
+        // exact accounts that turned it on.
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+        if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
+          setLoading(false)
+          return
+        }
         setAuthUser(session.user)
         const { data } = await getUserProfile(session.user.id)
         if (data) {

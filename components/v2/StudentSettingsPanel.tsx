@@ -9,8 +9,9 @@ import {
   updateUserProfile, changePassword, requestEmailChange, sendPasswordResetEmail,
   signOutEverywhere, setNotificationPrefs, exportMyData, deleteMyAccount,
   requestMinorAccountDeletion, submitReport, signOut, getMyOrganisationInfo,
-  getBlockedUsers, unblockUser, setCookieConsent, setThemePreference,
+  getBlockedUsers, unblockUser, setCookieConsent, setThemePreference, disableTwoStep,
 } from '@/lib/supabase'
+import TwoStepSetup from '@/components/v2/TwoStepSetup'
 import {
   ChevronRight, ChevronLeft, Lock, Bell, Download, Trash2, Flag, FileText, LogOut,
   Shield, Eye, Sun, Moon, Monitor, Mail, UserX,
@@ -63,6 +64,18 @@ export default function StudentSettingsPanel() {
     await updateUserProfile(user.id, { [field]: value })
     await refreshUser()
     setBusyField(null)
+  }
+
+  const [showTwoStepSetup, setShowTwoStepSetup] = useState(false)
+  const toggleTwoStep = async () => {
+    if (!user.two_step_enabled) { setShowTwoStepSetup(true); return }
+    const code = prompt('Enter the current 6-digit code from your authenticator app to turn this off.')
+    if (!code) return
+    setBusyField('two_step_enabled')
+    const { error } = await disableTwoStep(code.trim())
+    setBusyField(null)
+    if (error) { alert('That code didn’t match — two-step verification is still on.'); return }
+    await refreshUser()
   }
 
   const notifs = user.notification_prefs || {}
@@ -162,7 +175,13 @@ export default function StudentSettingsPanel() {
       <Group title="Security and sign-in">
         <Row label="Change password" onClick={() => setScreen('password')} />
         <Row label="Reset password by email" onClick={requestReset} busy={busyField === 'reset'} />
-        <ToggleRow label="Two-step verification" value={!!user.two_step_enabled} busy={busyField === 'two_step_enabled'} onToggle={v => savePrivacy('two_step_enabled', v)} />
+        <ToggleRow label="Two-step verification" value={!!user.two_step_enabled} busy={busyField === 'two_step_enabled'} onToggle={toggleTwoStep} />
+        {showTwoStepSetup && (
+          <TwoStepSetup
+            onClose={() => setShowTwoStepSetup(false)}
+            onEnabled={async () => { setShowTwoStepSetup(false); await refreshUser() }}
+          />
+        )}
         <Row label="Sign out of all devices" onClick={requestSignOutEverywhere} />
       </Group>
 

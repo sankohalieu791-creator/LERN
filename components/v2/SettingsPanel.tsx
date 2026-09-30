@@ -10,8 +10,9 @@ import {
   getOrgStaff, updateOrganisationProfile, supabase,
   requestEmailChange, sendPasswordResetEmail, signOutEverywhere,
   getBlockedUsers, unblockUser, setCookieConsent, uploadOrgLogo,
-  uploadAvatar, removeAvatar,
+  uploadAvatar, removeAvatar, disableTwoStep,
 } from '@/lib/supabase'
+import TwoStepSetup from '@/components/v2/TwoStepSetup'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
 import {
@@ -88,11 +89,16 @@ export default function SettingsPanel() {
     alert(error ? `Couldn't send the reset link — ${error.message}` : `A password reset link has been sent to ${user.email}.`)
   }
 
+  const [showTwoStepSetup, setShowTwoStepSetup] = useState(false)
   const toggleTwoStep = async () => {
+    if (!user.two_step_enabled) { setShowTwoStepSetup(true); return }
+    const code = prompt('Enter the current 6-digit code from your authenticator app to turn this off.')
+    if (!code) return
     setBusyField('two_step')
-    await updateUserProfile(user.id, { two_step_enabled: !user.two_step_enabled })
-    await refreshUser()
+    const { error } = await disableTwoStep(code.trim())
     setBusyField(null)
+    if (error) { alert('That code didn’t match — two-step verification is still on.'); return }
+    await refreshUser()
   }
 
   const requestSignOutEverywhere = async () => {
@@ -220,6 +226,12 @@ export default function SettingsPanel() {
         <Row label="Sign out of all devices" onClick={requestSignOutEverywhere} danger />
         <Row label="Blocked accounts" onClick={() => setScreen('blocked')} />
       </Group>
+      {showTwoStepSetup && (
+        <TwoStepSetup
+          onClose={() => setShowTwoStepSetup(false)}
+          onEnabled={async () => { setShowTwoStepSetup(false); await refreshUser() }}
+        />
+      )}
 
       {/* ── Notifications ── */}
       <Group title="Notifications" icon={Bell}>
