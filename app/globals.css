@@ -385,29 +385,16 @@ body.auth-scroll::-webkit-scrollbar-track { background: transparent; }
 body.auth-scroll::-webkit-scrollbar-thumb { background: var(--brand); border-radius: 4px; }
 body.auth-scroll::-webkit-scrollbar-thumb:hover { background: #D9601C; }
 
-/* The app-wide hidden scrollbar above is a deliberate phone choice --
-   real native apps don't show one, so neither does this at phone widths.
-   Laptop is a different medium: every reference SaaS dashboard (Stripe,
-   Vercel, Resend -- literally the products this was compared against)
-   shows a thin, subtle one on desktop, because a mouse/trackpad user
-   relies on it to see there's more below and to grab-drag through a long
-   list. Hiding it there wasn't "native app feel", it was just an
-   affordance nobody meant to remove -- scrolling itself still worked
-   (every shell's <main> already has overflow-y-auto), there was simply
-   nothing on screen showing it was possible. 1024px matches this
-   codebase's own lg: breakpoint (OrgShell/StudentShell/OpsShell all
-   switch their own layout at the same width), so this turns on exactly
-   where the laptop sidebar layout itself begins, not before. */
-@media (min-width: 1024px) {
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-input) transparent;
-  }
-  *::-webkit-scrollbar { display: block; width: 10px; height: 10px; }
-  *::-webkit-scrollbar-track { background: transparent; }
-  *::-webkit-scrollbar-thumb { background: var(--border-input); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
-  *::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); background-clip: padding-box; }
-}
+/* A laptop-only visible scrollbar on <main> in each shell is handled by
+   ScrollTrack.tsx (a real drawn element, not CSS) -- see that file for
+   why. A native ::-webkit-scrollbar rule used to live here too, which
+   on a real desktop browser (unlike the sandbox this was first built
+   and checked in) rendered its own classic scrollbar, arrow buttons
+   and all, right alongside ScrollTrack's -- two overlapping scrollbars
+   at the same edge ("theres two of them ... goes all the way inside
+   the arrow"). The universal hide rule above stays in force everywhere,
+   laptop included, now that ScrollTrack is the only thing supplying
+   the visible affordance. */
 
 /* Animations */
 @keyframes fadeIn {
