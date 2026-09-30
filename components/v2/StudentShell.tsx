@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NotificationsBell from '@/components/v2/NotificationsBell'
 import Logo from '@/components/v2/Logo'
+import ScrollTrack from '@/components/v2/ScrollTrack'
 import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
 import { signOut } from '@/lib/supabase'
@@ -42,6 +43,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   const router = useRouter()
   const { user } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
+  const mainRef = useRef<HTMLElement>(null)
   // Feed is deliberately edge-to-edge (Instagram-style cards, full-
   // bleed media) -- everything else on a wide laptop screen was just
   // stretching to fill whatever width was available, which reads as
@@ -338,9 +340,12 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
       {/* tabIndex so a keyboard-only user can Tab straight into this
           scrollable region -- otherwise arrow keys/Page Down/Space have
           no focused scrollable element to act on. */}
-      <main tabIndex={0} className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[var(--app-bg)] pb-[calc(60px+env(safe-area-inset-bottom))] lg:pb-0">
-        {isFeed ? children : <div className="lg:max-w-3xl lg:mx-auto">{children}</div>}
-      </main>
+      <div className="relative flex-1 min-h-0">
+        <main ref={mainRef} tabIndex={0} className="h-full overflow-y-auto overscroll-contain bg-[var(--app-bg)] pb-[calc(60px+env(safe-area-inset-bottom))] lg:pb-0">
+          {isFeed ? children : <div className="lg:max-w-3xl lg:mx-auto">{children}</div>}
+        </main>
+        <ScrollTrack containerRef={mainRef} />
+      </div>
 
       {/* Phone-only bottom nav, "+" and all -- untouched, this is the
           layout that's already right. Only laptop gets the sidebar

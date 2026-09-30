@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { signOut } from '@/lib/supabase'
 import { useResolvedTheme } from '@/context/ThemeProvider'
 import Logo from '@/components/v2/Logo'
+import ScrollTrack from '@/components/v2/ScrollTrack'
 import { LayoutDashboard, Building2, Flag, ShieldAlert, ClipboardList, ScrollText, Settings, LogOut, Menu, X, UserPlus, ShieldCheck, BadgeCheck, School } from 'lucide-react'
 
 const NAV = [
@@ -35,6 +36,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const theme = useResolvedTheme()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const mainRef = useRef<HTMLElement>(null)
 
   const handleSignOut = async () => {
     await signOut()
@@ -105,7 +107,10 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
             into this scrollable region and use arrow keys/Page Down/Space
             to move through it -- without this, focus has nowhere to land
             inside it and those keys have nothing to act on. */}
-        <main tabIndex={0} className="flex-1 min-h-0 px-4 py-5 lg:px-8 lg:py-7 overflow-y-auto overflow-x-hidden">{children}</main>
+        <div className="relative flex-1 min-h-0">
+          <main ref={mainRef} tabIndex={0} className="h-full px-4 py-5 lg:px-8 lg:py-7 overflow-y-auto overflow-x-hidden">{children}</main>
+          <ScrollTrack containerRef={mainRef} />
+        </div>
       </div>
 
       {drawerOpen && (

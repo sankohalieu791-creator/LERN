@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
@@ -13,6 +13,7 @@ import Logo from '@/components/v2/Logo'
 import NotificationsBell from '@/components/v2/NotificationsBell'
 import PostComposer from '@/components/v2/PostComposer'
 import PresenceBadge from '@/components/v2/PresenceBadge'
+import ScrollTrack from '@/components/v2/ScrollTrack'
 
 function orgInitials(name?: string | null) {
   if (!name) return 'LN'
@@ -65,6 +66,7 @@ export default function OrgShell({
   const [composerOpen, setComposerOpen] = useState(false)
   const [reviewCount, setReviewCount] = useState(0)
   const [interestCount, setInterestCount] = useState(0)
+  const mainRef = useRef<HTMLElement>(null)
 
   // Keeps the same lern-theme cookie StudentShell writes in sync for
   // org accounts too -- the org layouts (institution/provider/employer)
@@ -388,10 +390,15 @@ export default function OrgShell({
             from Dashboard/Review/Students/Settings etc. too. */}
         {/* tabIndex so a keyboard-only user can Tab straight into this
             scrollable region -- otherwise arrow keys/Page Down/Space have
-            no focused scrollable element to act on. */}
-        <main tabIndex={0} className={`flex-1 min-h-0 overflow-y-auto bg-paper ${pathname.endsWith('/feed') ? '' : 'px-5 lg:px-10 py-7 pb-8'}`}>
-          {children}
-        </main>
+            no focused scrollable element to act on. relative wrapper +
+            ScrollTrack: see that component for why this isn't just
+            ::-webkit-scrollbar CSS. */}
+        <div className="relative flex-1 min-h-0">
+          <main ref={mainRef} tabIndex={0} className={`h-full overflow-y-auto bg-paper ${pathname.endsWith('/feed') ? '' : 'px-5 lg:px-10 py-7 pb-8'}`}>
+            {children}
+          </main>
+          <ScrollTrack containerRef={mainRef} />
+        </div>
       </div>
 
       {/* ── Phone floating "+" -- Gmail-style: bottom-right, elevated
