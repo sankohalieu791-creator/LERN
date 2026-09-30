@@ -346,6 +346,23 @@ export const getAuthenticatorAssuranceLevel = async () => {
   return { data, error }
 }
 
+// Supabase reports nextLevel === 'aal2' both for a real, verified factor
+// awaiting its challenge AND for a factor that was only ever enrolled
+// and never confirmed (someone started setup and closed the tab, or
+// mistyped the code and gave up). Only the first case has any way to
+// actually clear the challenge -- an unverified factor can't be
+// challenged at all. Gating login on nextLevel alone would permanently
+// lock that person out with no path back in, so every place that checks
+// AAL must also confirm a *verified* factor exists before treating the
+// session as still needing one.
+export const requiresTwoStepChallenge = async () => {
+  const { data: aal } = await getAuthenticatorAssuranceLevel()
+  if (!aal || aal.nextLevel !== 'aal2' || aal.currentLevel === aal.nextLevel) return { required: false, factorId: '' }
+  const { data: factors } = await listMfaFactors()
+  const factor = factors?.totp?.find(f => f.status === 'verified')
+  return factor ? { required: true, factorId: factor.id } : { required: false, factorId: '' }
+}
+
 export const enrollTotpFactor = async () => {
   const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' })
   return { data, error }

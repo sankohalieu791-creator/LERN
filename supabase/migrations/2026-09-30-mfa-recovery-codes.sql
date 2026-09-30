@@ -49,7 +49,7 @@ BEGIN
     -- back accurately off a printed sheet or a phone screen.
     v_code := '';
     FOR j IN 1..10 LOOP
-      v_code := v_code || substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789', floor(random() * 32)::int + 1, 1);
+      v_code := v_code || substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789', floor(random() * 31)::int + 1, 1);
     END LOOP;
     v_codes := array_append(v_codes, v_code);
     INSERT INTO public.mfa_recovery_codes (user_id, code_hash) VALUES (auth.uid(), encode(digest(v_code, 'sha256'), 'hex'));

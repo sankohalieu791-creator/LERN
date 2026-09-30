@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User } from '@/lib/types'
-import { supabase, getUser, getUserProfile } from '@/lib/supabase'
+import { supabase, getUser, getUserProfile, requiresTwoStepChallenge } from '@/lib/supabase'
 import { markHasAccount } from '@/lib/deviceAccount'
 
 interface AuthContextType {
@@ -84,9 +84,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // is actually challenged. Without this check here, someone
         // could skip the login page's own TwoStepChallenge entirely by
         // just navigating straight to a protected route with a session
-        // that only ever passed the first factor.
-        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-        if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
+        // that only ever passed the first factor. Gated on a *verified*
+        // factor specifically -- see requiresTwoStepChallenge's comment.
+        const { required } = await requiresTwoStepChallenge()
+        if (required) {
           setUser(null)
           setAuthUser(null)
           setCachedProfile(null)
@@ -121,8 +122,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // someone as fully signed in before the login page's own
         // TwoStepChallenge ever ran, defeating it entirely for the
         // exact accounts that turned it on.
-        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-        if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
+        const { required } = await requiresTwoStepChallenge()
+        if (required) {
           setLoading(false)
           return
         }

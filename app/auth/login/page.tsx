@@ -6,7 +6,7 @@ import AuthShell from '@/components/v2/AuthShell'
 import LoginGreeting from '@/components/v2/LoginGreeting'
 import TwoStepChallenge from '@/components/v2/TwoStepChallenge'
 import { TextField, PrimaryButton, ErrorBanner, OrDivider, GoogleButton } from '@/components/v2/Field'
-import { signIn, signInWithGoogle, getUserProfile, resendConfirmation, getAuthenticatorAssuranceLevel, listMfaFactors } from '@/lib/supabase'
+import { signIn, signInWithGoogle, getUserProfile, resendConfirmation, requiresTwoStepChallenge } from '@/lib/supabase'
 import { routeForRole } from '@/lib/roleRouting'
 import { useAuth } from '@/context/AuthContext'
 import type { User } from '@supabase/supabase-js'
@@ -95,16 +95,12 @@ export default function LoginPage() {
     // which is only ever a display cache). AuthContext checks this same
     // thing independently, so there's no route that skips it even if
     // someone navigated straight past this page.
-    const { data: aal } = await getAuthenticatorAssuranceLevel()
-    if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
-      const { data: factors } = await listMfaFactors()
-      const factor = factors?.totp?.find(f => f.status === 'verified')
-      if (factor) {
-        setLoading(false)
-        setPendingUser(data.user)
-        setChallengeFactorId(factor.id)
-        return
-      }
+    const { required, factorId } = await requiresTwoStepChallenge()
+    if (required) {
+      setLoading(false)
+      setPendingUser(data.user)
+      setChallengeFactorId(factorId)
+      return
     }
 
     await proceedAfterAuth(data.user)
