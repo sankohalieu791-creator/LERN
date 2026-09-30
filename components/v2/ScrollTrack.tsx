@@ -91,11 +91,11 @@ export default function ScrollTrack({ containerRef }: { containerRef: React.RefO
   return (
     <div
       onMouseDown={onTrackMouseDown}
-      className="hidden lg:block absolute top-0 right-0 bottom-0 w-2.5 z-10"
+      className="hidden lg:block absolute top-0.5 right-0.5 bottom-0.5 w-2 z-10"
     >
       <div
         onMouseDown={onThumbMouseDown}
-        className="absolute right-0 w-2.5 rounded-full bg-[var(--border-input)] hover:bg-[var(--text-tertiary)] cursor-pointer transition-colors"
+        className="absolute right-0 w-1 rounded-full bg-[var(--border-input)] hover:bg-[var(--text-tertiary)] hover:w-1.5 cursor-pointer transition-[background-color,width]"
         style={{ top: thumb.top, height: thumb.height }}
       />
     </div>
