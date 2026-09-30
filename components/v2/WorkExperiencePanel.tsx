@@ -175,7 +175,7 @@ export default function WorkExperiencePanel() {
 
           <button
             onClick={exportCsv}
-            className="w-full flex items-center justify-center gap-2 bg-ink text-white text-[14px] font-bold py-3.5 rounded-xl hover:opacity-90 transition mb-4"
+            className="w-full flex items-center justify-center gap-2 bg-brand text-white text-[14px] font-bold py-3.5 rounded-xl hover:bg-brand-hover transition mb-4"
           >
             <Download className="w-4 h-4" /> Export placement evidence
           </button>
