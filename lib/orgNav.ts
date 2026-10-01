@@ -1,4 +1,4 @@
-import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase, Search, Megaphone, HeartHandshake, Inbox, Building2, Bookmark, HardHat, Award } from 'lucide-react'
+import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase, Search, Megaphone, HeartHandshake, Inbox, Building2, Bookmark, HardHat, Award, Link as LinkIcon } from 'lucide-react'
 import type { NavItem } from '@/components/v2/OrgShell'
 
 // Institutions and providers are the SAME shell now -- one org layout,
@@ -6,11 +6,10 @@ import type { NavItem } from '@/components/v2/OrgShell'
 // (Briefs for institutions, Courses for providers -- a brief is set
 // and verified by a tutor, a course is the provider-side equivalent
 // unit of work). Everything else -- Review, Students (roster +
-// attendance register + guest invites, all three tabs live inside
-// StudentsPanel), Workshops, Interest received, Job tracking,
-// Dashboard -- is identical for both, generated from the same array
-// so the two navs structurally can't drift apart again the way
-// providerSections missing Students did before this.
+// attendance register), Guest invite, Workshops, Interest received,
+// Job tracking, Dashboard -- is identical for both, generated from the
+// same array so the two navs structurally can't drift apart again the
+// way providerSections missing Students did before this.
 //
 // Final Build Spec, 23 Sep 2026: Work Experience is institution-only,
 // Bootcamp Evidence is provider-only -- neither appears on the other
@@ -18,6 +17,12 @@ import type { NavItem } from '@/components/v2/OrgShell'
 // useful per direct feedback, 23 Sep 2026: Feed stays first, then the
 // named reason that customer type buys (Work Experience / Bootcamp
 // Evidence) straight after it, ahead of the day-to-day admin screens.
+//
+// Guest invite promoted out of Students' third tab into its own nav
+// item, 1 Oct 2026 -- it's the one place an outside employer touches
+// LERN data with no account at all, distinct enough from the
+// roster/attendance that it was undersold as a secondary tab. Placed
+// right after Students since that's where it's drawn from.
 function buildOrgSections(kind: 'institution' | 'provider'): NavItem[] {
   const base = `/${kind}`
   const workSection: NavItem = kind === 'institution'
@@ -32,6 +37,7 @@ function buildOrgSections(kind: 'institution' | 'provider'): NavItem[] {
     roleSpecific,
     { key: 'review',    label: 'Review',    icon: ClipboardCheck,  href: `${base}/review` },
     { key: 'students',  label: 'Students',  icon: Users,           href: `${base}/students` },
+    { key: 'guest-invites', label: 'Guest invite', icon: LinkIcon, href: `${base}/guest-invites` },
     workSection,
     { key: 'workshops', label: 'Workshops', icon: Presentation,    href: `${base}/workshops` },
     { key: 'interest',  label: 'Interest received', icon: HeartHandshake, href: `${base}/interest` },
@@ -43,15 +49,15 @@ function buildOrgSections(kind: 'institution' | 'provider'): NavItem[] {
 export const institutionSections: NavItem[] = buildOrgSections('institution')
 export const institutionPhoneItems: [NavItem, NavItem, NavItem] = [
   institutionSections[0], // Feed
-  institutionSections[4], // Briefs
-  institutionSections[8], // Dashboard
+  institutionSections[5], // Briefs
+  institutionSections[9], // Dashboard
 ]
 
 export const providerSections: NavItem[] = buildOrgSections('provider')
 export const providerPhoneItems: [NavItem, NavItem, NavItem] = [
   providerSections[0], // Feed
-  providerSections[4], // Courses
-  providerSections[8], // Dashboard
+  providerSections[5], // Courses
+  providerSections[9], // Dashboard
 ]
 
 // Independent employer sidebar -- corrected per direct feedback: Briefs

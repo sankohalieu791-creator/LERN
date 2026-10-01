@@ -7,26 +7,30 @@ import { useResolvedTheme } from '@/context/ThemeProvider'
 import {
   getOrgStudents, getMySubmissions, getGroups, createGroup, setStudentGroup,
   getAttendanceForSession, markAttendance, getStudentAttendanceSummary,
-  createGuestInvite, getGuestInvites, revokeGuestInvite,
 } from '@/lib/supabase'
 import {
   ChevronRight, ArrowLeft, Clock, CheckCircle2, RotateCcw, Ban, Users2,
-  ClipboardList, Link as LinkIcon, Shield, Copy, Check, Square, CheckSquare,
+  ClipboardList,
 } from 'lucide-react'
 import type { Group, AttendanceStatus } from '@/lib/types'
 
-// Build Spec: Students area (roster, attendance, guest invite) v1.0,
-// 2 September 2026. Card/border/structural colours stay this app's
-// own theme tokens (bg-surface/text-ink/border-edge) rather than the
-// spec's literal #FFFFFF/#E7E4DE -- the same call made for Review and
-// every other org-side rebuild this session, since the values are
+// Build Spec: Students area (roster, attendance) v1.0, 2 September
+// 2026. Card/border/structural colours stay this app's own theme
+// tokens (bg-surface/text-ink/border-edge) rather than the spec's
+// literal #FFFFFF/#E7E4DE -- the same call made for Review and every
+// other org-side rebuild this session, since the values are
 // numerically almost identical in light mode and this is what
 // actually delivers real dark-mode support instead of a hardcoded
 // copy of one theme. Every pinned SEMANTIC colour (status pills, the
-// orange tab underline, the primary button, the blue safeguarding
-// note, the green check) is the spec's exact hex regardless of theme.
-// One area for both institutions and providers -- "no difference
-// between them here."
+// orange tab underline, the primary button, the green check) is the
+// spec's exact hex regardless of theme. One area for both institutions
+// and providers -- "no difference between them here."
+//
+// Guest invite used to be this panel's third tab -- moved out to its
+// own screen (GuestInvitePanel.tsx) 1 Oct 2026: it's the one place an
+// outside employer touches LERN data with no account at all, distinct
+// enough from the roster/attendance that burying it as a secondary tab
+// undersold it.
 function initials(name?: string) {
   if (!name) return '?'
   return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
@@ -39,7 +43,7 @@ const STATUS_ICON: Record<string, { icon: any; cls: string }> = {
   revoked: { icon: Ban, cls: 'text-danger-text' },
 }
 
-type Tab = 'students' | 'attendance' | 'guests'
+type Tab = 'students' | 'attendance'
 
 export default function StudentsPanel() {
   const { user } = useAuth()
@@ -72,10 +76,10 @@ export default function StudentsPanel() {
   return (
     <div>
       <p className="text-[18px] font-semibold text-ink">Students</p>
-      <p className="text-[13px] mt-0.5 mb-4" style={{ color: '#5A5A5A' }}>Your learners, attendance, and employer invites</p>
+      <p className="text-[13px] mt-0.5 mb-4" style={{ color: '#5A5A5A' }}>Your learners and their attendance</p>
 
       <div className="flex gap-5 border-b border-edge-subtle mb-5">
-        {([['students', 'Students'], ['attendance', 'Attendance'], ['guests', 'Guest invite']] as [Tab, string][]).map(([key, label]) => {
+        {([['students', 'Students'], ['attendance', 'Attendance']] as [Tab, string][]).map(([key, label]) => {
           const active = tab === key
           return (
             <button
@@ -140,10 +144,8 @@ export default function StudentsPanel() {
             </div>
           )}
         </div>
-      ) : tab === 'attendance' ? (
-        <AttendanceRegister groups={groups} students={students} onChanged={load} />
       ) : (
-        <GuestInvitePanel students={students} />
+        <AttendanceRegister groups={groups} students={students} onChanged={load} />
       )}
 
       {detailStudent && (
@@ -427,189 +429,5 @@ function AttendancePill({ label, selected, bg, text, onClick }: { label: string;
     >
       {label}
     </button>
-  )
-}
-
-// One or more students, defaulting to one -- "the common case is one
-// student; a role with several candidates can include a few, without
-// creating separate links." The guest sees only the chosen students,
-// only their verified work, whether it's one or several.
-function GuestInvitePanel({ students }: { students: any[] }) {
-  const { user } = useAuth()
-  const [invites, setInvites] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [email, setEmail] = useState('')
-  const [creating, setCreating] = useState(false)
-  const [newLink, setNewLink] = useState<string | null>(null)
-  const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [error, setError] = useState('')
-
-  const load = () => {
-    if (!user?.organisation_id) return
-    getGuestInvites(user.organisation_id).then(({ data }) => { setInvites(data || []); setLoading(false) })
-  }
-  useEffect(load, [user?.organisation_id])
-
-  // One student selected by default, per spec -- the first time the
-  // roster arrives with nothing chosen yet.
-  useEffect(() => {
-    if (students.length > 0 && selected.size === 0) setSelected(new Set([students[0].id]))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [students])
-
-  const toggle = (id: string) => setSelected(prev => {
-    const next = new Set(prev)
-    next.has(id) ? next.delete(id) : next.add(id)
-    return next
-  })
-
-  // Was a silent no-op on failure before -- disabled button with no
-  // explanation if nothing was selected, and any real error from
-  // createGuestInvite (RLS, network, a bad organisation_id) just
-  // vanished with nothing shown. Every path now either creates the
-  // link or tells the person why not.
-  const handleCreate = async () => {
-    setError('')
-    if (selected.size === 0) return setError('Select at least one student first.')
-    if (!user?.organisation_id) return setError("Your organisation hasn't loaded yet — wait a moment and try again.")
-    setCreating(true)
-    setNewLink(null)
-    const { data, error: err } = await createGuestInvite(user.organisation_id, user.id, Array.from(selected), email)
-    setCreating(false)
-    if (err || !data) { setError(err?.message || "Couldn't create the invite — try again."); return }
-    setNewLink(`${window.location.origin}/guest/${(data as any).token}`)
-    setEmail('')
-    load()
-  }
-
-  const handleRevoke = async (id: string) => {
-    setError('')
-    // Was discarding the error and unconditionally marking it revoked
-    // before -- a failed revoke still showed the link as dead in this
-    // list while it kept working perfectly fine for whoever holds it,
-    // which is exactly backwards for a button whose whole job is
-    // cutting off access.
-    const { error: err } = await revokeGuestInvite(id)
-    if (err) { setError("Couldn't revoke that link — try again."); return }
-    setInvites(prev => prev.map(i => i.id === id ? { ...i, revoked_at: new Date().toISOString() } : i))
-  }
-
-  const copy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text)
-    setCopiedId(id)
-    setTimeout(() => setCopiedId(null), 1500)
-  }
-
-  return (
-    <div>
-      <div className="bg-surface border border-edge rounded-2xl p-6 mb-5">
-        <p className="text-[14px] font-semibold text-ink mb-1.5">Invite an employer</p>
-        <p className="text-[12px] mb-5 leading-relaxed" style={{ color: '#5A5A5A' }}>
-          Bring in one employer to see a student's verified work. No account, no browsing the rest of LERN. Any interest comes straight back to you.
-        </p>
-
-        <p className="text-[12px] font-medium mb-2" style={{ color: '#5A5A5A' }}>Who should they see?</p>
-        {students.length === 0 ? (
-          <p className="text-[13px] text-ink-tertiary mb-1">No students have joined yet.</p>
-        ) : (
-          <div className="space-y-1.5 mb-1.5">
-            {students.map(s => {
-              const checked = selected.has(s.id)
-              return (
-                <button
-                  key={s.id} onClick={() => toggle(s.id)}
-                  className="w-full flex items-center gap-3 border rounded-xl px-3.5 py-2.5 text-left transition"
-                  style={{ borderColor: checked ? '#0F6E56' : '#E7E4DE' }}
-                >
-                  {checked
-                    ? <CheckSquare className="w-4 h-4 flex-shrink-0" style={{ color: '#0F6E56' }} />
-                    : <Square className="w-4 h-4 flex-shrink-0" style={{ color: '#B9B4A8' }} />}
-                  <span className="flex-1 min-w-0 text-[13px] font-semibold text-ink truncate">{s.full_name}</span>
-                  <span className="text-[12px] flex-shrink-0" style={{ color: '#5A5A5A' }}>{s.verified} verified piece{s.verified === 1 ? '' : 's'}</span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-        <p className="text-[11px] mb-5" style={{ color: '#8A8A8A' }}>You can add more than one student if this employer is hiring for a role.</p>
-
-        <label className="block mb-5">
-          <span className="block text-[12px] font-medium mb-1.5" style={{ color: '#5A5A5A' }}>Employer's email (optional)</span>
-          <input
-            value={email} onChange={e => setEmail(e.target.value)} placeholder="name@company.com" type="email"
-            className="w-full bg-surface border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
-          />
-        </label>
-
-        {error && (
-          <div className="bg-danger-bg border border-danger-hover rounded-lg px-3.5 py-2.5 mb-4">
-            <p className="text-[12.5px] text-danger-text">{error}</p>
-          </div>
-        )}
-
-        {newLink && (
-          <div className="flex items-center gap-2 bg-success-bg border border-success-text/20 rounded-lg px-3.5 py-2.5 mb-4">
-            <p className="text-[12.5px] text-ink flex-1 truncate font-mono">{newLink}</p>
-            <button onClick={() => copy(newLink, 'new')} className="text-success-text hover:opacity-70 transition flex-shrink-0">
-              {copiedId === 'new' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            </button>
-          </div>
-        )}
-
-        {/* Always clickable now, even with nothing selected -- a
-            disabled button with no explanation is indistinguishable
-            from a broken one. handleCreate itself explains why, if
-            there's a reason it can't proceed. */}
-        <button
-          onClick={handleCreate} disabled={creating}
-          className="w-full flex items-center justify-center gap-1.5 text-white text-[14px] font-semibold py-3 rounded-xl disabled:opacity-60 transition mb-4"
-          style={{ backgroundColor: '#F26B21' }}
-        >
-          <LinkIcon className="w-4 h-4" /> {creating ? 'Creating…' : 'Create invite link'}
-        </button>
-
-        <div className="flex items-start gap-2.5 rounded-lg px-3.5 py-3" style={{ backgroundColor: '#E6F1FB' }}>
-          <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#0C447C' }} />
-          <p className="text-[12px] leading-relaxed" style={{ color: '#0C447C' }}>
-            The guest sees only the students you pick, and only their verified work. You can revoke the link any time.
-          </p>
-        </div>
-      </div>
-
-      {loading ? (
-        <p className="text-ink-tertiary text-[14px]">Loading…</p>
-      ) : invites.length > 0 && (
-        <div className="space-y-2">
-          {invites.map(inv => {
-            const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/guest/${inv.token}`
-            const shares = inv.guest_invite_shares || []
-            const names = shares.map((s: any) => s.users?.full_name).filter(Boolean)
-            const nameLabel = names.length === 0 ? 'Student' : names.length === 1 ? names[0] : `${names[0]} +${names.length - 1} more`
-            const status = inv.revoked_at ? 'Revoked' : inv.claimed_by ? 'Claimed' : 'Pending'
-            return (
-              <div key={inv.id} className="flex items-center justify-between bg-surface border border-edge rounded-xl px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-ink truncate">{nameLabel}</p>
-                  <p className="text-[11px] text-ink-tertiary">{status} · {new Date(inv.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  {!inv.revoked_at && !inv.claimed_by && (
-                    <button onClick={() => copy(link, inv.id)} className="text-ink-secondary hover:text-brand transition">
-                      {copiedId === inv.id ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    </button>
-                  )}
-                  {!inv.revoked_at && (
-                    <button onClick={() => handleRevoke(inv.id)} className="text-ink-secondary hover:text-danger-text transition">
-                      <Ban className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
   )
 }
