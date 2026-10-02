@@ -334,18 +334,6 @@ export default function OrgShell({
           </div>
           <div className="flex items-center gap-1">
             <NotificationsBell />
-            {/* Visible on phone now too, not just laptop -- direct
-                access next to the bell instead of only being reachable
-                by opening the drawer, per direct request ("add the
-                settings next to the notif bell to be easier"). The only
-                path to Settings now -- the drawer's own trailing
-                Settings row was removed as the duplicate it had become. */}
-            <button
-              aria-label="Settings" onClick={() => setSettingsOpen(true)}
-              className="flex w-10 h-10 items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
             <div className="relative flex items-center gap-1.5">
               {/* Colour alone ("just green") isn't a status -- the dot
                   on the avatar below stays as a compact always-there
