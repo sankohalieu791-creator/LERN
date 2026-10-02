@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, List } from 'lucide-react'
+import { ArrowLeft, X, List } from 'lucide-react'
 import Logo from '@/components/v2/Logo'
 
 // Reachable from Settings (opened in a new tab -- see SettingsPanel's
@@ -30,6 +30,13 @@ export default function LegalShell({ title, children }: { title: string; childre
   const [sections, setSections] = useState<{ id: string; text: string }[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [navOpen, setNavOpen] = useState(false)
+  // Starts true (the safe default -- matches what the server itself
+  // renders, since `window`/`history` don't exist there at all) and
+  // corrects client-side after mount if there's genuinely no history
+  // to go back to. Checking history.length directly during render
+  // would crash server-side rendering outright.
+  const [canGoBack, setCanGoBack] = useState(true)
+  useEffect(() => { setCanGoBack(window.history.length > 1) }, [])
 
   useEffect(() => {
     const root = contentRef.current
@@ -67,16 +74,15 @@ export default function LegalShell({ title, children }: { title: string; childre
   return (
     <div className="min-h-screen bg-paper" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <header className="flex items-center justify-between px-6 lg:px-10 py-6 border-b border-edge-subtle">
-        {/* router.back() -- not a hardcoded href="/". That sent a
-            logged-in student who tapped this from Settings out to the
-            marketing root, which then redirects them back into the
-            app but drops them at Feed, not wherever they actually
-            came from. Real browser history returns them to the exact
-            screen they left; opened in a fresh tab from Settings,
-            there's simply nowhere to go and the button is a no-op. */}
-        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-secondary hover:text-ink transition">
-          <ArrowLeft className="w-4 h-4" /> Back
-        </button>
+        {canGoBack ? (
+          <button onClick={() => router.back()} className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-secondary hover:text-ink transition">
+            <ArrowLeft className="w-4 h-4" /> Back
+          </button>
+        ) : (
+          <button onClick={() => window.close()} className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-secondary hover:text-ink transition">
+            <X className="w-4 h-4" /> Close tab
+          </button>
+        )}
         <span className="text-ink-tertiary"><Logo size="sm" /></span>
       </header>
 
