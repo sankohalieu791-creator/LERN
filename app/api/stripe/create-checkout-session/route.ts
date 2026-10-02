@@ -49,8 +49,11 @@ export async function POST(req: NextRequest) {
     mode: 'subscription',
     customer: customerId,
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${APP_URL}/employer/settings?checkout=success`,
-    cancel_url: `${APP_URL}/employer/settings?checkout=cancelled`,
+    // EmployerBillingGate (mounted around the whole /employer layout,
+    // not this one page) is what actually reads ?checkout= -- lands on
+    // the dashboard now that Settings is a modal, not a route.
+    success_url: `${APP_URL}/employer/dashboard?checkout=success`,
+    cancel_url: `${APP_URL}/employer/dashboard?checkout=cancelled`,
     metadata: { employer_id: profile.id, tier },
     subscription_data: { metadata: { employer_id: profile.id, tier } },
     // This Stripe account has Managed Payments on by default, which

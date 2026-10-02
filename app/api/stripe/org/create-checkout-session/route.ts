@@ -69,8 +69,11 @@ export async function POST(req: NextRequest) {
       },
       quantity: 1,
     }],
-    success_url: `${APP_URL}/${org.type === 'provider' ? 'provider' : 'institution'}/settings?checkout=success`,
-    cancel_url: `${APP_URL}/${org.type === 'provider' ? 'provider' : 'institution'}/settings?checkout=cancelled`,
+    // OrgBillingGate (mounted around the whole institution/provider
+    // layout, not this one page) is what actually reads ?checkout= --
+    // lands on the dashboard now that Settings is a modal, not a route.
+    success_url: `${APP_URL}/${org.type === 'provider' ? 'provider' : 'institution'}/dashboard?checkout=success`,
+    cancel_url: `${APP_URL}/${org.type === 'provider' ? 'provider' : 'institution'}/dashboard?checkout=cancelled`,
     metadata: { organisation_id: org.id, annual_price: String(computed.annual_price) },
     subscription_data: { metadata: { organisation_id: org.id } },
     managed_payments: { enabled: false },

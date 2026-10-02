@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { getOrgBilling, setBootcampEvidence, createOrgCheckoutSession, cancelOrgSubscriptionViaStripe } from '@/lib/supabase'
 import { providerBandFor, PROVIDER_BAND_LABEL, BOOTCAMP_EVIDENCE_MONTHLY, INSTITUTION_MAX_PRICE } from '@/lib/billing'
-import { ChevronLeft, TrendingUp } from 'lucide-react'
+import { ChevronLeft, TrendingUp, GraduationCap, Receipt, Sparkles } from 'lucide-react'
 
 // Billing and Subscription — Complete Build Spec, Part 2. Every number
 // shown here comes straight from get_org_billing() (server-computed,
@@ -14,7 +14,7 @@ import { ChevronLeft, TrendingUp } from 'lucide-react'
 // the exhaustive boundary + live-integration tests behind them.
 const money = (n: number) => `£${Number(n).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-export default function BillingPanel({ onBack }: { onBack: () => void }) {
+export default function BillingPanel({ onBack }: { onBack?: () => void }) {
   const { user } = useAuth()
   const [billing, setBilling] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -60,9 +60,11 @@ export default function BillingPanel({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="max-w-lg mx-auto">
-      <button onClick={onBack} className="flex items-center gap-1 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
-        <ChevronLeft className="w-4 h-4" /> Back to Settings
-      </button>
+      {onBack && (
+        <button onClick={onBack} className="flex items-center gap-1 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
+          <ChevronLeft className="w-4 h-4" /> Back to Settings
+        </button>
+      )}
 
       {loading ? (
         <p className="text-[14px] text-ink-tertiary">Loading…</p>
@@ -100,8 +102,8 @@ function BillingContent({ billing, onToggleBootcamp, togglingBootcamp, error, bu
 
       {/* ── Headcount card ── */}
       <div className="bg-surface border border-edge rounded-2xl p-5">
-        <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2">
-          {isProvider ? 'Learners on platform' : 'Students on platform'}
+        <p className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2">
+          <GraduationCap className="w-3.5 h-3.5" /> {isProvider ? 'Learners on platform' : 'Students on platform'}
         </p>
         <p className="text-[34px] font-extrabold text-ink leading-none mb-3">{billing.headcount.toLocaleString('en-GB')}</p>
         {isProvider ? (
@@ -129,6 +131,9 @@ function BillingContent({ billing, onToggleBootcamp, togglingBootcamp, error, bu
         </div>
       ) : (
         <div className="bg-surface border border-edge rounded-2xl p-5">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-3">
+            <Receipt className="w-3.5 h-3.5" /> This year's charges
+          </p>
           <div className="space-y-2.5">
             <div className="flex items-center justify-between text-[14px]">
               <span className="text-ink-secondary">{isProvider ? 'Base plan' : 'Base subscription'}</span>
@@ -172,9 +177,12 @@ function BillingContent({ billing, onToggleBootcamp, togglingBootcamp, error, bu
 
       {isProvider && (
         <div className="bg-surface border border-edge rounded-2xl px-5 py-4 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[14px] font-semibold text-ink">Bootcamp Evidence</p>
-            <p className="text-[12px] text-ink-tertiary mt-0.5">{money(BOOTCAMP_EVIDENCE_MONTHLY)} per month while active</p>
+          <div className="flex items-center gap-3">
+            <span className="w-9 h-9 rounded-full bg-accent-bg flex items-center justify-center flex-shrink-0"><Sparkles className="w-4 h-4 text-brand" /></span>
+            <div>
+              <p className="text-[14px] font-semibold text-ink">Bootcamp Evidence</p>
+              <p className="text-[12px] text-ink-tertiary mt-0.5">{money(BOOTCAMP_EVIDENCE_MONTHLY)} per month while active</p>
+            </div>
           </div>
           <button
             onClick={() => onToggleBootcamp(!billing.bootcamp_evidence_enabled)} disabled={togglingBootcamp}
@@ -190,8 +198,7 @@ function BillingContent({ billing, onToggleBootcamp, togglingBootcamp, error, bu
       {!billing.is_custom_pricing && billing.subscription_status !== 'active' && (
         <button
           onClick={onSubscribe} disabled={busy}
-          className="w-full text-white font-semibold text-[14px] py-3 rounded-xl disabled:opacity-40 transition"
-          style={{ backgroundColor: '#D4551A' }}
+          className="w-full bg-brand text-white font-semibold text-[14px] py-3 rounded-xl disabled:opacity-40 hover:bg-brand-hover transition"
         >
           {busy ? 'Setting up…' : billing.subscription_status === 'restricted' ? 'Reactivate' : 'Subscribe'}
         </button>

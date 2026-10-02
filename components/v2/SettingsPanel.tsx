@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { useResolvedTheme } from '@/context/ThemeProvider'
 import {
   updateUserProfile, changePassword, setThemePreference, setNotificationPrefs,
   exportMyData, deleteMyAccount, submitReport, signOut,
@@ -16,24 +18,28 @@ import TwoStepSetup from '@/components/v2/TwoStepSetup'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { TextField, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components/v2/Field'
 import {
-  Sun, Moon, Monitor, ShieldCheck, Users2, Ticket,
-  Mail, UserX, ChevronRight, ChevronLeft, Camera, BadgeCheck, LogOut,
-  Lock, Download, Check, User, Bell, AlertTriangle,
-  Paintbrush, Info, CreditCard, HelpCircle,
+  X, ChevronLeft, Sun, Moon, Monitor, ShieldCheck, Users2, Ticket,
+  Mail, UserX, ChevronRight, Camera, BadgeCheck, LogOut,
+  Lock, Download, User, Bell, AlertTriangle, KeyRound, Flag, Cookie, Trash2,
+  Paintbrush, Info, CreditCard, HelpCircle, FileText, ClipboardList, Smartphone, MonitorX,
 } from 'lucide-react'
 import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
 import BillingPanel from '@/components/v2/BillingPanel'
 import EmployerSubscriptionPanel from '@/components/v2/EmployerSubscriptionPanel'
 import { showOnboardingChecklist } from '@/components/v2/OnboardingChecklist'
 
-// Rebuilt to the same grouped-row-list structure as the student app's
-// own Settings (Group/Row/ToggleRow, one flowing screen, sub-screens
-// for anything with its own form) instead of this shell's previous
-// stack of bordered Cards -- same request as "bring org up to the same
-// depth as student's settings," applied to the shape of the page
-// itself, not just what's on it. Colours stay this shell's own
-// (--paper/--ink, light-first with dark support) rather than student's
-// --app-* dark-only palette -- the pattern is shared, the theme isn't.
+// Rebuilt as a modal dialog with left-tab navigation, 2 Oct 2026 --
+// same interaction model as the "Create brief" modal (a createPortal
+// overlay, not a page route) and the same left-tab-plus-content-pane
+// shape as Claude's own Settings dialog: click a tab, the content pane
+// to its right swaps, no URL change, no full-page navigation.
+// Previously this was a full /settings PAGE with a single flat `screen`
+// state -- every sub-screen's "Back" returned to one hardcoded root
+// regardless of which group it came from. Now `activeTab` (which tab
+// is selected) and `subScreen` (a sub-form opened from within a tab,
+// e.g. Change password) are separate state: opening a sub-screen never
+// touches activeTab, so its own Back always lands back on the correct
+// tab, not a flat list.
 const NOTIFICATION_LABELS: Record<string, string> = {
   work_submitted: 'Work submitted for review',
   work_verified: 'Work verified',
@@ -41,18 +47,32 @@ const NOTIFICATION_LABELS: Record<string, string> = {
   reports: 'New reports',
 }
 
-type Screen = null | 'email' | 'password' | 'photo' | 'rename' | 'organisation' | 'blocked' | 'report' | 'delete' | 'consent' | 'billing' | 'subscription'
+export type TabKey = 'profile' | 'security' | 'billing' | 'notifications' | 'privacy' | 'appearance' | 'help'
+type Screen = null | 'email' | 'password' | 'photo' | 'rename' | 'organisation' | 'blocked' | 'report' | 'delete' | 'consent'
 
-export default function SettingsPanel() {
+const SCREEN_TITLE: Record<Exclude<Screen, null>, string> = {
+  email: 'Change email', password: 'Change password', photo: 'Profile photo', rename: 'Full name',
+  organisation: 'Organisation', blocked: 'Blocked accounts', report: 'Report a problem',
+  delete: 'Delete my account', consent: 'Consent',
+}
+
+// Opens the modal from anywhere outside OrgShell's own tree (e.g. a
+// "Turn it on in Settings" CTA deep inside Bootcamp Evidence) without
+// prop-drilling a setter down through every intermediate component --
+// same event-dispatch pattern as showOnboardingChecklist() below.
+export function openSettings(tab?: TabKey) {
+  window.dispatchEvent(new CustomEvent('lern:open-settings', { detail: { tab } }))
+}
+
+export default function SettingsPanel({ onClose, initialTab }: { onClose: () => void; initialTab?: TabKey }) {
   const { user, refreshUser } = useAuth()
   const router = useRouter()
+  const theme = useResolvedTheme()
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab || 'profile')
   const [screen, setScreen] = useState<Screen>(null)
   const [org, setOrg] = useState<any>(null)
   const [busyField, setBusyField] = useState<string | null>(null)
-  // Called here, before any of the sub-screen early returns below --
-  // hooks can't move past a conditional return, unlike the old
-  // synchronous getAvatarUrl() calls these replace, which could sit
-  // anywhere since they weren't hooks at all.
+  const [showTwoStepSetup, setShowTwoStepSetup] = useState(false)
   const logoUrl = useAvatarUrl(org?.logo_path)
   const avatarUrl = useAvatarUrl(user?.avatar_path)
   const isOrgAdmin = user?.role === 'institution_staff' || user?.role === 'provider_staff'
@@ -62,6 +82,18 @@ export default function SettingsPanel() {
       supabase.from('organisations').select('*').eq('id', user.organisation_id).single().then(({ data }) => setOrg(data))
     }
   }, [user?.organisation_id])
+
+  // Esc closes the whole dialog (sub-screen first, if one's open) --
+  // same expectation as any desktop settings window.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (screen) setScreen(null)
+      else onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [screen, onClose])
 
   if (!user) return null
 
@@ -84,12 +116,9 @@ export default function SettingsPanel() {
     setBusyField('reset')
     const { error } = await sendPasswordResetEmail(user.email)
     setBusyField(null)
-    // Was unconditional before -- a failed send (rate limit, bad email
-    // on the account, network) still told the user it had gone out.
     alert(error ? `Couldn't send the reset link — ${error.message}` : `A password reset link has been sent to ${user.email}.`)
   }
 
-  const [showTwoStepSetup, setShowTwoStepSetup] = useState(false)
   const toggleTwoStep = async () => {
     if (!user.two_step_enabled) { setShowTwoStepSetup(true); return }
     const code = prompt('Enter the current 6-digit code from your authenticator app to turn this off.')
@@ -104,9 +133,6 @@ export default function SettingsPanel() {
   const requestSignOutEverywhere = async () => {
     if (!confirm('Sign out of every device you’re signed in on?')) return
     const { error } = await signOutEverywhere()
-    // A failed global sign-out still redirected this device to login as
-    // if it had worked, silently leaving every OTHER device signed in --
-    // the one thing this button exists to guarantee.
     if (error) { alert(`Couldn't sign out everywhere — ${error.message}`); return }
     router.replace('/auth/login')
   }
@@ -118,196 +144,253 @@ export default function SettingsPanel() {
     setBusyField(null)
   }
 
-  // ── Sub-screens ──
-  if (screen === 'email') return <ChangeEmailScreen currentEmail={user.email} onBack={() => setScreen(null)} />
-  if (screen === 'password') return <ChangePasswordScreen onBack={() => setScreen(null)} />
-  if (screen === 'photo') return <PhotoScreen onBack={() => setScreen(null)} />
-  if (screen === 'rename') return <RenameScreen onBack={() => setScreen(null)} />
-  if (screen === 'organisation') return <OrganisationScreen org={org} onBack={() => setScreen(null)} onChanged={() => { setOrg(null); if (user.organisation_id) supabase.from('organisations').select('*').eq('id', user.organisation_id).single().then(({ data }) => setOrg(data)) }} />
-  if (screen === 'blocked') return <BlockedAccountsScreen userId={user.id} onBack={() => setScreen(null)} />
-  if (screen === 'report') return <ReportScreen userId={user.id} organisationId={user.organisation_id || null} onBack={() => setScreen(null)} />
-  if (screen === 'delete') return <DeleteAccountScreen email={user.email} onBack={() => setScreen(null)} />
-  if (screen === 'consent') return <ConsentScreen consentedAt={user.consented_at} onBack={() => setScreen(null)} onDelete={() => setScreen('delete')} />
-  if (screen === 'billing') return <BillingPanel onBack={() => setScreen(null)} />
-  if (screen === 'subscription') return <EmployerSubscriptionPanel onBack={() => setScreen(null)} />
+  const roleLabel = user.role === 'employer' ? 'Employer' : user.role === 'institution_staff' ? 'Institution staff' : 'Provider staff'
 
-  const roleLabel = user.role === 'employer' ? 'Employer' : user.role === 'institution_staff' ? 'Institution staff' : user.role === 'provider_staff' ? 'Provider staff' : 'Student'
+  const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { key: 'profile', label: 'Profile', icon: User },
+    { key: 'security', label: 'Security', icon: ShieldCheck },
+    { key: 'billing', label: 'Billing', icon: CreditCard },
+    { key: 'notifications', label: 'Notifications', icon: Bell },
+    { key: 'privacy', label: 'Privacy & data', icon: Lock },
+    { key: 'appearance', label: 'Appearance', icon: Paintbrush },
+    { key: 'help', label: 'Help & legal', icon: HelpCircle },
+  ]
 
-  return (
-    <div className="max-w-2xl mx-auto pb-10">
-      <p className="text-[22px] font-bold text-ink mb-5">Settings</p>
+  const reloadOrg = () => { if (user.organisation_id) supabase.from('organisations').select('*').eq('id', user.organisation_id).single().then(({ data }) => setOrg(data)) }
 
-      {/* Account summary -- a proper hub up top (avatar, name, email,
-          role) instead of the list starting straight into rows with no
-          identity anchor above it. Purely presentational -- every field
-          here is still edited via its own row below, this is just
-          somewhere to see it all at a glance first. */}
-      <div className="flex items-center gap-4 bg-gradient-to-br from-accent-bg to-surface border border-edge rounded-2xl px-5 py-5 mb-6">
-        {avatarUrl ? (
-          <img src={avatarUrl} alt="" className="w-16 h-16 rounded-full object-cover flex-shrink-0 border-2 border-surface shadow-sm" />
-        ) : (
-          <span className="w-16 h-16 rounded-full bg-brand text-white font-bold text-[22px] flex items-center justify-center flex-shrink-0 border-2 border-surface shadow-sm">
-            {user.full_name?.[0]?.toUpperCase() || 'U'}
-          </span>
-        )}
-        <div className="min-w-0">
-          <p className="font-bold text-ink text-[17px] truncate">{user.full_name}</p>
-          <p className="text-[13px] text-ink-secondary truncate">{user.email}</p>
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand bg-surface px-2 py-0.5 rounded-full mt-1.5">
-            {isOrgAdmin && org?.name ? `${roleLabel} · ${org.name}` : roleLabel}
-          </span>
+  const renderScreen = () => {
+    switch (screen) {
+      case 'email': return <ChangeEmailScreen currentEmail={user.email} onBack={() => setScreen(null)} />
+      case 'password': return <ChangePasswordScreen onBack={() => setScreen(null)} />
+      case 'photo': return <PhotoScreen onBack={() => setScreen(null)} />
+      case 'rename': return <RenameScreen onBack={() => setScreen(null)} />
+      case 'organisation': return <OrganisationScreen org={org} onBack={() => setScreen(null)} onChanged={() => { setOrg(null); reloadOrg() }} />
+      case 'blocked': return <BlockedAccountsScreen userId={user.id} onBack={() => setScreen(null)} />
+      case 'report': return <ReportScreen userId={user.id} organisationId={user.organisation_id || null} onBack={() => setScreen(null)} />
+      case 'delete': return <DeleteAccountScreen email={user.email} onBack={() => setScreen(null)} />
+      case 'consent': return <ConsentScreen consentedAt={user.consented_at} onBack={() => setScreen(null)} onDelete={() => setScreen('delete')} />
+      default: return null
+    }
+  }
+
+  const renderTab = () => {
+    switch (activeTab) {
+      case 'profile':
+        return (
+          <>
+            <div className="flex items-center gap-4 bg-gradient-to-br from-accent-bg to-surface border border-edge rounded-2xl px-5 py-5 mb-6">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="w-16 h-16 rounded-full object-cover flex-shrink-0 border-2 border-surface shadow-sm" />
+              ) : (
+                <span className="w-16 h-16 rounded-full bg-brand text-white font-bold text-[22px] flex items-center justify-center flex-shrink-0 border-2 border-surface shadow-sm">
+                  {user.full_name?.[0]?.toUpperCase() || 'U'}
+                </span>
+              )}
+              <div className="min-w-0">
+                <p className="font-bold text-ink text-[17px] truncate">{user.full_name}</p>
+                <p className="text-[13px] text-ink-secondary truncate">{user.email}</p>
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand bg-surface px-2 py-0.5 rounded-full mt-1.5">
+                  {isOrgAdmin && org?.name ? `${roleLabel} · ${org.name}` : roleLabel}
+                </span>
+              </div>
+            </div>
+
+            <Group>
+              {isOrgAdmin && (
+                <Row
+                  icon={Users2} label={org?.name || 'Your organisation'} onClick={() => setScreen('organisation')}
+                  right={
+                    <span className="flex items-center gap-2">
+                      {org?.verified && <BadgeCheck className="w-4 h-4 flex-shrink-0" style={{ color: '#4a9de0' }} />}
+                      {logoUrl ? <img src={logoUrl} alt="" className="w-8 h-8 rounded-lg object-cover" /> : <span className="w-8 h-8 rounded-lg bg-accent-bg text-brand font-bold text-[12px] flex items-center justify-center">{org?.name?.[0]?.toUpperCase() || 'O'}</span>}
+                    </span>
+                  }
+                />
+              )}
+              <Row
+                icon={Camera} label="Profile photo" onClick={() => setScreen('photo')}
+                right={avatarUrl ? <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" /> : <span className="w-8 h-8 rounded-full bg-accent-bg text-brand font-bold text-[12px] flex items-center justify-center">{user.full_name?.[0]?.toUpperCase() || 'U'}</span>}
+              />
+              <Row icon={User} label="Full name" value={user.full_name} onClick={() => setScreen('rename')} />
+              <Row icon={Mail} label="Email" value={user.email} onClick={() => setScreen('email')} />
+              <Row icon={KeyRound} label="Change password" onClick={() => setScreen('password')} />
+              {user.role === 'employer' && (
+                <Row
+                  icon={BadgeCheck} label="Employer status" noChevron
+                  value={user.employer_verified ? undefined : 'Not yet verified'}
+                  right={user.employer_verified ? <span className="flex items-center gap-1 text-[12px] font-semibold" style={{ color: '#4a9de0' }}><BadgeCheck className="w-3.5 h-3.5" /> Verified</span> : undefined}
+                />
+              )}
+            </Group>
+          </>
+        )
+
+      case 'security':
+        return (
+          <Group>
+            <Row icon={Mail} label="Reset password by email" onClick={requestReset} busy={busyField === 'reset'} />
+            <ToggleRow icon={Smartphone} label="Two-step verification" value={!!user.two_step_enabled} busy={busyField === 'two_step'} onToggle={toggleTwoStep} />
+            <Row icon={MonitorX} label="Sign out of all devices" onClick={requestSignOutEverywhere} danger />
+            <Row icon={UserX} label="Blocked accounts" onClick={() => setScreen('blocked')} />
+          </Group>
+        )
+
+      case 'billing':
+        return user.role === 'employer' ? <EmployerSubscriptionPanel /> : <BillingPanel />
+
+      case 'notifications':
+        return (
+          <>
+            <Group>
+              <ToggleRow icon={Bell} label="Push notifications" value={prefs.push_enabled !== false} busy={busyField === 'push_enabled'} onToggle={v => saveNotif('push_enabled', v)} />
+              <ToggleRow icon={Mail} label="Email notifications" value={prefs.email_enabled !== false} busy={busyField === 'email_enabled'} onToggle={v => saveNotif('email_enabled', v)} />
+            </Group>
+            <Group>
+              {Object.entries(NOTIFICATION_LABELS).map(([key, label]) => (
+                <ToggleRow key={key} label={label} value={prefs[key] !== false} busy={busyField === key} onToggle={() => saveNotif(key)} />
+              ))}
+            </Group>
+          </>
+        )
+
+      case 'privacy':
+        return (
+          <>
+            <Group>
+              <Row icon={Download} label="Download my data" onClick={async () => {
+                const data = await exportMyData(user.id)
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url; a.download = `lern-my-data-${new Date().toISOString().split('T')[0]}.json`; a.click()
+                URL.revokeObjectURL(url)
+              }} />
+              <Row icon={FileText} label="Consent" value="View" onClick={() => setScreen('consent')} />
+              <ToggleRow icon={Cookie} label="Analytics cookies" hint="Essential cookies are always on" value={!!user.cookie_consent?.analytics} busy={busyField === 'cookies'} onToggle={toggleAnalytics} />
+              <Row icon={Trash2} label="Delete my account and data" danger onClick={() => setScreen('delete')} />
+            </Group>
+            <Group title="Raise a concern" icon={AlertTriangle}>
+              <Row icon={Flag} label="Report a problem or something that worries you" onClick={() => setScreen('report')} />
+            </Group>
+          </>
+        )
+
+      case 'appearance':
+        return (
+          <Group>
+            <div className="px-4 py-3.5">
+              <div className="flex gap-2">
+                {([['light', 'Light', Sun], ['dark', 'Dark', Moon], ['system', 'System', Monitor]] as const).map(([key, label, Icon]) => (
+                  <button
+                    key={key} onClick={() => saveTheme(key)} disabled={busyField === 'theme'}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold transition ${
+                      (user.theme_preference || 'system') === key ? 'bg-brand text-white' : 'bg-surface-subtle border border-edge text-ink-secondary'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" /> {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Group>
+        )
+
+      case 'help':
+        return (
+          <>
+            {(isOrgAdmin || user.role === 'employer') && (
+              <Group>
+                <Row icon={ClipboardList} label="Show setup checklist" onClick={showOnboardingChecklist} />
+              </Group>
+            )}
+            <Group title="About and legal" icon={Info}>
+              <LinkRow icon={FileText} label="Data Protection" href="/legal/privacy" />
+              <LinkRow icon={Cookie} label="Cookie Policy" href="/legal/cookies" />
+              <LinkRow icon={FileText} label="Terms of Service" href="/legal/terms" />
+              <LinkRow icon={ShieldCheck} label="Public safeguarding summary" href="/legal/safeguarding" />
+              <Row icon={Info} label="App version" value="1.0" noChevron />
+              <a href="mailto:alieu@joinirl.co.uk" className="flex items-center justify-between px-4 py-3.5 hover:bg-surface-muted transition">
+                <span className="flex items-center gap-3 text-[14px] text-ink"><Mail className="w-4 h-4 text-ink-tertiary flex-shrink-0" /> Contact and support</span>
+                <span className="text-[13px] text-ink-secondary">alieu@joinirl.co.uk</span>
+              </a>
+            </Group>
+          </>
+        )
+    }
+  }
+
+  return createPortal((
+    <div data-theme={theme} className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 sm:p-8">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-3xl h-[640px] max-h-[88dvh] flex overflow-hidden">
+        {/* ── Left tab nav — hidden on phone widths in favour of a top
+            scroller, same breakpoint convention the rest of the app
+            uses for sidebar vs. drawer. ── */}
+        <div className="hidden sm:flex w-[200px] flex-shrink-0 border-r border-edge-subtle bg-surface-subtle flex-col py-4">
+          <p className="px-4 pb-3 font-bold text-ink text-[15px]">Settings</p>
+          <nav className="flex-1 px-2 space-y-0.5 overflow-y-auto">
+            {TABS.map(t => (
+              <button
+                key={t.key} onClick={() => { setActiveTab(t.key); setScreen(null) }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13.5px] font-semibold transition ${
+                  activeTab === t.key && !screen ? 'bg-accent-bg text-brand' : 'text-ink-secondary hover:bg-surface-muted'
+                }`}
+              >
+                <t.icon className="w-4 h-4 flex-shrink-0" /> {t.label}
+              </button>
+            ))}
+          </nav>
+          <button onClick={async () => { await signOut(); router.replace('/auth/login') }} className="flex items-center gap-2.5 px-5 py-2.5 text-[13px] font-semibold text-ink-tertiary hover:text-danger-text transition">
+            <LogOut className="w-4 h-4" /> Sign out
+          </button>
+        </div>
+
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-edge-subtle flex-shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              {screen && (
+                <button onClick={() => setScreen(null)} aria-label="Back" className="w-7 h-7 -ml-1 flex items-center justify-center rounded-full hover:bg-surface-muted text-ink-secondary transition flex-shrink-0">
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              )}
+              <p className="font-bold text-ink text-[16px] truncate">{screen ? SCREEN_TITLE[screen] : TABS.find(t => t.key === activeTab)?.label}</p>
+            </div>
+            <button onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-muted text-ink-secondary transition flex-shrink-0">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Phone-only tab scroller -- the left nav above is hidden
+              below sm, this is its replacement. */}
+          <div className="sm:hidden flex gap-1.5 px-3 py-2.5 border-b border-edge-subtle overflow-x-auto flex-shrink-0">
+            {TABS.map(t => (
+              <button
+                key={t.key} onClick={() => { setActiveTab(t.key); setScreen(null) }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12.5px] font-semibold whitespace-nowrap transition ${
+                  activeTab === t.key && !screen ? 'bg-accent-bg text-brand' : 'bg-surface-subtle text-ink-secondary'
+                }`}
+              >
+                <t.icon className="w-3.5 h-3.5" /> {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 sm:px-6 py-5">
+            {screen ? <ScreenCard>{renderScreen()}</ScreenCard> : renderTab()}
+          </div>
         </div>
       </div>
 
-      {/* ── Profile -- used to be two separate groups, "Organisation"
-          and "Account", stacked one above the other. Two headed
-          sections for what's really one person's settings read as two
-          separate profiles side by side; the organisation identity
-          (name, logo, verified tick -- what actually shows up on
-          course/brief/workshop cards) now leads the same single group
-          the personal rows sit in, not a section of its own. This used
-          to also carry a second "Join codes and staff" row that opened
-          this exact same OrganisationScreen a click below -- removed,
-          not merged, since it was a plain duplicate of the row above it. ── */}
-      <Group title="Profile" icon={User}>
-        {isOrgAdmin && (
-          <Row
-            label={org?.name || 'Your organisation'}
-            onClick={() => setScreen('organisation')}
-            right={
-              <span className="flex items-center gap-2">
-                {org?.verified && <BadgeCheck className="w-4 h-4 flex-shrink-0" style={{ color: '#4a9de0' }} />}
-                {logoUrl ? (
-                  <img src={logoUrl} alt="" className="w-8 h-8 rounded-lg object-cover" />
-                ) : (
-                  <span className="w-8 h-8 rounded-lg bg-accent-bg text-brand font-bold text-[12px] flex items-center justify-center">{org?.name?.[0]?.toUpperCase() || 'O'}</span>
-                )}
-              </span>
-            }
-          />
-        )}
-        <Row
-          label="Profile photo" onClick={() => setScreen('photo')}
-          right={avatarUrl ? <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" /> : <span className="w-8 h-8 rounded-full bg-accent-bg text-brand font-bold text-[12px] flex items-center justify-center">{user.full_name?.[0]?.toUpperCase() || 'U'}</span>}
-        />
-        <Row label="Full name" value={user.full_name} onClick={() => setScreen('rename')} />
-        <Row label="Email" value={user.email} onClick={() => setScreen('email')} />
-        <Row label="Change password" onClick={() => setScreen('password')} />
-        {user.role === 'employer' && (
-          <Row
-            label="Employer status" noChevron
-            value={user.employer_verified ? undefined : 'Not yet verified'}
-            right={user.employer_verified ? <span className="flex items-center gap-1 text-[12px] font-semibold" style={{ color: '#4a9de0' }}><BadgeCheck className="w-3.5 h-3.5" /> Verified</span> : undefined}
-          />
-        )}
-      </Group>
-
-      {isOrgAdmin && (
-        <Group title="Billing" icon={CreditCard}>
-          <Row label="Billing" onClick={() => setScreen('billing')} />
-        </Group>
-      )}
-      {user.role === 'employer' && (
-        <Group title="Subscription" icon={CreditCard}>
-          <Row label="Subscription" onClick={() => setScreen('subscription')} />
-        </Group>
-      )}
-
-      {(isOrgAdmin || user.role === 'employer') && (
-        <Group title="Help" icon={HelpCircle}>
-          <Row label="Show setup checklist" onClick={showOnboardingChecklist} />
-        </Group>
-      )}
-
-      {/* ── Security and sign-in ── */}
-      <Group title="Security and sign-in" icon={ShieldCheck}>
-        <Row label="Reset password by email" onClick={requestReset} busy={busyField === 'reset'} />
-        <ToggleRow label="Two-step verification" value={!!user.two_step_enabled} busy={busyField === 'two_step'} onToggle={toggleTwoStep} />
-        <Row label="Sign out of all devices" onClick={requestSignOutEverywhere} danger />
-        <Row label="Blocked accounts" onClick={() => setScreen('blocked')} />
-      </Group>
       {showTwoStepSetup && (
         <TwoStepSetup
           onClose={() => setShowTwoStepSetup(false)}
           onEnabled={async () => { setShowTwoStepSetup(false); await refreshUser() }}
         />
       )}
-
-      {/* ── Notifications ── */}
-      <Group title="Notifications" icon={Bell}>
-        <ToggleRow label="Push notifications" value={prefs.push_enabled !== false} busy={busyField === 'push_enabled'} onToggle={v => saveNotif('push_enabled', v)} />
-        <ToggleRow label="Email notifications" value={prefs.email_enabled !== false} busy={busyField === 'email_enabled'} onToggle={v => saveNotif('email_enabled', v)} />
-      </Group>
-      <Group>
-        {Object.entries(NOTIFICATION_LABELS).map(([key, label]) => (
-          <ToggleRow key={key} label={label} value={prefs[key] !== false} busy={busyField === key} onToggle={() => saveNotif(key)} />
-        ))}
-      </Group>
-
-      {/* ── Data and privacy ── */}
-      <Group title="Data and privacy" icon={Lock}>
-        <Row label="Download my data" onClick={async () => {
-          const data = await exportMyData(user.id)
-          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url; a.download = `lern-my-data-${new Date().toISOString().split('T')[0]}.json`; a.click()
-          URL.revokeObjectURL(url)
-        }} />
-        <Row label="Consent" value="View" onClick={() => setScreen('consent')} />
-        <ToggleRow label="Analytics cookies" hint="Essential cookies are always on" value={!!user.cookie_consent?.analytics} busy={busyField === 'cookies'} onToggle={toggleAnalytics} />
-        <Row label="Delete my account and data" danger onClick={() => setScreen('delete')} />
-      </Group>
-
-      {/* ── Raise a concern ── */}
-      <Group title="Raise a concern" icon={AlertTriangle}>
-        <Row label="Report a problem or something that worries you" onClick={() => setScreen('report')} />
-      </Group>
-
-      {/* ── Appearance ── */}
-      <Group title="Appearance" icon={Paintbrush}>
-        <div className="px-4 py-3.5">
-          <div className="flex gap-2">
-            {([['light', 'Light', Sun], ['dark', 'Dark', Moon], ['system', 'System', Monitor]] as const).map(([key, label, Icon]) => (
-              <button
-                key={key} onClick={() => saveTheme(key)} disabled={busyField === 'theme'}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold transition ${
-                  (user.theme_preference || 'system') === key ? 'bg-brand text-white' : 'bg-surface-subtle border border-edge text-ink-secondary'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" /> {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </Group>
-
-      {/* ── About and legal ── */}
-      <Group title="About and legal" icon={Info}>
-        <LinkRow label="Data Protection" href="/legal/privacy" />
-        <LinkRow label="Cookie Policy" href="/legal/cookies" />
-        <LinkRow label="Terms of Service" href="/legal/terms" />
-        <LinkRow label="Public safeguarding summary" href="/legal/safeguarding" />
-        <Row label="App version" value="1.0" noChevron />
-        <a href="mailto:alieu@joinirl.co.uk" className="flex items-center justify-between px-4 py-3.5 hover:bg-surface-muted transition">
-          <span className="text-[14px] text-ink">Contact and support</span>
-          <span className="flex items-center gap-1 text-[13px] text-ink-secondary"><Mail className="w-3.5 h-3.5" /> alieu@joinirl.co.uk</span>
-        </a>
-      </Group>
-
-      <button
-        onClick={async () => { await signOut(); router.replace('/auth/login') }}
-        className="flex items-center justify-center gap-2 w-full text-[14px] font-semibold text-danger-text py-3.5 mt-2"
-      >
-        <LogOut className="w-4 h-4" /> Sign out
-      </button>
     </div>
-  )
+  ), document.body)
 }
 
-// ── Shared row/group primitives -- org's own tokens (bg-surface/
-// text-ink/border-edge), same structural pattern as the student app's
-// Group/Row/ToggleRow. ──────────────────────────────────────────────
+// ── Shared row/group primitives ─────────────────────────────────────
 function Group({ title, icon: Icon, children }: { title?: string; icon?: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
     <div className="mb-5">
@@ -323,13 +406,16 @@ function Group({ title, icon: Icon, children }: { title?: string; icon?: React.C
   )
 }
 
-function Row({ label, value, onClick, right, noChevron, noChevronValue, danger, busy }: {
-  label: string; value?: string; onClick?: () => void; right?: React.ReactNode
+function Row({ icon: Icon, label, value, onClick, right, noChevron, noChevronValue, danger, busy }: {
+  icon?: React.ComponentType<{ className?: string }>; label: string; value?: string; onClick?: () => void; right?: React.ReactNode
   noChevron?: boolean; noChevronValue?: boolean; danger?: boolean; busy?: boolean
 }) {
   const content = (
     <>
-      <span className={`text-[14px] ${danger ? 'text-danger-text' : 'text-ink'}`}>{busy ? 'Working…' : label}</span>
+      <span className="flex items-center gap-3 min-w-0">
+        {Icon && <Icon className={`w-4 h-4 flex-shrink-0 ${danger ? 'text-danger-text' : 'text-ink-tertiary'}`} />}
+        <span className={`text-[14px] truncate ${danger ? 'text-danger-text' : 'text-ink'}`}>{busy ? 'Working…' : label}</span>
+      </span>
       <span className="flex items-center gap-2 flex-shrink-0">
         {value && <span className="text-[13px] text-ink-secondary truncate max-w-[160px]">{value}</span>}
         {right}
@@ -345,12 +431,15 @@ function Row({ label, value, onClick, right, noChevron, noChevronValue, danger, 
   )
 }
 
-function ToggleRow({ label, hint, value, onToggle, busy }: { label: string; hint?: string; value: boolean; onToggle: (v: boolean) => void; busy?: boolean }) {
+function ToggleRow({ icon: Icon, label, hint, value, onToggle, busy }: { icon?: React.ComponentType<{ className?: string }>; label: string; hint?: string; value: boolean; onToggle: (v: boolean) => void; busy?: boolean }) {
   return (
     <div className="flex items-center justify-between px-4 py-3.5 gap-3">
-      <div className="min-w-0">
-        <p className="text-[14px] text-ink">{label}</p>
-        {hint && <p className="text-[12px] text-ink-tertiary mt-0.5">{hint}</p>}
+      <div className="flex items-center gap-3 min-w-0">
+        {Icon && <Icon className="w-4 h-4 flex-shrink-0 text-ink-tertiary" />}
+        <div className="min-w-0">
+          <p className="text-[14px] text-ink">{label}</p>
+          {hint && <p className="text-[12px] text-ink-tertiary mt-0.5">{hint}</p>}
+        </div>
       </div>
       <button
         onClick={() => onToggle(!value)} disabled={busy}
@@ -362,24 +451,22 @@ function ToggleRow({ label, hint, value, onToggle, busy }: { label: string; hint
   )
 }
 
-function LinkRow({ label, href }: { label: string; href: string }) {
+function LinkRow({ icon: Icon, label, href }: { icon?: React.ComponentType<{ className?: string }>; label: string; href: string }) {
   return (
-    <Link href={href} className="flex items-center justify-between px-4 py-3.5 hover:bg-surface-muted transition">
-      <span className="text-[14px] text-ink">{label}</span>
+    <Link href={href} target="_blank" className="flex items-center justify-between px-4 py-3.5 hover:bg-surface-muted transition">
+      <span className="flex items-center gap-3 text-[14px] text-ink">{Icon && <Icon className="w-4 h-4 text-ink-tertiary flex-shrink-0" />} {label}</span>
       <ChevronRight className="w-4 h-4 text-ink-tertiary" />
     </Link>
   )
 }
 
-// ── Sub-screens ─────────────────────────────────────────────────
-function ScreenShell({ title, onBack, children }: { title: string; onBack: () => void; children: React.ReactNode }) {
+// ── Sub-screens — title/back are now handled by the modal's own
+// header (see SCREEN_TITLE + the back chevron above), so this is just
+// the bordered content card, not a full header of its own. ──────────
+function ScreenCard({ children }: { children: React.ReactNode }) {
   return (
     <div className="max-w-lg mx-auto">
-      <button onClick={onBack} className="flex items-center gap-1 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
-        <ChevronLeft className="w-4 h-4" /> Back to Settings
-      </button>
       <div className="bg-surface border border-edge rounded-2xl p-6">
-        <p className="font-bold text-ink text-[16px] mb-4">{title}</p>
         {children}
       </div>
     </div>
@@ -411,7 +498,7 @@ function PhotoScreen({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <ScreenShell title="Profile photo" onBack={onBack}>
+    <>
       <ErrorBanner message={error} />
       <p className="text-[13px] text-ink-secondary mb-4">
         {user?.role === 'employer' ? 'Shown on the jobs and roles you post.' : 'Shown next to your name across LERN.'}
@@ -433,7 +520,7 @@ function PhotoScreen({ onBack }: { onBack: () => void }) {
           {user?.avatar_path && <button onClick={remove} disabled={uploading} className="text-[11.5px] font-semibold text-ink-secondary disabled:opacity-40 mt-0.5">Remove</button>}
         </div>
       </div>
-    </ScreenShell>
+    </>
   )
 }
 
@@ -454,11 +541,11 @@ function RenameScreen({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <ScreenShell title="Full name" onBack={onBack}>
+    <>
       <ErrorBanner message={error} />
       <TextField label="Full name" value={name} onChange={setName} placeholder="Your name" />
       <PrimaryButton onClick={save} loading={saving} disabled={!name.trim()}>Save</PrimaryButton>
-    </ScreenShell>
+    </>
   )
 }
 
@@ -477,18 +564,14 @@ function ChangePasswordScreen({ onBack }: { onBack: () => void }) {
     setDone(true)
   }
 
-  return (
-    <ScreenShell title="Change password" onBack={onBack}>
-      {done ? (
-        <p className="text-[14px] text-success-text font-semibold">Password changed.</p>
-      ) : (
-        <>
-          <ErrorBanner message={error} />
-          <TextField label="New password" type="password" value={newPassword} onChange={setNewPassword} placeholder="At least 8 characters" />
-          <PrimaryButton onClick={submit} loading={saving} disabled={!newPassword}>Change password</PrimaryButton>
-        </>
-      )}
-    </ScreenShell>
+  return done ? (
+    <p className="text-[14px] text-success-text font-semibold">Password changed.</p>
+  ) : (
+    <>
+      <ErrorBanner message={error} />
+      <TextField label="New password" type="password" value={newPassword} onChange={setNewPassword} placeholder="At least 8 characters" />
+      <PrimaryButton onClick={submit} loading={saving} disabled={!newPassword}>Change password</PrimaryButton>
+    </>
   )
 }
 
@@ -508,7 +591,7 @@ function ChangeEmailScreen({ currentEmail, onBack }: { currentEmail: string; onB
   }
 
   return (
-    <ScreenShell title="Change email" onBack={onBack}>
+    <>
       <p className="text-[13px] text-ink-secondary mb-4">Current email: {currentEmail}</p>
       {sent ? (
         <p className="text-[13.5px] text-success-text leading-relaxed">Check <b>{email}</b> for a confirmation link — your email only changes once you click it.</p>
@@ -519,7 +602,7 @@ function ChangeEmailScreen({ currentEmail, onBack }: { currentEmail: string; onB
           <PrimaryButton onClick={submit} loading={saving} disabled={!email}>Send verification link</PrimaryButton>
         </>
       )}
-    </ScreenShell>
+    </>
   )
 }
 
@@ -571,7 +654,7 @@ function OrganisationScreen({ org, onBack, onChanged }: { org: any; onBack: () =
   const logoUrl = useAvatarUrl(org?.logo_path)
 
   return (
-    <ScreenShell title="Organisation" onBack={onBack}>
+    <>
       <ErrorBanner message={error} />
       {notice && <p className="text-[13px] text-success-text font-semibold mb-3">{notice}</p>}
 
@@ -638,7 +721,7 @@ function OrganisationScreen({ org, onBack, onChanged }: { org: any; onBack: () =
         <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink mb-3"><Ticket className="w-3.5 h-3.5" /> Student join codes</p>
         <JoinCodesPanel roleType="student" />
       </div>
-    </ScreenShell>
+    </>
   )
 }
 
@@ -649,26 +732,22 @@ function BlockedAccountsScreen({ userId, onBack }: { userId: string; onBack: () 
   const load = () => { setLoading(true); getBlockedUsers(userId).then(({ data }) => { setRows(data || []); setLoading(false) }) }
   useEffect(load, [userId])
 
-  return (
-    <ScreenShell title="Blocked accounts" onBack={onBack}>
-      {loading ? (
-        <p className="text-[13px] text-ink-tertiary">Loading…</p>
-      ) : rows.length === 0 ? (
-        <div className="text-center py-10">
-          <UserX className="w-7 h-7 text-ink-quaternary mx-auto mb-2.5" />
-          <p className="text-[13px] text-ink-tertiary">Nobody's blocked. Block someone from their profile and they'll show up here.</p>
+  return loading ? (
+    <p className="text-[13px] text-ink-tertiary">Loading…</p>
+  ) : rows.length === 0 ? (
+    <div className="text-center py-10">
+      <UserX className="w-7 h-7 text-ink-quaternary mx-auto mb-2.5" />
+      <p className="text-[13px] text-ink-tertiary">Nobody's blocked. Block someone from their profile and they'll show up here.</p>
+    </div>
+  ) : (
+    <div className="divide-y divide-edge-subtle -mx-2">
+      {rows.map(r => (
+        <div key={r.id} className="flex items-center justify-between px-2 py-3">
+          <span className="text-[14px] text-ink">{r.blocked?.full_name || 'A user'}</span>
+          <button onClick={async () => { await unblockUser(r.id); load() }} className="text-[13px] font-semibold text-brand">Unblock</button>
         </div>
-      ) : (
-        <div className="divide-y divide-edge-subtle -mx-2">
-          {rows.map(r => (
-            <div key={r.id} className="flex items-center justify-between px-2 py-3">
-              <span className="text-[14px] text-ink">{r.blocked?.full_name || 'A user'}</span>
-              <button onClick={async () => { await unblockUser(r.id); load() }} className="text-[13px] font-semibold text-brand">Unblock</button>
-            </div>
-          ))}
-        </div>
-      )}
-    </ScreenShell>
+      ))}
+    </div>
   )
 }
 
@@ -688,7 +767,7 @@ function ReportScreen({ userId, organisationId, onBack }: { userId: string; orga
   }
 
   return (
-    <ScreenShell title="Report a problem" onBack={onBack}>
+    <>
       <p className="text-[13px] text-ink-secondary mb-4 leading-relaxed">
         Something wrong with content or a person on LERN, or something that worries you? Tell us here — a human reviews every report, never an automated ban. Concerns about an adult at LERN follow the independent safeguarding route, not your organisation.
       </p>
@@ -702,13 +781,13 @@ function ReportScreen({ userId, organisationId, onBack }: { userId: string; orga
         />
       </label>
       <PrimaryButton onClick={send} loading={loading}>Send report</PrimaryButton>
-    </ScreenShell>
+    </>
   )
 }
 
 function ConsentScreen({ consentedAt, onBack, onDelete }: { consentedAt?: string; onBack: () => void; onDelete: () => void }) {
   return (
-    <ScreenShell title="Consent" onBack={onBack}>
+    <>
       <p className="text-[14px] leading-relaxed text-ink mb-4">
         {consentedAt
           ? `You agreed to LERN's Terms of Service and Privacy Policy on ${new Date(consentedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`
@@ -720,7 +799,7 @@ function ConsentScreen({ consentedAt, onBack, onDelete }: { consentedAt?: string
       <button onClick={onDelete} className="flex items-center gap-1.5 text-[13px] font-semibold text-danger-text hover:underline">
         Delete my account
       </button>
-    </ScreenShell>
+    </>
   )
 }
 
@@ -740,7 +819,7 @@ function DeleteAccountScreen({ email, onBack }: { email: string; onBack: () => v
   }
 
   return (
-    <ScreenShell title="Delete my account" onBack={onBack}>
+    <>
       <p className="text-[13px] text-danger-text font-semibold mb-4 leading-relaxed">
         This permanently deletes your account and everything attached to it. It can't be undone.
       </p>
@@ -752,7 +831,6 @@ function DeleteAccountScreen({ email, onBack }: { email: string; onBack: () => v
       >
         {deleting ? 'Deleting…' : 'Permanently delete'}
       </button>
-    </ScreenShell>
+    </>
   )
 }
-

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { useRouter } from 'next/navigation'
 import { getOrgBilling, getBootcampEvidence } from '@/lib/supabase'
 import { BOOTCAMP_EVIDENCE_MONTHLY } from '@/lib/billing'
+import { openSettings } from '@/components/v2/SettingsPanel'
 import { Award, CheckCircle2, Circle, Clock, Download, Info, ClipboardList, BookOpen, Briefcase as BriefcaseIcon } from 'lucide-react'
 
 // Final Build Spec: Bootcamp Evidence (training providers), 23 Sep
@@ -35,7 +35,6 @@ function interviewLabel(stage: string | null, date: string | null) {
 
 export default function BootcampEvidencePanel() {
   const { user } = useAuth()
-  const router = useRouter()
   const [enabled, setEnabled] = useState<boolean | null>(null)
   const [cohorts, setCohorts] = useState<any[]>([])
   const [cohortId, setCohortId] = useState('')
@@ -80,7 +79,7 @@ export default function BootcampEvidencePanel() {
           Attendance, completion, and interview outcome pulled into one exportable record per learner, per cohort — £{BOOTCAMP_EVIDENCE_MONTHLY} a month while active.
         </p>
         <button
-          onClick={() => router.push('/provider/settings')}
+          onClick={() => openSettings('billing')}
           className="bg-brand text-white text-[13px] font-semibold px-5 py-2.5 rounded-lg hover:bg-brand-hover transition"
         >
           Turn it on in Settings

@@ -15,7 +15,7 @@ const money = (n: number) => `£${n.toLocaleString('en-GB')}`
 // Limits/prices always come back from the server (set_employer_tier
 // re-validates the downgrade-blocking rule itself); EMPLOYER_TIERS here
 // is only used for display and for picking a sensible starting tier.
-export default function EmployerSubscriptionPanel({ onBack }: { onBack: () => void }) {
+export default function EmployerSubscriptionPanel({ onBack }: { onBack?: () => void }) {
   const { user } = useAuth()
   const [billing, setBilling] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -82,9 +82,11 @@ export default function EmployerSubscriptionPanel({ onBack }: { onBack: () => vo
   if (loading || !billing) {
     return (
       <div className="max-w-lg mx-auto">
-        <button onClick={onBack} className="flex items-center gap-1 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
-          <ChevronLeft className="w-4 h-4" /> Back to Settings
-        </button>
+        {onBack && (
+          <button onClick={onBack} className="flex items-center gap-1 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
+            <ChevronLeft className="w-4 h-4" /> Back to Settings
+          </button>
+        )}
         <p className="text-[14px] text-ink-tertiary">Loading…</p>
       </div>
     )
@@ -95,9 +97,11 @@ export default function EmployerSubscriptionPanel({ onBack }: { onBack: () => vo
   if (!billing.tier) {
     return (
       <div className="max-w-lg mx-auto">
-        <button onClick={onBack} className="flex items-center gap-1 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
-          <ChevronLeft className="w-4 h-4" /> Back to Settings
-        </button>
+        {onBack && (
+          <button onClick={onBack} className="flex items-center gap-1 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
+            <ChevronLeft className="w-4 h-4" /> Back to Settings
+          </button>
+        )}
         <p className="font-bold text-ink text-[16px] mb-1">Choose your plan</p>
         <p className="text-[13px] text-ink-tertiary mb-4">Company size is self-declared — pick the tier that fits, you can change it later.</p>
         <div className="mb-4">
@@ -135,9 +139,11 @@ export default function EmployerSubscriptionPanel({ onBack }: { onBack: () => vo
 
   return (
     <div className="max-w-lg mx-auto">
-      <button onClick={onBack} className="flex items-center gap-1 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
-        <ChevronLeft className="w-4 h-4" /> Back to Settings
-      </button>
+      {onBack && (
+        <button onClick={onBack} className="flex items-center gap-1 text-[13px] font-semibold text-ink-secondary hover:text-ink transition mb-4">
+          <ChevronLeft className="w-4 h-4" /> Back to Settings
+        </button>
+      )}
 
       {billing.subscription_status !== 'active' && (
         <div className={`rounded-xl px-4 py-3 mb-4 text-[13px] ${billing.subscription_status === 'restricted' ? 'bg-danger-bg text-danger-text' : 'bg-accent-bg text-ink'}`}>

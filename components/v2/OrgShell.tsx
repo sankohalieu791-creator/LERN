@@ -14,6 +14,8 @@ import NotificationsBell from '@/components/v2/NotificationsBell'
 import PostComposer from '@/components/v2/PostComposer'
 import PresenceBadge from '@/components/v2/PresenceBadge'
 import ScrollTrack from '@/components/v2/ScrollTrack'
+import SettingsPanel from '@/components/v2/SettingsPanel'
+import type { TabKey as SettingsTab } from '@/components/v2/SettingsPanel'
 
 function orgInitials(name?: string | null) {
   if (!name) return 'LN'
@@ -66,6 +68,8 @@ export default function OrgShell({
   const [composerOpen, setComposerOpen] = useState(false)
   const [reviewCount, setReviewCount] = useState(0)
   const [interestCount, setInterestCount] = useState(0)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined)
   const mainRef = useRef<HTMLElement>(null)
 
   // Keeps the same lern-theme cookie StudentShell writes in sync for
@@ -91,6 +95,20 @@ export default function OrgShell({
   }, [theme])
 
   useEffect(() => { setCollapsed(!!user?.sidebar_collapsed) }, [user?.sidebar_collapsed])
+
+  // Lets a deep child (e.g. Bootcamp Evidence's "Turn it on in
+  // Settings" CTA) open this shell's own Settings modal without
+  // prop-drilling a setter down through every intermediate component --
+  // see openSettings() in SettingsPanel.tsx.
+  useEffect(() => {
+    const onOpenSettings = (e: Event) => {
+      const tab = (e as CustomEvent<{ tab?: SettingsTab }>).detail?.tab
+      setSettingsInitialTab(tab)
+      setSettingsOpen(true)
+    }
+    window.addEventListener('lern:open-settings', onOpenSettings)
+    return () => window.removeEventListener('lern:open-settings', onOpenSettings)
+  }, [])
 
   // interactive-widget=resizes-content (see layout.tsx's own viewport)
   // asks the browser to shrink the layout viewport itself when the
@@ -309,7 +327,7 @@ export default function OrgShell({
                 path to Settings now -- the drawer's own trailing
                 Settings row was removed as the duplicate it had become. */}
             <button
-              aria-label="Settings" onClick={() => router.push(`${sections[0].href.split('/').slice(0, 2).join('/')}/settings`)}
+              aria-label="Settings" onClick={() => setSettingsOpen(true)}
               className="flex w-10 h-10 items-center justify-center rounded-lg hover:bg-surface-muted text-ink-secondary transition"
             >
               <Settings className="w-5 h-5" />
@@ -429,6 +447,8 @@ export default function OrgShell({
           <Plus className="w-6 h-6" />
         </button>
       )}
+
+      {settingsOpen && <SettingsPanel initialTab={settingsInitialTab} onClose={() => { setSettingsOpen(false); setSettingsInitialTab(undefined) }} />}
 
       {composerOpen && (
         <PostComposer
