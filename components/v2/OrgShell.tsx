@@ -288,6 +288,20 @@ export default function OrgShell({
               {!collapsed && <span className="truncate">{s.label}</span>}
             </Link>
           ))}
+          {/* Settings is a modal, not a route (see SettingsPanel.tsx) --
+              a button here, not a Link, but styled and positioned
+              identically to every real nav item above it, right under
+              Dashboard per direct request. The gear icon in the top bar
+              still opens the same modal -- this is a second, more
+              discoverable path to it, not a replacement. */}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            title={collapsed ? 'Settings' : undefined}
+            className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] font-semibold transition text-ink-secondary hover:bg-surface-muted ${collapsed ? 'justify-center' : ''}`}
+          >
+            <Settings className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span className="truncate">Settings</span>}
+          </button>
         </nav>
       </aside>
 
@@ -528,6 +542,15 @@ export default function OrgShell({
                   </Link>
                 )
               })}
+              {/* Same modal, not a route -- see the laptop sidebar's
+                  identical addition above for why this is a button. */}
+              <button
+                onClick={() => { setDrawerOpen(false); setSettingsOpen(true) }}
+                className="w-full flex items-center gap-3.5 px-3.5 py-3.5 rounded-xl text-[16px] font-semibold transition text-ink-secondary"
+              >
+                <Settings className="w-[22px] h-[22px] flex-shrink-0" />
+                <span className="flex-1 min-w-0 truncate text-left">Settings</span>
+              </button>
             </nav>
           </div>
         </div>
