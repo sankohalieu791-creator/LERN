@@ -27,6 +27,7 @@ import JoinCodesPanel from '@/components/v2/JoinCodesPanel'
 import BillingPanel from '@/components/v2/BillingPanel'
 import EmployerSubscriptionPanel from '@/components/v2/EmployerSubscriptionPanel'
 import { showOnboardingChecklist } from '@/components/v2/OnboardingChecklist'
+import ScrollTrack from '@/components/v2/ScrollTrack'
 
 // Rebuilt as a modal dialog with left-tab navigation, 2 Oct 2026 --
 // same interaction model as the "Create brief" modal (a createPortal
@@ -73,6 +74,7 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
   const [org, setOrg] = useState<any>(null)
   const [busyField, setBusyField] = useState<string | null>(null)
   const [showTwoStepSetup, setShowTwoStepSetup] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
   const logoUrl = useAvatarUrl(org?.logo_path)
   const avatarUrl = useAvatarUrl(user?.avatar_path)
   const isOrgAdmin = user?.role === 'institution_staff' || user?.role === 'provider_staff'
@@ -374,8 +376,11 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
             ))}
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-5 sm:px-6 py-5">
-            {screen ? <ScreenCard>{renderScreen()}</ScreenCard> : renderTab()}
+          <div className="relative flex-1 min-h-0">
+            <div ref={contentRef} className="h-full overflow-y-auto px-5 sm:px-6 py-5">
+              {screen ? <ScreenCard>{renderScreen()}</ScreenCard> : renderTab()}
+            </div>
+            <ScrollTrack containerRef={contentRef} />
           </div>
         </div>
       </div>

@@ -13,6 +13,7 @@ import {
 } from '@/lib/supabase'
 import { TextField, PrimaryButton, ErrorBanner, Spinner } from '@/components/v2/Field'
 import WorkshopSession from '@/components/v2/WorkshopSession'
+import ScrollTrack from '@/components/v2/ScrollTrack'
 import type { WorkItem, Group } from '@/lib/types'
 import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw, Film, Download, Clock, PenLine, CheckCircle2, Send } from 'lucide-react'
 
@@ -665,6 +666,7 @@ function FileDropzone({ files, onChange, multiple }: { files: File[]; onChange: 
 function CreateWorkItemForm({ type, onClose, onCreated }: { type: ItemType; onClose: () => void; onCreated: () => void }) {
   const { user } = useAuth()
   const theme = useResolvedTheme()
+  const bodyRef = useRef<HTMLDivElement>(null)
   const [title, setTitle] = useState('')
   const [topic, setTopic] = useState('')
   const [description, setDescription] = useState('')
@@ -706,16 +708,21 @@ function CreateWorkItemForm({ type, onClose, onCreated }: { type: ItemType; onCl
   // Same modal chrome as NewBriefForm -- was a plain inline card that
   // opened/closed within the page's own flow, the one thing here that
   // still didn't match how creating a brief already worked.
+  // h-[640px], not just a max-h -- see NewBriefForm's comment on the
+  // same line: a flex column with no definite height gives a flex-1
+  // child nothing to shrink against, so it grows to content size
+  // instead of scrolling.
   return createPortal((
     <div data-theme={theme} className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 sm:p-8">
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg max-h-[92dvh] flex flex-col overflow-hidden">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg h-[640px] max-h-[88dvh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-edge-subtle flex-shrink-0">
           <p className="font-bold text-ink text-[16px]">{copyForModal(type)}</p>
           <button onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-tertiary transition">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="relative flex-1 min-h-0">
+        <div ref={bodyRef} className="h-full overflow-y-auto p-5">
       <ErrorBanner message={error} />
       <TextField label="Title" value={title} onChange={setTitle} placeholder={type === 'course' ? 'Intro to Web Development' : 'Design a mobile app icon'} autoFocus />
       <TextField label="Topic / subject (optional)" value={topic} onChange={setTopic} placeholder={type === 'course' ? 'e.g. Web Development' : 'e.g. Graphic Design'} />
@@ -779,6 +786,8 @@ function CreateWorkItemForm({ type, onClose, onCreated }: { type: ItemType; onCl
       </label>
       <PrimaryButton onClick={handleSubmit} loading={loading}>Create</PrimaryButton>
         </div>
+        <ScrollTrack containerRef={bodyRef} />
+        </div>
       </div>
     </div>
   ), document.body)
@@ -815,6 +824,7 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const theme = useResolvedTheme()
+  const bodyRef = useRef<HTMLDivElement>(null)
 
   const handleSubmit = async () => {
     setError('')
@@ -861,7 +871,15 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
           edge, and whatever's behind it (document.body) shows through
           as a solid block. Same class of bug already fixed on OrgShell's
           own root box, just never applied to this portaled dialog. */}
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92dvh] flex flex-col overflow-hidden">
+      {/* h-[640px], not just a max-h -- a flex column sized purely by
+          max-height has no definite height for a flex-1 child to
+          resolve against, so that child just grows to fit its own
+          content instead of being capped and made to scroll (this is
+          why the old max-h-only version let the form run off the
+          bottom of the screen with no way to reach Create). A fixed
+          height, same as Settings' dialog, gives flex-1 something
+          real to divide up. */}
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl h-[640px] max-h-[88dvh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-edge-subtle flex-shrink-0">
           <p className="font-bold text-ink text-[16px]">New brief</p>
           <button onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-tertiary transition">
@@ -869,7 +887,8 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-[1fr_300px] divide-y lg:divide-y-0 lg:divide-x divide-edge-subtle">
+        <div className="relative flex-1 min-h-0">
+        <div ref={bodyRef} className="h-full overflow-y-auto grid grid-cols-1 lg:grid-cols-[1fr_300px] divide-y lg:divide-y-0 lg:divide-x divide-edge-subtle">
           {/* ── Main: title + instructions + attachments ── */}
           <div className="px-6 py-5">
             <input
@@ -974,6 +993,8 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
               )}
             </label>
           </div>
+        </div>
+        <ScrollTrack containerRef={bodyRef} />
         </div>
 
         <div className="flex items-center justify-between gap-4 px-6 py-4 border-t border-edge-subtle flex-shrink-0">

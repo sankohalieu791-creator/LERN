@@ -134,9 +134,15 @@ export default function ScrollTrack({ containerRef }: { containerRef: React.RefO
 
       <div ref={trackRef} onMouseDown={onTrackMouseDown} className="relative flex-1">
         {thumb && (
+          // left-1/2 -translate-x-1/2, not a fixed right offset -- that
+          // put the thumb visibly off-centre from the arrow buttons
+          // above/below it (which centre via items-center/justify-
+          // center), and made it grow asymmetrically on hover since a
+          // right-anchored box only gets wider to the left. This stays
+          // centred under the arrows regardless of width.
           <div
             onMouseDown={onThumbMouseDown}
-            className="absolute right-0.5 w-1 rounded-full bg-[var(--border-input)] hover:bg-[var(--text-tertiary)] hover:w-1.5 cursor-pointer transition-[background-color,width]"
+            className="absolute left-1/2 -translate-x-1/2 w-1 rounded-full bg-[var(--border-input)] hover:bg-[var(--text-tertiary)] hover:w-1.5 cursor-pointer transition-[background-color,width]"
             style={{ top: thumb.top, height: thumb.height }}
           />
         )}

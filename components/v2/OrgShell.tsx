@@ -71,6 +71,7 @@ export default function OrgShell({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined)
   const mainRef = useRef<HTMLElement>(null)
+  const navRef = useRef<HTMLElement>(null)
 
   // Keeps the same lern-theme cookie StudentShell writes in sync for
   // org accounts too -- the org layouts (institution/provider/employer)
@@ -275,7 +276,14 @@ export default function OrgShell({
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         </div>
-        <nav className="flex-1 px-3 space-y-1">
+        {/* relative wrapper + ScrollTrack, not a plain flex-1 -- this
+            list grew to 11 rows once Settings joined it, tall enough to
+            run past the bottom of a shorter laptop screen with no
+            native overflow at all (not even an invisible one), which
+            left Dashboard/Settings permanently unreachable there. Same
+            fix as <main>'s own scroll area just above. */}
+        <div className="relative flex-1 min-h-0">
+        <nav ref={navRef} className="h-full overflow-y-auto px-3 space-y-1">
           {sections.map(s => (
             <Link
               key={s.key} href={s.href}
@@ -291,9 +299,10 @@ export default function OrgShell({
           {/* Settings is a modal, not a route (see SettingsPanel.tsx) --
               a button here, not a Link, but styled and positioned
               identically to every real nav item above it, right under
-              Dashboard per direct request. The gear icon in the top bar
-              still opens the same modal -- this is a second, more
-              discoverable path to it, not a replacement. */}
+              Dashboard per direct request. This is now the only way
+              into it from the sidebar -- the top bar's gear icon was
+              removed once this existed, so there's no second path to
+              keep in sync any more. */}
           <button
             onClick={() => setSettingsOpen(true)}
             title={collapsed ? 'Settings' : undefined}
@@ -303,6 +312,8 @@ export default function OrgShell({
             {!collapsed && <span className="truncate">Settings</span>}
           </button>
         </nav>
+        <ScrollTrack containerRef={navRef} />
+        </div>
       </aside>
 
       <div className="flex-1 min-w-0 min-h-0 flex flex-col">
@@ -471,11 +482,11 @@ export default function OrgShell({
       )}
 
       {/* ── Phone nav drawer -- Gmail-style: org identity card, the
-          full section list (live badge counts, active item highlighted).
-          Settings is reachable from the top bar's own gear icon now
-          (visible on phone too), so it isn't duplicated down here any
-          more. Replaces the old bottom tab bar entirely; direct 1:1
-          with the reference screenshot. ── */}
+          full section list (live badge counts, active item highlighted),
+          plus its own Settings row at the bottom (see below) since the
+          top bar's gear icon is gone now that the sidebar/drawer both
+          open it directly. Replaces the old bottom tab bar entirely;
+          direct 1:1 with the reference screenshot. ── */}
       {drawerOpen && (
         <div className="lg:hidden fixed inset-0 z-30 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} />
