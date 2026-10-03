@@ -35,7 +35,13 @@ export default function GuestEmployerShell({ children }: { children: React.React
   }
 
   return (
-    <div className="min-h-screen bg-paper">
+    // paddingTop: env(safe-area-inset-top) -- same fix OrgShell/
+    // StudentShell/OpsShell already have on their own root. Without it
+    // this header sits flush at the very top of the screen, under the
+    // iPhone status bar, which clips "Log out" and the logo right along
+    // with it -- the one button a guest actually needs to be able to
+    // reach, on the one screen they're ever shown.
+    <div className="min-h-screen bg-paper" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <header className="flex items-center justify-between h-16 px-5 lg:px-8 border-b border-edge-subtle">
         <Logo size="sm" />
         <div className="flex items-center gap-3">
