@@ -142,47 +142,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    // When the user returns after a long background period the access token may
+    // When the user returns after a background period the access token may
     // have expired (browsers suspend JS timers for backgrounded tabs/PWAs, so
     // Supabase's own auto-refresh timer never fires). We call refreshSession()
     // explicitly — not getSession() — so the SDK fetches a fresh token from the
     // server before any page-level queries run. This prevents the "no internet"
     // blank-page symptom caused by stale tokens silently failing.
     //
-    // That fixes the SESSION, but not what was already on screen -- every panel
-    // in this app fetches its own data with useEffect(load, []), which only
-    // ever runs once on mount and has no way to know the session it fetched
-    // with has since gone stale. Refreshing the token doesn't make a feed list
-    // that already rendered (or a request that was silently failing this whole
-    // time) go re-fetch itself -- nothing was ever wired to react to that. This
-    // is the actual "acts weird until I refresh" bug: the auth layer quietly
-    // recovers, the screen doesn't. Tracking how long the tab was actually
-    // hidden and forcing a real reload past a threshold is the blunt but
-    // reliable fix -- it's exactly what manually refreshing already does, just
-    // automatic. A quick tab-switch (seconds) stays silent and seamless; only
-    // a genuine "left it for a while" gets the reload.
-    //
-    // 3 minutes was too short in practice -- a normal phone's own screen
-    // auto-lock (often 30s-2min) fires this on completely ordinary use
-    // (read something for a bit, phone locks, unlock and keep going),
-    // which read as "it reloads randomly every couple of minutes" and, on
-    // a PWA, a visible flash of the splash screen every time. 10 minutes
-    // still catches a genuinely stale session/screen without punishing
-    // normal reading pauses or brief native-picker interactions (photo
-    // upload, etc.) that also toggle visibility.
-    let hiddenAt: number | null = null
-    const STALE_AFTER_MS = 10 * 60 * 1000
+    // This used to escalate to a full window.location.reload() once the tab
+    // had been hidden past a threshold (first 3 minutes, then 10, per the
+    // comments that used to be here) -- meant to cover a feed list or other
+    // panel that fetched with its own useEffect(load, []) and had no way to
+    // know the session it fetched with had gone stale. In practice a 10-minute
+    // away-from-the-tab gap is completely ordinary (check something else,
+    // come back) and this fired constantly -- the real-world report was
+    // literally "it resets by itself, every single time", the splash/logo
+    // flash of a full reload, happening on totally normal use rather than any
+    // genuinely broken session. Every time away now gets the same silent
+    // refresh regardless of duration; a screen whose data is now stale just
+    // updates on its next fetch (a route change, a pull-to-refresh, a manual
+    // reload) rather than the whole app detonating out from under whatever
+    // someone was in the middle of doing.
     const handleVisibility = async () => {
-      if (document.visibilityState !== 'visible') {
-        hiddenAt = Date.now()
-        return
-      }
-      const wasHiddenFor = hiddenAt ? Date.now() - hiddenAt : 0
-      hiddenAt = null
-      if (wasHiddenFor > STALE_AFTER_MS) {
-        window.location.reload()
-        return
-      }
+      if (document.visibilityState !== 'visible') return
       const { data: refreshed } = await supabase.auth.refreshSession()
       if (refreshed.session?.user) {
         const { data } = await getUserProfile(refreshed.session.user.id)
