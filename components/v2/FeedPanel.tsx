@@ -158,11 +158,14 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
     // both themes rather than a colour invented just for this.
     <div className="pt-3 pb-2.5 border-b" style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
       <div className="flex gap-3.5 overflow-x-auto px-4 pb-0.5" style={{ scrollbarWidth: 'none' }}>
+        {/* Plain bordered circle, not a brand-orange ring over a grey
+            fill -- a coloured ring reads as "someone's story", which
+            this isn't; it's a bare add action, and Instagram's own
+            equivalent (the actual "Your story" circle) is just as
+            plain, a thin neutral outline with a plus. */}
         <button onClick={() => setAddOpen(true)} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 60 }}>
-          <span className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 54, height: 54, border: '3px solid #F26B21' }}>
-            <span className="w-full h-full rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--app-overlay-2)' }}>
-              <Plus className="w-5 h-5" style={{ color: '#F26B21' }} />
-            </span>
+          <span className="rounded-full flex items-center justify-center flex-shrink-0 border" style={{ width: 54, height: 54, borderColor: 'var(--app-border)', backgroundColor: 'var(--app-bg)' }}>
+            <Plus className="w-5 h-5" style={{ color: 'var(--app-text-secondary)' }} />
           </span>
           <span className="text-[11px] truncate w-full text-center" style={{ color: '#5A5A5A' }}>Add win</span>
         </button>
@@ -488,17 +491,24 @@ function WinViewer({ wins, startIndex, organisationId, userId, onClose, onDelete
             <span className="inline-block text-[11px] font-semibold px-2.5 py-[3px] rounded-full mt-0.5" style={{ backgroundColor: 'rgba(255,255,255,0.22)' }}>{meta?.pillLabel}</span>
           </div>
         </div>
+        {/* backdrop-blur + a faint white tint/border, not a flat black
+            circle -- this is the one place in the app where a button
+            actually floats over a photo or video rather than a plain
+            card background, which is exactly where a real frosted-glass
+            material (iOS's own toolbar buttons, iMessage's bubbles) is
+            visible at all; the same treatment on a button over a flat
+            background would have nothing behind it to blur. */}
         <div className="relative flex items-center gap-1.5 flex-shrink-0">
           {isOwn ? (
-            <button onClick={() => setMenuOpen(v => !v)} aria-label="Win options" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white">
+            <button onClick={() => setMenuOpen(v => !v)} aria-label="Win options" className="w-9 h-9 rounded-full backdrop-blur-md bg-white/10 border border-white/20 flex items-center justify-center text-white">
               <MoreHorizontal className="w-[18px] h-[18px]" />
             </button>
           ) : (
-            <button onClick={() => setReportOpen(true)} aria-label="Report this win" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white">
+            <button onClick={() => setReportOpen(true)} aria-label="Report this win" className="w-9 h-9 rounded-full backdrop-blur-md bg-white/10 border border-white/20 flex items-center justify-center text-white">
               <MoreHorizontal className="w-[18px] h-[18px]" />
             </button>
           )}
-          <button onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-full bg-black/30 flex items-center justify-center text-white">
+          <button onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-full backdrop-blur-md bg-white/10 border border-white/20 flex items-center justify-center text-white">
             <X className="w-5 h-5" />
           </button>
 
@@ -638,14 +648,14 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
               of whether the author had one set, so this always fell
               back to initials. */}
           {post.author_avatar_path ? (
-            <img src={authorAvatarUrl || ''} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+            <img src={authorAvatarUrl || ''} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
           ) : (
-            <span className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+            <span className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
               {initials(post.author_name)}
             </span>
           )}
           <div className="min-w-0">
-            <p className="flex items-center gap-1 text-[13px] font-semibold text-[var(--app-text)] truncate">
+            <p className="flex items-center gap-1 text-[14px] font-semibold text-[var(--app-text)] truncate">
               {post.author_name}
               {verified && <BadgeCheck className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#0F6E56' }} />}
             </p>
@@ -713,7 +723,7 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
       {/* Fixed height so the card never enlarges to fit a tall source
           image -- edge-to-edge width, but not edge-to-edge height. */}
       {post.image_path && (
-        <div className="relative w-full bg-[var(--app-surface-2)]" style={{ height: 300 }}>
+        <div className="relative w-full bg-[var(--app-surface-2)]" style={{ height: 380 }}>
           {!mediaUrl && <div className="absolute inset-0 animate-pulse" style={{ backgroundColor: 'var(--app-surface-2)' }} />}
           {mediaUrl && <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />}
         </div>

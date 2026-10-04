@@ -175,8 +175,11 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
     }
   }
 
-  const renderTab = () => {
-    switch (activeTab) {
+  // Takes the tab explicitly, not a closure over activeTab -- the phone
+  // flat list below calls this once per tab to build one continuous
+  // list, which the tab-switching desktop view couldn't need.
+  const renderTabContent = (tab: TabKey) => {
+    switch (tab) {
       case 'profile':
         return (
           <>
@@ -321,6 +324,30 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
     }
   }
 
+  const renderTab = () => renderTabContent(activeTab)
+
+  // Phone gets one continuous list, grouped by section -- same shape as
+  // the student app's own settings page ("one scrolling screen of
+  // grouped sections", not a drill-down menu). The laptop's left-tab
+  // nav makes sense once there's room for it beside the content; on a
+  // phone it was a second, narrower version of the same tab switcher
+  // the horizontal scroller already was, just one more tap before
+  // reaching anything. Sub-screens (Change password, Blocked accounts,
+  // etc.) still drill down the same way either way -- that part was
+  // never the complaint.
+  const renderAllTabsFlat = () => (
+    <>
+      {TABS.map(t => (
+        <div key={t.key} className="mb-6 last:mb-0">
+          <p className="flex items-center gap-1.5 text-[12.5px] font-bold text-ink-tertiary uppercase tracking-wide mb-2.5">
+            <t.icon className="w-3.5 h-3.5" /> {t.label}
+          </p>
+          {renderTabContent(t.key)}
+        </div>
+      ))}
+    </>
+  )
+
   return createPortal((
     <div data-theme={theme} className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 sm:p-8">
       <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-3xl h-[640px] max-h-[88dvh] flex overflow-hidden">
@@ -354,31 +381,36 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
                   <ChevronLeft className="w-4 h-4" />
                 </button>
               )}
-              <p className="font-bold text-ink text-[16px] truncate">{screen ? SCREEN_TITLE[screen] : TABS.find(t => t.key === activeTab)?.label}</p>
+              <p className="font-bold text-ink text-[16px] truncate">
+                {screen ? SCREEN_TITLE[screen] : (
+                  <>
+                    <span className="sm:hidden">Settings</span>
+                    <span className="hidden sm:inline">{TABS.find(t => t.key === activeTab)?.label}</span>
+                  </>
+                )}
+              </p>
             </div>
             <button onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-muted text-ink-secondary transition flex-shrink-0">
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Phone-only tab scroller -- the left nav above is hidden
-              below sm, this is its replacement. */}
-          <div className="sm:hidden flex gap-1.5 px-3 py-2.5 border-b border-edge-subtle overflow-x-auto flex-shrink-0">
-            {TABS.map(t => (
-              <button
-                key={t.key} onClick={() => { setActiveTab(t.key); setScreen(null) }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12.5px] font-semibold whitespace-nowrap transition ${
-                  activeTab === t.key && !screen ? 'bg-accent-bg text-brand' : 'bg-surface-subtle text-ink-secondary'
-                }`}
-              >
-                <t.icon className="w-3.5 h-3.5" /> {t.label}
-              </button>
-            ))}
-          </div>
-
           <div className="relative flex-1 min-h-0">
             <div ref={contentRef} className="h-full overflow-y-auto px-5 sm:px-6 py-5">
-              {screen ? <ScreenCard>{renderScreen()}</ScreenCard> : renderTab()}
+              {screen ? (
+                <ScreenCard>{renderScreen()}</ScreenCard>
+              ) : (
+                <>
+                  {/* Both branches mount (CSS display, not conditional
+                      render) -- same always-both-present, visibility-
+                      toggled pattern as the sidebar/drawer nav elsewhere
+                      in this app. Billing's own panel re-fetches once per
+                      mount either way, so this costs one duplicate read,
+                      not a layout thrash. */}
+                  <div className="sm:hidden">{renderAllTabsFlat()}</div>
+                  <div className="hidden sm:block">{renderTab()}</div>
+                </>
+              )}
             </div>
             <ScrollTrack containerRef={contentRef} />
           </div>

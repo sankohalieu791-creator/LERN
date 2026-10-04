@@ -490,8 +490,14 @@ export default function OrgShell({
       {drawerOpen && (
         <div className="lg:hidden fixed inset-0 z-30 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} />
+          {/* bg-surface-muted, not bg-surface -- in dark mode --surface
+              is a near-black #1D1917, which read as flat/stark next to
+              a real mail app's drawer (a mid grey, not black). The muted
+              token is a shade lighter and still theme-correct in light
+              mode, rather than hardcoding a grey that would look wrong
+              there. */}
           <div
-            className="relative w-[82%] max-w-[320px] h-full bg-surface flex flex-col overflow-y-auto"
+            className="relative w-[82%] max-w-[320px] h-full bg-surface-muted flex flex-col overflow-y-auto"
             style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
             <div className="flex items-center justify-between px-5 pt-4 pb-1 flex-shrink-0">
@@ -520,6 +526,14 @@ export default function OrgShell({
             </div>
             <div className="border-t border-edge-subtle flex-shrink-0" />
 
+            {/* Gmail-density pass -- rows were sized for a tap target
+                first and a list second (16px text, 22px icons, 14px of
+                vertical padding each). Dropped to match a real mail-app
+                drawer: smaller text/icons, tighter padding. The active
+                row no longer gets the brand-orange tint (bg-accent-bg) --
+                that read as a loud accent color rather than "this is
+                where you are", which a neutral surface tint plus bold
+                weight communicates without shouting. */}
             <nav className="flex-1 px-3 py-2 space-y-0.5">
               {sections.map(s => {
                 const active = isActive(s.href)
@@ -527,14 +541,21 @@ export default function OrgShell({
                 return (
                   <Link
                     key={s.key} href={s.href} onClick={() => setDrawerOpen(false)}
-                    className={`flex items-center gap-3.5 px-3.5 py-3.5 rounded-xl text-[16px] font-semibold transition ${
-                      active ? 'bg-accent-bg text-brand' : 'text-ink-secondary'
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14.5px] transition ${
+                      // bg-surface, a shade DARKER than this drawer's own
+                      // bg-surface-muted -- the two used to be the same
+                      // token (bg-accent-bg on bg-surface), which worked
+                      // because accent-bg was a distinct orange; now that
+                      // the drawer itself is the lighter muted tone, the
+                      // active pill needs the darker one for contrast,
+                      // not the same one it'd otherwise disappear into.
+                      active ? 'bg-surface text-ink font-bold' : 'text-ink-secondary font-medium'
                     }`}
                   >
-                    <s.icon className="w-[22px] h-[22px] flex-shrink-0" />
+                    <s.icon className="w-[19px] h-[19px] flex-shrink-0" />
                     <span className="flex-1 min-w-0 truncate">{s.label}</span>
                     {!!badge && (
-                      <span className="flex-shrink-0 min-w-[22px] text-center text-[11px] font-bold text-white bg-brand rounded-full px-[7px] py-[2px]">
+                      <span className="flex-shrink-0 min-w-[20px] text-center text-[10.5px] font-bold text-white bg-brand rounded-full px-[6px] py-[1px]">
                         {badge}
                       </span>
                     )}
@@ -545,9 +566,9 @@ export default function OrgShell({
                   identical addition above for why this is a button. */}
               <button
                 onClick={() => { setDrawerOpen(false); setSettingsOpen(true) }}
-                className="w-full flex items-center gap-3.5 px-3.5 py-3.5 rounded-xl text-[16px] font-semibold transition text-ink-secondary"
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14.5px] font-medium transition text-ink-secondary"
               >
-                <Settings className="w-[22px] h-[22px] flex-shrink-0" />
+                <Settings className="w-[19px] h-[19px] flex-shrink-0" />
                 <span className="flex-1 min-w-0 truncate text-left">Settings</span>
               </button>
             </nav>

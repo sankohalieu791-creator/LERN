@@ -225,7 +225,15 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
     // bottom of the screen. Fixed full-screen on phone (same as every
     // other full-screen mobile view in this app); reverts to the plain
     // in-page card on desktop, where this was never the complaint.
-    <div className="fixed inset-0 z-40 flex flex-col bg-paper lg:static lg:z-auto lg:flex lg:flex-col lg:bg-transparent">
+    // h-[100dvh], not bare inset-0 -- inset-0 alone sizes a fixed element
+    // against the INITIAL containing block, which on iOS Safari can be
+    // the largest-possible viewport (chrome collapsed) rather than the
+    // current visual one; the composer then renders at the bottom of
+    // that larger box, leaving real empty space below it once Safari's
+    // own toolbar is actually showing. dvh tracks the live visual
+    // viewport instead -- same fix already used for every other
+    // full-bleed phone view in this app.
+    <div className="fixed inset-0 h-[100dvh] z-40 flex flex-col bg-paper lg:static lg:h-auto lg:z-auto lg:flex lg:flex-col lg:bg-transparent">
       {/* Mobile: a sticky Gmail-style app bar. Desktop: the plain text link. */}
       <div className="flex-shrink-0 flex items-center gap-3 bg-paper border-b border-edge px-4 py-3 lg:hidden" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}>
         <button onClick={onBack} className="text-ink-secondary flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
