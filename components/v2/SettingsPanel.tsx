@@ -148,14 +148,19 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
 
   const roleLabel = user.role === 'employer' ? 'Employer' : user.role === 'institution_staff' ? 'Institution staff' : 'Provider staff'
 
-  const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { key: 'profile', label: 'Profile', icon: User },
-    { key: 'security', label: 'Security', icon: ShieldCheck },
-    { key: 'billing', label: 'Billing', icon: CreditCard },
-    { key: 'notifications', label: 'Notifications', icon: Bell },
-    { key: 'privacy', label: 'Privacy & data', icon: Lock },
-    { key: 'appearance', label: 'Appearance', icon: Paintbrush },
-    { key: 'help', label: 'Help & legal', icon: HelpCircle },
+  // badge: the phone flat list's per-section icon colour (Gmail-style
+  // coloured squares, not a uniform grey line icon) -- reusing colours
+  // already meaningful elsewhere in this app (the employer "verified"
+  // blue, the success green, danger red, brand orange) rather than
+  // inventing a new palette just for this screen.
+  const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; badge: string }[] = [
+    { key: 'profile', label: 'Profile', icon: User, badge: '#185FA5' },
+    { key: 'security', label: 'Security', icon: ShieldCheck, badge: '#C4314B' },
+    { key: 'billing', label: 'Billing', icon: CreditCard, badge: '#0F6E56' },
+    { key: 'notifications', label: 'Notifications', icon: Bell, badge: '#F26B21' },
+    { key: 'privacy', label: 'Privacy & data', icon: Lock, badge: '#7C5CBF' },
+    { key: 'appearance', label: 'Appearance', icon: Paintbrush, badge: '#C2548A' },
+    { key: 'help', label: 'Help & legal', icon: HelpCircle, badge: '#5A6B7A' },
   ]
 
   const reloadOrg = () => { if (user.organisation_id) supabase.from('organisations').select('*').eq('id', user.organisation_id).single().then(({ data }) => setOrg(data)) }
@@ -328,32 +333,129 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
 
   // Phone gets one continuous list, grouped by section -- same shape as
   // the student app's own settings page ("one scrolling screen of
-  // grouped sections", not a drill-down menu). The laptop's left-tab
-  // nav makes sense once there's room for it beside the content; on a
-  // phone it was a second, narrower version of the same tab switcher
-  // the horizontal scroller already was, just one more tap before
-  // reaching anything. Sub-screens (Change password, Blocked accounts,
-  // etc.) still drill down the same way either way -- that part was
-  // never the complaint.
+  // grouped sections", not a drill-down menu) -- but built on its own
+  // Gmail-style primitives (PhoneGroup/PhoneRow/PhoneToggleRow/
+  // PhoneLinkRow below), not reused desktop Row/Group/LinkRow: a
+  // coloured square icon badge per section, a subtitle line under a
+  // row's title where there's a second thing worth showing (an email, a
+  // current value), and real space between cards rather than a single
+  // grey wall of identical rows. The laptop's left-tab nav stays exactly
+  // as it was -- this only replaces the old phone-only horizontal tab
+  // scroller's content, not the desktop experience.
+  const profileBadge = TABS[0].badge, securityBadge = TABS[1].badge, notifBadge = TABS[3].badge
+  const privacyBadge = TABS[4].badge, appearanceBadge = TABS[5].badge, helpBadge = TABS[6].badge
   const renderAllTabsFlat = () => (
     <>
-      {TABS.map(t => (
-        <div key={t.key} className="mb-6 last:mb-0">
-          <p className="flex items-center gap-1.5 text-[12.5px] font-bold text-ink-tertiary uppercase tracking-wide mb-2.5">
-            <t.icon className="w-3.5 h-3.5" /> {t.label}
-          </p>
-          {renderTabContent(t.key)}
+      <p className="text-[26px] font-extrabold text-ink mb-5 mt-1">Settings</p>
+
+      <PhoneGroup title="Profile">
+        <PhoneRow
+          icon={User} badge={profileBadge} label={user.full_name} subtitle={user.email}
+          onClick={() => setScreen('rename')}
+        />
+        {isOrgAdmin && (
+          <PhoneRow
+            icon={Users2} badge={profileBadge} label={org?.name || 'Your organisation'}
+            subtitle={isOrgAdmin ? roleLabel : undefined} onClick={() => setScreen('organisation')}
+          />
+        )}
+        <PhoneRow icon={Camera} badge={profileBadge} label="Profile photo" onClick={() => setScreen('photo')} />
+        <PhoneRow icon={KeyRound} badge={profileBadge} label="Change password" onClick={() => setScreen('password')} />
+        {user.role === 'employer' && (
+          <PhoneRow
+            icon={BadgeCheck} badge={profileBadge} label="Employer status"
+            subtitle={user.employer_verified ? 'Verified' : 'Not yet verified'}
+          />
+        )}
+      </PhoneGroup>
+
+      <PhoneGroup title="Security">
+        <PhoneRow icon={Mail} badge={securityBadge} label="Reset password by email" onClick={requestReset} busy={busyField === 'reset'} />
+        <PhoneToggleRow icon={Smartphone} badge={securityBadge} label="Two-step verification" value={!!user.two_step_enabled} busy={busyField === 'two_step'} onToggle={toggleTwoStep} />
+        <PhoneRow icon={MonitorX} badge={securityBadge} label="Sign out of all devices" onClick={requestSignOutEverywhere} danger />
+        <PhoneRow icon={UserX} badge={securityBadge} label="Blocked accounts" onClick={() => setScreen('blocked')} />
+      </PhoneGroup>
+
+      <PhoneGroup title="Billing">
+        {user.role === 'employer' ? <EmployerSubscriptionPanel /> : <BillingPanel />}
+      </PhoneGroup>
+
+      <PhoneGroup title="Notifications">
+        <PhoneToggleRow icon={Bell} badge={notifBadge} label="Push notifications" value={prefs.push_enabled !== false} busy={busyField === 'push_enabled'} onToggle={v => saveNotif('push_enabled', v)} />
+        <PhoneToggleRow icon={Mail} badge={notifBadge} label="Email notifications" value={prefs.email_enabled !== false} busy={busyField === 'email_enabled'} onToggle={v => saveNotif('email_enabled', v)} />
+        {Object.entries(NOTIFICATION_LABELS).map(([key, label]) => (
+          <PhoneToggleRow key={key} icon={Bell} badge={notifBadge} label={label} value={prefs[key] !== false} busy={busyField === key} onToggle={() => saveNotif(key)} />
+        ))}
+      </PhoneGroup>
+
+      <PhoneGroup title="Privacy & data">
+        <PhoneRow
+          icon={Download} badge={privacyBadge} label="Download my data"
+          onClick={async () => {
+            const data = await exportMyData(user.id)
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url; a.download = `lern-my-data-${new Date().toISOString().split('T')[0]}.json`; a.click()
+            URL.revokeObjectURL(url)
+          }}
+        />
+        <PhoneRow icon={FileText} badge={privacyBadge} label="Consent" subtitle="View" onClick={() => setScreen('consent')} />
+        <PhoneToggleRow icon={Cookie} badge={privacyBadge} label="Analytics cookies" hint="Essential cookies are always on" value={!!user.cookie_consent?.analytics} busy={busyField === 'cookies'} onToggle={toggleAnalytics} />
+        <PhoneRow icon={Trash2} badge={privacyBadge} label="Delete my account and data" danger onClick={() => setScreen('delete')} />
+      </PhoneGroup>
+
+      <PhoneGroup title="Raise a concern">
+        <PhoneRow icon={Flag} badge={privacyBadge} label="Report a problem or something that worries you" onClick={() => setScreen('report')} />
+      </PhoneGroup>
+
+      <PhoneGroup title="Appearance">
+        <div className="px-4 py-3.5">
+          <div className="flex gap-2">
+            {([['light', 'Light', Sun], ['dark', 'Dark', Moon], ['system', 'System', Monitor]] as const).map(([key, label, Icon]) => (
+              <button
+                key={key} onClick={() => saveTheme(key)} disabled={busyField === 'theme'}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[13px] font-semibold transition ${
+                  (user.theme_preference || 'system') === key ? 'text-white' : 'bg-surface-subtle border border-edge text-ink-secondary'
+                }`}
+                style={(user.theme_preference || 'system') === key ? { backgroundColor: appearanceBadge } : undefined}
+              >
+                <Icon className="w-3.5 h-3.5" /> {label}
+              </button>
+            ))}
+          </div>
         </div>
-      ))}
+      </PhoneGroup>
+
+      {(isOrgAdmin || user.role === 'employer') && (
+        <PhoneGroup title="Help & legal">
+          <PhoneRow icon={ClipboardList} badge={helpBadge} label="Show setup checklist" onClick={showOnboardingChecklist} />
+        </PhoneGroup>
+      )}
+      <PhoneGroup title="About and legal">
+        <PhoneLinkRow icon={FileText} badge={helpBadge} label="Data Protection" href="/legal/privacy" />
+        <PhoneLinkRow icon={Cookie} badge={helpBadge} label="Cookie Policy" href="/legal/cookies" />
+        <PhoneLinkRow icon={FileText} badge={helpBadge} label="Terms of Service" href="/legal/terms" />
+        <PhoneLinkRow icon={ShieldCheck} badge={helpBadge} label="Public safeguarding summary" href="/legal/safeguarding" />
+        <PhoneRow icon={Info} badge={helpBadge} label="App version" subtitle="1.0" />
+        <a href="mailto:alieu@joinirl.co.uk" className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-muted transition">
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: helpBadge }}>
+            <Mail className="w-[18px] h-[18px] text-white" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[15px] font-semibold text-ink">Contact and support</span>
+            <span className="block text-[12.5px] text-ink-tertiary truncate">alieu@joinirl.co.uk</span>
+          </span>
+        </a>
+      </PhoneGroup>
     </>
   )
 
   return createPortal((
     <div data-theme={theme} className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 sm:p-8">
       <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-3xl h-[640px] max-h-[88dvh] flex overflow-hidden">
-        {/* ── Left tab nav — hidden on phone widths in favour of a top
-            scroller, same breakpoint convention the rest of the app
-            uses for sidebar vs. drawer. ── */}
+        {/* ── Left tab nav — hidden on phone widths, where the flat
+            Gmail-style list below replaces tab-switching entirely. ── */}
         <div className="hidden sm:flex w-[200px] flex-shrink-0 border-r border-edge-subtle bg-surface-subtle flex-col py-4">
           <p className="px-4 pb-3 font-bold text-ink text-[15px]">Settings</p>
           <nav className="flex-1 px-2 space-y-0.5 overflow-y-auto">
@@ -493,6 +595,89 @@ function LinkRow({ icon: Icon, label, href }: { icon?: React.ComponentType<{ cla
     <Link href={href} target="_blank" className="flex items-center justify-between px-4 py-3.5 hover:bg-surface-muted transition">
       <span className="flex items-center gap-3 text-[14px] text-ink">{Icon && <Icon className="w-4 h-4 text-ink-tertiary flex-shrink-0" />} {label}</span>
       <ChevronRight className="w-4 h-4 text-ink-tertiary" />
+    </Link>
+  )
+}
+
+// ── Phone-only primitives (the flat Settings list) — a coloured square
+// icon badge per row and an optional subtitle line, Gmail's own settings
+// screen shape, instead of desktop's plain grey line icon + inline
+// value. Desktop keeps using Group/Row/ToggleRow/LinkRow above
+// untouched. ──────────────────────────────────────────────────────
+function PhoneGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-7">
+      <p className="text-[12px] font-bold text-ink-tertiary uppercase tracking-wide mb-2 px-1">{title}</p>
+      <div className="bg-surface border border-edge rounded-2xl divide-y divide-edge-subtle overflow-hidden shadow-sm">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function PhoneBadgeIcon({ icon: Icon, badge }: { icon: React.ComponentType<{ className?: string }>; badge: string }) {
+  return (
+    <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: badge }}>
+      <Icon className="w-[18px] h-[18px] text-white" />
+    </span>
+  )
+}
+
+function PhoneRow({ icon, badge, label, subtitle, onClick, danger, busy }: {
+  icon: React.ComponentType<{ className?: string }>; badge: string; label: string; subtitle?: string
+  onClick?: () => void; danger?: boolean; busy?: boolean
+}) {
+  const content = (
+    <>
+      <span className="flex items-center gap-3 min-w-0">
+        <PhoneBadgeIcon icon={icon} badge={badge} />
+        <span className="min-w-0">
+          <span className={`block text-[15px] font-semibold truncate ${danger ? 'text-danger-text' : 'text-ink'}`}>{busy ? 'Working…' : label}</span>
+          {subtitle && <span className="block text-[12.5px] text-ink-tertiary truncate">{subtitle}</span>}
+        </span>
+      </span>
+      {onClick && <ChevronRight className="w-4 h-4 text-ink-tertiary flex-shrink-0" />}
+    </>
+  )
+  if (!onClick) return <div className="flex items-center justify-between gap-3 px-4 py-3.5">{content}</div>
+  return (
+    <button onClick={onClick} disabled={busy} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-surface-muted transition text-left disabled:opacity-60">
+      {content}
+    </button>
+  )
+}
+
+function PhoneToggleRow({ icon, badge, label, hint, value, onToggle, busy }: {
+  icon: React.ComponentType<{ className?: string }>; badge: string; label: string; hint?: string
+  value: boolean; onToggle: (v: boolean) => void; busy?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+      <span className="flex items-center gap-3 min-w-0">
+        <PhoneBadgeIcon icon={icon} badge={badge} />
+        <span className="min-w-0">
+          <span className="block text-[15px] font-semibold text-ink truncate">{label}</span>
+          {hint && <span className="block text-[12.5px] text-ink-tertiary truncate">{hint}</span>}
+        </span>
+      </span>
+      <button
+        onClick={() => onToggle(!value)} disabled={busy}
+        className={`w-11 h-6 rounded-full transition relative flex-shrink-0 disabled:opacity-50 border ${value ? 'bg-brand border-brand' : 'bg-surface-muted border-edge'}`}
+      >
+        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition ${value ? 'left-[21px]' : 'left-0.5'}`} />
+      </button>
+    </div>
+  )
+}
+
+function PhoneLinkRow({ icon, badge, label, href }: { icon: React.ComponentType<{ className?: string }>; badge: string; label: string; href: string }) {
+  return (
+    <Link href={href} target="_blank" className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-surface-muted transition">
+      <span className="flex items-center gap-3 min-w-0">
+        <PhoneBadgeIcon icon={icon} badge={badge} />
+        <span className="text-[15px] font-semibold text-ink truncate">{label}</span>
+      </span>
+      <ChevronRight className="w-4 h-4 text-ink-tertiary flex-shrink-0" />
     </Link>
   )
 }
