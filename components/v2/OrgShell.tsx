@@ -526,22 +526,21 @@ export default function OrgShell({
             </div>
             <div className="border-t border-edge-subtle flex-shrink-0" />
 
-            {/* Gmail-density pass -- rows were sized for a tap target
-                first and a list second (16px text, 22px icons, 14px of
-                vertical padding each). Dropped to match a real mail-app
-                drawer: smaller text/icons, tighter padding. The active
-                row no longer gets the brand-orange tint (bg-accent-bg) --
-                that read as a loud accent color rather than "this is
-                where you are", which a neutral surface tint plus bold
-                weight communicates without shouting. */}
-            <nav className="flex-1 px-3 py-2 space-y-0.5">
+            {/* Gmail-density pass, round two -- the first pass (14.5px
+                text, 19px icons, py-2.5) undershot; "Gmail size" means a
+                real medium row, not the smallest one that still fits.
+                Settled between that and the original 16px/22px/py-3.5
+                tap-target sizing. Active row keeps the neutral surface
+                tint (not brand-orange) from the first pass -- that part
+                landed right. */}
+            <nav className="flex-1 px-3 py-2 space-y-1">
               {sections.map(s => {
                 const active = isActive(s.href)
                 const badge = NAV_BADGES[s.key]
                 return (
                   <Link
                     key={s.key} href={s.href} onClick={() => setDrawerOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14.5px] transition ${
+                    className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] transition ${
                       // bg-surface, a shade DARKER than this drawer's own
                       // bg-surface-muted -- the two used to be the same
                       // token (bg-accent-bg on bg-surface), which worked
@@ -552,10 +551,10 @@ export default function OrgShell({
                       active ? 'bg-surface text-ink font-bold' : 'text-ink-secondary font-medium'
                     }`}
                   >
-                    <s.icon className="w-[19px] h-[19px] flex-shrink-0" />
+                    <s.icon className="w-[21px] h-[21px] flex-shrink-0" />
                     <span className="flex-1 min-w-0 truncate">{s.label}</span>
                     {!!badge && (
-                      <span className="flex-shrink-0 min-w-[20px] text-center text-[10.5px] font-bold text-white bg-brand rounded-full px-[6px] py-[1px]">
+                      <span className="flex-shrink-0 min-w-[21px] text-center text-[11px] font-bold text-white bg-brand rounded-full px-[6px] py-[1.5px]">
                         {badge}
                       </span>
                     )}
@@ -566,9 +565,9 @@ export default function OrgShell({
                   identical addition above for why this is a button. */}
               <button
                 onClick={() => { setDrawerOpen(false); setSettingsOpen(true) }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14.5px] font-medium transition text-ink-secondary"
+                className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-medium transition text-ink-secondary"
               >
-                <Settings className="w-[19px] h-[19px] flex-shrink-0" />
+                <Settings className="w-[21px] h-[21px] flex-shrink-0" />
                 <span className="flex-1 min-w-0 truncate text-left">Settings</span>
               </button>
             </nav>
