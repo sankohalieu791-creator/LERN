@@ -81,7 +81,7 @@ body {
      left a faint, slightly-cooler seam wherever this gap actually
      showed (screenshots surface it far more than the eye does live).
      Same fix applies below for the light value against #fafafa. */
-  background-color: #131110;
+  background-color: #0c0c0c;
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
@@ -103,7 +103,7 @@ body {
    system (see ThemeProvider.tsx). This one only ever touches body's
    own background. */
 html[data-body-theme="dark"] body {
-  background-color: #131110;
+  background-color: #0c0c0c;
 }
 html[data-body-theme="light"] body {
   background-color: #F7F3EA;
@@ -302,18 +302,18 @@ html[data-body-theme="student-light"] body {
 }
 
 [data-theme="dark"] {
-  --paper: #131110;
-  --ink: #F3EEE6;
-  --surface: #1D1917;
-  --surface-subtle: #211D1A;
-  --surface-muted: #29241F;
-  --border: #38322B;
-  --border-subtle: #2C2721;
-  --border-input: #4A4238;
-  --text-secondary: #BDB3A2;
-  --text-tertiary: #948A78;
-  --text-quaternary: #736A5A;
-  --text-body: #DED6C6;
+  --paper: #0c0c0c;
+  --ink: #f2f2f2;
+  --surface: #161616;
+  --surface-subtle: #121212;
+  --surface-muted: #1f1f1f;
+  --border: #2a2a2a;
+  --border-subtle: #222222;
+  --border-input: #3a3a3a;
+  --text-secondary: #b8b8b8;
+  --text-tertiary: #919191;
+  --text-quaternary: #6e6e6e;
+  --text-body: #d8d8d8;
   --brand: #FF7A3D;
   --brand-hover: #FF9159;
   --success-text: #4FCE7C;
@@ -325,14 +325,19 @@ html[data-body-theme="student-light"] body {
   --warning-text: #FFA05C;
   --warning-bg: #3A2710;
   --warning-bg-soft: #33220E;
-  --accent-bg: #3A2414;
-  --accent-bg-soft: #4A2E1C;
+  --accent-bg: #262626;
+  --accent-bg-soft: #303030;
 }
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html[data-splash-seen] [data-splash] {
+  display: none !important;
 }
 
 /* scroll-behavior: smooth removed -- nothing in the app actually uses

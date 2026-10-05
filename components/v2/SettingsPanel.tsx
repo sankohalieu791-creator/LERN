@@ -49,12 +49,12 @@ const NOTIFICATION_LABELS: Record<string, string> = {
 }
 
 export type TabKey = 'profile' | 'security' | 'billing' | 'notifications' | 'privacy' | 'appearance' | 'help'
-type Screen = null | 'email' | 'password' | 'photo' | 'rename' | 'organisation' | 'blocked' | 'report' | 'delete' | 'consent'
+type Screen = null | 'email' | 'password' | 'photo' | 'rename' | 'organisation' | 'blocked' | 'report' | 'delete' | 'consent' | 'billing'
 
 const SCREEN_TITLE: Record<Exclude<Screen, null>, string> = {
   email: 'Change email', password: 'Change password', photo: 'Profile photo', rename: 'Full name',
   organisation: 'Organisation', blocked: 'Blocked accounts', report: 'Report a problem',
-  delete: 'Delete my account', consent: 'Consent',
+  delete: 'Delete my account', consent: 'Consent', billing: 'Billing',
 }
 
 // Opens the modal from anywhere outside OrgShell's own tree (e.g. a
@@ -176,6 +176,7 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
       case 'report': return <ReportScreen userId={user.id} organisationId={user.organisation_id || null} onBack={() => setScreen(null)} />
       case 'delete': return <DeleteAccountScreen email={user.email} onBack={() => setScreen(null)} />
       case 'consent': return <ConsentScreen consentedAt={user.consented_at} onBack={() => setScreen(null)} onDelete={() => setScreen('delete')} />
+      case 'billing': return user.role === 'employer' ? <EmployerSubscriptionPanel /> : <BillingPanel />
       default: return null
     }
   }
@@ -377,7 +378,7 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
       </PhoneGroup>
 
       <PhoneGroup title="Billing">
-        {user.role === 'employer' ? <EmployerSubscriptionPanel /> : <BillingPanel />}
+        <PhoneRow icon={CreditCard} badge={TABS[2].badge} label="Billing and subscription" onClick={() => setScreen('billing')} />
       </PhoneGroup>
 
       <PhoneGroup title="Notifications">
@@ -508,7 +509,7 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
                 )}
               </p>
             </div>
-            <button onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-muted text-ink-secondary transition flex-shrink-0">
+            <button onClick={onClose} aria-label="Close" className="w-9 h-9 flex items-center justify-center rounded-full backdrop-blur-xl border border-edge text-ink-secondary transition flex-shrink-0" style={{ backgroundColor: 'var(--app-overlay-2)' }}>
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -519,7 +520,7 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
               style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}
             >
               {screen ? (
-                <ScreenCard>{renderScreen()}</ScreenCard>
+                screen === 'billing' ? <div>{renderScreen()}</div> : <ScreenCard>{renderScreen()}</ScreenCard>
               ) : (
                 <>
                   {/* Both branches mount (CSS display, not conditional

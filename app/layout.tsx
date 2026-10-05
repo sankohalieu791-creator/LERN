@@ -61,6 +61,19 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        {/* Runs before first paint: if this tab already played the launch
+            splash this session, mark the page so the splash is hidden
+            before anything renders. iOS unloads a backgrounded web app and
+            reloads it on return -- that's a fresh document load, which
+            replayed the full splash every time. Splash stays once per
+            session, not once per reload. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "try{if(sessionStorage.getItem('lern-splash-seen'))document.documentElement.setAttribute('data-splash-seen','')}catch(e){}",
+          }}
+        />
+      </head>
       {/* No bg-paper here on purpose -- it was the actual root cause of
           the white status-bar strip and the white flash during scroll,
           on EVERY page, this whole time. bg-paper is a Tailwind CLASS

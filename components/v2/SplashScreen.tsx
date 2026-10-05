@@ -33,6 +33,7 @@ export default function SplashScreen() {
   const [stage, setStage] = useState<'enter' | 'visible' | 'exit' | 'gone'>('enter')
 
   useEffect(() => {
+    try { sessionStorage.setItem('lern-splash-seen', '1') } catch {}
     const raf = requestAnimationFrame(() => setStage('visible'))
     const holdTimer = setTimeout(() => setStage('exit'), 1500)
     const goneTimer = setTimeout(() => setStage('gone'), 1900)
@@ -50,6 +51,7 @@ export default function SplashScreen() {
   return (
     <div
       aria-hidden
+      data-splash
       className={`fixed inset-0 z-[9999] flex items-center justify-center bg-[#0f0f0f] transition-opacity duration-[400ms] ease-out ${
         stage === 'exit' ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}

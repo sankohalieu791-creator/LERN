@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '@/context/AuthContext'
+import { useResolvedTheme } from '@/context/ThemeProvider'
 import {
   getOrgInterest, respondToInterest, getInterestMessages, sendInterestMessage, closeInterestThread,
   uploadInterestMessageFile, getSignedFileUrl,
@@ -165,6 +167,7 @@ export default function InterestReceivedPanel() {
 
 function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => void; onRespond: (id: string, status: 'accepted' | 'declined') => Promise<{ error: any }> }) {
   const { user } = useAuth()
+  const theme = useResolvedTheme()
   const [messages, setMessages] = useState<any[]>([])
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
@@ -229,7 +232,12 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   // hit this exact "reacted before the keyboard animation actually
   // finished" failure mode twice before landing on a fixed wait rather
   // than trusting any one signal to mean "settled").
-  const onComposerBlur = () => { window.setTimeout(updateViewportH, 400) }
+  // The page itself is never meant to scroll under this screen, so any
+  // scroll iOS applied to reveal the field is undone on dismiss.
+  const onComposerBlur = () => {
+    window.scrollTo(0, 0)
+    window.setTimeout(() => { window.scrollTo(0, 0); updateViewportH() }, 400)
+  }
 
   const adult = isAdult(item.student?.date_of_birth)
   // Same fix as the list view above -- "This student" was being
@@ -270,7 +278,14 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
     await closeInterestThread(item.id)
   }
 
-  return (
+  // Portaled to document.body on phone -- this sits inside OrgShell's own
+  // scrolling <main>, and a fixed full-screen view nested in a scroll
+  // container is exactly what mobile WebKit positions inconsistently
+  // (the thread sliding up behind the status bar when the keyboard
+  // opened). FeedPanel's AddWinSheet and WinViewer already escape it the
+  // same way for the same reason. Desktop keeps the in-page card.
+  const [onPhone] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1024)
+  const threadView = (
     // A real messaging app's composer is ALWAYS glued to the bottom of
     // the panel, whether the conversation is one message or fifty --
     // that only happens with a bounded-height flex column (header,
@@ -286,12 +301,13 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
     // visualViewport effect above has measured anything -- see that
     // effect for why dvh alone wasn't enough here.
     <div
+      data-theme={theme}
       className="fixed inset-0 h-[100dvh] z-40 flex flex-col bg-paper lg:static lg:h-auto lg:z-auto lg:flex lg:flex-col lg:bg-transparent"
       style={viewportBox ? { top: `${viewportBox.top}px`, height: `${viewportBox.height}px` } : undefined}
     >
       {/* Mobile: a sticky Gmail-style app bar. Desktop: the plain text link. */}
       <div className="flex-shrink-0 flex items-center gap-3 bg-paper border-b border-edge px-4 py-3 lg:hidden" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}>
-        <button onClick={onBack} className="text-ink-secondary flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
+        <button onClick={onBack} aria-label="Back" className="w-9 h-9 rounded-full flex items-center justify-center text-ink-secondary flex-shrink-0 backdrop-blur-xl border border-edge" style={{ backgroundColor: 'var(--app-overlay-2)' }}><ArrowLeft className="w-[18px] h-[18px]" /></button>
         <div className="min-w-0">
           <p className="font-bold text-ink text-[14px] truncate">{item.employer?.full_name || 'An employer'}</p>
           <p className="text-[12px] text-ink-tertiary truncate">Interested in {firstName}{item.opportunity_label ? ` · ${item.opportunity_label}` : ''}</p>
@@ -394,6 +410,7 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
       </p>
     </div>
   )
+  return onPhone ? createPortal(threadView, document.body) : threadView
 }
 
 function messageTime(iso?: string) {
