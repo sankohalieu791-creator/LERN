@@ -150,13 +150,8 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
   useEffect(load, [])
 
   return (
-    // A thin border line read as too subtle -- Instagram gives its own
-    // story strip a genuinely distinct background band from the feed
-    // below it, not just a hairline. --app-surface is already the
-    // "one step off the page background" tone used elsewhere in this
-    // dark/light system, so this reads as a proper separated band in
-    // both themes rather than a colour invented just for this.
-    <div className="pt-3 pb-2.5 border-b" style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
+    // No background band -- the strip sits on the page colour, per request.
+    <div className="pt-3 pb-2.5 border-b" style={{ backgroundColor: 'transparent', borderColor: 'var(--app-border)' }}>
       <div className="flex gap-3.5 overflow-x-auto px-4 pb-0.5" style={{ scrollbarWidth: 'none' }}>
         {/* Plain bordered circle, not a brand-orange ring over a grey
             fill -- a coloured ring reads as "someone's story", which
