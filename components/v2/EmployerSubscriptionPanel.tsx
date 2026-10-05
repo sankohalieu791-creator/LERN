@@ -159,7 +159,7 @@ export default function EmployerSubscriptionPanel({ onBack }: { onBack?: () => v
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="font-bold text-ink text-[16px]">{tier.label} plan</p>
-            <p className="text-[13px] text-ink-tertiary">{tier.monthlyPrice !== null ? `${money(tier.monthlyPrice)} / month` : 'Custom pricing'}</p>
+            <p className="text-[13px] text-ink-tertiary">{tier.monthlyPrice !== null ? `${money(tier.monthlyPrice)} / month` : tier.startingMonthlyPrice ? `From ${money(tier.startingMonthlyPrice)} / month` : 'Custom pricing'}</p>
           </div>
           {billing.subscription_status === 'active' && (
             <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-accent-bg text-brand">Active</span>
@@ -181,7 +181,7 @@ export default function EmployerSubscriptionPanel({ onBack }: { onBack?: () => v
               <div className="min-w-0">
                 <p className={`text-[14px] font-semibold ${isCurrent ? 'text-brand' : 'text-ink'}`}>{t2.label}</p>
                 <p className="text-[12px] text-ink-tertiary">
-                  {t2.talentPools ?? 'Unlimited'} talent pools · {t2.activeJobPostings ?? 'Unlimited'} postings · {t2.monthlyPrice !== null ? `${money(t2.monthlyPrice)}/mo` : 'Custom'}
+                  {t2.talentPools ?? 'Unlimited'} talent pools · {t2.activeJobPostings ?? 'Unlimited'} postings · {t2.monthlyPrice !== null ? `${money(t2.monthlyPrice)}/mo` : t2.startingMonthlyPrice ? `From ${money(t2.startingMonthlyPrice)}/mo` : 'Custom'}
                 </p>
               </div>
               {isCurrent ? (

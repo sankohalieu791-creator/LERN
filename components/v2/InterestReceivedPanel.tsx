@@ -202,19 +202,23 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   // the screen instead of on the keyboard. Tracking top + height from
   // the visual viewport keeps it exactly over what's actually visible.
   const [viewportBox, setViewportBox] = useState<{ top: number; height: number } | null>(null)
-  const [layoutH, setLayoutH] = useState<number | null>(null)
-  // Whether the reply field has focus is the source of truth for the
-  // layout, not visualViewport: on the installed home-screen app,
-  // visualViewport does not reliably report the keyboard going away, so
-  // a height read from it could stay short after dismiss. Unfocused =
-  // the full layout height, immediately, no event needed.
+  // The full height is captured once, when this screen opens (keyboard
+  // closed), and only refreshed on rotation. Re-reading window.innerHeight
+  // after dismiss is what stayed short on the home-screen app: iOS hadn't
+  // restored it yet, so the screen kept the keyboard-sized height.
+  const [fullH, setFullH] = useState<number | null>(null)
   const [composerFocused, setComposerFocused] = useState(false)
   const updateViewportH = () => {
-    if (window.innerWidth >= 1024) { setViewportBox(null); setLayoutH(null); return }
+    if (window.innerWidth >= 1024) { setViewportBox(null); return }
     const vv = window.visualViewport
     setViewportBox({ top: vv?.offsetTop ?? 0, height: vv?.height ?? window.innerHeight })
-    setLayoutH(window.innerHeight)
   }
+  useEffect(() => {
+    setFullH(window.innerHeight)
+    const onRotate = () => setFullH(window.innerHeight)
+    window.addEventListener('orientationchange', onRotate)
+    return () => window.removeEventListener('orientationchange', onRotate)
+  }, [])
   useEffect(() => {
     updateViewportH()
     window.visualViewport?.addEventListener('resize', updateViewportH)
@@ -318,7 +322,7 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
       className="fixed inset-0 h-[100dvh] z-40 flex flex-col bg-paper lg:static lg:h-auto lg:z-auto lg:flex lg:flex-col lg:bg-transparent"
       style={viewportBox ? (composerFocused
         ? { top: `${viewportBox.top}px`, height: `${viewportBox.height}px` }
-        : { top: '0px', height: `${layoutH ?? viewportBox.height}px` }) : undefined}
+        : { top: '0px', height: `${fullH ?? viewportBox.height}px` }) : undefined}
     >
       {/* Mobile: a sticky Gmail-style app bar. Desktop: the plain text link. */}
       <div className="flex-shrink-0 flex items-center gap-3 bg-paper border-b border-edge px-4 py-3 lg:hidden" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}>

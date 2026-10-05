@@ -16,13 +16,14 @@ export const EMPLOYER_TIERS: Record<EmployerTier, {
   talentPools: number | null // null = unlimited
   activeJobPostings: number | null
   monthlyPrice: number | null // null = custom/on application
+  startingMonthlyPrice?: number // shown as "From £X" where there's no fixed self-serve price
   warmCadence: 'full' | 'full_customisable'
   partnersView: 'basic' | 'advanced' | 'advanced_dedicated'
 }> = {
   micro: { label: 'Micro', employeeRange: '1 to 15 employees', minEmployees: 1, maxEmployees: 15, talentPools: 5, activeJobPostings: 5, monthlyPrice: 79, warmCadence: 'full', partnersView: 'basic' },
   growth: { label: 'Growth', employeeRange: '16 to 99 employees', minEmployees: 16, maxEmployees: 99, talentPools: 20, activeJobPostings: 20, monthlyPrice: 249, warmCadence: 'full', partnersView: 'basic' },
   scale: { label: 'Scale', employeeRange: '100 to 499 employees', minEmployees: 100, maxEmployees: 499, talentPools: 35, activeJobPostings: 35, monthlyPrice: 499, warmCadence: 'full_customisable', partnersView: 'advanced' },
-  enterprise: { label: 'Enterprise', employeeRange: '500+ employees', minEmployees: 500, maxEmployees: null, talentPools: null, activeJobPostings: null, monthlyPrice: null, warmCadence: 'full_customisable', partnersView: 'advanced_dedicated' },
+  enterprise: { label: 'Enterprise', employeeRange: '500+ employees', minEmployees: 500, maxEmployees: null, talentPools: null, activeJobPostings: null, monthlyPrice: null, startingMonthlyPrice: 999, warmCadence: 'full_customisable', partnersView: 'advanced_dedicated' },
 }
 
 export const EMPLOYER_TIER_ORDER: EmployerTier[] = ['micro', 'growth', 'scale', 'enterprise']
