@@ -325,8 +325,8 @@ html[data-body-theme="student-light"] body {
   --warning-text: #FFA05C;
   --warning-bg: #3A2710;
   --warning-bg-soft: #33220E;
-  --accent-bg: #3A2414;
-  --accent-bg-soft: #4A2E1C;
+  --accent-bg: #2a2a2a;
+  --accent-bg-soft: #333333;
 }
 
 * {
