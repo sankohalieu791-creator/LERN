@@ -14,7 +14,7 @@ export async function generateViewport(): Promise<Viewport> {
     maximumScale: 1,
     userScalable: false,
     viewportFit: 'cover',
-    themeColor: theme === 'dark' ? '#0c0c0c' : '#FFFDF9',
+    themeColor: theme === 'dark' ? '#131110' : '#FFFDF9',
     // Was resizes-content -- per-segment generateViewport() REPLACES
     // the root layout's viewport rather than merging with it, so this
     // was silently undoing the root layout's own interactiveWidget fix

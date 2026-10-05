@@ -202,23 +202,12 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   // the screen instead of on the keyboard. Tracking top + height from
   // the visual viewport keeps it exactly over what's actually visible.
   const [viewportBox, setViewportBox] = useState<{ top: number; height: number } | null>(null)
-  // The full height is captured once, when this screen opens (keyboard
-  // closed), and only refreshed on rotation. Re-reading window.innerHeight
-  // after dismiss is what stayed short on the home-screen app: iOS hadn't
-  // restored it yet, so the screen kept the keyboard-sized height.
-  const [fullH, setFullH] = useState<number | null>(null)
   const [composerFocused, setComposerFocused] = useState(false)
   const updateViewportH = () => {
     if (window.innerWidth >= 1024) { setViewportBox(null); return }
     const vv = window.visualViewport
     setViewportBox({ top: vv?.offsetTop ?? 0, height: vv?.height ?? window.innerHeight })
   }
-  useEffect(() => {
-    setFullH(window.innerHeight)
-    const onRotate = () => setFullH(window.innerHeight)
-    window.addEventListener('orientationchange', onRotate)
-    return () => window.removeEventListener('orientationchange', onRotate)
-  }, [])
   useEffect(() => {
     updateViewportH()
     window.visualViewport?.addEventListener('resize', updateViewportH)
@@ -314,15 +303,16 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
     // bottom of the screen. Fixed full-screen on phone (same as every
     // other full-screen mobile view in this app); reverts to the plain
     // in-page card on desktop, where this was never the complaint.
-    // h-[100dvh] is only the first-paint fallback now, before the
-    // visualViewport effect above has measured anything -- see that
-    // effect for why dvh alone wasn't enough here.
+    // Unfocused, this takes no explicit height: top and bottom both 0 pin
+    // it to the real bottom of the webview. An explicit dvh height
+    // overshot that bottom on the installed app and clipped the composer.
+    // Only focused (keyboard up) is sized from the visual viewport.
     <div
       data-theme={theme}
-      className="fixed inset-0 h-[100dvh] z-40 flex flex-col bg-paper lg:static lg:h-auto lg:z-auto lg:flex lg:flex-col lg:bg-transparent"
-      style={viewportBox ? (composerFocused
+      className="fixed inset-0 z-40 flex flex-col bg-paper lg:static lg:h-auto lg:z-auto lg:flex lg:flex-col lg:bg-transparent"
+      style={viewportBox && composerFocused
         ? { top: `${viewportBox.top}px`, height: `${viewportBox.height}px` }
-        : { top: '0px', height: `${fullH ?? viewportBox.height}px` }) : undefined}
+        : undefined}
     >
       {/* Mobile: a sticky Gmail-style app bar. Desktop: the plain text link. */}
       <div className="flex-shrink-0 flex items-center gap-3 bg-paper border-b border-edge px-4 py-3 lg:hidden" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}>
