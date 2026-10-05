@@ -174,6 +174,39 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   const load = () => { getInterestMessages(item.id).then(({ data }) => setMessages(data || [])) }
   useEffect(load, [item.id])
 
+  // dvh alone turned out not to be enough here -- same conclusion
+  // WorkshopSession's control bar and StudentShell/OrgShell's own fixed
+  // bottom UI already reached: this app sets interactive-widget=
+  // overlays-content everywhere, which keeps the CSS layout viewport
+  // (and so dvh) from ever shrinking for the keyboard at all. That left
+  // the keyboard simply covering the composer, which the browser "fixes"
+  // on its own by force-scrolling the focused field into view -- a
+  // scroll this fixed-position screen was never expecting, which is
+  // exactly what showed up as the composer visibly jumping ("popping
+  // up") when the field was focused and again when it blurred.
+  // window.visualViewport.height is the one number that always reflects
+  // what's really visible, keyboard included, regardless of that
+  // setting -- sizing against it directly means the composer is already
+  // above the keyboard without any compensating scroll ever needed.
+  // null on desktop (lg:) on purpose -- there this screen isn't a
+  // full-screen takeover at all (lg:static lg:h-auto below), so no
+  // inline height should ever compete with that; only measure once
+  // actually in the phone layout this problem exists in.
+  const [viewportH, setViewportH] = useState<number | null>(null)
+  useEffect(() => {
+    const update = () => {
+      if (window.innerWidth >= 1024) { setViewportH(null); return }
+      setViewportH(window.visualViewport?.height ?? window.innerHeight)
+    }
+    update()
+    window.visualViewport?.addEventListener('resize', update)
+    window.addEventListener('resize', update)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [])
+
   const adult = isAdult(item.student?.date_of_birth)
   // Same fix as the list view above -- "This student" was being
   // truncated to a bare "This" whenever student data was missing,
@@ -225,15 +258,13 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
     // bottom of the screen. Fixed full-screen on phone (same as every
     // other full-screen mobile view in this app); reverts to the plain
     // in-page card on desktop, where this was never the complaint.
-    // h-[100dvh], not bare inset-0 -- inset-0 alone sizes a fixed element
-    // against the INITIAL containing block, which on iOS Safari can be
-    // the largest-possible viewport (chrome collapsed) rather than the
-    // current visual one; the composer then renders at the bottom of
-    // that larger box, leaving real empty space below it once Safari's
-    // own toolbar is actually showing. dvh tracks the live visual
-    // viewport instead -- same fix already used for every other
-    // full-bleed phone view in this app.
-    <div className="fixed inset-0 h-[100dvh] z-40 flex flex-col bg-paper lg:static lg:h-auto lg:z-auto lg:flex lg:flex-col lg:bg-transparent">
+    // h-[100dvh] is only the first-paint fallback now, before the
+    // visualViewport effect above has measured anything -- see that
+    // effect for why dvh alone wasn't enough here.
+    <div
+      className="fixed inset-0 h-[100dvh] z-40 flex flex-col bg-paper lg:static lg:h-auto lg:z-auto lg:flex lg:flex-col lg:bg-transparent"
+      style={viewportH ? { height: `${viewportH}px` } : undefined}
+    >
       {/* Mobile: a sticky Gmail-style app bar. Desktop: the plain text link. */}
       <div className="flex-shrink-0 flex items-center gap-3 bg-paper border-b border-edge px-4 py-3 lg:hidden" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}>
         <button onClick={onBack} className="text-ink-secondary flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>

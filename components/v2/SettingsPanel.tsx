@@ -452,8 +452,17 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
   )
 
   return createPortal((
-    <div data-theme={theme} className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 sm:p-8">
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-3xl h-[640px] max-h-[88dvh] flex overflow-hidden">
+    // Phone: a real full-screen takeover -- opaque, edge to edge, no
+    // dimmed backdrop and no floating card -- same shape as the student
+    // app's own Settings page. This was built as a scaled-down version
+    // of the laptop dialog (bg-black/50 behind a rounded, padded, fixed-
+    // height card), which on a phone just reads as a popup sitting on
+    // top of the app rather than its own screen. The backdrop/card/
+    // rounding/fixed-height all move to sm: and up, where the floating
+    // dialog (explicitly asked for, matching "Create brief") is still
+    // exactly what's wanted.
+    <div data-theme={theme} className="fixed inset-0 h-[100dvh] sm:h-auto z-50 bg-paper sm:bg-black/50 sm:backdrop-blur-[2px] flex sm:items-center sm:justify-center sm:p-4 lg:p-8">
+      <div className="bg-surface w-full h-full sm:h-[640px] sm:max-h-[88dvh] sm:max-w-3xl sm:rounded-2xl sm:shadow-2xl flex overflow-hidden">
         {/* ── Left tab nav — hidden on phone widths, where the flat
             Gmail-style list below replaces tab-switching entirely. ── */}
         <div className="hidden sm:flex w-[200px] flex-shrink-0 border-r border-edge-subtle bg-surface-subtle flex-col py-4">
@@ -476,7 +485,14 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col">
-          <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-edge-subtle flex-shrink-0">
+          {/* Phone: this bar now sits flush against the real top of the
+              screen (no modal padding/backdrop above it any more), so it
+              needs the device's own safe-area inset the way every other
+              full-bleed screen in this app already accounts for. */}
+          <div
+            className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-edge-subtle flex-shrink-0"
+            style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}
+          >
             <div className="flex items-center gap-2 min-w-0">
               {screen && (
                 <button onClick={() => setScreen(null)} aria-label="Back" className="w-7 h-7 -ml-1 flex items-center justify-center rounded-full hover:bg-surface-muted text-ink-secondary transition flex-shrink-0">
@@ -498,7 +514,10 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
           </div>
 
           <div className="relative flex-1 min-h-0">
-            <div ref={contentRef} className="h-full overflow-y-auto px-5 sm:px-6 py-5">
+            <div
+              ref={contentRef} className="h-full overflow-y-auto px-5 sm:px-6 py-5"
+              style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}
+            >
               {screen ? (
                 <ScreenCard>{renderScreen()}</ScreenCard>
               ) : (
