@@ -192,20 +192,44 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   // full-screen takeover at all (lg:static lg:h-auto below), so no
   // inline height should ever compete with that; only measure once
   // actually in the phone layout this problem exists in.
-  const [viewportH, setViewportH] = useState<number | null>(null)
+  // Both edges, not just the height: when the keyboard opens, iOS also
+  // shifts the visible area's top (visualViewport.offsetTop) -- pinning
+  // the container to the layout viewport's top left the whole thread
+  // sliding up behind the status bar with the composer near the top of
+  // the screen instead of on the keyboard. Tracking top + height from
+  // the visual viewport keeps it exactly over what's actually visible.
+  const [viewportBox, setViewportBox] = useState<{ top: number; height: number } | null>(null)
+  const updateViewportH = () => {
+    if (window.innerWidth >= 1024) { setViewportBox(null); return }
+    const vv = window.visualViewport
+    setViewportBox({ top: vv?.offsetTop ?? 0, height: vv?.height ?? window.innerHeight })
+  }
   useEffect(() => {
-    const update = () => {
-      if (window.innerWidth >= 1024) { setViewportH(null); return }
-      setViewportH(window.visualViewport?.height ?? window.innerHeight)
-    }
-    update()
-    window.visualViewport?.addEventListener('resize', update)
-    window.addEventListener('resize', update)
+    updateViewportH()
+    window.visualViewport?.addEventListener('resize', updateViewportH)
+    window.visualViewport?.addEventListener('scroll', updateViewportH)
+    window.addEventListener('resize', updateViewportH)
     return () => {
-      window.visualViewport?.removeEventListener('resize', update)
-      window.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener('resize', updateViewportH)
+      window.visualViewport?.removeEventListener('scroll', updateViewportH)
+      window.removeEventListener('resize', updateViewportH)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Belt and suspenders on top of the resize listener above -- on a real
+  // device, dismissing the keyboard by tapping outside the field (not
+  // via a system "done"/return key) doesn't reliably fire a
+  // visualViewport resize event at all on every browser, which is
+  // exactly what this read as: the field correctly rides up when the
+  // keyboard opens, then never comes back down when it closes, because
+  // nothing ever told this component the keyboard was gone. blur always
+  // fires, regardless of how the keyboard was dismissed; the delay
+  // matches OrgShell's own keyboard-settle timing (its FAB-hide effect
+  // hit this exact "reacted before the keyboard animation actually
+  // finished" failure mode twice before landing on a fixed wait rather
+  // than trusting any one signal to mean "settled").
+  const onComposerBlur = () => { window.setTimeout(updateViewportH, 400) }
 
   const adult = isAdult(item.student?.date_of_birth)
   // Same fix as the list view above -- "This student" was being
@@ -263,7 +287,7 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
     // effect for why dvh alone wasn't enough here.
     <div
       className="fixed inset-0 h-[100dvh] z-40 flex flex-col bg-paper lg:static lg:h-auto lg:z-auto lg:flex lg:flex-col lg:bg-transparent"
-      style={viewportH ? { height: `${viewportH}px` } : undefined}
+      style={viewportBox ? { top: `${viewportBox.top}px`, height: `${viewportBox.height}px` } : undefined}
     >
       {/* Mobile: a sticky Gmail-style app bar. Desktop: the plain text link. */}
       <div className="flex-shrink-0 flex items-center gap-3 bg-paper border-b border-edge px-4 py-3 lg:hidden" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}>
@@ -346,6 +370,7 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
               </label>
               <textarea
                 value={reply} onChange={e => setReply(e.target.value)}
+                onBlur={onComposerBlur}
                 placeholder="Message…"
                 rows={1}
                 className="flex-1 bg-transparent text-[14px] text-ink placeholder-ink-quaternary outline-none resize-none py-1.5 max-h-28"
