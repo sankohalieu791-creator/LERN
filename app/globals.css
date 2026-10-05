@@ -130,32 +130,19 @@ html[data-body-theme="student-light"] body {
    borders, secondary text, status colors) is the --token below,
    referenced as e.g. bg-[var(--surface)]. */
 :root {
-  /* Was #FFFDF9 -- technically off-white but reads as flat bright
-     white on a laptop screen, especially once most of the visible
-     page is filled with it. Gmail's own canvas (Material 3's "surface"
-     token, #F8F9FA) is deliberately a shade further from pure white
-     than that, precisely so --surface's still-white cards read as a
-     distinct, "lifted" layer on top of it instead of just more white.
-     Same principle, kept in this app's own warm family rather than
-     importing Gmail's cool gray outright. --surface stays #FFFFFF —
-     the contrast between the two is the actual fix, not a flat dim. */
-  --paper: #F7F3EA;
-  --ink: #1A1A1A;
+  /* Light canvas is a very light blue; cards (--surface) stay white. */
+  --paper: #EEF3FA;
+  --ink: #1F2328;
   --surface: #FFFFFF;
-  --surface-subtle: #FBF9F4;
-  --surface-muted: #F5F1E8;
-  --border: #E2DDD1;
-  --border-subtle: #EDE9E1;
-  --border-input: #C9C2B2;
-  --text-secondary: #6B6558;
-  /* Measured against --paper (#FFFDF9): the old values were #8A8373
-     (3.71:1) and #A39C8A (2.69:1) -- both fail WCAG AA's 4.5:1 for
-     normal text, and quaternary was close to unreadable. These pass
-     (4.63:1) / come close (4.02:1) while keeping the same
-     secondary > tertiary > quaternary de-emphasis order. */
-  --text-tertiary: #7A7364;
-  --text-quaternary: #857D6C;
-  --text-body: #4A453B;
+  --surface-subtle: #F7F9FD;
+  --surface-muted: #E8EEF7;
+  --border: #D6E0EE;
+  --border-subtle: #E3EAF4;
+  --border-input: #B9C8DD;
+  --text-secondary: #4F5B6B;
+  --text-tertiary: #667386;
+  --text-quaternary: #7A869A;
+  --text-body: #343D4B;
   --brand: #F26B21;
   --brand-hover: #D95E17;
   --success-text: #1E7A34;
@@ -167,8 +154,8 @@ html[data-body-theme="student-light"] body {
   --warning-text: #B3651E;
   --warning-bg: #FFF3E4;
   --warning-bg-soft: #FFF7ED;
-  --accent-bg: #FCEEE4;
-  --accent-bg-soft: #F3C9BC;
+  --accent-bg: #E2E7EF;
+  --accent-bg-soft: #D3DAE5;
   /* Solid-fill buttons (paired with white label text) — deliberately the
      SAME value in both themes, not redefined below. Contrast is against
      their own white label, not the page background, so they don't need
@@ -302,18 +289,18 @@ html[data-body-theme="student-light"] body {
 }
 
 [data-theme="dark"] {
-  --paper: #131110;
-  --ink: #F3EEE6;
-  --surface: #1D1917;
-  --surface-subtle: #211D1A;
-  --surface-muted: #29241F;
-  --border: #38322B;
-  --border-subtle: #2C2721;
-  --border-input: #4A4238;
-  --text-secondary: #BDB3A2;
-  --text-tertiary: #948A78;
-  --text-quaternary: #736A5A;
-  --text-body: #DED6C6;
+  --paper: #161616;
+  --ink: #ECECEC;
+  --surface: #1F1F1F;
+  --surface-subtle: #1A1A1A;
+  --surface-muted: #272727;
+  --border: #2E2E2E;
+  --border-subtle: #262626;
+  --border-input: #3D3D3D;
+  --text-secondary: #A8A8A8;
+  --text-tertiary: #8F8F8F;
+  --text-quaternary: #6F6F6F;
+  --text-body: #D4D4D4;
   --brand: #FF7A3D;
   --brand-hover: #FF9159;
   --success-text: #4FCE7C;

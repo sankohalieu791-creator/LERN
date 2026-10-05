@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { getOrgStudents, createGuestInvite, getGuestInvites, revokeGuestInvite } from '@/lib/supabase'
-import { Link as LinkIcon, Shield, Copy, Check, Square, CheckSquare, Ban, Clock, UserCheck } from 'lucide-react'
+import { Link as LinkIcon, Shield, Copy, Check, Ban, Clock, UserCheck } from 'lucide-react'
 
 // Promoted out of StudentsPanel's third tab into its own screen, 1 Oct
 // 2026 -- this is the one place an outside employer touches LERN data
@@ -115,12 +115,11 @@ export default function GuestInvitePanel() {
               return (
                 <button
                   key={s.id} onClick={() => toggle(s.id)}
-                  className="w-full flex items-center gap-3 border rounded-xl px-3.5 py-2.5 text-left transition"
-                  style={{ borderColor: checked ? '#0F6E56' : '#E7E4DE' }}
+                  className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-surface-muted"
                 >
-                  {checked
-                    ? <CheckSquare className="w-4 h-4 flex-shrink-0" style={{ color: '#0F6E56' }} />
-                    : <Square className="w-4 h-4 flex-shrink-0" style={{ color: '#B9B4A8' }} />}
+                  <span className={`flex-shrink-0 w-[18px] h-[18px] rounded-[5px] border flex items-center justify-center transition ${checked ? 'bg-ink border-ink' : 'border-edge-input bg-surface'}`}>
+                    {checked && <Check className="w-3 h-3 text-paper" strokeWidth={3} />}
+                  </span>
                   <span className="flex-1 min-w-0 text-[13px] font-semibold text-ink truncate">{s.full_name}</span>
                   <span className="text-[12px] flex-shrink-0" style={{ color: '#5A5A5A' }}>{s.verified} verified piece{s.verified === 1 ? '' : 's'}</span>
                 </button>

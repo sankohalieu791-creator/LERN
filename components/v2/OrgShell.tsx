@@ -289,7 +289,7 @@ export default function OrgShell({
               key={s.key} href={s.href}
               title={collapsed ? s.label : undefined}
               className={`flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] font-semibold transition ${
-                isActive(s.href) ? 'bg-accent-bg text-brand' : 'text-ink-secondary hover:bg-surface-muted'
+                isActive(s.href) ? 'bg-accent-bg text-ink' : 'text-ink-secondary hover:bg-surface-muted'
               } ${collapsed ? 'justify-center' : ''}`}
             >
               <s.icon className="w-5 h-5 flex-shrink-0" />

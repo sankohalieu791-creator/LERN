@@ -309,7 +309,7 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
     // Only focused (keyboard up) is sized from the visual viewport.
     <div
       data-theme={theme}
-      className="fixed inset-0 z-40 flex flex-col bg-paper lg:static lg:h-auto lg:z-auto lg:flex lg:flex-col lg:bg-transparent"
+      className="fixed inset-0 z-40 flex flex-col bg-paper lg:static lg:h-[calc(100dvh-11rem)] lg:min-h-[460px] lg:z-auto lg:flex lg:flex-col lg:bg-transparent"
       style={viewportBox && composerFocused
         ? { top: `${viewportBox.top}px`, height: `${viewportBox.height}px` }
         : undefined}
@@ -326,7 +326,7 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
         <ArrowLeft className="w-3.5 h-3.5" /> Back to requests
       </button>
 
-      <div className="flex-1 overflow-y-auto px-4 pt-4 lg:flex-none lg:overflow-visible lg:px-0 lg:pt-0">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4 lg:px-0 lg:pt-0">
         {/* The safeguarding banner -- deliberately prominent, not decoration.
             It reassures the school and trains staff to do the right thing. */}
         <div className="flex items-start gap-2.5 rounded-xl px-4 py-3.5 mb-4" style={{ backgroundColor: '#E1F5EE' }}>
