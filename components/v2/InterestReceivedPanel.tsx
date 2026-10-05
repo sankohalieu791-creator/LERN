@@ -202,10 +202,18 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   // the screen instead of on the keyboard. Tracking top + height from
   // the visual viewport keeps it exactly over what's actually visible.
   const [viewportBox, setViewportBox] = useState<{ top: number; height: number } | null>(null)
+  const [layoutH, setLayoutH] = useState<number | null>(null)
+  // Whether the reply field has focus is the source of truth for the
+  // layout, not visualViewport: on the installed home-screen app,
+  // visualViewport does not reliably report the keyboard going away, so
+  // a height read from it could stay short after dismiss. Unfocused =
+  // the full layout height, immediately, no event needed.
+  const [composerFocused, setComposerFocused] = useState(false)
   const updateViewportH = () => {
-    if (window.innerWidth >= 1024) { setViewportBox(null); return }
+    if (window.innerWidth >= 1024) { setViewportBox(null); setLayoutH(null); return }
     const vv = window.visualViewport
     setViewportBox({ top: vv?.offsetTop ?? 0, height: vv?.height ?? window.innerHeight })
+    setLayoutH(window.innerHeight)
   }
   useEffect(() => {
     updateViewportH()
@@ -235,8 +243,13 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
   // The page itself is never meant to scroll under this screen, so any
   // scroll iOS applied to reveal the field is undone on dismiss.
   const onComposerBlur = () => {
+    setComposerFocused(false)
     window.scrollTo(0, 0)
     window.setTimeout(() => { window.scrollTo(0, 0); updateViewportH() }, 400)
+  }
+  const onComposerFocus = () => {
+    setComposerFocused(true)
+    updateViewportH()
   }
 
   const adult = isAdult(item.student?.date_of_birth)
@@ -303,7 +316,9 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
     <div
       data-theme={theme}
       className="fixed inset-0 h-[100dvh] z-40 flex flex-col bg-paper lg:static lg:h-auto lg:z-auto lg:flex lg:flex-col lg:bg-transparent"
-      style={viewportBox ? { top: `${viewportBox.top}px`, height: `${viewportBox.height}px` } : undefined}
+      style={viewportBox ? (composerFocused
+        ? { top: `${viewportBox.top}px`, height: `${viewportBox.height}px` }
+        : { top: '0px', height: `${layoutH ?? viewportBox.height}px` }) : undefined}
     >
       {/* Mobile: a sticky Gmail-style app bar. Desktop: the plain text link. */}
       <div className="flex-shrink-0 flex items-center gap-3 bg-paper border-b border-edge px-4 py-3 lg:hidden" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}>
@@ -386,6 +401,7 @@ function RequestThread({ item, onBack, onRespond }: { item: any; onBack: () => v
               </label>
               <textarea
                 value={reply} onChange={e => setReply(e.target.value)}
+                onFocus={onComposerFocus}
                 onBlur={onComposerBlur}
                 placeholder="Message…"
                 rows={1}

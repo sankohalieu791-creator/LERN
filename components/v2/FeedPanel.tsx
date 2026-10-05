@@ -164,8 +164,8 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
             equivalent (the actual "Your story" circle) is just as
             plain, a thin neutral outline with a plus. */}
         <button onClick={() => setAddOpen(true)} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 60 }}>
-          <span className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 54, height: 54, backgroundColor: 'transparent' }}>
-            <Plus className="w-7 h-7" style={{ color: 'var(--app-text)' }} />
+          <span className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 54, height: 54, backgroundColor: '#ffffff', boxShadow: '0 1px 4px rgba(0,0,0,0.18)' }}>
+            <Plus className="w-6 h-6" style={{ color: '#111111' }} />
           </span>
           <span className="text-[11px] truncate w-full text-center" style={{ color: '#5A5A5A' }}>Add win</span>
         </button>
