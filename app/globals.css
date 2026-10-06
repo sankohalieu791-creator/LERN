@@ -44,14 +44,6 @@ body:has(#auth-shell-root) {
 html:has(#auth-shell-root) {
   overscroll-behavior: auto;
 }
-/* The bottom safe-area gap only belongs to the home-screen app. In a
-   Safari tab the bottom toolbar sits there instead, and the padding
-   pushed the whole app up above it. */
-@media (display-mode: standalone) {
-  .org-safe-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-}
 
 /* Every real screen paints its own full-bleed background (bg-paper on
    light shells, bg-[var(--app-bg)] on the student shell), so body's

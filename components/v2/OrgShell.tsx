@@ -261,7 +261,7 @@ export default function OrgShell({
     // thing under"). box-sizing:border-box (global reset) means this
     // padding eats into the existing h-[100dvh] box rather than adding
     // to it, so it can't push the shell taller than the real viewport.
-    <div data-theme={theme} className="h-[100dvh] overflow-hidden bg-paper flex org-safe-bottom" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div data-theme={theme} className="h-[100dvh] overflow-hidden bg-paper flex" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* ── Laptop sidebar ── */}
       <aside className={`hidden lg:flex flex-col border-r border-edge-subtle bg-surface transition-[width] duration-150 flex-shrink-0 ${collapsed ? 'w-[72px]' : 'w-60'}`}>
         <div className={`flex items-center h-16 px-4 flex-shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>
