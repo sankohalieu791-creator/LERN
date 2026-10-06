@@ -13,7 +13,7 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: 'cover',
   themeColor: '#E7D8D8',
-  interactiveWidth: 'overlays-content',
+  interactiveWidget: 'overlays-content',
 }
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
