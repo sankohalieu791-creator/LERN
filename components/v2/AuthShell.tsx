@@ -106,24 +106,15 @@ export default function AuthShell({
     // hand-drawn approximation of it.
     <div
       id="auth-shell-root"
-      className="min-h-[100dvh] flex flex-col relative overflow-hidden bg-[#E7D8D8]"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      className="min-h-[100dvh] flex flex-col relative overflow-hidden bg-[#F3E4DA]"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        backgroundImage: 'url(/auth-bg.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
     >
-      {/* The picture sits on a full-screen layer, not on this box, so it
-          runs right to the top and bottom edges (under the status bar and
-          the bottom bar in a home-screen app) instead of stopping at the
-          safe-area padding. */}
-      <div
-        aria-hidden
-        className="pointer-events-none"
-        style={{
-          position: 'fixed', inset: 0, zIndex: -1,
-          backgroundImage: 'url(/auth-bg.png)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        }}
-      />
       <header className="flex-shrink-0 px-10 py-7 flex items-center gap-4 relative z-10">
         {!hideBack && (
           <button
