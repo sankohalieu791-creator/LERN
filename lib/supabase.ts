@@ -1306,6 +1306,25 @@ export const reportWin = async (winId: string, organisationId: string | null, re
   return submitReport(reporterId, organisationId, 'win', reason, winId)
 }
 
+// One row per viewer per win. Reopening a win is a no-op (the primary
+// key), and the database refuses a row for the author's own win.
+export const recordWinView = async (winId: string, viewerId: string) => {
+  const { error } = await supabase
+    .from('win_views')
+    .upsert([{ win_id: winId, viewer_id: viewerId }], { onConflict: 'win_id,viewer_id', ignoreDuplicates: true })
+  return { error }
+}
+
+// Only the win's author can read this (RLS), so anyone else gets an empty list.
+export const getWinViewers = async (winId: string) => {
+  const { data, error } = await supabase
+    .from('win_views')
+    .select('viewed_at, viewer:users!win_views_viewer_id_fkey(full_name)')
+    .eq('win_id', winId)
+    .order('viewed_at', { ascending: false })
+  return { data: data || [], error }
+}
+
 // "Everyone can see it, don't limit it" -- no org-scoping here any
 // more, same call as getFeed. RLS ("wins: read") already narrows a
 // hidden row to just its own author/org-staff, so this stays safe
@@ -2684,7 +2703,10 @@ export const getMyPosts = async (studentId: string) => {
     .eq('author_id', studentId)
     .eq('hidden', false)
     .order('created_at', { ascending: false })
-  return { data, error }
+  if (error || !data) return { data, error }
+  // Reactions are what the profile grid shows under each post, so they
+  // come back with the posts rather than as a second fetch per tile.
+  return { data: await attachReactions(data), error }
 }
 
 // Self-declared, never verified — kept in a table that's never joined

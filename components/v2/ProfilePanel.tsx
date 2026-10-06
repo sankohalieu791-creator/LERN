@@ -12,6 +12,7 @@ import {
   isUsernameAvailable, getMyOrganisationInfo, getPublicStudentProfile, blockUser,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
+import { STICKER_OPTIONS } from '@/lib/feedConstants'
 import {
   FolderCheck, Briefcase, Grid3x3, Settings as SettingsIcon, Plus, X, Trash2, Play,
   Bookmark, Lock, FilePlus, CheckCircle2, Camera, ChevronLeft, ChevronRight, ArrowRight, MoreHorizontal, UserX,
@@ -829,7 +830,13 @@ function PostThumb({ post, canDelete, onDeleted }: { post: any; canDelete: boole
 
   const remove = async () => { await deletePost(post.id); onDeleted() }
 
+  // Each reaction the post has, as its emoji and a count, most used first.
+  const counts = new Map<string, number>()
+  for (const r of post.post_reactions || []) counts.set(r.reaction, (counts.get(r.reaction) || 0) + 1)
+  const reactionRow = [...counts.entries()].sort((a, b) => b[1] - a[1])
+
   return (
+    <div>
     <div className="relative aspect-square bg-[var(--app-surface-2)] rounded-lg overflow-hidden group">
       {post.video_path && url ? (
         <video src={url} className="w-full h-full object-cover" muted />
@@ -851,6 +858,14 @@ function PostThumb({ post, canDelete, onDeleted }: { post: any; canDelete: boole
           <Trash2 className="w-3.5 h-3.5 text-white" />
         </button>
       )}
+    </div>
+    {reactionRow.length > 0 && (
+      <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 mt-1.5 px-0.5 text-[12px] font-semibold text-[var(--app-text-secondary)]">
+        {reactionRow.map(([key, n]) => (
+          <span key={key} className="whitespace-nowrap">{STICKER_OPTIONS.find(s => s.key === key)?.emoji} {n}</span>
+        ))}
+      </div>
+    )}
     </div>
   )
 }
