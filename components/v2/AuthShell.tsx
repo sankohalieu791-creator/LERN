@@ -53,28 +53,6 @@ export default function AuthShell({
     document.documentElement.setAttribute('data-body-theme', 'light')
   }, [])
 
-  // Pull down from the very top to reload, the way other apps refresh.
-  // Safari in a browser tab has no pull-to-refresh of its own, so this is
-  // built in. A pull of less than 90px does nothing, so ordinary scrolling
-  // and taps are unaffected.
-  useEffect(() => {
-    let startY: number | null = null
-    const onStart = (e: TouchEvent) => {
-      startY = window.scrollY <= 0 ? e.touches[0].clientY : null
-    }
-    const onEnd = (e: TouchEvent) => {
-      if (startY === null) return
-      const pulled = e.changedTouches[0].clientY - startY
-      startY = null
-      if (pulled > 90 && window.scrollY <= 0) window.location.reload()
-    }
-    window.addEventListener('touchstart', onStart, { passive: true })
-    window.addEventListener('touchend', onEnd, { passive: true })
-    return () => {
-      window.removeEventListener('touchstart', onStart)
-      window.removeEventListener('touchend', onEnd)
-    }
-  }, [])
 
   // min-h-[100dvh] below is a floor, not a lock -- content taller than
   // one screen is meant to push it taller (that's the whole point of

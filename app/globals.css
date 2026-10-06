@@ -38,6 +38,12 @@ body:has(#auth-shell-root) {
   overscroll-behavior: auto;
   background-color: #F7F3EA;
 }
+/* iOS rubber-band bounce is driven by the document scroller (html), not
+   body, so html has to allow it too -- html's own none (above) was
+   blocking the bounce on the auth pages even with body set to auto. */
+html:has(#auth-shell-root) {
+  overscroll-behavior: auto;
+}
 
 /* Every real screen paints its own full-bleed background (bg-paper on
    light shells, bg-[var(--app-bg)] on the student shell), so body's
