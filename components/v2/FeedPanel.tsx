@@ -441,13 +441,9 @@ function WinViewer({ wins, startIndex, organisationId, userId, onClose, onDelete
 
   return createPortal((
     <div className="fixed inset-0 z-50 bg-black" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-      {/* object-contain, not object-cover -- "shows the video and pic
-          clearly" meant never cropping into the actual content to fill
-          the frame. Letterboxed against the milestone-colour gradient
-          (already this win's own background) instead of a plain black
-          bar, so a portrait phone photo and a landscape screen-recording
-          both show completely, whichever way round they are. */}
-      <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${meta?.ring || '#0F6E56'}, #1A1613)` }} />
+      {/* object-contain, not object-cover -- never crop the photo or video.
+          Sits straight on the black page, like Instagram: no coloured
+          gradient behind it. */}
       {mediaUrl && (
         win.video_path
           ? <video key={win.id} src={mediaUrl} className="absolute inset-0 w-full h-full object-contain" autoPlay loop muted playsInline />
