@@ -8,6 +8,7 @@ import {
   getFeed, setPostReaction, getSignedFileUrl,
   reportPost, deletePost, updatePostVisibility, getVerifiedAuthorIds,
   getWins, createWin, reportWin, deleteWin, uploadPostImage, uploadPostVideo,
+  recordWinView, getWinViewers,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import PresenceBadge from '@/components/v2/PresenceBadge'
@@ -408,6 +409,18 @@ function WinViewer({ wins, startIndex, organisationId, userId, onClose, onDelete
     onDeleted()
   }
 
+  // Viewers: the author sees who viewed their win (and the count). Everyone
+  // else's open is recorded once, so the author's own views never count.
+  const [viewers, setViewers] = useState<any[]>([])
+  const [viewersOpen, setViewersOpen] = useState(false)
+  useEffect(() => {
+    setViewers([])
+    setViewersOpen(false)
+    if (!user?.id) return
+    if (isOwn) getWinViewers(win.id).then(({ data }) => setViewers(data))
+    else recordWinView(win.id, user.id)
+  }, [win.id, isOwn, user?.id])
+
   useEffect(() => {
     setMediaUrl(null)
     setMenuOpen(false)
@@ -480,6 +493,11 @@ function WinViewer({ wins, startIndex, organisationId, userId, onClose, onDelete
           <div className="min-w-0">
             <p className="font-bold text-[14px] truncate">{win.author?.full_name}</p>
             <span className="inline-block text-[11px] font-semibold px-2.5 py-[3px] rounded-full mt-0.5" style={{ backgroundColor: 'rgba(255,255,255,0.22)' }}>{meta?.pillLabel}</span>
+            {isOwn && (
+              <button onClick={() => setViewersOpen(true)} className="inline-block text-[11px] font-semibold px-2.5 py-[3px] rounded-full mt-0.5 ml-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.22)' }}>
+                {viewers.length} {viewers.length === 1 ? 'view' : 'views'}
+              </button>
+            )}
           </div>
         </div>
         {/* backdrop-blur + a faint white tint/border, not a flat black
@@ -536,6 +554,26 @@ function WinViewer({ wins, startIndex, organisationId, userId, onClose, onDelete
             onSent={() => { setReportOpen(false); goNext() }}
             onSend={(reasonKey, note) => reportWin(win.id, organisationId, userId, reasonKey, note)}
           />
+        </div>
+      )}
+
+      {viewersOpen && (
+        <div className="absolute inset-0 z-30 bg-black/60 flex items-end" onClick={e => { e.stopPropagation(); setViewersOpen(false) }}>
+          <div
+            className="w-full max-h-[70%] overflow-y-auto bg-[#1A1613] text-white rounded-t-2xl px-5 pt-4"
+            style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="font-bold text-[15px] mb-3">Viewed by {viewers.length}</p>
+            {viewers.length === 0 ? (
+              <p className="text-[13px] text-white/60">No views yet</p>
+            ) : viewers.map((v, i) => (
+              <div key={i} className="flex items-center justify-between py-2.5 border-t border-white/10 text-[14px]">
+                <span>{v.viewer?.full_name || 'Someone'}</span>
+                <span className="text-[12px] text-white/50">{timeAgo(v.viewed_at)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
