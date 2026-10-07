@@ -4,6 +4,12 @@ import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
+// Security audit, 7 Oct 2026: had no auth check at all -- anyone could
+// POST an arbitrary userId here and fire a push notification at that
+// person's device. Now requires a real session, and only ever sends to
+// the caller's own subscriptions (that's this endpoint's whole point --
+// letting someone check their own push setup works -- so there's no
+// legitimate case for targeting anyone else).
 export async function POST(req: NextRequest) {
   const subject    = process.env.VAPID_SUBJECT
   const publicKey  = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
@@ -20,11 +26,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: `Missing Vercel env vars: ${missing}` }, { status: 200 })
   }
 
-  const { userId } = await req.json()
-  if (!userId) return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+  const accessToken = (req.headers.get('authorization') || '').replace(/^Bearer /, '')
+  if (!accessToken) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 })
+
+  const service = createClient(supabaseUrl, serviceKey)
+  const { data: callerData, error: callerError } = await service.auth.getUser(accessToken)
+  if (callerError || !callerData?.user) return NextResponse.json({ error: 'Session expired — sign in again.' }, { status: 401 })
+  const userId = callerData.user.id
 
   webpush.setVapidDetails(subject, publicKey, privateKey)
-  const service = createClient(supabaseUrl, serviceKey)
 
   const { data: subs, error: dbErr } = await service
     .from('push_subscriptions')

@@ -188,7 +188,10 @@ export default function WorkshopSession({
 
       let token: string | null = null
       try {
-        const res = await fetch(`/api/agora-token?channel=${encodeURIComponent(channelName)}&uid=${myUid}`)
+        const { data: { session: agoraSession } } = await supabase.auth.getSession()
+        const res = await fetch(`/api/agora-token?channel=${encodeURIComponent(channelName)}&uid=${myUid}`, {
+          headers: agoraSession ? { authorization: `Bearer ${agoraSession.access_token}` } : undefined,
+        })
         if (res.ok) token = (await res.json()).token ?? null
       } catch {}
 

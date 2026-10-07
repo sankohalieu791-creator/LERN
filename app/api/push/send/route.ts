@@ -4,6 +4,16 @@ import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
+// Security audit, 7 Oct 2026: had no auth check at all, and unlike
+// push/test this one accepts an arbitrary list of OTHER people's user
+// ids plus free-text title/body -- anyone could push arbitrary
+// (phishing-shaped) notifications to any user's device. Nothing in the
+// app currently calls this route (confirmed: no client or server call
+// site), so rather than guess at a "who's allowed to notify whom"
+// policy, it's gated behind a server-only secret the same way the cron
+// route is -- safe by default (refuses every request) until whatever
+// backend feature is meant to trigger it sets PUSH_INTERNAL_SECRET and
+// sends it as a bearer token.
 export async function POST(req: NextRequest) {
   const subject    = process.env.VAPID_SUBJECT
   const publicKey  = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
@@ -13,6 +23,11 @@ export async function POST(req: NextRequest) {
 
   if (!subject || !publicKey || !privateKey || !supabaseUrl || !serviceKey) {
     return NextResponse.json({ ok: false, error: 'Push not configured' }, { status: 200 })
+  }
+
+  const auth = req.headers.get('authorization')
+  if (!process.env.PUSH_INTERNAL_SECRET || auth !== `Bearer ${process.env.PUSH_INTERNAL_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   webpush.setVapidDetails(subject, publicKey, privateKey)
