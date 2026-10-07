@@ -35,7 +35,10 @@ const BLOB_RADIUS = '42% 58% 55% 45% / 45% 42% 58% 55%'
 
 function OrbFace({ size = 8 }: { size?: number }) {
   return (
-    <span className="helpdesk-eyes flex items-center" style={{ gap: Math.max(2, size * 0.3) }}>
+    <span
+      className="helpdesk-eyes flex items-center"
+      style={{ gap: Math.max(2, size * 0.3), ['--eye-range' as string]: `${Math.round(size * 0.7)}px` }}
+    >
       <span className="rounded-full" style={{ width: Math.max(2, size * 0.3), height: size, backgroundColor: '#2b2622' }} />
       <span className="rounded-full" style={{ width: Math.max(2, size * 0.3), height: size, backgroundColor: '#2b2622' }} />
     </span>
@@ -259,7 +262,7 @@ export default function HelpDesk() {
         style={{ bottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
       >
         <span
-          className="absolute inset-0 flex items-center justify-center border"
+          className="absolute inset-0 flex items-center justify-center border overflow-hidden"
           style={{
             borderRadius: BLOB_RADIUS,
             background: 'rgba(255,255,255,0.75)',
@@ -312,7 +315,7 @@ export default function HelpDesk() {
       <div className="flex items-center justify-between px-4 pb-3 flex-shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <span
-            className="w-8 h-8 flex items-center justify-center flex-shrink-0 border"
+            className="w-8 h-8 flex items-center justify-center flex-shrink-0 border overflow-hidden"
             style={{ borderRadius: BLOB_RADIUS, background: 'rgba(255,255,255,0.75)', borderColor: 'rgba(255,255,255,0.9)' }}
           >
             <OrbFace size={8} />
