@@ -1,0 +1,42 @@
+-- Two earlier migrations -- 2026-09-28-close-employer-billing-rpc-bypass.sql
+-- and 2026-09-28-lock-down-sensitive-self-update-columns.sql -- were
+-- written and committed to this repo but never actually run against the
+-- database. Found during a full security audit on 2026-10-07: Supabase's
+-- own advisor still showed _test_mark_logged_in and get_org_billing
+-- exposed to anon exactly as those files' own comments describe.
+--
+-- Of the two, the self-update-columns migration's user-table trigger and
+-- the organisations-table guard trigger WERE already live (so that part
+-- had been applied some other way, or the gap was narrower than it
+-- looked) -- only the billing-rpc-bypass file's three fixes
+-- (set_employer_tier, cancel_employer_subscription, get_org_billing,
+-- and revoking _test_mark_logged_in from anon/authenticated) were
+-- actually missing. Applying only that file's OLDER version of
+-- set_employer_tier/cancel_employer_subscription, though, regressed
+-- them: the live trigger guard (from the other migration) requires the
+-- app.internal_org_join escape hatch before it'll let these functions
+-- write to columns it protects, and the older version of these two
+-- functions predates that requirement. This migration is the correction:
+-- the newer, complete versions of set_employer_tier and
+-- cancel_employer_subscription (both carrying the escape hatch), plus
+-- the same fix applied to get_org_billing's own write to
+-- organisations.subscription_status, which had the identical gap.
+--
+-- Net effect, now confirmed against the live database:
+--   - _test_mark_logged_in: EXECUTE revoked from anon/authenticated,
+--     granted to service_role only.
+--   - get_org_billing: now requires is_ops_admin() or same-org staff
+--     (previously returned any org's real billing to anyone, logged in
+--     or not -- a full cross-tenant leak).
+--   - set_employer_tier: non-admin callers can only ever self-select
+--     'enterprise' (unpriced, sales-led); paid tiers still require
+--     Stripe checkout. Has the internal_org_join escape so legitimate
+--     self-service enterprise selection doesn't trip the users-table
+--     guard trigger.
+--   - cancel_employer_subscription: ops-admin only; has the escape for
+--     the same reason.
+--
+-- No schema change here -- this file exists purely as an accurate record
+-- of what the database actually ended up running, since the two original
+-- files no longer describe it on their own.
+select 1; -- no-op; see the two function-recreation migrations applied alongside this record
