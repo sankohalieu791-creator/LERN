@@ -127,6 +127,13 @@ export default function TermsPage() {
             <li>A safe, routed way to express interest, with under-18 contact always mediated by the organisation.</li>
             <li>Tools to track hiring and see the partner organisations you work through.</li>
           </ul>
+          <p className="font-semibold text-ink mt-3">Billing, cancellation and refunds</p>
+          <ul>
+            <li>Paid plans are billed monthly in advance and renew automatically until you cancel.</li>
+            <li>You can cancel anytime from Settings. Cancelling stops the next renewal; you keep access until the end of the period you've already paid for.</li>
+            <li>We do not refund the current billing period once it has started. If you are charged in error, or the service was unavailable through our fault, contact us and we will put it right.</li>
+            <li>If a payment fails and is not resolved, we may suspend or restrict access to paid features.</li>
+          </ul>
           <p className="font-semibold text-ink mt-3">Limits</p>
           <ul>
             <li>LERN verifies that work has been reviewed by the young person's organisation. LERN does not guarantee a young person's suitability for a role; hiring decisions and checks are yours.</li>
