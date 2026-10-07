@@ -120,7 +120,7 @@ export default function AuthShell({
           <button
             onClick={() => (onBack ? onBack() : router.back())}
             aria-label="Back"
-            className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-full hover:bg-black/5 text-ink transition flex-shrink-0"
+            className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-full bg-white/40 hover:bg-white/60 backdrop-blur-md border border-white/50 shadow-sm text-ink transition flex-shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>

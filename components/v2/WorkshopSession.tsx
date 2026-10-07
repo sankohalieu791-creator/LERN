@@ -987,14 +987,14 @@ export default function WorkshopSession({
           <RoomButton active={cameraOn} onClick={toggleCamera} onIcon={Video} offIcon={VideoOff} disabled={!joined} />
           <button
             onClick={toggleScreenShare} disabled={!joined}
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition ${screenSharing ? 'bg-brand text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition ${screenSharing ? 'bg-brand text-white' : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/15'}`}
           >
             <ScreenShare className="w-[18px] h-[18px]" />
           </button>
           {!canEnd && (
             <button
               onClick={toggleHand} disabled={!joined}
-              className={`w-11 h-11 rounded-full flex items-center justify-center transition ${handRaised ? 'bg-brand text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              className={`w-11 h-11 rounded-full flex items-center justify-center transition ${handRaised ? 'bg-brand text-white' : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/15'}`}
             >
               <Hand className="w-[18px] h-[18px]" />
             </button>
@@ -1013,7 +1013,7 @@ export default function WorkshopSession({
           )}
           <button
             onClick={() => setQaOpen(v => !v)}
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition relative ${qaOpen ? 'bg-brand text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition relative ${qaOpen ? 'bg-brand text-white' : 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-md border border-white/15'}`}
           >
             <HelpCircle className="w-[18px] h-[18px]" />
             {raisedHands.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand text-white text-[9px] font-bold flex items-center justify-center border-2 border-[#141110]">{raisedHands.length}</span>}
@@ -1074,7 +1074,7 @@ function RoomButton({ active, onClick, onIcon: OnIcon, offIcon: OffIcon, disable
   return (
     <button
       onClick={onClick} disabled={disabled}
-      className={`w-11 h-11 rounded-full flex items-center justify-center transition ${active ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-white/10 text-[#8A8373] hover:bg-white/20'}`}
+      className={`w-11 h-11 rounded-full flex items-center justify-center transition backdrop-blur-md border border-white/15 ${active ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-white/10 text-[#8A8373] hover:bg-white/20'}`}
     >
       <Icon className="w-[18px] h-[18px]" />
     </button>
