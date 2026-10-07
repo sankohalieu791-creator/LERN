@@ -9,6 +9,7 @@ import { setSidebarCollapsed, setPresenceStatus, signOut, supabase, getPendingRe
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { ChevronLeft, ChevronRight, Settings, User as UserIcon, Plus, LogOut, Menu, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import HelpDesk from '@/components/v2/HelpDesk'
 import Logo from '@/components/v2/Logo'
 import NotificationsBell from '@/components/v2/NotificationsBell'
 import PostComposer from '@/components/v2/PostComposer'
@@ -460,6 +461,8 @@ export default function OrgShell({
           <Plus className="w-6 h-6" />
         </button>
       )}
+
+      <HelpDesk />
 
       {settingsOpen && <SettingsPanel initialTab={settingsInitialTab} onClose={() => { setSettingsOpen(false); setSettingsInitialTab(undefined) }} />}
 
