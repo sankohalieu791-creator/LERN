@@ -260,7 +260,7 @@ function PoolDetail({ pool, tier, onBack }: { pool: any; tier: EmployerTier; onB
         {pool.role_filled_at && ' · Role filled — automatic cadence has stopped'}
       </p>
 
-      {!loading && members.length > 8 && (
+      {!loading && members.length > 0 && (
         <div className="relative mb-4">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary pointer-events-none" />
           <input

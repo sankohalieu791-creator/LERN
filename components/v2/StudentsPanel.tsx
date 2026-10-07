@@ -98,7 +98,7 @@ export default function StudentsPanel() {
 
       {tab === 'students' ? (
         <div>
-          {students.length > 8 && (
+          {students.length > 0 && (
             <div className="relative mb-3">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary pointer-events-none" />
               <input

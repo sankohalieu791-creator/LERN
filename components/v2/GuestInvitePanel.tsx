@@ -111,7 +111,7 @@ export default function GuestInvitePanel() {
           <p className="text-[13px] text-ink-tertiary mb-1">No students have joined yet.</p>
         ) : (
           <>
-          {students.length > 8 && (
+          {students.length > 0 && (
             <div className="relative mb-2">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary pointer-events-none" />
               <input

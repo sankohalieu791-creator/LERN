@@ -100,7 +100,7 @@ export default function InterestReceivedPanel() {
             )}
           </div>
 
-          {!loading && items.length > 8 && (
+          {!loading && items.length > 0 && (
             <div className="relative mb-4">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary pointer-events-none" />
               <input

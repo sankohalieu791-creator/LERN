@@ -77,7 +77,7 @@ export default function EmployerInboxPanel() {
       <p className="text-[22px] font-bold text-ink mb-1">Inbox</p>
       <p className="text-[14px] text-ink-tertiary mb-6">Conversations about candidates you've reached out to, and activity on your open roles.</p>
 
-      {!loading && threads.length + applications.length > 8 && (
+      {!loading && threads.length + applications.length > 0 && (
         <div className="relative mb-5">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary pointer-events-none" />
           <input
