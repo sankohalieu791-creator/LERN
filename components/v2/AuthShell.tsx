@@ -143,7 +143,7 @@ export default function AuthShell({
             </div>
           )}
 
-          <h1 className="text-3xl font-bold text-ink mb-2 leading-tight text-center">{title}</h1>
+          <h1 className="text-3xl font-bold text-ink mb-2 leading-tight text-center" style={{ textShadow: '0 1px 16px rgba(255,255,255,0.5)' }}>{title}</h1>
           {subtitle && <p className="text-[#6B6558] text-[15px] leading-relaxed mb-8 text-center">{subtitle}</p>}
           {!subtitle && <div className="mb-8" />}
 

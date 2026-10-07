@@ -22,7 +22,7 @@ export function TextField({
         placeholder={placeholder}
         required={required}
         autoFocus={autoFocus}
-        className="w-full bg-surface border border-edge rounded-xl px-4 py-3 text-[15px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
+        className="w-full bg-surface border border-edge rounded-xl px-4 py-3 text-[15px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition shadow-[0_2px_10px_rgba(26,22,19,0.07)] focus:shadow-[0_2px_14px_rgba(242,107,33,0.18)]"
       />
       {hint && <span className="block text-[13px] text-ink-tertiary mt-1.5">{hint}</span>}
     </label>
@@ -49,7 +49,7 @@ export function PrimaryButton({
       // rendering glitch rather than "this button is off." A solid,
       // desaturated fill reads as disabled just as clearly without ever
       // exposing what's underneath, regardless of what that is.
-      className="w-full bg-brand text-white font-bold text-[15px] py-3.5 rounded-xl hover:bg-brand-hover active:scale-[0.99] transition disabled:bg-[#F0C9A6] disabled:text-white/80 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      className="w-full bg-brand text-white font-bold text-[15px] py-3.5 rounded-xl hover:bg-brand-hover active:scale-[0.99] transition disabled:bg-[#F0C9A6] disabled:text-white/80 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 shadow-[0_6px_20px_rgba(242,107,33,0.35)] hover:shadow-[0_8px_24px_rgba(242,107,33,0.45)]"
     >
       {loading ? <Spinner /> : null}
       {children}
@@ -63,7 +63,7 @@ export function SecondaryButton({ children, onClick, disabled }: { children: Rea
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="w-full bg-surface border border-edge text-ink font-semibold text-[15px] py-3.5 rounded-xl hover:border-edge-input active:scale-[0.99] transition disabled:text-ink-quaternary disabled:cursor-not-allowed"
+      className="w-full bg-surface border border-edge text-ink font-semibold text-[15px] py-3.5 rounded-xl hover:border-edge-input active:scale-[0.99] transition disabled:text-ink-quaternary disabled:cursor-not-allowed shadow-[0_2px_10px_rgba(26,22,19,0.07)]"
     >
       {children}
     </button>
@@ -86,7 +86,7 @@ export function GoogleButton({ onClick, loading, label = 'Continue with Google' 
       type="button"
       onClick={onClick}
       disabled={loading}
-      className="w-full flex items-center justify-center gap-2.5 bg-white border border-edge text-ink font-semibold text-[15px] py-3.5 rounded-xl hover:border-edge-input active:scale-[0.99] transition disabled:text-ink-quaternary disabled:cursor-not-allowed"
+      className="w-full flex items-center justify-center gap-2.5 bg-white border border-edge text-ink font-semibold text-[15px] py-3.5 rounded-xl hover:border-edge-input active:scale-[0.99] transition disabled:text-ink-quaternary disabled:cursor-not-allowed shadow-[0_2px_10px_rgba(26,22,19,0.07)]"
     >
       {loading ? <Spinner /> : (
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
