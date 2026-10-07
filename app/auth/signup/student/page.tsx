@@ -15,14 +15,25 @@ type Step = 1 | 2 | 3 | 'dob'
 const MIN_AGE = 5
 const MAX_AGE = 100
 
+function ageFromDob(dob: string): number {
+  return (Date.now() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25)
+}
+
 function isPlausibleDob(dob: string): boolean {
   if (!dob) return false
-  const d = new Date(dob)
-  if (Number.isNaN(d.getTime())) return false
-  const now = new Date()
-  const age = (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24 * 365.25)
+  if (Number.isNaN(new Date(dob).getTime())) return false
+  const age = ageFromDob(dob)
   return age >= MIN_AGE && age <= MAX_AGE
 }
+
+// UK GDPR/DPA 2018 set 13 as the age a child can consent to an online
+// service themselves -- below that, a parent or (as the ICO accepts for
+// a school delivering a service to its pupils) a school has to consent
+// on their behalf instead. A join code is exactly that: the school
+// enrolling the student, not the student signing themselves up. Skipping
+// it was previously always allowed, which let a under-13 end up with no
+// one but themselves having agreed to anything.
+const MIN_AGE_WITHOUT_SCHOOL_CODE = 13
 
 export default function StudentSignupPage() {
   const router = useRouter()
@@ -281,12 +292,18 @@ export default function StudentSignupPage() {
               match the real format. */}
           <TextField label="Join code" value={code} onChange={v => setCode(v.toUpperCase())} placeholder="e.g. 7K3P9X" autoFocus />
           <PrimaryButton onClick={handleA2Submit} loading={loading}>Continue</PrimaryButton>
-          <button
-            onClick={() => { setError(''); setCode(''); setStep(3) }}
-            className="block w-full text-center text-[13px] font-semibold text-[#8A8373] hover:text-ink transition mt-4"
-          >
-            I don't have a code yet — skip for now
-          </button>
+          {ageFromDob(dob) >= MIN_AGE_WITHOUT_SCHOOL_CODE ? (
+            <button
+              onClick={() => { setError(''); setCode(''); setStep(3) }}
+              className="block w-full text-center text-[13px] font-semibold text-[#8A8373] hover:text-ink transition mt-4"
+            >
+              I don't have a code yet — skip for now
+            </button>
+          ) : (
+            <p className="text-[12.5px] text-[#8A8373] text-center mt-4 leading-relaxed">
+              As you're under 13, you'll need a join code from your school, college or training provider before you can continue — ask them for one.
+            </p>
+          )}
         </div>
       )}
 
