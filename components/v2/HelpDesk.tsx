@@ -10,11 +10,9 @@ import { getGroups, createWorkItem } from '@/lib/supabase'
 import type { Group } from '@/lib/types'
 import { searchHelp, starterTopics } from '@/lib/helpDeskSearch'
 import type { HelpRole } from '@/lib/helpDeskContent'
-import { askHelpDeskAI, looksLikeAction, type AIBriefFields, type AIWorkshopFields } from '@/lib/helpDeskAI'
+import { buildDraft, looksLikeAction, type Draft } from '@/lib/helpDeskDraft'
 
-type ProposalDraft =
-  | { kind: 'brief'; fields: AIBriefFields }
-  | { kind: 'workshop'; fields: AIWorkshopFields }
+type ProposalDraft = Draft
 
 type Msg = {
   id: number
@@ -28,29 +26,27 @@ type Msg = {
 
 const FALLBACK = "I don't have a clear answer for that yet — try rephrasing, or pick one of the topics below."
 
-// The orb's two dashes, standing in for an "ask an AI" icon without
-// actually being one for the written-answer path -- see
-// lib/helpDeskContent.ts for that distinction, and askHelpDeskAI for
-// the one path (drafting a brief/workshop) that genuinely is AI.
+// An organic blob, not a circle -- and the two dashes drift through a
+// few gaze directions on a slow loop (up, down, sideways) via the
+// helpdesk-eyes keyframe in globals.css, standing in for an "ask an
+// AI" icon without actually being one -- see lib/helpDeskContent.ts
+// and lib/helpDeskDraft.ts for why nothing behind this is generated.
+const BLOB_RADIUS = '42% 58% 55% 45% / 45% 42% 58% 55%'
+
 function OrbFace({ size = 8 }: { size?: number }) {
   return (
-    <span className="flex items-center" style={{ gap: Math.max(2, size * 0.3) }}>
+    <span className="helpdesk-eyes flex items-center" style={{ gap: Math.max(2, size * 0.3) }}>
       <span className="rounded-full" style={{ width: Math.max(2, size * 0.3), height: size, backgroundColor: '#2b2622' }} />
       <span className="rounded-full" style={{ width: Math.max(2, size * 0.3), height: size, backgroundColor: '#2b2622' }} />
     </span>
   )
 }
 
-function resolveGroupId(groups: Group[], name?: string): string {
-  if (!name) return ''
-  return groups.find(g => g.name.toLowerCase() === name.trim().toLowerCase())?.id || ''
-}
-
-// The one place a proposal from the AI becomes a decision a human has
-// to actually make -- every field here is editable, nothing is sent
-// to Supabase until "Create" is tapped, and that write calls the
-// exact same createWorkItem the manual form uses, so it is bound by
-// the same RLS and shows up identically in Briefs/Workshops.
+// A quick-start draft, not a finished object -- every field here is
+// editable, nothing is sent to Supabase until "Create" is tapped, and
+// that write calls the exact same createWorkItem the manual form
+// uses, so it is bound by the same RLS and shows up identically in
+// Briefs/Workshops.
 function ProposalCard({
   msg, groups, organisationId, userId, onUpdate, onResolved,
 }: {
@@ -66,7 +62,7 @@ function ProposalCard({
   const [topic, setTopic] = useState(proposal.fields.topic || '')
   const [criteria, setCriteria] = useState(proposal.fields.criteria || '')
   const [deadline, setDeadline] = useState(proposal.fields.deadline || '')
-  const [groupId, setGroupId] = useState(() => resolveGroupId(groups, proposal.fields.group_name))
+  const [groupId, setGroupId] = useState(proposal.fields.group_id || '')
   const [assignment, setAssignment] = useState(proposal.kind === 'brief' ? proposal.fields.assignment : '')
   const [description, setDescription] = useState(proposal.kind === 'workshop' ? (proposal.fields.description || '') : '')
   const [mode, setMode] = useState<'online' | 'in_person'>(proposal.kind === 'workshop' ? proposal.fields.mode : 'online')
@@ -152,8 +148,8 @@ function ProposalCard({
 // fully block whatever page it was opened over. Most answers come
 // from the hand-written knowledge base (see lib/helpDeskContent.ts);
 // institution/provider staff asking it to *do* something -- "create a
-// brief for..." -- get routed to a real AI instead (lib/helpDeskAI.ts)
-// that can only draft, never create directly.
+// brief for..." -- get a quick-start draft instead (lib/helpDeskDraft.ts),
+// built from plain pattern matching, not a paid AI call.
 export default function HelpDesk() {
   const { user } = useAuth()
   const theme = useResolvedTheme()
@@ -223,21 +219,20 @@ export default function HelpDesk() {
   const isStaff = role === 'institution_staff' || role === 'provider_staff' || role === 'employer'
   if (!isStaff) return null
   const safeRole = role as HelpRole
-  const canAI = safeRole === 'institution_staff' || safeRole === 'provider_staff'
+  const canDraft = safeRole === 'institution_staff' || safeRole === 'provider_staff'
 
   const updateMsg = (id: number, patch: Partial<Msg>) => {
     setMessages(m => m.map(msg => (msg.id === id ? { ...msg, ...patch } : msg)))
   }
 
-  const ask = async (q: string) => {
+  const ask = (q: string) => {
     if (!q.trim()) return
     const userId = ++idRef.current
     const deskId = ++idRef.current
-    const historyForAI = messages.filter(m => m.text && !m.proposal).map(m => ({ role: m.from === 'me' ? ('user' as const) : ('assistant' as const), content: m.text! }))
     setMessages(m => [...m, { id: userId, from: 'me', text: q }, { id: deskId, from: 'desk', text: '', thinking: true }])
     setInput('')
 
-    const isAction = canAI && looksLikeAction(q)
+    const isAction = canDraft && looksLikeAction(q)
     const kbResults = isAction ? [] : searchHelp(q, safeRole)
 
     if (kbResults[0]) {
@@ -246,13 +241,9 @@ export default function HelpDesk() {
       return
     }
 
-    if (canAI) {
-      const result = await askHelpDeskAI(q, historyForAI)
-      if (result.type === 'proposal') {
-        updateMsg(deskId, { text: undefined, thinking: false, proposal: { kind: result.kind, fields: result.fields } as ProposalDraft, proposalStatus: 'draft' })
-      } else {
-        updateMsg(deskId, { text: result.text, thinking: false })
-      }
+    if (isAction) {
+      const draft = buildDraft(q, groups)
+      window.setTimeout(() => updateMsg(deskId, { text: undefined, thinking: false, proposal: draft, proposalStatus: 'draft' }), 350 + Math.random() * 250)
       return
     }
 
@@ -268,8 +259,9 @@ export default function HelpDesk() {
         style={{ bottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
       >
         <span
-          className="absolute inset-0 rounded-full flex items-center justify-center border"
+          className="absolute inset-0 flex items-center justify-center border"
           style={{
+            borderRadius: BLOB_RADIUS,
             background: 'rgba(255,255,255,0.75)',
             backdropFilter: 'blur(14px)',
             WebkitBackdropFilter: 'blur(14px)',
@@ -320,8 +312,8 @@ export default function HelpDesk() {
       <div className="flex items-center justify-between px-4 pb-3 flex-shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <span
-            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border"
-            style={{ background: 'rgba(255,255,255,0.75)', borderColor: 'rgba(255,255,255,0.9)' }}
+            className="w-8 h-8 flex items-center justify-center flex-shrink-0 border"
+            style={{ borderRadius: BLOB_RADIUS, background: 'rgba(255,255,255,0.75)', borderColor: 'rgba(255,255,255,0.9)' }}
           >
             <OrbFace size={8} />
           </span>
@@ -340,7 +332,7 @@ export default function HelpDesk() {
           <>
             <p className="text-[13px] text-ink-secondary leading-relaxed">
               Ask how to do something on LERN and I'll walk you through it. Every answer here was written by the LERN team, not generated — if I don't know something, I'll say so rather than guess.
-              {canAI && " Ask me to create a brief or schedule a workshop and I'll draft one for you to review."}
+              {canDraft && " Ask me to create a brief or schedule a workshop and I'll start a draft for you to fill in and confirm."}
             </p>
             <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mt-4 mb-1.5">Try one of these</p>
             <div className="flex flex-col gap-1.5">

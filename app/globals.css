@@ -518,3 +518,18 @@ body.keyboard-open #student-bottom-nav,
 body.keyboard-open #org-fab {
   display: none;
 }
+
+/* Help Desk orb's two-dash "face" (components/v2/HelpDesk.tsx) --
+   drifts through a few gaze directions on a slow loop so the icon
+   reads as alive without being distracting. */
+@keyframes helpdesk-eyes {
+  0%, 12% { transform: translate(0, 0); }
+  20%, 30% { transform: translate(0, -2px); }
+  38%, 50% { transform: translate(0, 0); }
+  58%, 68% { transform: translate(0, 1.5px); }
+  76%, 86% { transform: translate(1.5px, 0); }
+  94%, 100% { transform: translate(0, 0); }
+}
+.helpdesk-eyes {
+  animation: helpdesk-eyes 7s ease-in-out infinite;
+}
