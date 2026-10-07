@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920" width="1080" height="1920">
+  <defs>
+    <!-- Base wash: lavender-grey at the top to warm gold at the bottom,
+         echoing the top/bottom colours sampled from the photo this
+         replaces (#E7D8D8 / #EFD8D1), but with more range between the
+         two ends than a straight copy would give, so the gradient still
+         reads at a glance instead of looking like a flat tint. -->
+    <linearGradient id="base" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0%" stop-color="#DCC7CE" />
+      <stop offset="40%" stop-color="#EBD3CE" />
+      <stop offset="75%" stop-color="#F3D9B9" />
+      <stop offset="100%" stop-color="#F6CE93" />
+    </linearGradient>
+    <radialGradient id="glowOrange" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F0783A" stop-opacity="0.65" />
+      <stop offset="100%" stop-color="#F0783A" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="glowLavender" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#A97FC2" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#A97FC2" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="glowGold" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F5B84A" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#F5B84A" stop-opacity="0" />
+    </radialGradient>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="55" />
+    </filter>
+    <filter id="softer" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14" />
+    </filter>
+    <linearGradient id="streak" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0" />
+      <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1080" height="1920" fill="url(#base)" />
+
+  <!-- Three soft, blurred light pools standing in for the photo's own
+       warm highlights: enough depth to not read as a flat gradient,
+       without drawing any recognisable scene. -->
+  <circle cx="880" cy="230" r="420" fill="url(#glowOrange)" filter="url(#soft)" />
+  <circle cx="90" cy="480" r="380" fill="url(#glowLavender)" filter="url(#soft)" />
+  <circle cx="560" cy="1720" r="600" fill="url(#glowGold)" filter="url(#soft)" />
+
+  <!-- Two soft diagonal light streaks, standing in for the single one
+       the original photo had running through its lower half. -->
+  <rect x="-300" y="1480" width="1800" height="10" fill="url(#streak)" filter="url(#softer)" transform="rotate(-22 540 1480)" />
+  <rect x="-300" y="1620" width="1800" height="5" fill="url(#streak)" filter="url(#softer)" opacity="0.6" transform="rotate(-22 540 1620)" />
+</svg>
