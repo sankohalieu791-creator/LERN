@@ -10,7 +10,7 @@ import {
 } from '@/lib/supabase'
 import {
   ChevronRight, ArrowLeft, Clock, CheckCircle2, RotateCcw, Ban, Users2,
-  ClipboardList,
+  ClipboardList, Search,
 } from 'lucide-react'
 import type { Group, AttendanceStatus } from '@/lib/types'
 
@@ -52,6 +52,7 @@ export default function StudentsPanel() {
   const [loading, setLoading] = useState(true)
   const [detailStudent, setDetailStudent] = useState<any | null>(null)
   const [filterGroup, setFilterGroup] = useState<string>('all')
+  const [search, setSearch] = useState('')
   const [tab, setTab] = useState<Tab>('students')
 
   const load = () => {
@@ -71,7 +72,9 @@ export default function StudentsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.organisation_id])
 
-  const visible = filterGroup === 'all' ? students : students.filter(s => s.group_id === filterGroup)
+  const visible = students
+    .filter(s => filterGroup === 'all' || s.group_id === filterGroup)
+    .filter(s => !search.trim() || s.full_name?.toLowerCase().includes(search.trim().toLowerCase()))
 
   return (
     <div>
@@ -95,6 +98,16 @@ export default function StudentsPanel() {
 
       {tab === 'students' ? (
         <div>
+          {students.length > 8 && (
+            <div className="relative mb-3">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary pointer-events-none" />
+              <input
+                value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search students by name…"
+                className="w-full bg-surface border border-edge rounded-xl pl-9 pr-3 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
+              />
+            </div>
+          )}
           <div className="flex items-center justify-between mb-3">
             {/* Wasn't gated on loading at all -- always read straight
                 off students (starts as []), so it confidently said "0
@@ -121,7 +134,9 @@ export default function StudentsPanel() {
           {loading ? (
             <p className="text-ink-tertiary text-[14px]">Loading…</p>
           ) : visible.length === 0 ? (
-            <p className="text-ink-tertiary text-[14px]">{students.length === 0 ? 'No students have joined yet — share a join code from Dashboard.' : 'No students in this group.'}</p>
+            <p className="text-ink-tertiary text-[14px]">
+              {students.length === 0 ? 'No students have joined yet — share a join code from Dashboard.' : search.trim() ? 'No students match that search.' : 'No students in this group.'}
+            </p>
           ) : (
             <div className="space-y-2">
               {visible.map(s => (

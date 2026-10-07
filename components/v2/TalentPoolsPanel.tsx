@@ -9,7 +9,7 @@ import {
 import { EMPLOYER_TIERS, type EmployerTier } from '@/lib/billing'
 import { cadenceForPool, nextStage, DEFAULT_CADENCE, type CadenceStep } from '@/lib/cadence'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
-import { Bookmark, Plus, X, Trash2, ChevronLeft, UserCheck, Users, CheckCircle2, Clock, Settings2, Sparkles } from 'lucide-react'
+import { Bookmark, Plus, X, Trash2, ChevronLeft, UserCheck, Users, CheckCircle2, Clock, Settings2, Sparkles, Search } from 'lucide-react'
 
 // Talent pools -- Final Build Spec, 23 Sep 2026. "The employer's only
 // two actions are adding a candidate to a pool and removing them, or
@@ -202,6 +202,7 @@ function PoolDetail({ pool, tier, onBack }: { pool: any; tier: EmployerTier; onB
   const [loading, setLoading] = useState(true)
   const [editingCadence, setEditingCadence] = useState(false)
   const [filling, setFilling] = useState(false)
+  const [search, setSearch] = useState('')
   const canCustomise = tier === 'scale' || tier === 'enterprise'
 
   const load = () => {
@@ -231,6 +232,7 @@ function PoolDetail({ pool, tier, onBack }: { pool: any; tier: EmployerTier; onB
   }
 
   const cadence = cadenceForPool(pool.custom_cadence)
+  const visibleMembers = members.filter(m => !search.trim() || m.student?.full_name?.toLowerCase().includes(search.trim().toLowerCase()))
 
   return (
     <div>
@@ -258,6 +260,17 @@ function PoolDetail({ pool, tier, onBack }: { pool: any; tier: EmployerTier; onB
         {pool.role_filled_at && ' · Role filled — automatic cadence has stopped'}
       </p>
 
+      {!loading && members.length > 8 && (
+        <div className="relative mb-4">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary pointer-events-none" />
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search candidates by name…"
+            className="w-full bg-surface border border-edge rounded-xl pl-9 pr-3 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="space-y-2">
           {[0, 1].map(i => <div key={i} className="h-24 rounded-xl bg-surface animate-pulse" />)}
@@ -267,9 +280,13 @@ function PoolDetail({ pool, tier, onBack }: { pool: any; tier: EmployerTier; onB
           <UserCheck className="w-7 h-7 text-ink-quaternary mx-auto mb-2.5" />
           <p className="text-[13px] text-ink-tertiary">Nobody saved here yet — bookmark a candidate from Discover.</p>
         </div>
+      ) : visibleMembers.length === 0 ? (
+        <div className="text-center py-16 bg-surface border border-edge-subtle rounded-2xl">
+          <p className="text-[13px] text-ink-tertiary">No candidates match that search.</p>
+        </div>
       ) : (
         <div className="space-y-2.5">
-          {members.map(m => {
+          {visibleMembers.map(m => {
             const memberSends = sends.filter(s => s.member_id === m.id).sort((a, b) => a.stage - b.stage)
             const sentStages = memberSends.map(s => s.stage)
             const upcoming = pool.role_filled_at ? null : nextStage(cadence, sentStages, m.created_at)

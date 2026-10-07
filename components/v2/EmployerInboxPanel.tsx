@@ -6,7 +6,7 @@ import {
   getEmployerInterest, getEmployerInboxItems, getInterestMessages, sendInterestMessage,
   uploadInterestMessageFile, getSignedFileUrl,
 } from '@/lib/supabase'
-import { Send, Inbox as InboxIcon, ArrowLeft, Shield, Lock, Check, Plus, Paperclip, X } from 'lucide-react'
+import { Send, Inbox as InboxIcon, ArrowLeft, Shield, Lock, Check, Plus, Paperclip, X, Search } from 'lucide-react'
 
 function initials(name?: string) {
   if (!name) return '?'
@@ -50,6 +50,7 @@ export default function EmployerInboxPanel() {
   const [applications, setApplications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   const load = () => {
     if (!user) return
@@ -67,10 +68,25 @@ export default function EmployerInboxPanel() {
   const open = threads.find(t => t.id === openId) || null
   if (open) return <EmployerThread item={open} onBack={() => setOpenId(null)} />
 
+  const q = search.trim().toLowerCase()
+  const visibleThreads = threads.filter(t => !q || t.student?.full_name?.toLowerCase().includes(q))
+  const visibleApplications = applications.filter(a => !q || a.name?.toLowerCase().includes(q))
+
   return (
     <div>
       <p className="text-[22px] font-bold text-ink mb-1">Inbox</p>
       <p className="text-[14px] text-ink-tertiary mb-6">Conversations about candidates you've reached out to, and activity on your open roles.</p>
+
+      {!loading && threads.length + applications.length > 8 && (
+        <div className="relative mb-5">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary pointer-events-none" />
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search by candidate name…"
+            className="w-full bg-surface border border-edge rounded-xl pl-9 pr-3 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
+          />
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-2.5">
@@ -82,13 +98,17 @@ export default function EmployerInboxPanel() {
           <p className="text-[14px] font-semibold text-ink mb-1">Nothing yet</p>
           <p className="text-[13px] text-ink-tertiary">Reach out to a candidate from Discover to start a conversation.</p>
         </div>
+      ) : visibleThreads.length === 0 && visibleApplications.length === 0 ? (
+        <div className="text-center py-20 bg-surface border border-edge-subtle rounded-2xl">
+          <p className="text-[13px] text-ink-tertiary">Nothing matches that search.</p>
+        </div>
       ) : (
         <div className="space-y-6">
-          {threads.length > 0 && (
+          {visibleThreads.length > 0 && (
             <div>
               <p className="text-[12px] font-bold text-ink-tertiary uppercase tracking-wide mb-2.5 px-1">Conversations</p>
               <div className="bg-surface border border-edge rounded-2xl divide-y divide-edge-subtle overflow-hidden">
-                {threads.map(t => {
+                {visibleThreads.map(t => {
                   const status = STATUS_META[t.status] || STATUS_META.pending
                   // .split(' ')[0] was being applied to the FALLBACK
                   // phrase too whenever student data was missing,
@@ -115,11 +135,11 @@ export default function EmployerInboxPanel() {
             </div>
           )}
 
-          {applications.length > 0 && (
+          {visibleApplications.length > 0 && (
             <div>
               <p className="text-[12px] font-bold text-ink-tertiary uppercase tracking-wide mb-2.5 px-1">Applications</p>
               <div className="bg-surface border border-edge rounded-2xl divide-y divide-edge-subtle overflow-hidden">
-                {applications.map(a => (
+                {visibleApplications.map(a => (
                   <div key={a.id} className="flex items-center gap-3.5 px-4 py-4">
                     <span className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--accent-bg)', color: 'var(--brand)' }}>
                       <span className="font-bold text-[13px]">{initials(a.name)}</span>

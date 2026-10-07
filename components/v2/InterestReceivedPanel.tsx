@@ -8,7 +8,7 @@ import {
   getOrgInterest, respondToInterest, getInterestMessages, sendInterestMessage, closeInterestThread,
   uploadInterestMessageFile, getSignedFileUrl,
 } from '@/lib/supabase'
-import { Check, Ban, Shield, Lock, Send, ArrowLeft, Plus, Paperclip, X } from 'lucide-react'
+import { Check, Ban, Shield, Lock, Send, ArrowLeft, Plus, Paperclip, X, Search } from 'lucide-react'
 
 function age(dob?: string) {
   if (!dob) return null
@@ -35,6 +35,7 @@ export default function InterestReceivedPanel() {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   const load = () => {
     if (!user?.organisation_id) return
@@ -56,6 +57,11 @@ export default function InterestReceivedPanel() {
 
   const open = items.find(i => i.id === openId) || null
   const needResponse = items.filter(i => i.status === 'pending').length
+  const visible = items.filter(i => {
+    if (!search.trim()) return true
+    const q = search.trim().toLowerCase()
+    return i.student?.full_name?.toLowerCase().includes(q) || i.employer?.full_name?.toLowerCase().includes(q)
+  })
 
   return (
     <div>
@@ -94,6 +100,17 @@ export default function InterestReceivedPanel() {
             )}
           </div>
 
+          {!loading && items.length > 8 && (
+            <div className="relative mb-4">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary pointer-events-none" />
+              <input
+                value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search by student or employer name…"
+                className="w-full bg-surface border border-edge rounded-xl pl-9 pr-3 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
+              />
+            </div>
+          )}
+
           {loading ? (
             <p className="text-ink-tertiary text-[14px]">Loading…</p>
           ) : items.length === 0 ? (
@@ -104,9 +121,13 @@ export default function InterestReceivedPanel() {
               <p className="font-bold text-ink text-[15px] mb-1.5">Nothing yet</p>
               <p className="text-ink-tertiary text-[14px]">When an employer's interested in one of your students, it'll show up here first.</p>
             </div>
+          ) : visible.length === 0 ? (
+            <div className="bg-surface border border-edge rounded-2xl p-10 text-center">
+              <p className="text-ink-tertiary text-[14px]">No requests match that search.</p>
+            </div>
           ) : (
             <div className="space-y-3">
-              {items.map(i => {
+              {visible.map(i => {
                 const adult = isAdult(i.student?.date_of_birth)
                 const studentAge = age(i.student?.date_of_birth)
                 // .split(' ')[0] was being applied to the fallback

@@ -8,7 +8,7 @@ import {
   getOrgStudents, getGroups, getPlacements, createPlacement, setPlacementStatus,
   getPlacementAttendance, markPlacementAttendance, getPlacementAttendanceForOrg,
 } from '@/lib/supabase'
-import { ArrowLeft, Briefcase, Download, ChevronRight, Shield, Check, X as XIcon } from 'lucide-react'
+import { ArrowLeft, Briefcase, Download, ChevronRight, Shield, Check, X as XIcon, Search } from 'lucide-react'
 import type { Group } from '@/lib/types'
 
 // Final Build Spec: Work Experience (schools and colleges), 23 Sep
@@ -40,6 +40,7 @@ export default function WorkExperiencePanel() {
   const [placements, setPlacements] = useState<any[]>([])
   const [orgAttendance, setOrgAttendance] = useState<{ placement_id: string; status: string }[]>([])
   const [groupId, setGroupId] = useState('all')
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState<{ studentId: string; name: string } | null>(null)
   const [openPlacement, setOpenPlacement] = useState<any | null>(null)
@@ -63,6 +64,11 @@ export default function WorkExperiencePanel() {
   useEffect(load, [user?.organisation_id])
 
   const visibleStudents = groupId === 'all' ? students : students.filter(s => s.group_id === groupId)
+  // Search narrows what's shown in the roster below, not the stat cards
+  // or the CSV export -- those stay scoped to the whole group, so
+  // typing a name to find someone doesn't quietly change what "Placed"
+  // or the export means.
+  const searchedStudents = visibleStudents.filter(s => !search.trim() || s.full_name?.toLowerCase().includes(search.trim().toLowerCase()))
   const placementByStudent = new Map(placements.filter(p => p.status === 'active').map(p => [p.student_id, p]))
   const placedCount = visibleStudents.filter(s => placementByStudent.has(s.id)).length
   const needOneCount = visibleStudents.length - placedCount
@@ -141,14 +147,29 @@ export default function WorkExperiencePanel() {
             <StatCard label="Placement attendance" value={attendancePct === null ? '—' : `${attendancePct}%`} color="#185FA5" />
           </div>
 
+          {visibleStudents.length > 8 && (
+            <div className="relative mb-3">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary pointer-events-none" />
+              <input
+                value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search students by name…"
+                className="w-full bg-surface border border-edge rounded-xl pl-9 pr-3 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
+              />
+            </div>
+          )}
+
           {visibleStudents.length === 0 ? (
             <div className="text-center py-16 bg-surface border border-edge-subtle rounded-2xl">
               <Briefcase className="w-7 h-7 text-ink-quaternary mx-auto mb-2.5" />
               <p className="text-[13px] text-ink-tertiary">No students in this group yet.</p>
             </div>
+          ) : searchedStudents.length === 0 ? (
+            <div className="text-center py-16 bg-surface border border-edge-subtle rounded-2xl">
+              <p className="text-[13px] text-ink-tertiary">No students match that search.</p>
+            </div>
           ) : (
             <div className="bg-surface border border-edge rounded-2xl divide-y divide-edge-subtle overflow-hidden mb-5">
-              {visibleStudents.map(s => {
+              {searchedStudents.map(s => {
                 const p = placementByStudent.get(s.id)
                 const att = p ? orgAttendance.filter(a => a.placement_id === p.id) : []
                 return (

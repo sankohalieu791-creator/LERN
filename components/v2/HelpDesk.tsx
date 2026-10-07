@@ -6,6 +6,7 @@ import { X, Send } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
 import { Spinner } from '@/components/v2/Field'
+import ScrollTrack from '@/components/v2/ScrollTrack'
 import { getGroups, createWorkItem } from '@/lib/supabase'
 import type { Group } from '@/lib/types'
 import { searchHelp, starterTopics } from '@/lib/helpDeskSearch'
@@ -330,7 +331,8 @@ export default function HelpDesk() {
         </button>
       </div>
 
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
+      <div className="relative flex-1 min-h-0">
+      <div ref={scrollRef} className="h-full overflow-y-auto px-4 py-3 space-y-3">
         {messages.length === 0 && (
           <>
             <p className="text-[13px] text-ink-secondary leading-relaxed">
@@ -383,6 +385,8 @@ export default function HelpDesk() {
             )}
           </div>
         ))}
+      </div>
+      <ScrollTrack containerRef={scrollRef} />
       </div>
 
       <div className="flex-shrink-0 border-t p-3" style={{ borderColor: 'color-mix(in srgb, var(--border) 55%, transparent)' }}>

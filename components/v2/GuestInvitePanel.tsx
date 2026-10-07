@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { getOrgStudents, createGuestInvite, getGuestInvites, revokeGuestInvite } from '@/lib/supabase'
-import { Link as LinkIcon, Shield, Copy, Check, Ban, Clock, UserCheck } from 'lucide-react'
+import { Link as LinkIcon, Shield, Copy, Check, Ban, Clock, UserCheck, Search } from 'lucide-react'
 
 // Promoted out of StudentsPanel's third tab into its own screen, 1 Oct
 // 2026 -- this is the one place an outside employer touches LERN data
@@ -32,6 +32,7 @@ export default function GuestInvitePanel() {
   const [newLink, setNewLink] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
 
   const load = () => {
     if (!user?.organisation_id) return
@@ -109,8 +110,21 @@ export default function GuestInvitePanel() {
         {students.length === 0 ? (
           <p className="text-[13px] text-ink-tertiary mb-1">No students have joined yet.</p>
         ) : (
-          <div className="space-y-1.5 mb-1.5">
-            {students.map(s => {
+          <>
+          {students.length > 8 && (
+            <div className="relative mb-2">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary pointer-events-none" />
+              <input
+                value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search students by name…"
+                className="w-full bg-surface border border-edge rounded-lg pl-9 pr-3 py-2 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
+              />
+            </div>
+          )}
+          <div className="space-y-1.5 mb-1.5 max-h-72 overflow-y-auto">
+            {students
+              .filter(s => !search.trim() || s.full_name?.toLowerCase().includes(search.trim().toLowerCase()))
+              .map(s => {
               const checked = selected.has(s.id)
               return (
                 <button
@@ -125,7 +139,11 @@ export default function GuestInvitePanel() {
                 </button>
               )
             })}
+            {search.trim() && students.filter(s => s.full_name?.toLowerCase().includes(search.trim().toLowerCase())).length === 0 && (
+              <p className="text-[13px] text-ink-tertiary px-3 py-2">No students match that search.</p>
+            )}
           </div>
+          </>
         )}
         <p className="text-[11px] mb-5" style={{ color: '#8A8A8A' }}>You can add more than one student if this employer is hiring for a role.</p>
 

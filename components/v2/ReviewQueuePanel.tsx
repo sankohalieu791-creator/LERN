@@ -9,7 +9,7 @@ import {
 import type { Submission } from '@/lib/types'
 import {
   CheckCircle2, History, FileText, ExternalLink, ChevronLeft, Sparkles,
-  Flag, EyeOff, ShieldAlert,
+  Flag, EyeOff, ShieldAlert, Search,
 } from 'lucide-react'
 
 // Build Spec: Review Surface (institutions and providers) v1.0. One
@@ -248,6 +248,11 @@ function ReportedContentQueue({ onChanged }: { onChanged: () => void }) {
 }
 
 function ReviewQueue({ items, loading, onOpen }: { items: any[]; loading: boolean; onOpen: (id: string) => void }) {
+  const [search, setSearch] = useState('')
+  // Narrows the list shown below, not the "waiting" count -- that stays
+  // the real workload size regardless of what's currently searched.
+  const visible = items.filter(s => !search.trim() || s.users?.full_name?.toLowerCase().includes(search.trim().toLowerCase()))
+
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
@@ -262,6 +267,17 @@ function ReviewQueue({ items, loading, onOpen }: { items: any[]; loading: boolea
         )}
       </div>
 
+      {!loading && items.length > 8 && (
+        <div className="relative mb-4">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary pointer-events-none" />
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search by student name…"
+            className="w-full bg-surface border border-edge rounded-xl pl-9 pr-3 py-2.5 text-[13px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="space-y-2.5">
           {[0, 1, 2].map(i => <div key={i} className="h-16 rounded-xl bg-surface-muted animate-pulse" />)}
@@ -273,10 +289,14 @@ function ReviewQueue({ items, loading, onOpen }: { items: any[]; loading: boolea
           </div>
           <p className="font-semibold text-ink text-[14px] mb-1">Nothing waiting. You are all caught up.</p>
         </div>
+      ) : visible.length === 0 ? (
+        <div className="flex flex-col items-center text-center py-16">
+          <p className="text-[13px] text-ink-tertiary">No submissions match that search.</p>
+        </div>
       ) : (
         <>
           <div className="space-y-2.5">
-            {items.map(s => {
+            {visible.map(s => {
               const overdue = isOverdue(s)
               return (
                 <button
