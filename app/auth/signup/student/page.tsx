@@ -265,7 +265,7 @@ export default function StudentSignupPage() {
           <TextField label="Email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" />
           <TextField label="Password" type="password" value={password} onChange={setPassword} placeholder="At least 8 characters" hint="Minimum 8 characters." />
           <TextField label="Date of birth" type="date" value={dob} onChange={setDob} />
-          <PrimaryButton onClick={handleA1Submit} loading={loading}>Continue</PrimaryButton>
+          <PrimaryButton strong onClick={handleA1Submit} loading={loading}>Continue</PrimaryButton>
           <p className="text-[12.5px] text-[#8A8373] text-center mt-3 leading-relaxed">
             By continuing, you agree to LERN's <Link href="/legal/terms" className="underline hover:text-ink">Terms</Link> and{' '}
             <Link href="/legal/privacy" className="underline hover:text-ink">Privacy Policy</Link>.
@@ -280,7 +280,7 @@ export default function StudentSignupPage() {
       {step === 'dob' && (
         <div>
           <TextField label="Date of birth" type="date" value={dob} onChange={setDob} autoFocus />
-          <PrimaryButton onClick={handleDobSubmit} loading={loading}>Continue</PrimaryButton>
+          <PrimaryButton strong onClick={handleDobSubmit} loading={loading}>Continue</PrimaryButton>
         </div>
       )}
 
@@ -291,7 +291,7 @@ export default function StudentSignupPage() {
               code that length, following this example, would never
               match the real format. */}
           <TextField label="Join code" value={code} onChange={v => setCode(v.toUpperCase())} placeholder="e.g. 7K3P9X" autoFocus />
-          <PrimaryButton onClick={handleA2Submit} loading={loading}>Continue</PrimaryButton>
+          <PrimaryButton strong onClick={handleA2Submit} loading={loading}>Continue</PrimaryButton>
           {ageFromDob(dob) >= MIN_AGE_WITHOUT_SCHOOL_CODE ? (
             <button
               onClick={() => { setError(''); setCode(''); setStep(3) }}
@@ -323,7 +323,7 @@ export default function StudentSignupPage() {
           </div>
           <div className="flex gap-3">
             <SecondaryButton onClick={() => handleConsent(false)} disabled={loading}>Decline</SecondaryButton>
-            <PrimaryButton onClick={() => handleConsent(true)} loading={loading}>I understand, accept</PrimaryButton>
+            <PrimaryButton strong onClick={() => handleConsent(true)} loading={loading}>I understand, accept</PrimaryButton>
           </div>
         </div>
       )}

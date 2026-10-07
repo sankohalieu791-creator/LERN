@@ -213,7 +213,7 @@ export default function EmployerSignupPage() {
           <TextField label="Full name" value={fullName} onChange={setFullName} placeholder="Your name" autoFocus />
           <TextField label="Email" type="email" value={email} onChange={setEmail} placeholder="you@company.com" />
           <TextField label="Password" type="password" value={password} onChange={setPassword} placeholder="At least 8 characters" hint="Minimum 8 characters." />
-          <PrimaryButton onClick={handleStep1} loading={loading}>Continue</PrimaryButton>
+          <PrimaryButton strong onClick={handleStep1} loading={loading}>Continue</PrimaryButton>
           <p className="text-[12.5px] text-[#8A8373] text-center mt-3 leading-relaxed">
             By continuing, you agree to LERN's <Link href="/legal/terms" className="underline hover:text-ink">Terms</Link> and{' '}
             <Link href="/legal/privacy" className="underline hover:text-ink">Privacy Policy</Link>.
@@ -238,7 +238,7 @@ export default function EmployerSignupPage() {
           </div>
           <TextField label="Companies House number" value={companyNumber} onChange={setCompanyNumber} placeholder="e.g. 12345678" hint="We check this against Companies House the moment you continue." />
           <TextField label="Company website" value={website} onChange={setWebsite} placeholder="https://yourcompany.com" />
-          <PrimaryButton onClick={handleCompanyDetails} loading={loading}>Continue</PrimaryButton>
+          <PrimaryButton strong onClick={handleCompanyDetails} loading={loading}>Continue</PrimaryButton>
         </div>
       )}
 
@@ -258,7 +258,7 @@ export default function EmployerSignupPage() {
           </div>
           <div className="flex gap-3">
             <SecondaryButton onClick={() => handleConsent(false)} disabled={loading}>Decline</SecondaryButton>
-            <PrimaryButton onClick={() => handleConsent(true)} loading={loading}>I understand, accept</PrimaryButton>
+            <PrimaryButton strong onClick={() => handleConsent(true)} loading={loading}>I understand, accept</PrimaryButton>
           </div>
         </div>
       )}

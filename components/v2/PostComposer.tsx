@@ -236,7 +236,13 @@ export default function PostComposer({ onClose, onPosted }: { onClose: () => voi
                 <button
                   key={s.key} onClick={() => toggleSticker(s.key)}
                   className="flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-medium transition"
-                  style={{ borderColor: active ? '#F26B21' : 'var(--app-border)', backgroundColor: active ? 'rgba(242,107,33,0.1)' : 'var(--app-overlay-2)', color: active ? '#F26B21' : 'var(--app-text-secondary)' }}
+                  style={{
+                    borderColor: active ? 'rgba(220,38,38,0.35)' : 'var(--app-border)',
+                    backgroundColor: active ? 'rgba(220,38,38,0.12)' : 'var(--app-overlay-2)',
+                    backdropFilter: active ? 'blur(8px)' : undefined,
+                    WebkitBackdropFilter: active ? 'blur(8px)' : undefined,
+                    color: active ? '#DC2626' : 'var(--app-text-secondary)',
+                  }}
                 >
                   <span className="text-[14px] leading-none">{s.emoji}</span> {s.label}
                 </button>

@@ -107,7 +107,7 @@ export default function BootcampEvidencePanel() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url; a.download = `funding-evidence-${(cohort.title || 'cohort').replace(/\s+/g, '-').toLowerCase()}.csv`
-    a.click()
+    document.body.appendChild(a); a.click(); a.remove()
     URL.revokeObjectURL(url)
   }
 

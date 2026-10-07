@@ -44,7 +44,7 @@ export default function OpsLoginPage() {
       <ErrorBanner message={error} />
       <TextField label="Email" type="email" value={email} onChange={setEmail} placeholder="you@opstool.co.uk" autoFocus />
       <TextField label="Password" type="password" value={password} onChange={setPassword} placeholder="Password" />
-      <PrimaryButton onClick={handleSubmit} loading={loading}>Sign in</PrimaryButton>
+      <PrimaryButton strong onClick={handleSubmit} loading={loading}>Sign in</PrimaryButton>
     </AuthShell>
   )
 }

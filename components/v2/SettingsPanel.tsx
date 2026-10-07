@@ -273,7 +273,8 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
                 const url = URL.createObjectURL(blob)
                 const a = document.createElement('a')
-                a.href = url; a.download = `lern-my-data-${new Date().toISOString().split('T')[0]}.json`; a.click()
+                a.href = url; a.download = `lern-my-data-${new Date().toISOString().split('T')[0]}.json`
+                document.body.appendChild(a); a.click(); a.remove()
                 URL.revokeObjectURL(url)
               }} />
               <Row icon={FileText} label="Consent" value="View" onClick={() => setScreen('consent')} />
@@ -397,7 +398,8 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
-            a.href = url; a.download = `lern-my-data-${new Date().toISOString().split('T')[0]}.json`; a.click()
+            a.href = url; a.download = `lern-my-data-${new Date().toISOString().split('T')[0]}.json`
+            document.body.appendChild(a); a.click(); a.remove()
             URL.revokeObjectURL(url)
           }}
         />

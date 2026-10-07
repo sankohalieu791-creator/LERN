@@ -122,7 +122,7 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit}>
         <TextField label="Email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" autoFocus />
         <TextField label="Password" type="password" value={password} onChange={setPassword} placeholder="Your password" />
-        <PrimaryButton type="submit" loading={loading} disabled={!email || !password}>Log in</PrimaryButton>
+        <PrimaryButton strong type="submit" loading={loading} disabled={!email || !password}>Log in</PrimaryButton>
       </form>
       {unconfirmed && (
         <button

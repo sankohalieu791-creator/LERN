@@ -226,7 +226,8 @@ export default function StudentSettingsPanel() {
           const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
           const url = URL.createObjectURL(blob)
           const a = document.createElement('a')
-          a.href = url; a.download = `lern-my-data-${new Date().toISOString().split('T')[0]}.json`; a.click()
+          a.href = url; a.download = `lern-my-data-${new Date().toISOString().split('T')[0]}.json`
+          document.body.appendChild(a); a.click(); a.remove()
           URL.revokeObjectURL(url)
         }} />
         <div className="px-4 py-3.5 border-t border-[var(--app-border-subtle)]">

@@ -767,14 +767,21 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
               key={r.key} onClick={() => react(r.key)} title={r.label}
               className="flex items-center gap-1.5 rounded-full border transition"
               style={{
-                borderColor: myReaction === r.key ? '#F26B21' : '#E7E4DE',
-                backgroundColor: myReaction === r.key ? 'rgba(242,107,33,0.1)' : '#F7F5F0',
+                // Selected state: a glass pill, not a flat fill -- a
+                // translucent red tint with the blur behind it, so it
+                // reads as "lit up" rather than just a different
+                // background colour. Red rather than the brand orange,
+                // so a reaction never looks like a brand/CTA action.
+                borderColor: myReaction === r.key ? 'rgba(220,38,38,0.35)' : '#E7E4DE',
+                backgroundColor: myReaction === r.key ? 'rgba(220,38,38,0.12)' : '#F7F5F0',
+                backdropFilter: myReaction === r.key ? 'blur(8px)' : undefined,
+                WebkitBackdropFilter: myReaction === r.key ? 'blur(8px)' : undefined,
                 padding: '6px 12px',
               }}
             >
               <span className="text-[13px] leading-none">{r.emoji}</span>
-              <span className="text-[12px] font-medium leading-none" style={{ color: myReaction === r.key ? '#F26B21' : '#5A5A5A' }}>{r.label}</span>
-              {count > 0 && <span className="text-[12px] font-semibold leading-none" style={{ color: myReaction === r.key ? '#F26B21' : '#8A8373' }}>{count}</span>}
+              <span className="text-[12px] font-medium leading-none" style={{ color: myReaction === r.key ? '#DC2626' : '#5A5A5A' }}>{r.label}</span>
+              {count > 0 && <span className="text-[12px] font-semibold leading-none" style={{ color: myReaction === r.key ? '#DC2626' : '#8A8373' }}>{count}</span>}
             </button>
             )
           })}

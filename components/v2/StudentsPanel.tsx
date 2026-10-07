@@ -108,12 +108,12 @@ export default function StudentsPanel() {
               <div className="relative">
                 <select
                   value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
-                  className="appearance-none bg-transparent text-brand text-[13px] font-semibold outline-none cursor-pointer pr-4"
+                  className="appearance-none bg-transparent text-ink text-[13px] font-semibold outline-none cursor-pointer pr-4"
                 >
                   <option value="all">Filter by group</option>
                   {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
-                <ChevronRight className="w-3 h-3 text-brand rotate-90 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronRight className="w-3 h-3 text-ink-tertiary rotate-90 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             )}
           </div>

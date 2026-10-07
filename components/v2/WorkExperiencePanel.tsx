@@ -91,7 +91,14 @@ export default function WorkExperiencePanel() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url; a.download = `placement-evidence-${groupLabel.replace(/\s+/g, '-').toLowerCase()}.csv`
+    // Not attached to the page before -- click() on a detached anchor
+    // silently does nothing in Safari (and some locked-down Chrome
+    // setups), which is exactly "the export button doesn't work": no
+    // error, no download, nothing visibly wrong in a quick look at the
+    // code either.
+    document.body.appendChild(a)
     a.click()
+    a.remove()
     URL.revokeObjectURL(url)
   }
 

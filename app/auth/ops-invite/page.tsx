@@ -106,7 +106,7 @@ function OpsInviteInner() {
       <ErrorBanner message={error} />
       <TextField label="Your full name" value={fullName} onChange={setFullName} placeholder="J. Ahmed" autoFocus />
       <TextField label="Password" type="password" value={password} onChange={setPassword} placeholder="At least 8 characters" hint="Minimum 8 characters." />
-      <PrimaryButton onClick={submit} loading={submitting}>Create account</PrimaryButton>
+      <PrimaryButton strong onClick={submit} loading={submitting}>Create account</PrimaryButton>
     </AuthShell>
   )
 }

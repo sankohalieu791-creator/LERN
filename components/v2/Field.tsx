@@ -30,13 +30,20 @@ export function TextField({
 }
 
 export function PrimaryButton({
-  children, onClick, type = 'button', disabled, loading,
+  children, onClick, type = 'button', disabled, loading, strong,
 }: {
   children: React.ReactNode
   onClick?: () => void
   type?: 'button' | 'submit'
   disabled?: boolean
   loading?: boolean
+  // The bold brand-orange glow is for the handful of screens that sit
+  // directly on the auth photo (login, sign-up, ops login, the guest
+  // claim page) -- it was added globally by mistake and showed up as
+  // "too bright" on ordinary app screens (a plain white card in
+  // WorkItemsPanel, Settings, etc.) that were never meant to have it.
+  // Off by default; pass true only from an AuthShell page.
+  strong?: boolean
 }) {
   return (
     <button
@@ -49,7 +56,9 @@ export function PrimaryButton({
       // rendering glitch rather than "this button is off." A solid,
       // desaturated fill reads as disabled just as clearly without ever
       // exposing what's underneath, regardless of what that is.
-      className="w-full bg-brand text-white font-bold text-[15px] py-3.5 rounded-xl hover:bg-brand-hover active:scale-[0.99] transition disabled:bg-[#F0C9A6] disabled:text-white/80 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 shadow-[0_6px_20px_rgba(242,107,33,0.35)] hover:shadow-[0_8px_24px_rgba(242,107,33,0.45)]"
+      className={`w-full bg-brand text-white font-bold text-[15px] py-3.5 rounded-xl hover:bg-brand-hover active:scale-[0.99] transition disabled:bg-[#F0C9A6] disabled:text-white/80 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 ${
+        strong ? 'shadow-[0_6px_20px_rgba(242,107,33,0.35)] hover:shadow-[0_8px_24px_rgba(242,107,33,0.45)]' : ''
+      }`}
     >
       {loading ? <Spinner /> : null}
       {children}

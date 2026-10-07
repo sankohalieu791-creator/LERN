@@ -630,7 +630,7 @@ export default function WorkshopSession({
     const a = document.createElement('a')
     a.href = url
     a.download = `${title.replace(/\s+/g, '_')}_recording.${ext}`
-    a.click()
+    document.body.appendChild(a); a.click(); a.remove()
     URL.revokeObjectURL(url)
   }
 

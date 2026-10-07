@@ -107,7 +107,7 @@ export default function GuestClaimPage({ params }: { params: { token: string } }
         </span>
       </label>
 
-      <PrimaryButton onClick={handleSubmit} loading={submitting}>Continue</PrimaryButton>
+      <PrimaryButton strong onClick={handleSubmit} loading={submitting}>Continue</PrimaryButton>
     </AuthShell>
   )
 }

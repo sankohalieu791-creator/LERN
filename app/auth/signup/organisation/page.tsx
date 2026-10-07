@@ -355,7 +355,7 @@ function OrganisationSignupInner() {
             </>
           )}
 
-          <PrimaryButton onClick={handleO1Submit} loading={loading}>Continue</PrimaryButton>
+          <PrimaryButton strong onClick={handleO1Submit} loading={loading}>Continue</PrimaryButton>
           <p className="text-[12.5px] text-[#8A8373] text-center mt-3 leading-relaxed">
             By continuing, you agree to LERN's <Link href="/legal/terms" className="underline hover:text-ink">Terms</Link> and{' '}
             <Link href="/legal/privacy" className="underline hover:text-ink">Privacy Policy</Link>.
@@ -373,7 +373,7 @@ function OrganisationSignupInner() {
             label={orgType === 'institution' ? 'School or college name' : 'Organisation name'}
             value={orgName} onChange={setOrgName} placeholder="Riverside College" autoFocus
           />
-          <PrimaryButton onClick={handleOrgNameSubmit}>Continue</PrimaryButton>
+          <PrimaryButton strong onClick={handleOrgNameSubmit}>Continue</PrimaryButton>
         </div>
       )}
 
@@ -394,7 +394,7 @@ function OrganisationSignupInner() {
           </div>
           <div className="flex gap-3">
             <SecondaryButton onClick={() => handleAgreement(false)} disabled={loading}>Decline</SecondaryButton>
-            <PrimaryButton onClick={() => handleAgreement(true)} loading={loading}>I agree, accept</PrimaryButton>
+            <PrimaryButton strong onClick={() => handleAgreement(true)} loading={loading}>I agree, accept</PrimaryButton>
           </div>
         </div>
       )}
@@ -415,7 +415,7 @@ function OrganisationSignupInner() {
           <p className="text-[14px] text-[#6B6558] mb-6 leading-relaxed">
             Students enter this code when they sign up to join {orgName}. Bringing on another teacher or tutor? Generate a separate staff join code from Settings instead — you can do that any time.
           </p>
-          <PrimaryButton onClick={() => setShowGreeting(true)}>
+          <PrimaryButton strong onClick={() => setShowGreeting(true)}>
             Continue
           </PrimaryButton>
         </div>
