@@ -109,7 +109,7 @@ export default function AuthShell({
       className="min-h-[100dvh] flex flex-col relative overflow-hidden bg-[#F3E4DA]"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
-        backgroundImage: 'url(/auth-bg.svg)',
+        backgroundImage: 'url(/auth-bg.png)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
