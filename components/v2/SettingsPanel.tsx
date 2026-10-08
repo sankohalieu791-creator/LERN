@@ -321,9 +321,9 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
               <LinkRow icon={FileText} label="Terms of Service" href="/legal/terms" />
               <LinkRow icon={ShieldCheck} label="Public safeguarding summary" href="/legal/safeguarding" />
               <Row icon={Info} label="App version" value="1.0" noChevron />
-              <a href="mailto:alieu@joinirl.co.uk" className="flex items-center justify-between px-4 py-3.5 hover:bg-surface-muted transition">
+              <a href="mailto:hello@lernapp.uk" className="flex items-center justify-between px-4 py-3.5 hover:bg-surface-muted transition">
                 <span className="flex items-center gap-3 text-[14px] text-ink"><Mail className="w-4 h-4 text-ink-tertiary flex-shrink-0" /> Contact and support</span>
-                <span className="text-[13px] text-ink-secondary">alieu@joinirl.co.uk</span>
+                <span className="text-[13px] text-ink-secondary">hello@lernapp.uk</span>
               </a>
             </Group>
           </>
@@ -441,13 +441,13 @@ export default function SettingsPanel({ onClose, initialTab }: { onClose: () => 
         <PhoneLinkRow icon={FileText} badge={helpBadge} label="Terms of Service" href="/legal/terms" />
         <PhoneLinkRow icon={ShieldCheck} badge={helpBadge} label="Public safeguarding summary" href="/legal/safeguarding" />
         <PhoneRow icon={Info} badge={helpBadge} label="App version" subtitle="1.0" />
-        <a href="mailto:alieu@joinirl.co.uk" className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-muted transition">
+        <a href="mailto:hello@lernapp.uk" className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-muted transition">
           <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: helpBadge }}>
             <Mail className="w-[18px] h-[18px] text-white" />
           </span>
           <span className="min-w-0">
             <span className="block text-[15px] font-semibold text-ink">Contact and support</span>
-            <span className="block text-[12.5px] text-ink-tertiary truncate">alieu@joinirl.co.uk</span>
+            <span className="block text-[12.5px] text-ink-tertiary truncate">hello@lernapp.uk</span>
           </span>
         </a>
       </PhoneGroup>

@@ -14,7 +14,7 @@ export default function GuestTermsPage() {
       <p>
         You've been sent a link by an organisation using LERN to share a young person's verified work with you.
         This page explains exactly what that means. LERN is run by IRL Connect Ltd, trading as LERN. Contact:
-        alieu@joinirl.co.uk.
+        hello@lernapp.uk.
       </p>
 
       <h2 className="text-[15px] font-bold text-ink mt-6 mb-2">What this link gives you</h2>

@@ -66,7 +66,7 @@ export default function PrivacyPage() {
             <li>You joined through your school, and they look after your information with us.</li>
             <li>You can see a copy of your data, correct it, or ask to delete it.</li>
             <li>If you are under 18 and want to delete your data, we let your school know so the right adult can help.</li>
-            <li>You can ask us anything at alieu@joinirl.co.uk, or complain to the ICO.</li>
+            <li>You can ask us anything at hello@lernapp.uk, or complain to the ICO.</li>
           </ul>
         </>
       )}
@@ -96,7 +96,7 @@ export default function PrivacyPage() {
       )}
 
       <p className="mt-6 pt-4 border-t border-edge-subtle text-[13px] text-ink-tertiary">
-        Contact for all: alieu@joinirl.co.uk. Concerns can also go to the Information Commissioner's Office (ICO).
+        Contact for all: hello@lernapp.uk. Concerns can also go to the Information Commissioner's Office (ICO).
       </p>
     </LegalShell>
   )

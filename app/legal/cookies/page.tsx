@@ -42,7 +42,7 @@ export default function CookiesPage() {
       </ul>
 
       <p className="mt-6 pt-4 border-t border-edge-subtle text-[13px] text-ink-tertiary">
-        Questions about this policy: alieu@joinirl.co.uk. Concerns can also go to the Information Commissioner's Office (ICO).
+        Questions about this policy: hello@lernapp.uk. Concerns can also go to the Information Commissioner's Office (ICO).
       </p>
     </LegalShell>
   )

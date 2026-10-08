@@ -20,7 +20,7 @@ export default function TermsPage() {
         These terms are the rules for using LERN: what you can and cannot do, who owns what, and the limits of the
         service. They sit alongside the Privacy, Data Protection, and Safeguarding pages, which cover data and
         safety. LERN is run by IRL Connect Ltd, trading as LERN (company number 17200180, registered office 93a
-        Cobbold Road, London, NW10 9SU). Contact: alieu@joinirl.co.uk.
+        Cobbold Road, London, NW10 9SU). Contact: hello@lernapp.uk.
       </p>
       <p>
         By using LERN you agree to these terms. If you do not agree, do not use the service. These terms are
@@ -143,7 +143,7 @@ export default function TermsPage() {
       )}
 
       <p className="mt-6 pt-4 border-t border-edge-subtle text-[13px] text-ink-tertiary">
-        Contact: alieu@joinirl.co.uk. Concerns can also go to the Information Commissioner's Office (ICO).
+        Contact: hello@lernapp.uk. Concerns can also go to the Information Commissioner's Office (ICO).
       </p>
     </LegalShell>
   )
