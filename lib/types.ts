@@ -242,6 +242,61 @@ export interface Verification {
   users?: User
 }
 
+// ── Skill Wallet (Phase 1) ──────────────────────────────────────────
+// Extends the submission/review/verification loop above rather than
+// duplicating it -- a work_item with no work_item_skills rows behaves
+// exactly as it always has. See lib/supabase.ts's submitSkillReview for
+// the one write path into review_criteria_results/student_skills.
+
+export interface Course {
+  id: string
+  organisation_id: string
+  name: string
+  created_by?: string
+  created_at: string
+}
+
+export interface Skill {
+  id: string
+  course_id: string
+  name: string
+  unit_label?: string
+  sort_order: number
+  created_by?: string
+  created_at: string
+  skill_criteria?: SkillCriterion[]
+}
+
+export interface SkillCriterion {
+  id: string
+  skill_id: string
+  text: string
+  sort_order: number
+}
+
+export type SkillLevel = 'not_started' | 'beginner' | 'developing' | 'secure' | 'advanced'
+
+export interface StudentSkill {
+  id: string
+  student_id: string
+  skill_id: string
+  level: SkillLevel
+  verified_count: number
+  updated_at: string
+  updated_by?: string
+  skills?: Skill
+}
+
+export type CriterionResult = 'met' | 'partly_met' | 'not_met'
+
+export interface ReviewCriteriaResult {
+  id: string
+  review_id: string
+  criterion_id: string
+  result: CriterionResult
+  created_at: string
+}
+
 export interface Opportunity {
   id: string
   employer_id: string

@@ -1,5 +1,5 @@
-import StudentMyWorkPanel from '@/components/v2/StudentMyWorkPanel'
+import StudentWorkContainer from '@/components/v2/StudentWorkContainer'
 
 export default function StudentWorkPage() {
-  return <StudentMyWorkPanel />
+  return <StudentWorkContainer />
 }

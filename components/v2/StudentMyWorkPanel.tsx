@@ -7,9 +7,10 @@ import {
   getVisibleWorkItems, getMySubmissions, getMyOrgType, getWorkItemMemberCount,
   submitWork, uploadSubmissionFile, getSignedFileUrl, redeemJoinCode,
   markWorkItemStarted, getMyStartedWorkItemIds, getSubmissionAttachments,
+  getWorkItemSkills, tickSubmissionSkills,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
-import type { WorkItem } from '@/lib/types'
+import type { WorkItem, Skill } from '@/lib/types'
 import {
   Clock, Users, BadgeCheck, Paperclip, X, Video, MapPin, CalendarClock,
   CheckCircle2, RotateCcw, KeyRound, ArrowLeft, FileText,
@@ -435,6 +436,11 @@ function WorkItemDetail({
   // left, rather than resetting every tick -- checked_criteria is
   // exactly what latest already carries for that case.
   const [checkedCriteria, setCheckedCriteria] = useState<Set<string>>(new Set(latest?.checked_criteria || []))
+  // Which of this brief/assignment's tagged skills the student says
+  // this submission demonstrates -- additive, only ever shown when the
+  // item actually has skills tagged (tagWorkItemSkills, set by staff).
+  const [tagged, setTagged] = useState<Skill[]>([])
+  const [tickedSkillIds, setTickedSkillIds] = useState<Set<string>>(new Set())
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [inSession, setInSession] = useState(false)
@@ -468,6 +474,17 @@ function WorkItemDetail({
     if (item.type === 'course' || item.type === 'workshop') getWorkItemMemberCount(item.id).then(setMemberCount)
   }, [item.id, item.type])
 
+  useEffect(() => {
+    if (canSubmit) getWorkItemSkills(item.id).then(({ data }) => setTagged(data || []))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id])
+
+  const toggleSkill = (skillId: string) => setTickedSkillIds(prev => {
+    const next = new Set(prev)
+    next.has(skillId) ? next.delete(skillId) : next.add(skillId)
+    return next
+  })
+
   // Fallback net -- SubmittableCard's own "Start" pill already marks
   // this, but a student can just as easily open the detail view
   // directly (tapping the card body, not that specific pill) without
@@ -494,10 +511,11 @@ function WorkItemDetail({
       if (uploadError || !path) { setLoading(false); return setError(uploadError?.message || `"${f.name}" failed to upload.`) }
       uploaded.push({ path, name: f.name, type: f.type, size: f.size })
     }
-    const { error: submitError } = await submitWork(user.id, item.id, content.trim(), uploaded, Array.from(checkedCriteria))
+    const { data: newSubmission, error: submitError } = await submitWork(user.id, item.id, content.trim(), uploaded, Array.from(checkedCriteria))
     setLoading(false)
     if (submitError) return setError(submitError.message)
-    setContent(''); setFiles([]); setCheckedCriteria(new Set())
+    if (tickedSkillIds.size > 0 && newSubmission) await tickSubmissionSkills((newSubmission as any).id, Array.from(tickedSkillIds))
+    setContent(''); setFiles([]); setCheckedCriteria(new Set()); setTickedSkillIds(new Set())
     ;(document.activeElement as HTMLElement | null)?.blur()
     onChanged()
   }
@@ -649,6 +667,31 @@ function WorkItemDetail({
           {canSubmit && (
             <div className="border-t border-edge-subtle pt-4">
               {error && <p className="text-xs text-danger-text mb-3">{error}</p>}
+
+              {/* Which skills this piece demonstrates -- only shown
+                  when a tutor has actually tagged this brief/assignment
+                  with skills (WorkItemsPanel's "Link to a course").
+                  Optional: unticked is a perfectly normal submission,
+                  same as before this existed. */}
+              {tagged.length > 0 && (
+                <div className="mb-4">
+                  <label className="block mb-1.5">
+                    <span className="block text-[13px] font-semibold text-ink">Skills this shows (optional)</span>
+                    <span className="block text-xs text-ink-tertiary mt-0.5">Tick any you're using this piece as evidence for — your tutor checks it against each one.</span>
+                  </label>
+                  <div className="bg-surface-subtle border border-edge rounded-xl px-4 py-3 space-y-2">
+                    {tagged.map(skill => (
+                      <label key={skill.id} className="flex items-start gap-2.5 cursor-pointer">
+                        <input
+                          type="checkbox" checked={tickedSkillIds.has(skill.id)} onChange={() => toggleSkill(skill.id)}
+                          className="mt-0.5 flex-shrink-0"
+                        />
+                        <span className="text-sm leading-relaxed text-ink-body">{skill.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* YOUR WORK -- multi-file, no cap on count. Each file
                   gets its own remove button; "+ Add another file" stays

@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getReviewQueue, submitReview, getStudentReviewHistory, getSignedFileUrl,
-  getReportedPosts, restorePost, removePost,
+  getReportedPosts, restorePost, removePost, getSubmissionSkills, submitSkillReview,
 } from '@/lib/supabase'
-import type { Submission } from '@/lib/types'
+import type { Submission, Skill, CriterionResult } from '@/lib/types'
 import {
   CheckCircle2, History, FileText, ExternalLink, ChevronLeft, Sparkles,
   Flag, EyeOff, ShieldAlert, Search,
@@ -338,11 +338,19 @@ function ReviewPiece({ submission, onBack, onDecided }: { submission: any; onBac
   const [fileUrl, setFileUrl] = useState<string | null>(null)
   const [history, setHistory] = useState<any[] | null>(null)
   const [showHistory, setShowHistory] = useState(false)
+  // Skills the STUDENT ticked at submit time (not just whatever the
+  // work item has tagged) -- only what they actually claimed this
+  // piece demonstrates gets a real structured check here. Untagged
+  // submissions (taggedSkills stays []) fall through to the old
+  // free-text checklist below, completely unchanged.
+  const [taggedSkills, setTaggedSkills] = useState<Skill[] | null>(null)
+  const [criteriaResults, setCriteriaResults] = useState<Record<string, CriterionResult>>({})
 
   useEffect(() => {
     if (submission.file_path) getSignedFileUrl('submission-files', submission.file_path).then(({ url }) => setFileUrl(url))
     getStudentReviewHistory(submission.student_id, submission.id).then(({ data }) => setHistory(data || []))
-    setTicked(new Set()); setFeedback(''); setError(''); setConfirmVerify(false)
+    getSubmissionSkills(submission.id).then(({ data }) => setTaggedSkills(data || []))
+    setTicked(new Set()); setFeedback(''); setError(''); setConfirmVerify(false); setCriteriaResults({})
   }, [submission.id])
 
   // No criteria array in the schema -- criteria is one text field a
@@ -352,11 +360,20 @@ function ReviewPiece({ submission, onBack, onDecided }: { submission: any; onBac
   // works fine as a one-item checklist.
   const criteriaLines = (submission.work_items?.criteria || '').split('\n').map((l: string) => l.trim()).filter(Boolean)
   const isImage = submission.file_type && ['image/png', 'image/jpeg', 'image/webp'].includes(submission.file_type)
+  const hasStructuredSkills = !!taggedSkills && taggedSkills.length > 0
+  const allCriteria = hasStructuredSkills
+    ? taggedSkills!.flatMap(s => (s.skill_criteria || []).map(c => ({ ...c, skillName: s.name })))
+    : []
+  const setCriterionResult = (criterionId: string, result: CriterionResult) =>
+    setCriteriaResults(prev => ({ ...prev, [criterionId]: result }))
 
   const toggle = (i: number) => setTicked(prev => { const next = new Set(prev); next.has(i) ? next.delete(i) : next.add(i); return next })
 
   const verify = async () => {
-    if (criteriaLines.length > 0 && ticked.size < criteriaLines.length && !confirmVerify) { setConfirmVerify(true); return }
+    const incomplete = hasStructuredSkills
+      ? allCriteria.some(c => (criteriaResults[c.id] || 'not_met') !== 'met')
+      : criteriaLines.length > 0 && ticked.size < criteriaLines.length
+    if (incomplete && !confirmVerify) { setConfirmVerify(true); return }
     setConfirmVerify(false)
     await decide('verified')
   }
@@ -369,7 +386,9 @@ function ReviewPiece({ submission, onBack, onDecided }: { submission: any; onBac
   const decide = async (decision: 'verified' | 'returned') => {
     if (!user) return
     setError(''); setLoading(true)
-    const { error: reviewError } = await submitReview(submission.id, user.id, decision, feedback.trim())
+    const { error: reviewError } = hasStructuredSkills
+      ? await submitSkillReview(submission.id, decision, feedback.trim(), allCriteria.map(c => ({ criterion_id: c.id, result: criteriaResults[c.id] || 'not_met' })))
+      : await submitReview(submission.id, user.id, decision, feedback.trim())
     setLoading(false)
     if (reviewError) return setError(reviewError.message)
     if (decision === 'verified') { setJustVerified(true); setTimeout(onDecided, 1100) }
@@ -424,8 +443,39 @@ function ReviewPiece({ submission, onBack, onDecided }: { submission: any; onBac
         </div>
 
         <div className="bg-surface border border-edge rounded-xl p-[14px]">
-          <p className="text-[12px] font-medium uppercase tracking-wide mb-2.5" style={{ color: '#5A5A5A' }}>Check against criteria</p>
-          {criteriaLines.length === 0 ? (
+          <p className="text-[12px] font-medium uppercase tracking-wide mb-2.5" style={{ color: '#5A5A5A' }}>
+            {hasStructuredSkills ? 'Check against skill criteria' : 'Check against criteria'}
+          </p>
+          {hasStructuredSkills ? (
+            <div className="space-y-3.5 mb-3">
+              {taggedSkills!.map(skill => (
+                <div key={skill.id}>
+                  <p className="text-[12.5px] font-semibold text-ink mb-1.5">{skill.name}</p>
+                  <div className="space-y-2">
+                    {(skill.skill_criteria || []).map(c => (
+                      <div key={c.id}>
+                        <p className="text-[13.5px] text-ink-body leading-snug mb-1">{c.text}</p>
+                        <div className="flex items-center gap-1.5">
+                          {([['met', 'Met', '#0F6E56', '#E1F5EE'], ['partly_met', 'Partly met', '#854F0B', '#FAEEDA'], ['not_met', 'Not met', '#B4362A', '#FBE9E7']] as [CriterionResult, string, string, string][]).map(([val, label, color, bg]) => {
+                            const active = (criteriaResults[c.id] || null) === val
+                            return (
+                              <button
+                                key={val} type="button" onClick={() => setCriterionResult(c.id, val)}
+                                className="text-[11.5px] font-semibold px-[9px] py-[3px] rounded-full border transition"
+                                style={active ? { backgroundColor: bg, color, borderColor: color } : { backgroundColor: 'transparent', color: '#8A8A8A', borderColor: '#E7E4DE' }}
+                              >
+                                {label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : criteriaLines.length === 0 ? (
             <p className="text-[13px] italic" style={{ color: '#8A8A8A' }}>No criteria written for this brief.</p>
           ) : (
             <div className="space-y-2 mb-3">
@@ -453,7 +503,7 @@ function ReviewPiece({ submission, onBack, onDecided }: { submission: any; onBac
 
       {confirmVerify && (
         <div className="bg-surface-subtle border border-edge rounded-xl px-4 py-3 mb-3 flex items-center justify-between gap-3">
-          <p className="text-[13px] text-ink">Some criteria are not ticked. Verify anyway?</p>
+          <p className="text-[13px] text-ink">{hasStructuredSkills ? 'Not every criterion is marked Met. Verify anyway?' : 'Some criteria are not ticked. Verify anyway?'}</p>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button onClick={() => setConfirmVerify(false)} className="text-[13px] font-semibold text-ink-secondary px-3 py-1.5">Cancel</button>
             <button onClick={verify} disabled={loading} className="text-[13px] font-semibold text-white px-3 py-1.5 rounded-lg disabled:opacity-50" style={{ backgroundColor: '#0F6E56' }}>Verify</button>

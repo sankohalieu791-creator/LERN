@@ -10,11 +10,12 @@ import {
   uploadWorkItemAttachment, uploadSubmissionFileFor, submitWorkForStudents, getSignedFileUrl, startWorkItemSession,
   closeWorkItem, reopenWorkItem, getWorkItemRecordings, getBriefStatusSummaries,
   publishWorkItemNow, publishOverdueScheduledWorkItems,
+  getCourses, getCourseSkills, tagWorkItemSkills,
 } from '@/lib/supabase'
 import { TextField, PrimaryButton, ErrorBanner, Spinner } from '@/components/v2/Field'
 import WorkshopSession from '@/components/v2/WorkshopSession'
 import ScrollTrack from '@/components/v2/ScrollTrack'
-import type { WorkItem, Group } from '@/lib/types'
+import type { WorkItem, Group, Skill } from '@/lib/types'
 import { Plus, X, Paperclip, UploadCloud, FileText, ExternalLink, CalendarClock, Users2, Video, MapPin, Ban, RotateCcw, Film, Download, Clock, PenLine, CheckCircle2, Send } from 'lucide-react'
 
 type ItemType = 'brief' | 'course' | 'workshop'
@@ -559,6 +560,60 @@ function AttachmentChip({ attachment }: { attachment: any }) {
 
 // Assign-to picker: pick an existing group, or create one inline --
 // orgs start with zero groups, so this has to be usable from empty.
+// Skill Wallet (Phase 1) -- optional, additive. Only shows up once an
+// org has actually set up a course with skills (Course skills setup
+// screen); with none yet, this renders nothing rather than a dead-end
+// picker pointing at an empty list.
+function SkillTagPicker({ organisationId, selectedSkillIds, onChange }: {
+  organisationId?: string; selectedSkillIds: string[]; onChange: (ids: string[]) => void
+}) {
+  const [courses, setCourses] = useState<{ id: string; name: string }[]>([])
+  const [courseId, setCourseId] = useState('')
+  const [skills, setSkills] = useState<Skill[]>([])
+
+  useEffect(() => {
+    if (!organisationId) return
+    getCourses(organisationId).then(({ data }) => setCourses(data || []))
+  }, [organisationId])
+
+  useEffect(() => {
+    if (!courseId) { setSkills([]); return }
+    getCourseSkills(courseId).then(({ data }) => setSkills(data || []))
+  }, [courseId])
+
+  if (courses.length === 0) return null
+
+  const toggle = (id: string) => onChange(selectedSkillIds.includes(id) ? selectedSkillIds.filter(x => x !== id) : [...selectedSkillIds, id])
+
+  return (
+    <label className="block">
+      <span className="block text-[13px] font-semibold text-ink mb-1.5">Link to a course (optional)</span>
+      <select
+        value={courseId} onChange={e => setCourseId(e.target.value)}
+        className="w-full bg-surface border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition mb-2"
+      >
+        <option value="">Not linked to a course</option>
+        {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+      {courseId && (
+        skills.length === 0 ? (
+          <p className="text-[12px] text-ink-tertiary">No skills set up for this course yet.</p>
+        ) : (
+          <div className="space-y-1.5">
+            <span className="block text-[12px] text-ink-tertiary mb-1">Which skills can this credit?</span>
+            {skills.map(s => (
+              <label key={s.id} className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={selectedSkillIds.includes(s.id)} onChange={() => toggle(s.id)} />
+                <span className="text-[13px] text-ink">{s.name}</span>
+              </label>
+            ))}
+          </div>
+        )
+      )}
+    </label>
+  )
+}
+
 function GroupPicker({ organisationId, value, onChange, required }: { organisationId?: string; value: string; onChange: (id: string) => void; required?: boolean }) {
   const { user } = useAuth()
   const [groups, setGroups] = useState<Group[]>([])
@@ -676,6 +731,7 @@ function CreateWorkItemForm({ type, onClose, onCreated }: { type: ItemType; onCl
   const [location, setLocation] = useState('')
   const [startsAt, setStartsAt] = useState('')
   const [groupId, setGroupId] = useState('')
+  const [skillIds, setSkillIds] = useState<string[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -692,16 +748,17 @@ function CreateWorkItemForm({ type, onClose, onCreated }: { type: ItemType; onCl
     // all, so the "private = join code only" distinction never actually
     // meant anything extra; public (visible to the whole org) is the
     // only behaviour that ever made sense as a default.
-    const { error: createError } = await createWorkItem(user.organisation_id, user.id, {
+    const { data: workItem, error: createError } = await createWorkItem(user.organisation_id, user.id, {
       type, title: title.trim(), topic: topic.trim() || undefined, description: description.trim() || undefined,
       criteria: criteria.trim(), visibility: 'public', deadline: deadline || null,
       mode, location: mode === 'in_person' ? location.trim() : undefined,
       starts_at: mode === 'online' && startsAt ? new Date(startsAt).toISOString() : null,
       group_id: type === 'course' ? (groupId || null) : null,
     })
+    if (createError || !workItem) { setLoading(false); return setError(createError?.message || `Could not create the ${type}.`) }
+    if (skillIds.length > 0) await tagWorkItemSkills((workItem as any).id, skillIds)
     setLoading(false)
-    if (createError) return setError(createError.message)
-    setTitle(''); setTopic(''); setDescription(''); setCriteria(''); setDeadline(''); setLocation(''); setStartsAt(''); setGroupId('')
+    setTitle(''); setTopic(''); setDescription(''); setCriteria(''); setDeadline(''); setLocation(''); setStartsAt(''); setGroupId(''); setSkillIds([])
     onCreated()
   }
 
@@ -733,6 +790,9 @@ function CreateWorkItemForm({ type, onClose, onCreated }: { type: ItemType; onCl
         placeholder="e.g. Original, scalable to 16px, with a one-paragraph rationale"
         hint="Visible to students too. This is what a tutor checks the work against when they verify it."
       />
+      <div className="mb-4">
+        <SkillTagPicker organisationId={user?.organisation_id} selectedSkillIds={skillIds} onChange={setSkillIds} />
+      </div>
       {type === 'course' && (
         <GroupPicker organisationId={user?.organisation_id} value={groupId} onChange={setGroupId} />
       )}
@@ -817,6 +877,7 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
   const [criteria, setCriteria] = useState('')
   const [deadline, setDeadline] = useState('')
   const [groupId, setGroupId] = useState('')
+  const [skillIds, setSkillIds] = useState<string[]>([])
   const [portfolioWork, setPortfolioWork] = useState(true)
   const [files, setFiles] = useState<File[]>([])
   const [publishChoice, setPublishChoice] = useState<PublishChoice>('posted')
@@ -852,6 +913,7 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
       const { error: attachError } = await uploadWorkItemAttachment((workItem as any).id, user.id, file)
       if (attachError) { setLoading(false); return setError(`Brief created, but "${file.name}" failed to attach: ${attachError.message}`) }
     }
+    if (skillIds.length > 0) await tagWorkItemSkills((workItem as any).id, skillIds)
     setLoading(false)
     onCreated()
   }
@@ -933,6 +995,7 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
               />
               <p className="text-[12px] text-ink-tertiary mt-1.5">Visible to the student too, as a tickable checklist — LERN's replacement for a rubric, not a mark out of ten.</p>
             </label>
+            <SkillTagPicker organisationId={user?.organisation_id} selectedSkillIds={skillIds} onChange={setSkillIds} />
             <div className="rounded-lg px-3 py-2.5" style={{ backgroundColor: '#E6F1FB' }}>
               <p className="text-[12px] leading-relaxed" style={{ color: '#0C447C' }}>
                 This isn't extra work — tag what you're already running: enterprise days, real projects, employer challenges.

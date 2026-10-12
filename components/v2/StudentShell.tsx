@@ -9,12 +9,17 @@ import ScrollTrack from '@/components/v2/ScrollTrack'
 import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
 import { signOut } from '@/lib/supabase'
-import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search, ChevronLeft, ChevronRight, LogOut } from 'lucide-react'
+import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search, ChevronLeft, ChevronRight, LogOut, Award } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
+// Skill Wallet gets its own standalone button here, separate from My
+// Work, per direct request -- only on desktop; on phone it's a tab
+// inside My Work instead (StudentWorkContainer), since the 5-slot
+// bottom nav has no room for a 6th destination.
 const DESKTOP_NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/student/feed', label: 'Feed', icon: Home },
   { href: '/student/work', label: 'My Work', icon: ClipboardList },
+  { href: '/student/skill-wallet', label: 'Skill Wallet', icon: Award },
   { href: '/student/discover', label: 'Discover', icon: Compass },
   { href: '/student/profile', label: 'Profile', icon: UserIcon },
 ]

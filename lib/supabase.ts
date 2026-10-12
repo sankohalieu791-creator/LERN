@@ -857,6 +857,152 @@ export const submitReview = async (
   return { data, error }
 }
 
+// ── Skill Wallet (Phase 1) ──────────────────────────────────────────
+// Extends the submit/review/verify loop above rather than duplicating
+// it -- see supabase/migrations (skill_wallet_phase1_core) for the
+// tables and the submit_skill_review() RPC this all leads to.
+
+export const createCourse = async (organisationId: string, createdBy: string, name: string) => {
+  const { data, error } = await supabase
+    .from('courses')
+    .insert([{ organisation_id: organisationId, created_by: createdBy, name }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const getCourses = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('organisation_id', organisationId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// Returns each course's skills with their criteria nested, ordered for
+// display -- this is the shape the course-skills-setup screen and the
+// work_item skill-tag picker both want.
+export const getCourseSkills = async (courseId: string) => {
+  const { data, error } = await supabase
+    .from('skills')
+    .select('*, skill_criteria(*)')
+    .eq('course_id', courseId)
+    .order('sort_order', { ascending: true })
+  return { data, error }
+}
+
+export const createSkill = async (
+  courseId: string, createdBy: string,
+  fields: { name: string; unit_label?: string; sort_order?: number; criteria: string[] },
+) => {
+  const { data: skill, error } = await supabase
+    .from('skills')
+    .insert([{ course_id: courseId, created_by: createdBy, name: fields.name, unit_label: fields.unit_label || null, sort_order: fields.sort_order ?? 0 }])
+    .select()
+    .single()
+  if (error || !skill) return { data: null, error }
+  const criteriaRows = fields.criteria.filter(Boolean).map((text, i) => ({ skill_id: skill.id, text, sort_order: i }))
+  if (criteriaRows.length > 0) {
+    const { error: critErr } = await supabase.from('skill_criteria').insert(criteriaRows)
+    if (critErr) return { data: skill, error: critErr }
+  }
+  return { data: skill, error: null }
+}
+
+// Which skills a brief/workshop can credit -- additive, called once
+// after createWorkItem. An item with no rows here is untouched by any
+// of this; the existing free-text criteria flow keeps working exactly
+// as it does today.
+export const tagWorkItemSkills = async (workItemId: string, skillIds: string[]) => {
+  if (skillIds.length === 0) return { error: null }
+  const { error } = await supabase
+    .from('work_item_skills')
+    .insert(skillIds.map(skill_id => ({ work_item_id: workItemId, skill_id })))
+  return { error }
+}
+
+export const getWorkItemSkills = async (workItemId: string) => {
+  const { data, error } = await supabase
+    .from('work_item_skills')
+    .select('skills(*, skill_criteria(*))')
+    .eq('work_item_id', workItemId)
+  return { data: (data || []).map((r: any) => r.skills).filter(Boolean) as (import('./types').Skill)[], error }
+}
+
+// What the student ticked at submit time -- a subset of the work_item's
+// tagged skills. Called alongside the existing submitWork().
+export const tickSubmissionSkills = async (submissionId: string, skillIds: string[]) => {
+  if (skillIds.length === 0) return { error: null }
+  const { error } = await supabase
+    .from('submission_skills')
+    .insert(skillIds.map(skill_id => ({ submission_id: submissionId, skill_id })))
+  return { error }
+}
+
+export const getSubmissionSkills = async (submissionId: string) => {
+  const { data, error } = await supabase
+    .from('submission_skills')
+    .select('skills(*, skill_criteria(*))')
+    .eq('submission_id', submissionId)
+  return { data: (data || []).map((r: any) => r.skills).filter(Boolean) as (import('./types').Skill)[], error }
+}
+
+// The one write path for a skill-tagged review -- inserts the reviews
+// row (same trigger cascade as every other review), the per-criterion
+// results, and rolls verified work up into student_skills, all in one
+// transaction server-side. Staff call this instead of plain
+// submitReview() when the submission's work_item is skill-tagged.
+export const submitSkillReview = async (
+  submissionId: string,
+  decision: 'verified' | 'returned' | 'revoked',
+  feedback: string,
+  criteriaResults: { criterion_id: string; result: 'met' | 'partly_met' | 'not_met' }[],
+  levelOverrides?: Record<string, string>,
+) => {
+  const { data, error } = await supabase.rpc('submit_skill_review', {
+    p_submission_id: submissionId,
+    p_decision: decision,
+    p_feedback: feedback || null,
+    p_criteria_results: criteriaResults,
+    p_level_overrides: levelOverrides || {},
+  })
+  return { data, error }
+}
+
+// A student's full skill list with current level -- the Skill Wallet
+// home screen's main query.
+export const getStudentSkills = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('student_skills')
+    .select('*, skills(*, courses(name))')
+    .eq('student_id', studentId)
+  return { data, error }
+}
+
+// Every course's skills for an org, for students who haven't started a
+// skill yet (student_skills has no row until the first verified piece) --
+// the wallet home needs the full "not started" list too, not just rows
+// that already exist.
+export const getOrgSkillsForStudent = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('id, name, skills(*, skill_criteria(*))')
+    .eq('organisation_id', organisationId)
+  return { data, error }
+}
+
+// Evidence for one skill -- verified submissions tagged with it, newest
+// first, for the "one skill" detail screen.
+export const getSkillEvidence = async (studentId: string, skillId: string) => {
+  const { data, error } = await supabase
+    .from('submission_skills')
+    .select('submissions!inner(id, content, file_path, submitted_at, student_id, work_items(title), reviews(decision, feedback, created_at, review_criteria_results(result, criterion_id)))')
+    .eq('skill_id', skillId)
+    .eq('submissions.student_id', studentId)
+  return { data, error }
+}
+
 export const setModeration = async (submissionId: string, status: 'clear' | 'flagged' | 'hidden', reason?: string) => {
   const { error } = await supabase
     .from('submissions')
