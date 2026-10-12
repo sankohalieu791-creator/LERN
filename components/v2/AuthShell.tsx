@@ -113,11 +113,10 @@ export default function AuthShell({
       // actual bug. Dropping it lets the header's sticky resolve against
       // the real scrolling context (body) as intended.
       //
-      // Same texture image, recolored dark per direct request ("keep
-      // the texture, change the color to black") -- every text/button
-      // colour below is flipped to match (was tuned for the original
-      // light peachy version), not just the background swapped in.
-      className="min-h-[100dvh] flex flex-col relative bg-[#141414]"
+      // Back to the original light peachy colourway -- the dark
+      // experiment (black background, light text) didn't stick; same
+      // texture image either way, this only ever changes the colours.
+      className="min-h-[100dvh] flex flex-col relative bg-[#F3E4DA]"
       style={{
         backgroundImage: 'url(/auth-bg.png)',
         backgroundSize: 'cover',
@@ -133,22 +132,19 @@ export default function AuthShell({
           padding (not the root's) so it stays correctly offset from a
           notch/Dynamic Island while pinned. */}
       <header
-        className="flex-shrink-0 sticky top-0 z-20 px-10 py-7 flex items-center gap-4 bg-black/35 backdrop-blur-md"
+        className="flex-shrink-0 sticky top-0 z-20 px-10 py-7 flex items-center gap-4 bg-[#F3E4DA]/70 backdrop-blur-md"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.75rem)' }}
       >
         {!hideBack && (
           <button
             onClick={() => (onBack ? onBack() : router.back())}
             aria-label="Back"
-            className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/25 shadow-sm text-white transition flex-shrink-0"
+            className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-full bg-white/70 hover:bg-white/90 backdrop-blur-md border border-white/80 shadow-sm text-ink transition flex-shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
         )}
-        {/* currentColor -- was unset (inherited the app's dark "ink" text
-            colour, nearly invisible on this now-dark background); the R's
-            own accent stays fixed orange regardless, same as everywhere else. */}
-        <span style={{ color: '#F3E4DA' }}><Logo size="lg" /></span>
+        <Logo size="lg" />
       </header>
 
       <main className="flex-1 flex items-start justify-center px-6 pb-20 relative z-10">
@@ -159,15 +155,15 @@ export default function AuthShell({
                 <div
                   key={i}
                   className={`h-1 flex-1 rounded-full transition-colors ${
-                    i < step ? 'bg-brand' : 'bg-white/15'
+                    i < step ? 'bg-brand' : 'bg-[#EDE9E1]'
                   }`}
                 />
               ))}
             </div>
           )}
 
-          <h1 className="text-3xl font-bold mb-2 leading-tight text-center" style={{ color: '#F7F3EA', textShadow: '0 1px 20px rgba(0,0,0,0.45)' }}>{title}</h1>
-          {subtitle && <p className="text-[#AFA89B] text-[15px] leading-relaxed mb-8 text-center">{subtitle}</p>}
+          <h1 className="text-3xl font-bold text-ink mb-2 leading-tight text-center" style={{ textShadow: '0 1px 16px rgba(255,255,255,0.5)' }}>{title}</h1>
+          {subtitle && <p className="text-[#6B6558] text-[15px] leading-relaxed mb-8 text-center">{subtitle}</p>}
           {!subtitle && <div className="mb-8" />}
 
           {children}
@@ -177,8 +173,8 @@ export default function AuthShell({
       {/* Bottom-left, per direct request -- so it's reachable from
           every sign-up/login screen without hunting for it. */}
       <footer className="flex-shrink-0 px-6 pb-6 flex items-center gap-4 relative z-10">
-        <Link href="/legal/privacy" className="text-[12.5px] font-medium text-[#9A9488] hover:text-white transition">Privacy</Link>
-        <Link href="/legal/terms" className="text-[12.5px] font-medium text-[#9A9488] hover:text-white transition">Terms</Link>
+        <Link href="/legal/privacy" className="text-[12.5px] font-medium text-[#8A8373] hover:text-ink transition">Privacy</Link>
+        <Link href="/legal/terms" className="text-[12.5px] font-medium text-[#8A8373] hover:text-ink transition">Terms</Link>
       </footer>
     </div>
   )
