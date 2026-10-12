@@ -347,10 +347,17 @@ function ReviewPiece({ submission, onBack, onDecided }: { submission: any; onBac
   const [criteriaResults, setCriteriaResults] = useState<Record<string, CriterionResult>>({})
 
   useEffect(() => {
-    if (submission.file_path) getSignedFileUrl('submission-files', submission.file_path).then(({ url }) => setFileUrl(url))
-    getStudentReviewHistory(submission.student_id, submission.id).then(({ data }) => setHistory(data || []))
-    getSubmissionSkills(submission.id).then(({ data }) => setTaggedSkills(data || []))
+    // Guarded against a late response landing after the reviewer has
+    // already moved to a different submission -- without this, a slow
+    // getSubmissionSkills for submission A resolving after B is open
+    // would overwrite B's criteria with A's, and a decision made right
+    // after would submit the wrong criterion ids against B's review.
+    let cancelled = false
+    if (submission.file_path) getSignedFileUrl('submission-files', submission.file_path).then(({ url }) => { if (!cancelled) setFileUrl(url) })
+    getStudentReviewHistory(submission.student_id, submission.id).then(({ data }) => { if (!cancelled) setHistory(data || []) })
+    getSubmissionSkills(submission.id).then(({ data }) => { if (!cancelled) setTaggedSkills(data || []) })
     setTicked(new Set()); setFeedback(''); setError(''); setConfirmVerify(false); setCriteriaResults({})
+    return () => { cancelled = true }
   }, [submission.id])
 
   // No criteria array in the schema -- criteria is one text field a

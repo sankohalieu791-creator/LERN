@@ -756,7 +756,10 @@ function CreateWorkItemForm({ type, onClose, onCreated }: { type: ItemType; onCl
       group_id: type === 'course' ? (groupId || null) : null,
     })
     if (createError || !workItem) { setLoading(false); return setError(createError?.message || `Could not create the ${type}.`) }
-    if (skillIds.length > 0) await tagWorkItemSkills((workItem as any).id, skillIds)
+    if (skillIds.length > 0) {
+      const { error: tagError } = await tagWorkItemSkills((workItem as any).id, skillIds)
+      if (tagError) { setLoading(false); return setError(`${type === 'course' ? 'Course' : 'Workshop'} created, but linking the skills failed: ${tagError.message}`) }
+    }
     setLoading(false)
     setTitle(''); setTopic(''); setDescription(''); setCriteria(''); setDeadline(''); setLocation(''); setStartsAt(''); setGroupId(''); setSkillIds([])
     onCreated()
@@ -913,7 +916,10 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
       const { error: attachError } = await uploadWorkItemAttachment((workItem as any).id, user.id, file)
       if (attachError) { setLoading(false); return setError(`Brief created, but "${file.name}" failed to attach: ${attachError.message}`) }
     }
-    if (skillIds.length > 0) await tagWorkItemSkills((workItem as any).id, skillIds)
+    if (skillIds.length > 0) {
+      const { error: tagError } = await tagWorkItemSkills((workItem as any).id, skillIds)
+      if (tagError) { setLoading(false); return setError(`Brief created, but linking the skills failed: ${tagError.message}`) }
+    }
     setLoading(false)
     onCreated()
   }

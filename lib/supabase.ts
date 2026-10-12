@@ -862,6 +862,17 @@ export const submitReview = async (
 // it -- see supabase/migrations (skill_wallet_phase1_core) for the
 // tables and the submit_skill_review() RPC this all leads to.
 
+// PostgREST can embed skill_criteria unordered (insertion order isn't
+// guaranteed), and sort_order exists specifically so a tutor's
+// authored criteria order survives display -- sorted client-side here
+// rather than trusting a nested .order(..., { foreignTable }) path
+// across a double embed (skills -> skill_criteria), which is easy to
+// get subtly wrong without a live PostgREST instance to check against.
+function sortSkillCriteria<T extends { skill_criteria?: { sort_order: number }[] }>(skill: T): T {
+  if (!skill.skill_criteria) return skill
+  return { ...skill, skill_criteria: [...skill.skill_criteria].sort((a, b) => a.sort_order - b.sort_order) }
+}
+
 export const createCourse = async (organisationId: string, createdBy: string, name: string) => {
   const { data, error } = await supabase
     .from('courses')
@@ -889,7 +900,7 @@ export const getCourseSkills = async (courseId: string) => {
     .select('*, skill_criteria(*)')
     .eq('course_id', courseId)
     .order('sort_order', { ascending: true })
-  return { data, error }
+  return { data: (data || []).map(sortSkillCriteria), error }
 }
 
 export const createSkill = async (
@@ -905,7 +916,12 @@ export const createSkill = async (
   const criteriaRows = fields.criteria.filter(Boolean).map((text, i) => ({ skill_id: skill.id, text, sort_order: i }))
   if (criteriaRows.length > 0) {
     const { error: critErr } = await supabase.from('skill_criteria').insert(criteriaRows)
-    if (critErr) return { data: skill, error: critErr }
+    if (critErr) {
+      // Don't leave an orphan skill with zero criteria behind -- from
+      // the caller's view this whole call either worked or it didn't.
+      await supabase.from('skills').delete().eq('id', skill.id)
+      return { data: null, error: critErr }
+    }
   }
   return { data: skill, error: null }
 }
@@ -927,7 +943,8 @@ export const getWorkItemSkills = async (workItemId: string) => {
     .from('work_item_skills')
     .select('skills(*, skill_criteria(*))')
     .eq('work_item_id', workItemId)
-  return { data: (data || []).map((r: any) => r.skills).filter(Boolean) as (import('./types').Skill)[], error }
+  const skills = (data || []).map((r: any) => r.skills).filter(Boolean).map(sortSkillCriteria) as (import('./types').Skill)[]
+  return { data: skills.sort((a, b) => a.sort_order - b.sort_order), error }
 }
 
 // What the student ticked at submit time -- a subset of the work_item's
@@ -945,7 +962,8 @@ export const getSubmissionSkills = async (submissionId: string) => {
     .from('submission_skills')
     .select('skills(*, skill_criteria(*))')
     .eq('submission_id', submissionId)
-  return { data: (data || []).map((r: any) => r.skills).filter(Boolean) as (import('./types').Skill)[], error }
+  const skills = (data || []).map((r: any) => r.skills).filter(Boolean).map(sortSkillCriteria) as (import('./types').Skill)[]
+  return { data: skills.sort((a, b) => a.sort_order - b.sort_order), error }
 }
 
 // The one write path for a skill-tagged review -- inserts the reviews
@@ -989,7 +1007,11 @@ export const getOrgSkillsForStudent = async (organisationId: string) => {
     .from('courses')
     .select('id, name, skills(*, skill_criteria(*))')
     .eq('organisation_id', organisationId)
-  return { data, error }
+  const sorted = (data || []).map((c: any) => ({
+    ...c,
+    skills: [...(c.skills || [])].map(sortSkillCriteria).sort((a: any, b: any) => a.sort_order - b.sort_order),
+  }))
+  return { data: sorted, error }
 }
 
 // Evidence for one skill -- verified submissions tagged with it, newest

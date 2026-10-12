@@ -21,9 +21,11 @@ import { useEffect, useState } from 'react'
 // staggered in on its own, then draws an underline beneath once
 // they've landed, before the whole thing holds and fades.
 //
-// Colour is hardcoded black-with-white-wordmark regardless of the
+// Colour is hardcoded white-with-black-wordmark regardless of the
 // viewer's light/dark preference, same as TikTok/Instagram do -- the
-// splash is brand identity, not themed UI.
+// splash is brand identity, not themed UI. White, not the previous
+// dark-with-white-wordmark, per direct request: the mark needed to
+// stand out more than a dark screen let it.
 // L, E, R-body, N, in that order -- R's accent (drawn separately below,
 // in brand orange) lands on the same beat as the R body beside it.
 const LETTER_DELAYS_MS = [0, 90, 180, 270]
@@ -52,7 +54,7 @@ export default function SplashScreen() {
     <div
       aria-hidden
       data-splash
-      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-[#0f0f0f] transition-opacity duration-[400ms] ease-out ${
+      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-white transition-opacity duration-[400ms] ease-out ${
         stage === 'exit' ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
@@ -66,7 +68,7 @@ export default function SplashScreen() {
           ].map((d, i) => (
             <path
               key={i}
-              fill="#ffffff"
+              fill="#1F2328"
               d={d}
               style={{
                 opacity: lettersIn ? 1 : 0,
@@ -93,6 +95,21 @@ export default function SplashScreen() {
             animation: lettersIn ? 'splashUnderlineIn 350ms ease-out 620ms both' : undefined,
           }}
         />
+        {/* The company behind the product, same spot Anthropic's name
+            sits under Claude's own mark on launch -- lands last, after
+            the wordmark and its underline have already settled, so it
+            reads as a quiet byline rather than competing with the mark. */}
+        <p
+          className="mt-3 text-[11px] font-medium uppercase"
+          style={{
+            color: '#9A958C',
+            letterSpacing: '0.12em',
+            opacity: lettersIn ? 1 : 0,
+            animation: lettersIn ? 'splashLetterIn 450ms ease-out 700ms both' : undefined,
+          }}
+        >
+          IRL Connect
+        </p>
       </div>
     </div>
   )

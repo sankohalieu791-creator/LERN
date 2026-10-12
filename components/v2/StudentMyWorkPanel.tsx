@@ -476,8 +476,7 @@ function WorkItemDetail({
 
   useEffect(() => {
     if (canSubmit) getWorkItemSkills(item.id).then(({ data }) => setTagged(data || []))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id])
+  }, [item.id, canSubmit])
 
   const toggleSkill = (skillId: string) => setTickedSkillIds(prev => {
     const next = new Set(prev)
@@ -514,7 +513,14 @@ function WorkItemDetail({
     const { data: newSubmission, error: submitError } = await submitWork(user.id, item.id, content.trim(), uploaded, Array.from(checkedCriteria))
     setLoading(false)
     if (submitError) return setError(submitError.message)
-    if (tickedSkillIds.size > 0 && newSubmission) await tickSubmissionSkills((newSubmission as any).id, Array.from(tickedSkillIds))
+    // The submission itself is real and already in review at this
+    // point -- a failed tick-save shouldn't discard it or block
+    // closing (retrying would just create a second submission), but
+    // it shouldn't be silently swallowed either.
+    if (tickedSkillIds.size > 0 && newSubmission) {
+      const { error: tickError } = await tickSubmissionSkills((newSubmission as any).id, Array.from(tickedSkillIds))
+      if (tickError) setError(`Submitted, but saving which skills this shows failed: ${tickError.message}`)
+    }
     setContent(''); setFiles([]); setCheckedCriteria(new Set()); setTickedSkillIds(new Set())
     ;(document.activeElement as HTMLElement | null)?.blur()
     onChanged()

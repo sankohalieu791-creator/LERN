@@ -12,6 +12,7 @@ import {
   isUsernameAvailable, getMyOrganisationInfo, getPublicStudentProfile, blockUser,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
+import FollowButton from '@/components/v2/FollowButton'
 import { STICKER_OPTIONS } from '@/lib/feedConstants'
 import {
   FolderCheck, Briefcase, Grid3x3, Settings as SettingsIcon, Plus, X, Trash2, Play,
@@ -231,13 +232,18 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
               ))}
             </div>
           )}
-          {isOwn && (
+          {isOwn ? (
             <button
               onClick={() => setEditingBio(true)}
               className="mt-4 px-6 py-2 rounded-full border border-[var(--app-overlay-3)] text-[13px] font-semibold hover:bg-[var(--app-overlay-2)] active:scale-[0.98] transition"
             >
               Edit profile
             </button>
+          ) : (
+            <FollowButton
+              profileId={profileId!}
+              onChange={isNowFollowing => setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers + (isNowFollowing ? 1 : -1)) }))}
+            />
           )}
         </div>
 

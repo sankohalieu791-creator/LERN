@@ -239,16 +239,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         </div>
-        <div className={collapsed ? 'px-2.5 pb-3' : 'px-4 pb-3'}>
-          <button
-            onClick={onPlus} aria-label="New post"
-            className="w-full flex items-center justify-center gap-2 text-white font-semibold text-[14px] py-2.5 rounded-xl hover:opacity-90 active:scale-[0.99] transition"
-            style={{ backgroundColor: '#F26B21' }}
-          >
-            <Plus className="w-4 h-4 flex-shrink-0" /> {!collapsed && 'New post'}
-          </button>
-        </div>
-        <nav className={`flex-1 space-y-1 ${collapsed ? 'px-2.5' : 'px-3'}`}>
+        <nav className={`flex-1 space-y-1 pt-3 ${collapsed ? 'px-2.5' : 'px-3'}`}>
           {DESKTOP_NAV.map(item => {
             const active = isActive(item.href)
             return (
@@ -266,6 +257,18 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
             )
           })}
         </nav>
+        {/* Icon-only now, under the nav list rather than above it --
+            was a full "+ New post" pill at the very top; per direct
+            request it's just the plus button now, moved underneath. */}
+        <div className={`flex-shrink-0 py-3 ${collapsed ? 'px-2.5 flex justify-center' : 'px-3'}`}>
+          <button
+            onClick={onPlus} aria-label="New post" title="New post"
+            className="w-10 h-10 flex items-center justify-center rounded-full text-white hover:opacity-90 active:scale-[0.99] transition flex-shrink-0"
+            style={{ backgroundColor: '#F26B21' }}
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+        </div>
         {/* Reachable straight from the sidebar now, not just buried in
             Settings -- an org account has always had this same
             one-tap sign out, students didn't. */}

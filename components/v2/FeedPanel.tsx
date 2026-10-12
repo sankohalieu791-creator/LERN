@@ -12,6 +12,7 @@ import {
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import PresenceBadge from '@/components/v2/PresenceBadge'
+import FollowButton from '@/components/v2/FollowButton'
 import type { ReactionType } from '@/lib/types'
 import { MILESTONE_TYPES, MILESTONE_BY_KEY, STICKER_OPTIONS, type MilestoneType } from '@/lib/feedConstants'
 import {
@@ -697,6 +698,7 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
               {meta.pillLabel}
             </span>
           )}
+          {post.author_id !== user?.id && <FollowButton profileId={post.author_id} variant="icon" />}
           {post.author_id === user?.id ? (
             <div className="relative">
               <button onClick={() => setMenuOpen(v => !v)} aria-label="Post options" className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition">
