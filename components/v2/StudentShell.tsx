@@ -229,7 +229,14 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
     <div data-theme={dataTheme} className="h-[100dvh] overflow-hidden bg-[var(--app-bg)] flex" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <aside className={`hidden lg:flex flex-col flex-shrink-0 border-r border-[var(--app-border)] bg-[var(--app-surface)] transition-[width] duration-150 ${collapsed ? 'w-[72px]' : 'w-64'}`}>
         <div className={`h-16 flex items-center flex-shrink-0 ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
-          {!collapsed && <span style={{ color: '#D4551A' }}><Logo size="md" /></span>}
+          {/* var(--app-text), not the brand orange -- that was painting
+              the whole wordmark solid orange (Logo's 4 letters use
+              currentColor), losing the real mark's black-letters/
+              orange-R distinction. The R's accent stays fixed orange
+              either way (hardcoded in Logo.tsx, not currentColor); this
+              only governs the other 4 letters, and inverts correctly
+              with the sidebar's own light/dark theme. */}
+          {!collapsed && <span style={{ color: 'var(--app-text)' }}><Logo size="md" /></span>}
           <button
             onClick={() => setCollapsed(v => !v)}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
