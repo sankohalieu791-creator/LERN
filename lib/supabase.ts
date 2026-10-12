@@ -535,6 +535,10 @@ export const createWorkItem = async (
     // Courses/Workshops never pass these, so they stay the default
     // 'posted', unaffected.
     publish_state?: 'draft' | 'scheduled' | 'posted'; scheduled_for?: string | null
+    // Briefs only -- distinguishes "Upload work students already do"
+    // rows from ordinary briefs (both type='brief'), so the Briefs
+    // screen can show them as two separate lists.
+    is_existing_work?: boolean
   }
 ) => {
   const { data, error } = await supabase
@@ -1045,6 +1049,69 @@ export const getEmployerVisibleSkills = async (studentId: string) => {
 export const getDiscoverSkillNames = async () => {
   const { data, error } = await supabase.from('skills').select('name').order('name')
   return { data: Array.from(new Set((data || []).map((s: any) => s.name))), error }
+}
+
+// ── Self-reported skills -- a student declares a skill and attaches
+// evidence with zero institution setup first, no criteria, no 5-level
+// progression (that's the leveled skills system above). Sits as
+// 'self_reported' until a teacher's one-tap confirm, mirroring
+// set_employer_visibility's org-check shape -- see the migration for
+// the actual RLS/RPC.
+export const uploadSelfReportedSkillEvidence = async (studentId: string, file: File) => {
+  const path = `${studentId}/self-reported/${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from('submission-files').upload(path, file)
+  return { path: error ? null : path, error }
+}
+
+export const createSelfReportedSkill = async (
+  studentId: string, organisationId: string | undefined,
+  fields: { name: string; note?: string; evidence_file_path: string; evidence_file_type?: string },
+) => {
+  const { data, error } = await supabase
+    .from('self_reported_skills')
+    .insert([{ student_id: studentId, organisation_id: organisationId, ...fields }])
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const getMySelfReportedSkills = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('self_reported_skills')
+    .select('*')
+    .eq('student_id', studentId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+// Institution/provider staff confirm queue -- every self-reported
+// skill in their org still awaiting a tap, across all students at once
+// (not buried one-student-at-a-time).
+export const getOrgPendingSelfReportedSkills = async (organisationId: string) => {
+  const { data, error } = await supabase
+    .from('self_reported_skills')
+    .select('*, student:users!self_reported_skills_student_id_fkey(id, full_name)')
+    .eq('organisation_id', organisationId)
+    .eq('status', 'self_reported')
+    .order('created_at', { ascending: true })
+  return { data, error }
+}
+
+export const confirmSelfReportedSkill = async (skillId: string) => {
+  const { error } = await supabase.rpc('confirm_self_reported_skill', { p_skill_id: skillId })
+  return { error }
+}
+
+// Employer-facing -- RLS already restricts this to confirmed rows for
+// an already-discoverable student (has_verification()), this query
+// just mirrors that boundary, same convention as getDiscoverWork.
+export const getEmployerConfirmedSelfReportedSkills = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('self_reported_skills')
+    .select('id, name, note, evidence_file_path, confirmed_at')
+    .eq('student_id', studentId)
+    .eq('status', 'verified')
+  return { data, error }
 }
 
 export const setModeration = async (submissionId: string, status: 'clear' | 'flagged' | 'hidden', reason?: string) => {

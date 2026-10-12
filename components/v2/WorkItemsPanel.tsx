@@ -100,6 +100,7 @@ function BriefsPanel() {
   const [summaries, setSummaries] = useState<Awaited<ReturnType<typeof getBriefStatusSummaries>>>({})
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  const [showUpload, setShowUpload] = useState(false)
 
   const load = async () => {
     if (!user?.organisation_id) return
@@ -117,6 +118,12 @@ function BriefsPanel() {
     })
   }
   useEffect(() => { load() }, [user?.organisation_id])
+
+  // Both created via type='brief', so this flag is the only thing
+  // telling the two tabs' rows apart -- set by UploadExistingWorkForm
+  // at creation time, never changed afterward.
+  const briefItems = items.filter(i => !i.is_existing_work)
+  const uploadItems = items.filter(i => i.is_existing_work)
 
   return (
     <div>
@@ -155,18 +162,37 @@ function BriefsPanel() {
           )}
           {loading ? (
             <p className="text-ink-tertiary text-[14px]">Loading…</p>
-          ) : items.length === 0 ? (
+          ) : briefItems.length === 0 ? (
             <p className="text-ink-tertiary text-[14px]">No briefs yet.</p>
           ) : (
             <div className="space-y-3">
-              {items.map(item => <BriefCard key={item.id} item={item} summary={summaries[item.id]} onChanged={load} />)}
+              {briefItems.map(item => <BriefCard key={item.id} item={item} summary={summaries[item.id]} onChanged={load} />)}
             </div>
           )}
         </div>
       ) : (
         <div>
-          <p className="font-bold text-ink text-[15px] mb-5">Upload work students already do</p>
-          <UploadExistingWorkForm onCreated={() => { setTab('briefs'); load() }} />
+          <div className="flex items-center justify-between mb-5">
+            <p className="font-bold text-ink text-[15px]">Upload work students already do</p>
+            <button
+              onClick={() => setShowUpload(true)}
+              className="flex items-center gap-1.5 border border-edge text-ink font-semibold text-[13px] px-4 py-2 rounded-lg hover:border-edge-input transition"
+            >
+              <Plus className="w-3.5 h-3.5" /> Create
+            </button>
+          </div>
+          {showUpload && (
+            <UploadExistingWorkDialog onClose={() => setShowUpload(false)} onCreated={() => { setShowUpload(false); load() }} />
+          )}
+          {loading ? (
+            <p className="text-ink-tertiary text-[14px]">Loading…</p>
+          ) : uploadItems.length === 0 ? (
+            <p className="text-ink-tertiary text-[14px]">Nothing uploaded yet — this already happened outside LERN, so just add it here for verification.</p>
+          ) : (
+            <div className="space-y-3">
+              {uploadItems.map(item => <BriefCard key={item.id} item={item} summary={summaries[item.id]} onChanged={load} />)}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1097,6 +1123,27 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
   ), document.body)
 }
 
+// Modal wrapper, matching Briefs' own "+ Create" → portal dialog
+// pattern -- UploadExistingWorkForm used to render inline as the
+// tab's entire default view; now it's reached the same way a new
+// brief is, via Create, so this tab can show a real list first.
+function UploadExistingWorkDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const theme = useResolvedTheme()
+  return createPortal((
+    <div data-theme={theme} className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 sm:p-8">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg max-h-[88dvh] overflow-y-auto p-5">
+        <div className="flex items-center justify-between mb-4">
+          <p className="font-bold text-ink text-[16px]">Upload work students already do</p>
+          <button onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-tertiary transition">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <UploadExistingWorkForm onCreated={onCreated} />
+      </div>
+    </div>
+  ), document.body)
+}
+
 function UploadExistingWorkForm({ onCreated }: { onCreated: () => void }) {
   const { user } = useAuth()
   const [title, setTitle] = useState('')
@@ -1125,6 +1172,7 @@ function UploadExistingWorkForm({ onCreated }: { onCreated: () => void }) {
     const { data: workItem, error: createError } = await createWorkItem(user.organisation_id, user.id, {
       type: 'brief', title: title.trim(), topic: topic.trim() || undefined,
       criteria: criteria.trim(), group_id: groupId, visibility: 'public',
+      is_existing_work: true,
     })
     if (createError || !workItem) { setLoading(false); return setError(createError?.message || 'Could not create the brief.') }
 

@@ -27,19 +27,17 @@ type Msg = {
 
 const FALLBACK = "I don't have a clear answer for that yet — try rephrasing, or pick one of the topics below."
 
-// An organic blob, not a circle -- and the two dashes drift through a
-// few gaze directions on a slow loop (up, down, sideways) via the
-// helpdesk-eyes keyframe in globals.css, standing in for an "ask an
-// AI" icon without actually being one -- see lib/helpDeskContent.ts
-// and lib/helpDeskDraft.ts for why nothing behind this is generated.
-const BLOB_RADIUS = '42% 58% 55% 45% / 45% 42% 58% 55%'
+// A plain circle with a static two-dot face, not an organic blob with
+// gaze-animated eyes -- simplified per direct feedback ("just keep it
+// like a circle"). Still a stand-in for an "ask an AI" icon without
+// actually being one -- see lib/helpDeskContent.ts and
+// lib/helpDeskDraft.ts for why nothing behind this is generated.
+// Pending a reference design for the real final look.
+const BLOB_RADIUS = '50%'
 
 function OrbFace({ size = 8 }: { size?: number }) {
   return (
-    <span
-      className="helpdesk-eyes flex items-center"
-      style={{ gap: Math.max(2, size * 0.3), ['--eye-range' as string]: `${Math.round(size * 0.7)}px` }}
-    >
+    <span className="flex items-center" style={{ gap: Math.max(2, size * 0.3) }}>
       <span className="rounded-full" style={{ width: Math.max(2, size * 0.3), height: size, backgroundColor: '#2b2622' }} />
       <span className="rounded-full" style={{ width: Math.max(2, size * 0.3), height: size, backgroundColor: '#2b2622' }} />
     </span>

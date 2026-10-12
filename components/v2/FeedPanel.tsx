@@ -669,21 +669,40 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
       {meta && <div className="h-[4px]" style={{ background: 'linear-gradient(to right, #F26B21, #E0A94B)' }} />}
 
       <div className="flex items-start justify-between gap-2 px-4 pt-3.5 pb-2.5">
-        <button
+        {/* A div, not a button -- the follow badge below needs to sit
+            inside this clickable area as its own real <button> (so its
+            own click/stopPropagation works), and a button can't
+            validly nest another button. role="button" + onKeyDown
+            keeps it keyboard-accessible the same way a real button is. */}
+        <div
           onClick={() => router.push(post.author_id === user?.id ? '/student/profile' : `/student/profile/${post.author_id}`)}
-          className="flex-1 min-w-0 flex items-center gap-2.5 text-left"
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(post.author_id === user?.id ? '/student/profile' : `/student/profile/${post.author_id}`) } }}
+          role="button" tabIndex={0}
+          className="flex-1 min-w-0 flex items-center gap-2.5 text-left cursor-pointer"
         >
           {/* posts_feed never selected the author's avatar_path at all
               before -- there was no real photo to render here regardless
               of whether the author had one set, so this always fell
               back to initials. */}
-          {post.author_avatar_path ? (
-            <img src={authorAvatarUrl || ''} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-          ) : (
-            <span className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
-              {initials(post.author_name)}
-            </span>
-          )}
+          <span className="relative flex-shrink-0">
+            {post.author_avatar_path ? (
+              <img src={authorAvatarUrl || ''} alt="" className="w-10 h-10 rounded-full object-cover" />
+            ) : (
+              <span className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-semibold" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+                {initials(post.author_name)}
+              </span>
+            )}
+            {/* Instagram/TikTok-style "+" badge on the avatar's own
+                corner, not a separate button in the header's right
+                cluster -- FollowButton's icon variant already
+                stopPropagation()s its own click, so this never also
+                triggers the profile navigation underneath it. */}
+            {post.author_id !== user?.id && (
+              <span className="absolute -bottom-0.5 -right-0.5">
+                <FollowButton profileId={post.author_id} variant="icon" />
+              </span>
+            )}
+          </span>
           <div className="min-w-0">
             <p className="flex items-center gap-1 text-[14px] font-semibold text-[var(--app-text)] truncate">
               {post.author_name}
@@ -691,14 +710,13 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
             </p>
             <p className="text-[11px]" style={{ color: '#5A5A5A' }}>{timeAgo(post.created_at)}</p>
           </div>
-        </button>
+        </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {meta && (
             <span className="text-[11px] font-semibold px-[10px] py-[3px] rounded-full whitespace-nowrap" style={{ backgroundColor: meta.pillBg, color: meta.pillText }}>
               {meta.pillLabel}
             </span>
           )}
-          {post.author_id !== user?.id && <FollowButton profileId={post.author_id} variant="icon" />}
           {post.author_id === user?.id ? (
             <div className="relative">
               <button onClick={() => setMenuOpen(v => !v)} aria-label="Post options" className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition">

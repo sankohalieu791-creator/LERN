@@ -291,6 +291,25 @@ export interface StudentSkill {
   skills?: Skill
 }
 
+// A student-declared skill + evidence, no criteria or levels --
+// distinct from the institution-authored Skill/StudentSkill above.
+export type SelfReportedSkillStatus = 'self_reported' | 'verified'
+
+export interface SelfReportedSkill {
+  id: string
+  student_id: string
+  organisation_id?: string
+  name: string
+  note?: string
+  evidence_file_path: string
+  evidence_file_type?: string
+  status: SelfReportedSkillStatus
+  confirmed_by?: string
+  confirmed_at?: string
+  created_at: string
+  student?: { id: string; full_name: string }
+}
+
 export type CriterionResult = 'met' | 'partly_met' | 'not_met'
 
 export interface ReviewCriteriaResult {

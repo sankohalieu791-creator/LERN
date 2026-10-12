@@ -11,6 +11,7 @@ import {
   getSavedOpportunities, unsaveOpportunity, updateUserProfile, uploadAvatar, removeAvatar,
   isUsernameAvailable, getMyOrganisationInfo, getPublicStudentProfile, blockUser,
   getStudentSkills, getOrgSkillsForStudent,
+  getMySelfReportedSkills, uploadSelfReportedSkillEvidence, createSelfReportedSkill,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import FollowButton from '@/components/v2/FollowButton'
@@ -525,40 +526,53 @@ function FolderContent({
 // review_criteria_results nobody's asked for). Cross-org profile views
 // correctly render empty here (courses/skills RLS is org-scoped), same
 // reason getMyOrganisationInfo above is isOwn-gated -- not a bug.
+const SELF_REPORT_STATUS: Record<string, { label: string; bg: string; text: string }> = {
+  self_reported: { label: 'Self-reported', bg: 'var(--status-warn-bg)', text: 'var(--status-warn-text)' },
+  verified: { label: 'Verified', bg: 'var(--status-success-bg)', text: 'var(--status-success-text)' },
+}
+
 function SkillsFolderContent({ profileId, organisationId, isOwn }: { profileId: string; organisationId?: string | null; isOwn: boolean }) {
   const router = useRouter()
   const [courses, setCourses] = useState<any[]>([])
   const [studentSkills, setStudentSkills] = useState<any[]>([])
+  const [selfReported, setSelfReported] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [addingSkill, setAddingSkill] = useState(false)
 
-  useEffect(() => {
-    if (!organisationId) { setLoading(false); return }
-    Promise.all([
-      getOrgSkillsForStudent(organisationId),
+  const load = () => {
+    const calls: Promise<any>[] = [
+      organisationId ? getOrgSkillsForStudent(organisationId) : Promise.resolve({ data: [] }),
       getStudentSkills(profileId),
-    ]).then(([c, ss]) => {
+    ]
+    // Only fetched for the owner -- RLS has no read path for anyone
+    // else to see a self-reported skill at all (student-own or
+    // org-staff only), so this would just come back empty for a peer.
+    if (isOwn) calls.push(getMySelfReportedSkills(profileId))
+    Promise.all(calls).then(([c, ss, sr]) => {
       setCourses((c.data as any) || [])
       setStudentSkills(ss.data || [])
+      if (sr) setSelfReported(sr.data || [])
       setLoading(false)
     })
-  }, [profileId, organisationId])
+  }
+  useEffect(load, [profileId, organisationId, isOwn])
 
   if (loading) return <p className="text-[13px] text-[var(--app-text-tertiary)]">Loading…</p>
 
   const levelFor = (skillId: string) => studentSkills.find((ss: any) => ss.skill_id === skillId)
   const coursesWithSkills = courses.filter((c: any) => (c.skills || []).length > 0)
+  const nothingAtAll = coursesWithSkills.length === 0 && selfReported.length === 0 && !isOwn
 
-  if (coursesWithSkills.length === 0) {
-    return (
-      <EmptyState
-        icon={Award} title="No skills yet"
-        hint={isOwn ? "Your tutor adds skills to a course — they'll show up here once they have." : 'Nothing to show here yet.'}
-      />
-    )
+  if (nothingAtAll) {
+    return <EmptyState icon={Award} title="No skills yet" hint="Nothing to show here yet." />
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
+      {coursesWithSkills.length === 0 && isOwn && selfReported.length === 0 && !addingSkill && (
+        <p className="text-[13px] text-[var(--app-text-tertiary)]">Your tutor adds skills to a course — they'll show up here once they have. Or add your own below.</p>
+      )}
+
       {coursesWithSkills.map((course: any) => (
         <div key={course.id}>
           <p className="text-[12px] font-semibold text-[var(--app-text-tertiary)] uppercase tracking-wide mb-2">{course.name}</p>
@@ -588,6 +602,99 @@ function SkillsFolderContent({ profileId, organisationId, isOwn }: { profileId: 
           </div>
         </div>
       ))}
+
+      {/* ── Self-reported -- own view only. No institution setup needed
+          to start; stays "Self-reported" until a teacher taps to
+          confirm it, same word discipline as everything else LERN
+          calls "Verified". ── */}
+      {isOwn && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[12px] font-semibold text-[var(--app-text-tertiary)] uppercase tracking-wide">Self-reported</p>
+            {!addingSkill && (
+              <button onClick={() => setAddingSkill(true)} className="text-[12px] font-semibold text-brand flex items-center gap-1">
+                <Plus className="w-3.5 h-3.5" /> Add a skill
+              </button>
+            )}
+          </div>
+          {addingSkill && (
+            <AddSelfReportedSkillForm
+              profileId={profileId} organisationId={organisationId}
+              onAdded={() => { setAddingSkill(false); load() }}
+              onCancel={() => setAddingSkill(false)}
+            />
+          )}
+          {selfReported.length === 0 && !addingSkill ? (
+            <p className="text-[13px] text-[var(--app-text-tertiary)]">A skill you've taught yourself — add it with a video, screenshot, or anything that shows the work.</p>
+          ) : (
+            <div className="space-y-2.5 mt-2">
+              {selfReported.map((s: any) => {
+                const info = SELF_REPORT_STATUS[s.status]
+                return (
+                  <div key={s.id} className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-[14px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[14px] font-semibold text-[var(--app-text)] truncate">{s.name}</p>
+                      <span className="text-[11px] font-semibold px-[10px] py-[3px] rounded-full flex-shrink-0" style={{ backgroundColor: info.bg, color: info.text }}>
+                        {info.label}
+                      </span>
+                    </div>
+                    {s.note && <p className="text-[12px] text-[var(--app-text-tertiary)] mt-1">{s.note}</p>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AddSelfReportedSkillForm({ profileId, organisationId, onAdded, onCancel }: {
+  profileId: string; organisationId?: string | null; onAdded: () => void; onCancel: () => void
+}) {
+  const [name, setName] = useState('')
+  const [note, setNote] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const submit = async () => {
+    if (!name.trim()) return setError('Name the skill.')
+    if (!file) return setError('Attach a video, screenshot, or the work itself — that\'s the evidence.')
+    setSaving(true); setError('')
+    const { path, error: uploadError } = await uploadSelfReportedSkillEvidence(profileId, file)
+    if (uploadError || !path) { setSaving(false); setError("Couldn't upload that — try again."); return }
+    const { error: err } = await createSelfReportedSkill(profileId, organisationId || undefined, {
+      name: name.trim(), note: note.trim() || undefined, evidence_file_path: path, evidence_file_type: file.type,
+    })
+    setSaving(false)
+    if (err) { setError("Couldn't save — try again."); return }
+    onAdded()
+  }
+
+  return (
+    <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl p-3.5 space-y-2 mb-3">
+      <input
+        value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Adobe Illustrator" autoFocus
+        className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition"
+      />
+      <input
+        value={note} onChange={e => setNote(e.target.value)} placeholder="A line about it (optional)"
+        className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition"
+      />
+      <button onClick={() => fileRef.current?.click()} className="text-[12px] font-semibold text-[var(--app-text-secondary)] hover:text-brand transition">
+        {file ? file.name : 'Attach a video, screenshot, or the work (required)'}
+      </button>
+      <input ref={fileRef} type="file" accept="image/*,video/*,application/pdf" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
+      {error && <p className="text-[12px] text-danger-text">{error}</p>}
+      <div className="flex items-center gap-2">
+        <button onClick={submit} disabled={!name.trim() || !file || saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button onClick={onCancel} disabled={saving} className="px-3.5 py-2 text-[12px] font-semibold text-[var(--app-text-secondary)]">Cancel</button>
+      </div>
     </div>
   )
 }

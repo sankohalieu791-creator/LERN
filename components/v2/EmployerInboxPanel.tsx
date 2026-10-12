@@ -104,10 +104,16 @@ export default function EmployerInboxPanel() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Matches InterestReceivedPanel's "Requests" card shape on
+              the institution/provider side (individually-bordered
+              cards with an inline quoted-message preview and a
+              safeguarding caption), not the old denser divide-y row
+              list -- same messaging-platform feel on both sides of
+              the same conversation, not just the same thread view. */}
           {visibleThreads.length > 0 && (
             <div>
               <p className="text-[12px] font-bold text-ink-tertiary uppercase tracking-wide mb-2.5 px-1">Conversations</p>
-              <div className="bg-surface border border-edge rounded-2xl divide-y divide-edge-subtle overflow-hidden">
+              <div className="space-y-3">
                 {visibleThreads.map(t => {
                   const status = STATUS_META[t.status] || STATUS_META.pending
                   // .split(' ')[0] was being applied to the FALLBACK
@@ -116,19 +122,35 @@ export default function EmployerInboxPanel() {
                   // split has to happen only on a real name.
                   const firstName = t.student?.full_name?.split(' ')[0] || 'A student'
                   return (
-                    <button key={t.id} onClick={() => setOpenId(t.id)} className="w-full flex items-center gap-3.5 px-4 py-4 text-left hover:bg-surface-subtle transition">
-                      <span className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 text-white font-bold text-[13px]" style={{ backgroundColor: '#185FA5' }}>
-                        {initials(t.student?.full_name)}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-ink text-[14.5px] truncate">{firstName}{t.opportunity_label ? ` · ${t.opportunity_label}` : ''}</p>
-                        {t.message && <p className="text-[13px] text-ink-tertiary truncate mt-0.5">{t.message}</p>}
+                    <div key={t.id} className="bg-surface border border-edge rounded-xl px-5 py-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold text-[13px]" style={{ backgroundColor: '#185FA5' }}>
+                          {initials(t.student?.full_name)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-bold text-ink text-[15px] truncate">{firstName}{t.opportunity_label ? ` · ${t.opportunity_label}` : ''}</p>
+                            <span className="flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: status.bg, color: status.fg }}>{status.label}</span>
+                          </div>
+                          <p className="text-[13px] text-ink-tertiary mt-0.5">{timeAgo(t.created_at)}</p>
+
+                          {t.message && (
+                            <div className="bg-surface-muted rounded-lg px-3.5 py-2.5 mt-3">
+                              <p className="text-[13px] text-ink-secondary italic">"{t.message}"</p>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between mt-3">
+                            <p className="flex items-center gap-1.5 text-[12px] text-ink-tertiary">
+                              <Shield className="w-3.5 h-3.5" /> Routed through their organisation
+                            </p>
+                            <button onClick={() => setOpenId(t.id)} className="flex items-center gap-1 text-[13px] font-semibold hover:underline flex-shrink-0" style={{ color: '#185FA5' }}>
+                              Open ↗
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: status.bg, color: status.fg }}>{status.label}</span>
-                        <span className="text-[11.5px] text-ink-quaternary whitespace-nowrap">{timeAgo(t.created_at)}</span>
-                      </div>
-                    </button>
+                    </div>
                   )
                 })}
               </div>

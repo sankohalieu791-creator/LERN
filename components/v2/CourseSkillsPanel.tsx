@@ -4,18 +4,28 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
-import { getCourses, createCourse, getCourseSkills, createSkill } from '@/lib/supabase'
+import {
+  getCourses, createCourse, getCourseSkills, createSkill,
+  getOrgPendingSelfReportedSkills, confirmSelfReportedSkill, getSignedFileUrl,
+} from '@/lib/supabase'
 import { TextField, PrimaryButton, ErrorBanner, Spinner } from '@/components/v2/Field'
 import type { Course, Skill } from '@/lib/types'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, CheckCircle2, Paperclip } from 'lucide-react'
+
+type SkillsTab = 'courses' | 'pending'
 
 // Skill Wallet (Phase 1), staff-only -- set up a course once, add 2-4
 // skills each with 2-4 criteria. Nothing here touches work_items at
 // all; tagging a brief/workshop/course against these skills happens
 // from the ordinary create-work form instead (WorkItemsPanel's own
-// SkillTagPicker reads whatever's set up here).
+// SkillTagPicker reads whatever's set up here). "Pending confirmations"
+// is the other half of self-reported skills (ProfilePanel.tsx's Skills
+// tab, own view) -- a student can declare one with zero course/criteria
+// setup, this is where staff give it the one tap that turns it from
+// "Self-reported" into "Verified".
 export default function CourseSkillsPanel() {
   const { user } = useAuth()
+  const [tab, setTab] = useState<SkillsTab>('courses')
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -23,6 +33,8 @@ export default function CourseSkillsPanel() {
   const [skillsLoading, setSkillsLoading] = useState(false)
   const [showNewCourse, setShowNewCourse] = useState(false)
   const [showNewSkill, setShowNewSkill] = useState(false)
+  const [pending, setPending] = useState<any[]>([])
+  const [pendingLoading, setPendingLoading] = useState(true)
 
   const load = () => {
     if (!user?.organisation_id) return
@@ -35,6 +47,13 @@ export default function CourseSkillsPanel() {
   }
   useEffect(load, [user?.organisation_id])
 
+  const loadPending = () => {
+    if (!user?.organisation_id) return
+    setPendingLoading(true)
+    getOrgPendingSelfReportedSkills(user.organisation_id).then(({ data }) => { setPending(data || []); setPendingLoading(false) })
+  }
+  useEffect(loadPending, [user?.organisation_id])
+
   const loadSkills = (courseId: string) => {
     setSkillsLoading(true)
     getCourseSkills(courseId).then(({ data }) => { setSkills(data || []); setSkillsLoading(false) })
@@ -45,18 +64,46 @@ export default function CourseSkillsPanel() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <p className="font-bold text-ink text-[15px]">Skills</p>
           <p className="text-[13px] text-ink-tertiary mt-0.5">Set up once per course — tag briefs and workshops against them when you create one.</p>
         </div>
-        <button
-          onClick={() => setShowNewCourse(true)}
-          className="flex items-center gap-1.5 border border-edge text-ink font-semibold text-[13px] px-4 py-2 rounded-lg hover:border-edge-input transition flex-shrink-0"
-        >
-          <Plus className="w-3.5 h-3.5" /> New course
-        </button>
+        {tab === 'courses' && (
+          <button
+            onClick={() => setShowNewCourse(true)}
+            className="flex items-center gap-1.5 border border-edge text-ink font-semibold text-[13px] px-4 py-2 rounded-lg hover:border-edge-input transition flex-shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" /> New course
+          </button>
+        )}
       </div>
+
+      <div className="flex gap-1 mb-5 border-b border-edge-subtle">
+        {([['courses', 'Courses'], ['pending', `Pending confirmations${pending.length > 0 ? ` (${pending.length})` : ''}`]] as [SkillsTab, string][]).map(([key, label]) => (
+          <button
+            key={key} onClick={() => setTab(key)}
+            className={`px-4 py-2.5 text-[14px] font-semibold border-b-2 -mb-px transition ${
+              tab === key ? 'text-ink border-brand' : 'text-ink-tertiary border-transparent hover:text-ink'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'pending' ? (
+        pendingLoading ? (
+          <p className="text-ink-tertiary text-[14px]">Loading…</p>
+        ) : pending.length === 0 ? (
+          <p className="text-ink-tertiary text-[14px]">Nothing waiting on a confirmation right now.</p>
+        ) : (
+          <div className="space-y-3">
+            {pending.map(p => <PendingSkillCard key={p.id} skill={p} onConfirmed={loadPending} />)}
+          </div>
+        )
+      ) : (
+      <>
 
       {loading ? (
         <p className="text-ink-tertiary text-[14px]">Loading…</p>
@@ -114,6 +161,50 @@ export default function CourseSkillsPanel() {
           onCreated={() => { setShowNewSkill(false); loadSkills(selected.id) }}
         />
       )}
+      </>
+      )}
+    </div>
+  )
+}
+
+function PendingSkillCard({ skill, onConfirmed }: { skill: any; onConfirmed: () => void }) {
+  const [fileUrl, setFileUrl] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (skill.evidence_file_path) getSignedFileUrl('submission-files', skill.evidence_file_path).then(({ url }) => setFileUrl(url))
+  }, [skill.evidence_file_path])
+
+  const confirm = async () => {
+    setConfirming(true); setError('')
+    const { error: err } = await confirmSelfReportedSkill(skill.id)
+    setConfirming(false)
+    if (err) { setError("Couldn't confirm — try again."); return }
+    onConfirmed()
+  }
+
+  return (
+    <div className="bg-surface border border-edge rounded-xl p-[14px]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[14px] font-semibold text-ink">{skill.name}</p>
+          <p className="text-[12px] text-ink-tertiary mt-0.5">{skill.student?.full_name || 'A student'}</p>
+          {skill.note && <p className="text-[13px] text-ink-secondary mt-1.5">{skill.note}</p>}
+          {fileUrl && (
+            <a href={fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[12.5px] font-semibold text-brand hover:underline mt-1.5">
+              <Paperclip className="w-3 h-3" /> View evidence
+            </a>
+          )}
+          {error && <p className="text-[12px] text-danger-text mt-1.5">{error}</p>}
+        </div>
+        <button
+          onClick={confirm} disabled={confirming}
+          className="flex items-center gap-1.5 bg-brand text-white text-[12px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50 flex-shrink-0"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" /> {confirming ? 'Confirming…' : 'Confirm'}
+        </button>
+      </div>
     </div>
   )
 }

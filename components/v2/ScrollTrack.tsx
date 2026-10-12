@@ -47,9 +47,15 @@ export default function ScrollTrack({ containerRef }: { containerRef: React.RefO
     ro.observe(el)
     ro.observe(track)
     // Content inside can change height without the container itself
-    // resizing (a list growing, a panel switching) -- observe the
-    // first child too, when there is one, so the thumb stays accurate.
-    if (el.firstElementChild) ro.observe(el.firstElementChild)
+    // resizing (a list growing, a panel switching) -- observe EVERY
+    // direct child, not just the first. A multi-column grid container
+    // (e.g. Create Brief's two-column layout) has more than one child,
+    // and content growing in the second/sidebar column (like
+    // GroupPicker's "+ New group" revealing an inline input) was never
+    // triggering a re-measure at all when only firstElementChild was
+    // watched -- the thumb went stale and the newly-revealed control
+    // wasn't reliably reachable.
+    Array.from(el.children).forEach(child => ro.observe(child))
 
     return () => {
       el.removeEventListener('scroll', measure)

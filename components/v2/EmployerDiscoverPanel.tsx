@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getDiscoverWork, getMyInterest, expressInterest, getTalentPools, createTalentPool, addToTalentPool,
   getVerifiedWorkForProfile, getExperienceEntries, getSelfQualifications, getEmployerVisibleSkills, getDiscoverSkillNames,
+  getEmployerConfirmedSelfReportedSkills,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { LEVEL_INFO } from '@/lib/skillLevels'
@@ -14,6 +15,27 @@ import { BadgeCheck, Search, Send, Check, Clock, Bookmark, Shield, X, Briefcase,
 type WorkType = 'all' | 'brief' | 'course' | 'workshop'
 
 const TYPE_LABEL: Record<string, string> = { brief: 'Brief', course: 'Course', workshop: 'Workshop' }
+
+// One "folder" per student, not one card per piece of work -- a
+// student with 3 verified pieces used to show as 3 disconnected cards
+// with no way to see their full picture without already knowing to
+// click into one first. Groups the same getDiscoverWork rows client
+// side (no new query needed), newest-first within each folder.
+function groupByStudent(items: any[]) {
+  const byId = new Map<string, { student: any; pieces: any[]; latest: any }>()
+  for (const v of items) {
+    const student = v.submissions?.student
+    if (!student) continue
+    const existing = byId.get(student.id)
+    if (existing) {
+      existing.pieces.push(v)
+      if (new Date(v.verified_at) > new Date(existing.latest.verified_at)) existing.latest = v
+    } else {
+      byId.set(student.id, { student, pieces: [v], latest: v })
+    }
+  }
+  return Array.from(byId.values()).sort((a, b) => new Date(b.latest.verified_at).getTime() - new Date(a.latest.verified_at).getTime())
+}
 
 // Every row this queries is either work an 18+ student chose to make
 // public themselves, OR a specific piece their institution has
@@ -115,64 +137,61 @@ export default function EmployerDiscoverPanel() {
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 gap-4">
-          {items.map(v => {
-            const sub = v.submissions
-            const wi = sub?.work_items
-            const student = sub?.student
-            const status = student ? interestByStudent[student.id] : undefined
+          {groupByStudent(items).map(folder => {
+            const { student, pieces, latest } = folder
+            const status = interestByStudent[student.id]
+            const wi = latest.submissions?.work_items
             return (
-              <div key={v.id} className="bg-surface border border-edge rounded-2xl p-5 flex flex-col">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide">{TYPE_LABEL[wi?.type] || wi?.type}</span>
-                  <span className="flex items-center gap-1 text-[12px] font-semibold text-success-text flex-shrink-0">
-                    <BadgeCheck className="w-3.5 h-3.5" /> Verified
-                  </span>
-                </div>
-                <p className="font-bold text-ink text-[15px] mb-1">{wi?.title}</p>
-                {wi?.description && <p className="text-[13px] text-ink-tertiary mb-3 line-clamp-2">{wi.description}</p>}
-                {sub?.content && <p className="text-[13px] text-ink-secondary mb-3 line-clamp-3 bg-surface-subtle rounded-lg p-2.5">{sub.content}</p>}
+              <div key={student.id} className="bg-surface border border-edge rounded-2xl p-5 flex flex-col">
+                <button
+                  className="flex-1 min-w-0 text-left hover:opacity-80 transition mb-3"
+                  onClick={() => setViewingProfile(student)}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide">
+                      {pieces.length} verified {pieces.length === 1 ? 'piece' : 'pieces'} of work
+                    </span>
+                    <span className="flex items-center gap-1 text-[12px] font-semibold text-success-text flex-shrink-0">
+                      <BadgeCheck className="w-3.5 h-3.5" /> Verified
+                    </span>
+                  </div>
+                  <p className="font-bold text-ink text-[16px] mb-1">{student.full_name || 'Student'}</p>
+                  <p className="text-[13px] text-ink-tertiary mb-1">
+                    Most recent: {wi?.title} ({TYPE_LABEL[wi?.type] || wi?.type})
+                  </p>
+                  {student.bio && <p className="text-[12.5px] text-ink-secondary line-clamp-2 mt-1.5">{student.bio}</p>}
+                </button>
 
                 <div className="mt-auto pt-3 border-t border-edge-subtle flex items-center justify-between gap-2">
-                  <button
-                    className="min-w-0 text-left hover:opacity-80 transition"
-                    onClick={() => student && setViewingProfile(student)}
-                    disabled={!student}
-                  >
-                    <p className="text-[13px] font-semibold text-ink truncate">{student?.full_name || 'Student'}</p>
-                    <p className="text-[11px] text-ink-tertiary truncate">
-                      Verified by {v.verifier?.full_name || 'a reviewer'} · {new Date(v.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </p>
-                  </button>
-                  {student && (
-                    status === 'pending' ? (
-                      <span className="flex items-center gap-1 text-[12px] font-semibold text-warning-text flex-shrink-0"><Clock className="w-3.5 h-3.5" /> Pending</span>
-                    ) : status === 'accepted' ? (
-                      <span className="flex items-center gap-1 text-[12px] font-semibold text-success-text flex-shrink-0"><Check className="w-3.5 h-3.5" /> Accepted</span>
-                    ) : status === 'declined' ? (
-                      <span className="text-[12px] font-semibold text-ink-tertiary flex-shrink-0">Declined</span>
-                    ) : (
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <div className="relative">
-                          <button
-                            onClick={() => setPoolPickerFor(v => v === student.id ? null : student.id)}
-                            aria-label="Save to a talent pool"
-                            className="w-8 h-8 flex items-center justify-center rounded-lg border border-edge text-ink-tertiary hover:border-edge-input transition"
-                          >
-                            <Bookmark className="w-3.5 h-3.5" />
-                          </button>
-                          {poolPickerFor === student.id && (
-                            <PoolPicker studentId={student.id} onClose={() => setPoolPickerFor(null)} />
-                          )}
-                        </div>
+                  <span className="text-[11px] text-ink-tertiary truncate">Tap the card for the full picture</span>
+                  {status === 'pending' ? (
+                    <span className="flex items-center gap-1 text-[12px] font-semibold text-warning-text flex-shrink-0"><Clock className="w-3.5 h-3.5" /> Pending</span>
+                  ) : status === 'accepted' ? (
+                    <span className="flex items-center gap-1 text-[12px] font-semibold text-success-text flex-shrink-0"><Check className="w-3.5 h-3.5" /> Accepted</span>
+                  ) : status === 'declined' ? (
+                    <span className="text-[12px] font-semibold text-ink-tertiary flex-shrink-0">Declined</span>
+                  ) : (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className="relative">
                         <button
-                          onClick={() => setComposer({ studentId: student.id, studentName: student.full_name || 'this student', label: wi?.title })}
-                          disabled={sending === student.id}
-                          className="flex items-center gap-1.5 bg-brand text-white text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 transition disabled:opacity-50"
+                          onClick={() => setPoolPickerFor(v => v === student.id ? null : student.id)}
+                          aria-label="Save to a talent pool"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg border border-edge text-ink-tertiary hover:border-edge-input transition"
                         >
-                          <Send className="w-3.5 h-3.5" /> {sending === student.id ? 'Sending…' : 'Express interest'}
+                          <Bookmark className="w-3.5 h-3.5" />
                         </button>
+                        {poolPickerFor === student.id && (
+                          <PoolPicker studentId={student.id} onClose={() => setPoolPickerFor(null)} />
+                        )}
                       </div>
-                    )
+                      <button
+                        onClick={() => setComposer({ studentId: student.id, studentName: student.full_name || 'this student', label: wi?.title })}
+                        disabled={sending === student.id}
+                        className="flex items-center gap-1.5 bg-brand text-white text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 transition disabled:opacity-50"
+                      >
+                        <Send className="w-3.5 h-3.5" /> {sending === student.id ? 'Sending…' : 'Express interest'}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -343,6 +362,7 @@ function CandidateProfileModal({ student, status, onClose, onExpressInterest }: 
   const [experience, setExperience] = useState<any[]>([])
   const [quals, setQuals] = useState<any[]>([])
   const [skills, setSkills] = useState<any[]>([])
+  const [selfReportedSkills, setSelfReportedSkills] = useState<any[]>([])
   const avatarUrl = useAvatarUrl(student.avatar_path)
 
   useEffect(() => {
@@ -350,6 +370,7 @@ function CandidateProfileModal({ student, status, onClose, onExpressInterest }: 
     getExperienceEntries(student.id).then(({ data }) => setExperience(data || []))
     getSelfQualifications(student.id).then(({ data }) => setQuals(data || []))
     getEmployerVisibleSkills(student.id).then(({ data }) => setSkills(data || []))
+    getEmployerConfirmedSelfReportedSkills(student.id).then(({ data }) => setSelfReportedSkills(data || []))
   }, [student.id])
 
   return createPortal((
@@ -423,6 +444,24 @@ function CandidateProfileModal({ student, status, onClose, onExpressInterest }: 
                     </span>
                   )
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* A separate category from the leveled Skills above on
+              purpose -- these were declared by the student themselves,
+              not set by an institution, so they're never mixed into
+              the same badges. Only ever reaches here already confirmed
+              (RLS only returns status='verified' rows at all). */}
+          {selfReportedSkills.length > 0 && (
+            <div className="bg-surface-subtle rounded-xl p-3 mb-4">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2"><Award className="w-3 h-3" /> Self-reported skills</p>
+              <div className="flex flex-wrap gap-1.5">
+                {selfReportedSkills.map((s: any) => (
+                  <span key={s.id} className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
+                    {s.name} · Verified
+                  </span>
+                ))}
               </div>
             </div>
           )}
