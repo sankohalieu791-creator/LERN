@@ -15,9 +15,13 @@ import { useEffect, useState } from 'react'
 // Kept deliberately plain per direct request -- an earlier version
 // staggered each letter in individually with an underline accent
 // settling in after; simpler reads better here: the mark appears as
-// one piece, then "IRL Connect" settles in beneath it, same spot a
-// parent company's name sits under a product's own mark on launch
-// (Claude/Anthropic).
+// one piece, centred on its own.
+//
+// "IRL Connect" sits pinned to the very bottom of the screen instead
+// of stacked directly under the mark -- same placement Microsoft/
+// Anthropic use for the company behind the product on a launch
+// screen, small and out of the way like a manufacturer's badge
+// (a Mercedes badge, not a second logo).
 //
 // Colour is hardcoded white background / near-black wordmark
 // regardless of the viewer's light/dark preference -- the splash is
@@ -49,33 +53,37 @@ export default function SplashScreen() {
         stage === 'exit' ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
-      <div className="flex flex-col items-center">
-        <svg
-          viewBox="0 0 460 180" width={44 * (460 / 180)} height={44} aria-label="LERN" role="img"
-          style={{
-            opacity: visible ? 1 : 0,
-            transform: visible ? 'none' : 'translateY(6px)',
-            transition: 'opacity 400ms ease-out, transform 400ms ease-out',
-          }}
-        >
-          <path fill="#1F2328" d="M82.82,137.15 L3.88,136.96 L3.49,40.59 L4.08,40.00 L19.36,40.00 L19.94,40.59 L19.94,120.89 L82.82,121.09 L82.82,137.15 Z" />
-          <path fill="#1F2328" d="M193.68,137.15 L110.83,136.96 L110.83,40.59 L111.42,40.00 L193.29,40.00 L193.88,40.59 L193.68,56.06 L127.08,56.06 L126.50,56.65 L126.50,79.37 L127.08,79.96 L183.10,79.96 L183.69,80.55 L183.10,96.02 L127.08,96.02 L126.50,96.61 L126.50,120.50 L127.08,121.09 L193.68,121.09 L193.68,137.15 Z" />
-          <path fill="#1F2328" d="M293.97,102.68 L291.23,102.68 L276.53,87.99 L293.58,87.40 L299.06,85.05 L302.00,82.50 L305.13,77.02 L305.92,70.75 L304.35,64.48 L300.63,59.59 L296.71,57.24 L291.62,56.06 L232.07,56.06 L217.77,40.20 L292.79,40.00 L301.80,41.96 L310.03,46.66 L315.71,52.73 L320.02,61.35 L321.19,67.23 L321.19,76.24 L320.41,80.55 L316.88,88.77 L311.20,95.63 L303.76,100.33 L293.97,102.68 Z" />
-          <path fill="#1F2328" d="M448.31,137.15 L433.82,137.15 L368.40,65.46 L367.42,66.05 L367.42,136.96 L352.53,136.96 L352.73,40.00 L367.22,40.00 L432.25,111.30 L433.23,111.10 L433.23,40.20 L447.92,40.00 L448.51,40.59 L448.31,137.15 Z" />
-          <path fill="#F26B21" d="M319.43,137.15 L294.36,137.15 L243.63,87.99 L247.35,87.40 L266.94,87.79 L317.86,134.80 L319.63,136.56 L319.43,137.15 Z" />
-        </svg>
-        <p
-          className="mt-3 text-[11px] font-medium uppercase"
-          style={{
-            color: '#9A958C',
-            letterSpacing: '0.12em',
-            opacity: visible ? 1 : 0,
-            transition: 'opacity 400ms ease-out 200ms',
-          }}
-        >
-          IRL Connect
-        </p>
-      </div>
+      <svg
+        viewBox="0 0 460 180" width={44 * (460 / 180)} height={44} aria-label="LERN" role="img"
+        style={{
+          opacity: visible ? 1 : 0,
+          transform: visible ? 'none' : 'translateY(6px)',
+          transition: 'opacity 400ms ease-out, transform 400ms ease-out',
+        }}
+      >
+        <path fill="#1F2328" d="M82.82,137.15 L3.88,136.96 L3.49,40.59 L4.08,40.00 L19.36,40.00 L19.94,40.59 L19.94,120.89 L82.82,121.09 L82.82,137.15 Z" />
+        <path fill="#1F2328" d="M193.68,137.15 L110.83,136.96 L110.83,40.59 L111.42,40.00 L193.29,40.00 L193.88,40.59 L193.68,56.06 L127.08,56.06 L126.50,56.65 L126.50,79.37 L127.08,79.96 L183.10,79.96 L183.69,80.55 L183.10,96.02 L127.08,96.02 L126.50,96.61 L126.50,120.50 L127.08,121.09 L193.68,121.09 L193.68,137.15 Z" />
+        <path fill="#1F2328" d="M293.97,102.68 L291.23,102.68 L276.53,87.99 L293.58,87.40 L299.06,85.05 L302.00,82.50 L305.13,77.02 L305.92,70.75 L304.35,64.48 L300.63,59.59 L296.71,57.24 L291.62,56.06 L232.07,56.06 L217.77,40.20 L292.79,40.00 L301.80,41.96 L310.03,46.66 L315.71,52.73 L320.02,61.35 L321.19,67.23 L321.19,76.24 L320.41,80.55 L316.88,88.77 L311.20,95.63 L303.76,100.33 L293.97,102.68 Z" />
+        <path fill="#1F2328" d="M448.31,137.15 L433.82,137.15 L368.40,65.46 L367.42,66.05 L367.42,136.96 L352.53,136.96 L352.73,40.00 L367.22,40.00 L432.25,111.30 L433.23,111.10 L433.23,40.20 L447.92,40.00 L448.51,40.59 L448.31,137.15 Z" />
+        <path fill="#F26B21" d="M319.43,137.15 L294.36,137.15 L243.63,87.99 L247.35,87.40 L266.94,87.79 L317.86,134.80 L319.63,136.56 L319.43,137.15 Z" />
+      </svg>
+
+      {/* Pinned to the bottom edge, not stacked under the mark above --
+          its own safe-area padding so it clears a phone's home
+          indicator instead of sitting flush against it. */}
+      <p
+        className="absolute left-1/2 text-[10px] font-medium uppercase"
+        style={{
+          bottom: 'calc(env(safe-area-inset-bottom) + 28px)',
+          transform: 'translateX(-50%)',
+          color: '#B5AEA1',
+          letterSpacing: '0.14em',
+          opacity: visible ? 1 : 0,
+          transition: 'opacity 400ms ease-out 200ms',
+        }}
+      >
+        IRL Connect
+      </p>
     </div>
   )
 }

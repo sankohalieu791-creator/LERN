@@ -6,6 +6,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import ServiceWorkerRegistration from '@/components/v2/ServiceWorkerRegistration'
 import SplashScreen from '@/components/v2/SplashScreen'
+import CookieConsentBanner from '@/components/v2/CookieConsentBanner'
 
 // v2 rebuild: desktop/laptop-first, paper/ink/orange. Dark mode exists
 // today only inside the institution/provider shell (see
@@ -92,6 +93,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ThemeProvider>
             {children}
           </ThemeProvider>
+          <CookieConsentBanner />
         </AuthProvider>
         <ServiceWorkerRegistration />
         <Analytics />
