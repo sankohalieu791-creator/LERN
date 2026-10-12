@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import WorkshopSession from '@/components/v2/WorkshopSession'
 import Logo from '@/components/v2/Logo'
+import { SkillsFolderContent } from '@/components/v2/ProfilePanel'
 
 // Student My Work — three tabs, learner-type dependent. Sizes/structure
 // pulled directly from the actual deleted v1 app/courses/page.tsx (git
@@ -103,6 +104,12 @@ export default function StudentMyWorkPanel() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('primary')
   const [selected, setSelected] = useState<WorkItem | null>(null)
+  // Phone-only: "My Skill" and "My Work" as two top-level tabs on this
+  // same screen -- laptop reaches skills through its own sidebar
+  // destination instead (StudentShell's "My Skill"), so this toggle is
+  // lg:hidden below and never shows there. My Skill first/leftmost per
+  // direct request ("at the top").
+  const [view, setView] = useState<'skill' | 'work'>('work')
 
   const load = () => {
     if (!user?.organisation_id) return
@@ -149,44 +156,59 @@ export default function StudentMyWorkPanel() {
 
   return (
     <div>
-      {/* Build Spec: Feed and My Work (student) v1.0, Part 2 --
-          "Title 'My Work' at 20px weight 600. Sub-line 'Everything set
-          for you, in one place'." Missing entirely before -- the
-          screen went straight from the shell's own top padding into
-          the tab row with no identity of its own. */}
-      <div className="px-4 pt-4 pb-3">
-        <h1 className="text-[var(--app-text)] text-[20px] font-semibold">My Work</h1>
-        <p className="text-[13px] mt-0.5" style={{ color: 'var(--app-text-secondary)' }}>Everything set for you, in one place</p>
+      <div className="lg:hidden sticky top-0 z-10 flex items-stretch border-b border-[var(--app-border-subtle)] bg-[var(--app-bg)]">
+        <TabButton active={view === 'skill'} label="My Skill" onClick={() => setView('skill')} />
+        <TabButton active={view === 'work'} label="My Work" onClick={() => setView('work')} />
       </div>
 
-      <div className="sticky top-0 z-10 flex items-stretch border-b border-[var(--app-border-subtle)] bg-[var(--app-bg)]">
-        <TabButton active={tab === 'primary'} label={primaryLabel} onClick={() => setTab('primary')} />
-        <TabButton active={tab === 'assignment'} label="Assignments" onClick={() => setTab('assignment')} />
-        <TabButton active={tab === 'workshop'} label="Workshops" onClick={() => setTab('workshop')} />
-      </div>
-
-      <div className="px-4 pt-3 pb-1">
-        <span className="text-[13px] font-semibold text-[var(--app-text-tertiary)]">{items.length} {items.length === 1 ? tab === 'primary' ? primaryLabel.slice(0, -1).toLowerCase() : tab : tab === 'primary' ? primaryLabel.toLowerCase() : `${tab}s`}</span>
-      </div>
-
-      {items.length === 0 ? (
-        <div className="flex flex-col items-center text-center py-16 px-6">
-          <p className="font-bold text-[var(--app-text)] text-[15px] mb-1">Nothing here yet</p>
-          <p className="text-sm text-[var(--app-text-tertiary)]">Check back once your organisation posts something.</p>
+      {view === 'skill' && (
+        <div className="px-4 pt-4 pb-10">
+          <SkillsFolderContent profileId={user.id} organisationId={user.organisation_id} isOwn={true} />
         </div>
-      ) : (
-        <div className="px-4 py-3 space-y-3">
-          {items.map(item => {
-            const mySubs = submissions.filter((s: any) => s.work_item_id === item.id)
-            return (
-              <WorkCard
-                key={item.id} item={item} latest={mySubs[0]} started={startedIds.includes(item.id)}
-                onOpen={() => setSelected(item)}
-                onStart={async () => { if (user) { await markWorkItemStarted(item.id, user.id); setStartedIds(prev => [...prev, item.id]) } setSelected(item) }}
-              />
-            )
-          })}
-        </div>
+      )}
+
+      {view === 'work' && (
+        <>
+          {/* Build Spec: Feed and My Work (student) v1.0, Part 2 --
+              "Title 'My Work' at 20px weight 600. Sub-line 'Everything set
+              for you, in one place'." Missing entirely before -- the
+              screen went straight from the shell's own top padding into
+              the tab row with no identity of its own. */}
+          <div className="px-4 pt-4 pb-3">
+            <h1 className="text-[var(--app-text)] text-[20px] font-semibold">My Work</h1>
+            <p className="text-[13px] mt-0.5" style={{ color: 'var(--app-text-secondary)' }}>Everything set for you, in one place</p>
+          </div>
+
+          <div className="sticky top-0 z-10 flex items-stretch border-b border-[var(--app-border-subtle)] bg-[var(--app-bg)]">
+            <TabButton active={tab === 'primary'} label={primaryLabel} onClick={() => setTab('primary')} />
+            <TabButton active={tab === 'assignment'} label="Assignments" onClick={() => setTab('assignment')} />
+            <TabButton active={tab === 'workshop'} label="Workshops" onClick={() => setTab('workshop')} />
+          </div>
+
+          <div className="px-4 pt-3 pb-1">
+            <span className="text-[13px] font-semibold text-[var(--app-text-tertiary)]">{items.length} {items.length === 1 ? tab === 'primary' ? primaryLabel.slice(0, -1).toLowerCase() : tab : tab === 'primary' ? primaryLabel.toLowerCase() : `${tab}s`}</span>
+          </div>
+
+          {items.length === 0 ? (
+            <div className="flex flex-col items-center text-center py-16 px-6">
+              <p className="font-bold text-[var(--app-text)] text-[15px] mb-1">Nothing here yet</p>
+              <p className="text-sm text-[var(--app-text-tertiary)]">Check back once your organisation posts something.</p>
+            </div>
+          ) : (
+            <div className="px-4 py-3 space-y-3">
+              {items.map(item => {
+                const mySubs = submissions.filter((s: any) => s.work_item_id === item.id)
+                return (
+                  <WorkCard
+                    key={item.id} item={item} latest={mySubs[0]} started={startedIds.includes(item.id)}
+                    onOpen={() => setSelected(item)}
+                    onStart={async () => { if (user) { await markWorkItemStarted(item.id, user.id); setStartedIds(prev => [...prev, item.id]) } setSelected(item) }}
+                  />
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {selected && (

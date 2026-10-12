@@ -2942,7 +2942,10 @@ export const getExperienceEntries = async (studentId: string) => {
     .order('created_at', { ascending: false })
   return { data, error }
 }
-export const addExperienceEntry = async (studentId: string, fields: { title: string; organisation?: string; description?: string }) => {
+export const addExperienceEntry = async (studentId: string, fields: {
+  title: string; organisation?: string; description?: string
+  employment_type?: string; location?: string; start_date?: string; end_date?: string; is_current?: boolean
+}) => {
   const { data, error } = await supabase
     .from('experience_entries')
     .insert([{ student_id: studentId, ...fields }])

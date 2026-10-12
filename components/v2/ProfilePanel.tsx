@@ -34,6 +34,33 @@ function daysAgo(dateStr: string) {
   return Math.max(0, Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)))
 }
 
+// Experience entries used to be just a title + an optional organisation
+// -- "it needs more details than that" (direct feedback). These extra
+// fields (employment_type/start_date/end_date/is_current/location/
+// description) are read defensively everywhere below (every usage is
+// `e.field &&`-guarded) so this renders fine both before and after the
+// migration that adds the columns has actually been run.
+export const EMPLOYMENT_TYPE_LABEL: Record<string, string> = {
+  work_placement: 'Work placement',
+  volunteering: 'Volunteering',
+  part_time: 'Part-time job',
+  saturday_job: 'Saturday job',
+  internship: 'Internship',
+  other: 'Other',
+}
+function formatMonthYear(d?: string) {
+  if (!d) return ''
+  const dt = new Date(d)
+  if (isNaN(dt.getTime())) return ''
+  return dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+}
+function formatDateRange(e: { start_date?: string; end_date?: string; is_current?: boolean }) {
+  const start = formatMonthYear(e.start_date)
+  if (!start) return ''
+  const end = e.is_current ? 'Present' : formatMonthYear(e.end_date)
+  return end ? `${start} – ${end}` : start
+}
+
 type Folder = 'verified' | 'experience' | 'posts' | 'skills' | 'saved'
 
 // LERN Student Profile, Final Layout Spec v2.0 -- supersedes the
@@ -256,12 +283,21 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
             Posts, and (own view only) Saved jobs. Tapping one doesn't
             navigate anywhere -- it swaps the grid below, same screen,
             tabs stay visible, active tab gets an underline. "Tap
-            Posts, see your posts. Tap Saved, see what's saved." ── */}
-        <div className={`grid ${isOwn ? 'grid-cols-5' : 'grid-cols-4'} mt-6 border-b border-[var(--app-border)]`}>
+            Posts, see your posts. Tap Saved, see what's saved."
+            Skills only shows here for someone ELSE's profile now --
+            your own skills (leveled + self-reported) live at their own
+            destination instead (desktop: "My Skill" in the sidebar;
+            phone: a tab inside My Work, see StudentMyWorkPanel.tsx),
+            so this row stays 4 tabs either way: verified/experience/
+            posts/saved for your own profile, verified/experience/
+            posts/skills for a peer's. ── */}
+        <div className="grid grid-cols-4 mt-6 border-b border-[var(--app-border)]">
           <FolderTab active={folder === 'verified'} onClick={() => setFolder('verified')} icon={FolderCheck} iconColor="#0F6E56" label="Verified" count={folderCount.verified} />
           <FolderTab active={folder === 'experience'} onClick={() => setFolder('experience')} icon={Briefcase} iconColor="#D4551A" label="Experience" count={folderCount.experience} />
           <FolderTab active={folder === 'posts'} onClick={() => setFolder('posts')} icon={Grid3x3} iconColor="#5A5A5A" label="Posts" count={folderCount.posts} />
-          <FolderTab active={folder === 'skills'} onClick={() => setFolder('skills')} icon={Award} iconColor="#7C3AED" label="Skills" />
+          {!isOwn && (
+            <FolderTab active={folder === 'skills'} onClick={() => setFolder('skills')} icon={Award} iconColor="#7C3AED" label="Skills" />
+          )}
           {isOwn && (
             <FolderTab active={folder === 'saved'} onClick={() => setFolder('saved')} icon={Bookmark} iconColor="#D4551A" label="Saved" count={folderCount.saved} />
           )}
@@ -388,6 +424,7 @@ function FolderContent({
   addingQual: boolean; setAddingQual: (v: boolean | ((v: boolean) => boolean)) => void
 }) {
   const [openWork, setOpenWork] = useState<any | null>(null)
+  const [openExperience, setOpenExperience] = useState<any | null>(null)
 
   return (
     <div>
@@ -442,12 +479,22 @@ function FolderContent({
           ) : (
             <div className="grid grid-cols-2 gap-[10px]">
               {experience.map(e => (
-                <div key={e.id} className="bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-xl p-[14px] relative">
-                  <span className="w-8 h-8 rounded-lg flex items-center justify-center mb-2.5" style={{ backgroundColor: '#E6F1FB' }}>
-                    <Briefcase className="w-4 h-4" style={{ color: '#D4551A' }} />
-                  </span>
-                  <p className="text-[13px] font-semibold leading-snug line-clamp-2">{e.title}</p>
-                  <p className="text-[12px] text-[var(--app-text-secondary)] mt-1 truncate">{e.organisation || 'Work experience'}</p>
+                <div key={e.id} className="relative">
+                  <button
+                    onClick={() => setOpenExperience(e)}
+                    className="w-full text-left bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-xl p-[14px] hover:border-[var(--app-overlay-3)] transition"
+                  >
+                    <span className="w-8 h-8 rounded-lg flex items-center justify-center mb-2.5" style={{ backgroundColor: '#E6F1FB' }}>
+                      <Briefcase className="w-4 h-4" style={{ color: '#D4551A' }} />
+                    </span>
+                    <p className="text-[13px] font-semibold leading-snug line-clamp-2">{e.title}</p>
+                    <p className="text-[12px] text-[var(--app-text-secondary)] mt-1 truncate">{e.organisation || 'Work experience'}</p>
+                    {(e.employment_type || e.start_date) && (
+                      <p className="text-[11px] text-[var(--app-text-tertiary)] mt-1 truncate">
+                        {[EMPLOYMENT_TYPE_LABEL[e.employment_type] || e.employment_type, formatDateRange(e)].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
+                  </button>
                   {isOwn && (
                     <button onClick={async () => { await deleteExperienceEntry(e.id); onChanged() }} className="absolute top-2.5 right-2.5 text-[var(--app-text-tertiary)] hover:text-danger-text transition">
                       <Trash2 className="w-3.5 h-3.5" />
@@ -514,8 +561,46 @@ function FolderContent({
       )}
 
       {openWork && <VerifiedWorkDetail work={openWork} onClose={() => setOpenWork(null)} />}
+      {openExperience && <ExperienceDetail entry={openExperience} onClose={() => setOpenExperience(null)} />}
     </div>
   )
+}
+
+// Same "tap it, see the whole thing" pattern as VerifiedWorkDetail --
+// the compact tile only has room for title/org/a short meta line, the
+// full employment type, date range, location and description (the
+// actual "more detail" asked for) live here.
+function ExperienceDetail({ entry, onClose }: { entry: any; onClose: () => void }) {
+  const range = formatDateRange(entry)
+  return createPortal((
+    <div className="fixed inset-0 z-50 bg-[var(--app-bg)] overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="sticky top-0 z-10 flex items-center h-14 px-3 bg-[var(--app-bg)]/95 backdrop-blur border-b border-[var(--app-border)]">
+        <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-2)] transition">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+      </div>
+      <div className="p-4 pb-10 lg:max-w-2xl lg:mx-auto">
+        <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-2xl p-5">
+          {entry.employment_type && (
+            <span className="inline-flex items-center text-[12px] font-semibold px-3 py-1 rounded-full mb-3" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+              {EMPLOYMENT_TYPE_LABEL[entry.employment_type] || entry.employment_type}
+            </span>
+          )}
+          <h1 className="text-[20px] font-bold leading-snug mb-1 text-[var(--app-text)]">{entry.title}</h1>
+          {entry.organisation && <p className="text-[14px] text-[var(--app-text-secondary)] mb-2">{entry.organisation}</p>}
+          {(range || entry.location) && (
+            <p className="text-[12.5px] text-[var(--app-text-tertiary)] mb-4">{[range, entry.location].filter(Boolean).join(' · ')}</p>
+          )}
+          {entry.description && (
+            <div className="mt-2">
+              <p className="text-[11px] font-semibold text-[var(--app-text-secondary)] uppercase tracking-wide mb-1.5">What they did</p>
+              <p className="text-[14px] text-[var(--app-text)] whitespace-pre-wrap leading-relaxed">{entry.description}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  ), document.body)
 }
 
 // ── Skills tab -- a compact read of the Skill Wallet, not the full
@@ -526,7 +611,7 @@ function FolderContent({
 // review_criteria_results nobody's asked for). Cross-org profile views
 // correctly render empty here (courses/skills RLS is org-scoped), same
 // reason getMyOrganisationInfo above is isOwn-gated -- not a bug.
-function SkillsFolderContent({ profileId, organisationId, isOwn }: { profileId: string; organisationId?: string | null; isOwn: boolean }) {
+export function SkillsFolderContent({ profileId, organisationId, isOwn }: { profileId: string; organisationId?: string | null; isOwn: boolean }) {
   const router = useRouter()
   const [courses, setCourses] = useState<any[]>([])
   const [studentSkills, setStudentSkills] = useState<any[]>([])
@@ -943,15 +1028,32 @@ function EditField({ label, value, onChange, placeholder, hint, multiline, maxLe
 function AddExperienceForm({ profileId, onAdded }: { profileId: string; onAdded: () => void }) {
   const [title, setTitle] = useState('')
   const [organisation, setOrganisation] = useState('')
+  const [employmentType, setEmploymentType] = useState('')
+  const [location, setLocation] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [isCurrent, setIsCurrent] = useState(false)
+  const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  const inputCls = "w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition"
 
   const submit = async () => {
     if (!title.trim()) return
     setSaving(true); setError('')
     // Was discarding the error and closing the form regardless before --
     // a failed save silently threw away what was just typed.
-    const { error: err } = await addExperienceEntry(profileId, { title: title.trim(), organisation: organisation.trim() || undefined })
+    const { error: err } = await addExperienceEntry(profileId, {
+      title: title.trim(),
+      organisation: organisation.trim() || undefined,
+      employment_type: employmentType || undefined,
+      location: location.trim() || undefined,
+      start_date: startDate || undefined,
+      end_date: isCurrent ? undefined : (endDate || undefined),
+      is_current: isCurrent,
+      description: description.trim() || undefined,
+    } as any)
     setSaving(false)
     if (err) { setError("Couldn't save — try again."); return }
     onAdded()
@@ -959,8 +1061,31 @@ function AddExperienceForm({ profileId, onAdded }: { profileId: string; onAdded:
 
   return (
     <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl p-3.5 space-y-2">
-      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Saturday job at a local print shop" className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition" />
-      <input value={organisation} onChange={e => setOrganisation(e.target.value)} placeholder="Where (optional)" className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition" />
+      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Saturday job at a local print shop" className={inputCls} />
+      <input value={organisation} onChange={e => setOrganisation(e.target.value)} placeholder="Where (optional)" className={inputCls} />
+      <select value={employmentType} onChange={e => setEmploymentType(e.target.value)} className={inputCls} style={{ color: employmentType ? undefined : '#555' }}>
+        <option value="">Type (optional)</option>
+        {Object.entries(EMPLOYMENT_TYPE_LABEL).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+      </select>
+      <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Location (optional)" className={inputCls} />
+      <div className="flex items-center gap-2">
+        <label className="flex-1">
+          <span className="block text-[11px] text-[var(--app-text-tertiary)] mb-1">Started</span>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={inputCls} />
+        </label>
+        <label className="flex-1">
+          <span className="block text-[11px] text-[var(--app-text-tertiary)] mb-1">Ended</span>
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} disabled={isCurrent} className={`${inputCls} disabled:opacity-40`} />
+        </label>
+      </div>
+      <label className="flex items-center gap-2 text-[12.5px] text-[var(--app-text-secondary)] cursor-pointer">
+        <input type="checkbox" checked={isCurrent} onChange={e => setIsCurrent(e.target.checked)} /> I still do this
+      </label>
+      <textarea
+        value={description} onChange={e => setDescription(e.target.value)} rows={3}
+        placeholder="What did you actually do? Responsibilities, what you learned (optional)"
+        className={`${inputCls} resize-none leading-relaxed`}
+      />
       {error && <p className="text-[12px] text-danger-text">{error}</p>}
       <button onClick={submit} disabled={!title.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
         {saving ? 'Saving…' : 'Save'}

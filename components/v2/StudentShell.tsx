@@ -9,7 +9,7 @@ import ScrollTrack from '@/components/v2/ScrollTrack'
 import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
 import { signOut } from '@/lib/supabase'
-import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search, ChevronLeft, ChevronRight, LogOut, Settings } from 'lucide-react'
+import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search, ChevronLeft, ChevronRight, LogOut, Settings, Award } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 // Skill Wallet used to get its own standalone button here (and its own
@@ -19,9 +19,17 @@ import type { LucideIcon } from 'lucide-react'
 // it was previously reachable only via a small gear icon buried inside
 // ProfilePanel (which still exists too, for phone -- this nav is
 // desktop-only).
+//
+// "My Skill" is new -- per direct request, self-reported skills get
+// their own laptop destination rather than living inside Profile's
+// folder tabs (which still hosts Skills for viewing someone ELSE's
+// profile; see ProfilePanel.tsx). Phone doesn't get a 6th bottom-nav
+// icon for it -- there's no room in the fixed 5-button row -- it's a
+// tab inside My Work there instead (StudentMyWorkPanel.tsx).
 const DESKTOP_NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/student/feed', label: 'Feed', icon: Home },
   { href: '/student/work', label: 'My Work', icon: ClipboardList },
+  { href: '/student/skills', label: 'My Skill', icon: Award },
   { href: '/student/discover', label: 'Discover', icon: Compass },
   { href: '/student/profile', label: 'Profile', icon: UserIcon },
   { href: '/student/settings', label: 'Settings', icon: Settings },
@@ -267,18 +275,6 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
             )
           })}
         </nav>
-        {/* Icon-only now, under the nav list rather than above it --
-            was a full "+ New post" pill at the very top; per direct
-            request it's just the plus button now, moved underneath. */}
-        <div className={`flex-shrink-0 py-3 ${collapsed ? 'px-2.5 flex justify-center' : 'px-3'}`}>
-          <button
-            onClick={onPlus} aria-label="New post" title="New post"
-            className="w-10 h-10 flex items-center justify-center rounded-full text-white hover:opacity-90 active:scale-[0.99] transition flex-shrink-0"
-            style={{ backgroundColor: '#F26B21' }}
-          >
-            <Plus className="w-5 h-5" />
-          </button>
-        </div>
         {/* Reachable straight from the sidebar now, not just buried in
             Settings -- an org account has always had this same
             one-tap sign out, students didn't. */}
