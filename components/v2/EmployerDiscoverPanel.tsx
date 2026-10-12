@@ -5,19 +5,23 @@ import { createPortal } from 'react-dom'
 import { useAuth } from '@/context/AuthContext'
 import {
   getDiscoverWork, getMyInterest, expressInterest, getTalentPools, createTalentPool, addToTalentPool,
-  getVerifiedWorkForProfile, getExperienceEntries, getSelfQualifications,
+  getVerifiedWorkForProfile, getExperienceEntries, getSelfQualifications, getEmployerVisibleSkills, getDiscoverSkillNames,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
-import { BadgeCheck, Search, Send, Check, Clock, Bookmark, Shield, X, Briefcase, FolderCheck } from 'lucide-react'
+import { LEVEL_INFO } from '@/lib/skillLevels'
+import { BadgeCheck, Search, Send, Check, Clock, Bookmark, Shield, X, Briefcase, FolderCheck, Award } from 'lucide-react'
 
 type WorkType = 'all' | 'brief' | 'course' | 'workshop'
 
 const TYPE_LABEL: Record<string, string> = { brief: 'Brief', course: 'Course', workshop: 'Workshop' }
 
-// Every row this queries is, by construction, work an 18+ student
-// chose to make public — a minor's verification can never carry
-// visibility = 'public' (enforced in the database, not here), so
-// there is no under-18 case to anonymise: they simply never appear.
+// Every row this queries is either work an 18+ student chose to make
+// public themselves, OR a specific piece their institution has
+// explicitly flagged employer-visible on their behalf (the only path
+// for under-18 students, who can't self-toggle 'public' at all) --
+// both enforced in the database (RLS + submission_visible_to_employer/
+// work_item_visible_to_employer), not here. Either way, this never
+// means literally public: it's gated to vetted employer accounts only.
 // "Express interest" never gives an employer contact details — it
 // only ever inserts a row that's routed to the student's organisation.
 export default function EmployerDiscoverPanel() {
@@ -26,6 +30,8 @@ export default function EmployerDiscoverPanel() {
   const [loading, setLoading] = useState(true)
   const [type, setType] = useState<WorkType>('all')
   const [q, setQ] = useState('')
+  const [skill, setSkill] = useState('')
+  const [skillOptions, setSkillOptions] = useState<string[]>([])
   const [interestByStudent, setInterestByStudent] = useState<Record<string, string>>({})
   const [sending, setSending] = useState<string | null>(null)
   const [composer, setComposer] = useState<{ studentId: string; studentName: string; label?: string } | null>(null)
@@ -34,12 +40,13 @@ export default function EmployerDiscoverPanel() {
 
   const load = () => {
     setLoading(true)
-    getDiscoverWork({ type: type === 'all' ? undefined : type, q: q.trim() || undefined }).then(({ data }) => {
+    getDiscoverWork({ type: type === 'all' ? undefined : type, q: q.trim() || undefined, skill: skill || undefined }).then(({ data }) => {
       setItems(data || [])
       setLoading(false)
     })
   }
-  useEffect(load, [type])
+  useEffect(load, [type, skill])
+  useEffect(() => { getDiscoverSkillNames().then(({ data }) => setSkillOptions(data)) }, [])
 
   useEffect(() => {
     if (!user) return
@@ -88,6 +95,15 @@ export default function EmployerDiscoverPanel() {
             </button>
           ))}
         </div>
+        {skillOptions.length > 0 && (
+          <select
+            value={skill} onChange={e => setSkill(e.target.value)}
+            className="bg-surface border border-edge rounded-xl px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition flex-shrink-0"
+          >
+            <option value="">Any skill</option>
+            {skillOptions.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
       </div>
 
       {loading ? (
@@ -326,12 +342,14 @@ function CandidateProfileModal({ student, status, onClose, onExpressInterest }: 
   const [work, setWork] = useState<any[] | null>(null)
   const [experience, setExperience] = useState<any[]>([])
   const [quals, setQuals] = useState<any[]>([])
+  const [skills, setSkills] = useState<any[]>([])
   const avatarUrl = useAvatarUrl(student.avatar_path)
 
   useEffect(() => {
-    getVerifiedWorkForProfile(student.id).then(({ data }) => setWork((data || []).filter((v: any) => v.visibility === 'public')))
+    getVerifiedWorkForProfile(student.id).then(({ data }) => setWork((data || []).filter((v: any) => v.visibility === 'public' || v.employer_visible)))
     getExperienceEntries(student.id).then(({ data }) => setExperience(data || []))
     getSelfQualifications(student.id).then(({ data }) => setQuals(data || []))
+    getEmployerVisibleSkills(student.id).then(({ data }) => setSkills(data || []))
   }, [student.id])
 
   return createPortal((
@@ -354,7 +372,7 @@ function CandidateProfileModal({ student, status, onClose, onExpressInterest }: 
             <div className="min-w-0">
               <p className="font-bold text-ink text-[16px] truncate">{student.full_name}</p>
               {work && work.length > 0 && (
-                <p className="flex items-center gap-1 text-[12px] font-semibold text-success-text"><BadgeCheck className="w-3.5 h-3.5" /> {work.length} verified {work.length === 1 ? 'piece' : 'pieces'} of public work</p>
+                <p className="flex items-center gap-1 text-[12px] font-semibold text-success-text"><BadgeCheck className="w-3.5 h-3.5" /> {work.length} verified {work.length === 1 ? 'piece' : 'pieces'} of work</p>
               )}
             </div>
           </div>
@@ -393,11 +411,27 @@ function CandidateProfileModal({ student, status, onClose, onExpressInterest }: 
             </div>
           )}
 
-          <p className="text-[12px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2">Public verified work</p>
+          {skills.length > 0 && (
+            <div className="bg-surface-subtle rounded-xl p-3 mb-4">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2"><Award className="w-3 h-3" /> Skills</p>
+              <div className="flex flex-wrap gap-1.5">
+                {skills.map((s: any) => {
+                  const info = LEVEL_INFO[s.level as keyof typeof LEVEL_INFO]
+                  return (
+                    <span key={s.id} className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: info.bg, color: info.text }}>
+                      {s.skills?.name} · {info.label}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          <p className="text-[12px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2">Verified work</p>
           {work === null ? (
             <p className="text-[13px] text-ink-tertiary">Loading…</p>
           ) : work.length === 0 ? (
-            <p className="text-[13px] text-ink-tertiary">Nothing public yet.</p>
+            <p className="text-[13px] text-ink-tertiary">Nothing to show yet.</p>
           ) : (
             <div className="space-y-2.5 mb-2">
               {work.map(v => (

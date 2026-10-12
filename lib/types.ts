@@ -236,6 +236,10 @@ export interface Verification {
   verified_by: string
   verified_at: string
   visibility: ShareVisibility
+  // Separate from `visibility` on purpose -- institution-granted, for
+  // students who can't self-toggle 'public' (everyone under 18). See
+  // lib/supabase.ts's setEmployerVisibility for the one write path.
+  employer_visible: boolean
   revoked_at?: string
   revoked_by?: string
   revocation_reason?: string

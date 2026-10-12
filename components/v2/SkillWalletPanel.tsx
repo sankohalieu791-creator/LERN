@@ -4,21 +4,18 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '@/context/AuthContext'
 import { getOrgSkillsForStudent, getStudentSkills, getSkillEvidence } from '@/lib/supabase'
-import type { Skill, StudentSkill, SkillLevel } from '@/lib/types'
+import type { Skill, StudentSkill } from '@/lib/types'
+import { LEVEL_INFO } from '@/lib/skillLevels'
 import { ArrowLeft, CheckCircle2, Sparkles, FileText, Award } from 'lucide-react'
 
 // LERN Skill Wallet (Phase 1) -- the student's own evidence-backed
 // skill levels, built from work they already submit through My Work.
 // Proof only in this phase (levels + evidence); goals/direction are a
 // later phase per the agreed build plan.
-
-const LEVEL_INFO: Record<SkillLevel, { label: string; bg: string; text: string }> = {
-  not_started: { label: 'Not started', bg: 'var(--app-overlay-2)', text: 'var(--app-text-tertiary)' },
-  beginner: { label: 'Beginner', bg: 'var(--status-info-bg)', text: 'var(--status-info-text)' },
-  developing: { label: 'Developing', bg: 'var(--status-warn-bg)', text: 'var(--status-warn-text)' },
-  secure: { label: 'Secure', bg: 'var(--status-success-bg)', text: 'var(--status-success-text)' },
-  advanced: { label: 'Advanced', bg: '#F3E8FF', text: '#7C3AED' },
-}
+//
+// Reachable only via the Profile 'skills' tab's drill-in now (own view),
+// not a standalone nav destination any more -- see ProfilePanel.tsx and
+// StudentShell.tsx.
 
 type CourseWithSkills = { id: string; name: string; skills: Skill[] }
 

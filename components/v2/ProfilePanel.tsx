@@ -10,12 +10,14 @@ import {
   updateProfileBioTags, getExperienceEntries, addExperienceEntry, deleteExperienceEntry,
   getSavedOpportunities, unsaveOpportunity, updateUserProfile, uploadAvatar, removeAvatar,
   isUsernameAvailable, getMyOrganisationInfo, getPublicStudentProfile, blockUser,
+  getStudentSkills, getOrgSkillsForStudent,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import FollowButton from '@/components/v2/FollowButton'
 import { STICKER_OPTIONS } from '@/lib/feedConstants'
+import { LEVEL_INFO } from '@/lib/skillLevels'
 import {
-  FolderCheck, Briefcase, Grid3x3, Settings as SettingsIcon, Plus, X, Trash2, Play,
+  FolderCheck, Briefcase, Grid3x3, Award, Settings as SettingsIcon, Plus, X, Trash2, Play,
   Bookmark, Lock, FilePlus, CheckCircle2, Camera, ChevronLeft, ChevronRight, ArrowRight, MoreHorizontal, UserX,
 } from 'lucide-react'
 
@@ -31,7 +33,7 @@ function daysAgo(dateStr: string) {
   return Math.max(0, Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)))
 }
 
-type Folder = 'verified' | 'experience' | 'posts' | 'saved'
+type Folder = 'verified' | 'experience' | 'posts' | 'skills' | 'saved'
 
 // LERN Student Profile, Final Layout Spec v2.0 -- supersedes the
 // earlier compact-stack layout. Spacious, centred, TikTok-style top;
@@ -116,6 +118,8 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
   const title = orgName || (!profile.organisation_id && !isAdult(profile.date_of_birth) ? 'Student' : '')
 
   const folderCount = { verified: verified.length, experience: experience.length, posts: posts.length, saved: saved.length }
+  // Skills has no natural "count" the way a list does (it's a level per
+  // skill, not items to tally) -- FolderTab just omits the badge for it.
 
   return (
     // Flat, edge-to-edge, no enclosing card -- exactly how Feed, My
@@ -252,10 +256,11 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
             navigate anywhere -- it swaps the grid below, same screen,
             tabs stay visible, active tab gets an underline. "Tap
             Posts, see your posts. Tap Saved, see what's saved." ── */}
-        <div className={`grid ${isOwn ? 'grid-cols-4' : 'grid-cols-3'} mt-6 border-b border-[var(--app-border)]`}>
+        <div className={`grid ${isOwn ? 'grid-cols-5' : 'grid-cols-4'} mt-6 border-b border-[var(--app-border)]`}>
           <FolderTab active={folder === 'verified'} onClick={() => setFolder('verified')} icon={FolderCheck} iconColor="#0F6E56" label="Verified" count={folderCount.verified} />
           <FolderTab active={folder === 'experience'} onClick={() => setFolder('experience')} icon={Briefcase} iconColor="#D4551A" label="Experience" count={folderCount.experience} />
           <FolderTab active={folder === 'posts'} onClick={() => setFolder('posts')} icon={Grid3x3} iconColor="#5A5A5A" label="Posts" count={folderCount.posts} />
+          <FolderTab active={folder === 'skills'} onClick={() => setFolder('skills')} icon={Award} iconColor="#7C3AED" label="Skills" />
           {isOwn && (
             <FolderTab active={folder === 'saved'} onClick={() => setFolder('saved')} icon={Bookmark} iconColor="#D4551A" label="Saved" count={folderCount.saved} />
           )}
@@ -267,7 +272,7 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
           <FolderContent
             folder={folder} isOwn={isOwn} loading={loading}
             verified={verified} quals={quals} experience={experience} posts={posts} saved={saved}
-            profileId={profileId!}
+            profileId={profileId!} organisationId={profile.organisation_id}
             onChanged={load}
             addingExperience={addingExperience} setAddingExperience={setAddingExperience}
             addingQual={addingQual} setAddingQual={setAddingQual}
@@ -341,7 +346,7 @@ function StatDivider() {
 // padding -- per direct feedback that the tab row read as too small
 // next to everything else on the page.
 function FolderTab({ active, onClick, icon: Icon, iconColor, label, count }: {
-  active: boolean; onClick: () => void; icon: any; iconColor: string; label: string; count: number
+  active: boolean; onClick: () => void; icon: any; iconColor: string; label: string; count?: number
 }) {
   return (
     <button
@@ -352,7 +357,7 @@ function FolderTab({ active, onClick, icon: Icon, iconColor, label, count }: {
       <Icon className="w-5 h-5" style={{ color: active ? iconColor : '#666' }} />
       <span>
         <span className={`text-[13px] font-semibold ${active ? 'text-[var(--app-text)]' : 'text-[var(--app-text-secondary)]'}`}>{label}</span>
-        <span className="text-[11px] text-[var(--app-text-secondary)]"> · {count}</span>
+        {count !== undefined && <span className="text-[11px] text-[var(--app-text-secondary)]"> · {count}</span>}
       </span>
     </button>
   )
@@ -372,12 +377,12 @@ function EmptyState({ icon: Icon, title, hint }: { icon: any; title: string; hin
 // repeated header (the tab itself already shows what's selected).
 // Same component for all four, just the grid inside changes.
 function FolderContent({
-  folder, isOwn, loading, verified, quals, experience, posts, saved, profileId, onChanged,
+  folder, isOwn, loading, verified, quals, experience, posts, saved, profileId, organisationId, onChanged,
   addingExperience, setAddingExperience, addingQual, setAddingQual,
 }: {
   folder: Folder; isOwn: boolean; loading: boolean
   verified: any[]; quals: any[]; experience: any[]; posts: any[]; saved: any[]
-  profileId: string; onChanged: () => void
+  profileId: string; organisationId?: string | null; onChanged: () => void
   addingExperience: boolean; setAddingExperience: (v: boolean | ((v: boolean) => boolean)) => void
   addingQual: boolean; setAddingQual: (v: boolean | ((v: boolean) => boolean)) => void
 }) {
@@ -470,6 +475,10 @@ function FolderContent({
         )
       )}
 
+      {folder === 'skills' && (
+        <SkillsFolderContent profileId={profileId} organisationId={organisationId} isOwn={isOwn} />
+      )}
+
       {folder === 'saved' && (
         <>
           {saved.length === 0 ? (
@@ -504,6 +513,81 @@ function FolderContent({
       )}
 
       {openWork && <VerifiedWorkDetail work={openWork} onClose={() => setOpenWork(null)} />}
+    </div>
+  )
+}
+
+// ── Skills tab -- a compact read of the Skill Wallet, not the full
+// evidence-drilldown experience (that stays at /student/skill-wallet,
+// own view only -- the route re-derives everything from the VIEWER's
+// own session, so it can never show a different student's evidence;
+// building that out would be real new RLS surface on
+// review_criteria_results nobody's asked for). Cross-org profile views
+// correctly render empty here (courses/skills RLS is org-scoped), same
+// reason getMyOrganisationInfo above is isOwn-gated -- not a bug.
+function SkillsFolderContent({ profileId, organisationId, isOwn }: { profileId: string; organisationId?: string | null; isOwn: boolean }) {
+  const router = useRouter()
+  const [courses, setCourses] = useState<any[]>([])
+  const [studentSkills, setStudentSkills] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!organisationId) { setLoading(false); return }
+    Promise.all([
+      getOrgSkillsForStudent(organisationId),
+      getStudentSkills(profileId),
+    ]).then(([c, ss]) => {
+      setCourses((c.data as any) || [])
+      setStudentSkills(ss.data || [])
+      setLoading(false)
+    })
+  }, [profileId, organisationId])
+
+  if (loading) return <p className="text-[13px] text-[var(--app-text-tertiary)]">Loading…</p>
+
+  const levelFor = (skillId: string) => studentSkills.find((ss: any) => ss.skill_id === skillId)
+  const coursesWithSkills = courses.filter((c: any) => (c.skills || []).length > 0)
+
+  if (coursesWithSkills.length === 0) {
+    return (
+      <EmptyState
+        icon={Award} title="No skills yet"
+        hint={isOwn ? "Your tutor adds skills to a course — they'll show up here once they have." : 'Nothing to show here yet.'}
+      />
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      {coursesWithSkills.map((course: any) => (
+        <div key={course.id}>
+          <p className="text-[12px] font-semibold text-[var(--app-text-tertiary)] uppercase tracking-wide mb-2">{course.name}</p>
+          <div className="space-y-2.5">
+            {course.skills.map((skill: any) => {
+              const ss = levelFor(skill.id)
+              const level = ss?.level || 'not_started'
+              const info = LEVEL_INFO[level as keyof typeof LEVEL_INFO]
+              return (
+                <button
+                  key={skill.id}
+                  onClick={() => { if (isOwn) router.push('/student/skill-wallet') }}
+                  className={`block w-full text-left bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-[14px] transition ${isOwn ? 'hover:border-[var(--app-overlay-3)]' : 'cursor-default'}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-semibold text-[var(--app-text)] truncate">{skill.name}</p>
+                      {skill.unit_label && <p className="text-[12px] text-[var(--app-text-tertiary)] mt-0.5 truncate">{skill.unit_label}</p>}
+                    </div>
+                    <span className="text-[11px] font-semibold px-[10px] py-[3px] rounded-full flex-shrink-0" style={{ backgroundColor: info.bg, color: info.text }}>
+                      {info.label}
+                    </span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

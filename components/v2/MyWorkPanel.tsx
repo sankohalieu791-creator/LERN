@@ -236,6 +236,13 @@ function SubmissionHistoryRow({ submission }: { submission: any }) {
               {verification.visibility === 'public' ? <Globe className="w-3 h-3" /> : <Users className="w-3 h-3" />}
               {verification.visibility === 'public' ? 'Public — tap to make org-only' : 'Org only — tap to make public'}
             </button>
+          ) : verification.employer_visible ? (
+            // Can't control this themselves (under 18) -- their
+            // institution can, via StudentsPanel -- this is just
+            // read-only awareness that it's happened.
+            <span className="flex items-center gap-1 text-[11px]" style={{ color: '#0F6E56' }}>
+              <Globe className="w-3 h-3" /> Your institution has made this visible to employers
+            </span>
           ) : (
             <span className="flex items-center gap-1 text-[11px] text-[#8A8373]">
               <Users className="w-3 h-3" /> Visible to your organisation only

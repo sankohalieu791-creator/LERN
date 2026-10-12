@@ -704,7 +704,7 @@ export const getWorkItemMemberCount = async (workItemId: string): Promise<number
 export const getMySubmissions = async (studentId: string) => {
   const { data, error } = await supabase
     .from('submissions')
-    .select('*, work_items(title, criteria), verifications(id, verified_by, verified_at, visibility, revoked_at)')
+    .select('*, work_items(title, criteria), verifications(id, verified_by, verified_at, visibility, employer_visible, revoked_at)')
     .eq('student_id', studentId)
     .order('submitted_at', { ascending: false })
   return { data, error }
@@ -1025,6 +1025,28 @@ export const getSkillEvidence = async (studentId: string, skillId: string) => {
   return { data, error }
 }
 
+// For the employer-facing candidate modal -- a level badge alone with
+// no criteria text or evidence file reveals nothing about a student's
+// actual work, so this is fine to show for any discoverable student
+// (RLS itself still gates this on has_verification(student_id), not
+// just a UI check). not_started excluded -- a blank skill is just noise.
+export const getEmployerVisibleSkills = async (studentId: string) => {
+  const { data, error } = await supabase
+    .from('student_skills')
+    .select('id, level, verified_count, skills(name, unit_label)')
+    .eq('student_id', studentId)
+    .neq('level', 'not_started')
+  return { data, error }
+}
+
+// Populates the Discover skills-filter control. Distinct names only --
+// multiple orgs can have a skill with the same name under different
+// courses, the filter just matches on the label.
+export const getDiscoverSkillNames = async () => {
+  const { data, error } = await supabase.from('skills').select('name').order('name')
+  return { data: Array.from(new Set((data || []).map((s: any) => s.name))), error }
+}
+
 export const setModeration = async (submissionId: string, status: 'clear' | 'flagged' | 'hidden', reason?: string) => {
   const { error } = await supabase
     .from('submissions')
@@ -1041,6 +1063,20 @@ export const setShareVisibility = async (verificationId: string, visibility: 'or
     .from('verifications')
     .update({ visibility })
     .eq('id', verificationId)
+  return { error }
+}
+
+// Institution staff only, for students who can't self-toggle 'public'
+// (everyone under 18 -- MyWorkPanel's toggle above only renders for
+// adults). Deliberately a separate RPC/column from setShareVisibility,
+// not a staff-privileged path into the same 'visibility' field --
+// 'public' means literally public elsewhere in this product's own
+// safeguarding language; this only ever means "shown to vetted
+// employer accounts in Discover." The RPC does its own org-membership
+// check server-side (see the migration) -- this is just the client
+// wrapper, no auth logic lives here.
+export const setEmployerVisibility = async (verificationId: string, visible: boolean) => {
+  const { error } = await supabase.rpc('set_employer_visibility', { p_verification_id: verificationId, p_visible: visible })
   return { error }
 }
 
@@ -1170,7 +1206,14 @@ export const getPlacements = async (organisationId: string, groupId?: string | n
 
 export const createPlacement = async (
   organisationId: string, createdBy: string,
-  fields: { student_id: string; group_id?: string | null; employer_name: string; starts_on: string; ends_on: string },
+  fields: {
+    student_id: string; group_id?: string | null; employer_name: string; starts_on: string; ends_on: string
+    location_mode?: 'in_person' | 'virtual' | null
+    time_commitment?: string | null
+    employer_lead_name?: string | null
+    employer_lead_email?: string | null
+    coordinator_id?: string | null
+  },
 ) => {
   const { data, error } = await supabase
     .from('placements')
@@ -2084,11 +2127,11 @@ export const getWorkItemRecordings = async (workItemId: string) => {
 // RLS controls which ROWS an employer can read, not which COLUMNS, so
 // "no contact details" for a minor is enforced here at the query
 // level, deliberately, not left to chance.
-export const getDiscoverWork = async (filters?: { type?: string; q?: string }) => {
+export const getDiscoverWork = async (filters?: { type?: string; q?: string; skill?: string }) => {
   let query = supabase
     .from('verifications')
     .select(`
-      id, verified_at, submission_id, views_count,
+      id, verified_at, submission_id, views_count, visibility, employer_visible,
       verifier:users!verifications_verified_by_fkey(full_name),
       submissions!inner(
         id, content, student_id,
@@ -2096,13 +2139,27 @@ export const getDiscoverWork = async (filters?: { type?: string; q?: string }) =
         work_items!inner(id, title, description, type)
       )
     `)
-    .eq('visibility', 'public')
+    .or('visibility.eq.public,employer_visible.eq.true')
     .is('revoked_at', null)
     .order('verified_at', { ascending: false })
     .limit(60)
 
   if (filters?.type) query = query.eq('submissions.work_items.type', filters.type)
   if (filters?.q) query = query.or(`title.ilike.%${filters.q}%,description.ilike.%${filters.q}%`, { referencedTable: 'submissions.work_items' })
+
+  // Resolve matching student ids first (same RLS gate as
+  // getEmployerVisibleSkills protects this), then filter the main
+  // query by them -- simpler than a three-way join, and an empty
+  // studentIds correctly yields zero rows, the right "no matches" state.
+  if (filters?.skill) {
+    const { data: matches } = await supabase
+      .from('student_skills')
+      .select('student_id, skills!inner(name)')
+      .eq('skills.name', filters.skill)
+      .neq('level', 'not_started')
+    const studentIds = (matches || []).map((m: any) => m.student_id)
+    query = query.in('submissions.student_id', studentIds.length ? studentIds : ['00000000-0000-0000-0000-000000000000'])
+  }
 
   const { data, error } = await query
   return { data, error }
@@ -2795,7 +2852,7 @@ export const getVerifiedWorkForProfile = async (studentId: string) => {
   const { data, error } = await supabase
     .from('verifications')
     .select(`
-      id, verified_at, visibility,
+      id, verified_at, visibility, employer_visible,
       verifier:users!verifications_verified_by_fkey(full_name),
       submissions!inner(student_id, content, file_path, file_type, work_items(title, type, criteria, organisation_id, organisations(name)))
     `)

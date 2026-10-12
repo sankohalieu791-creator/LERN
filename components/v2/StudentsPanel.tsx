@@ -6,11 +6,11 @@ import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
 import {
   getOrgStudents, getMySubmissions, getGroups, createGroup, setStudentGroup,
-  getAttendanceForSession, markAttendance, getStudentAttendanceSummary,
+  getAttendanceForSession, markAttendance, getStudentAttendanceSummary, setEmployerVisibility,
 } from '@/lib/supabase'
 import {
   ChevronRight, ArrowLeft, Clock, CheckCircle2, RotateCcw, Ban, Users2,
-  ClipboardList, Search,
+  ClipboardList, Search, Eye, EyeOff,
 } from 'lucide-react'
 import type { Group, AttendanceStatus } from '@/lib/types'
 
@@ -193,6 +193,7 @@ function StudentDetail({ student, groups, onClose, onGroupChanged }: {
   const [attendance, setAttendance] = useState<any>(null)
   const [savingGroup, setSavingGroup] = useState(false)
   const [groupError, setGroupError] = useState('')
+  const [busyVerificationId, setBusyVerificationId] = useState<string | null>(null)
   const theme = useResolvedTheme()
 
   useEffect(() => {
@@ -209,6 +210,23 @@ function StudentDetail({ student, groups, onClose, onGroupChanged }: {
     setSavingGroup(false)
     if (error) { setGroupError(error.message || "Couldn't move them — try again."); return }
     onGroupChanged(groupId)
+  }
+
+  // Institution-granted, for students who can't self-toggle 'public'
+  // (everyone under 18) -- available for any student regardless of
+  // age here, since this never implies literal public visibility, just
+  // "shown to vetted employers in Discover." Patches local state on
+  // success rather than refetching everything.
+  const toggleEmployerVisible = async (verification: any) => {
+    setBusyVerificationId(verification.id)
+    const nextVisible = !verification.employer_visible
+    const { error } = await setEmployerVisibility(verification.id, nextVisible)
+    setBusyVerificationId(null)
+    if (error) return
+    setSubmissions(prev => (prev || []).map(s => ({
+      ...s,
+      verifications: (s.verifications || []).map((v: any) => v.id === verification.id ? { ...v, employer_visible: nextVisible } : v),
+    })))
   }
 
   // data-theme is repeated here even though OrgShell already sets it --
@@ -262,12 +280,26 @@ function StudentDetail({ student, groups, onClose, onGroupChanged }: {
               {submissions.map(s => {
                 const status = STATUS_ICON[s.status] || STATUS_ICON.submitted
                 const Icon = status.icon
+                const verification = (s.verifications || []).find((v: any) => !v.revoked_at)
                 return (
-                  <div key={s.id} className="flex items-center justify-between text-[13px]">
-                    <span className="text-ink">{s.work_items?.title}</span>
-                    <span className={`flex items-center gap-1.5 font-semibold capitalize ${status.cls}`}>
-                      <Icon className="w-3.5 h-3.5" /> {s.status}
-                    </span>
+                  <div key={s.id}>
+                    <div className="flex items-center justify-between text-[13px]">
+                      <span className="text-ink">{s.work_items?.title}</span>
+                      <span className={`flex items-center gap-1.5 font-semibold capitalize ${status.cls}`}>
+                        <Icon className="w-3.5 h-3.5" /> {s.status}
+                      </span>
+                    </div>
+                    {s.status === 'verified' && verification && (
+                      <button
+                        onClick={() => toggleEmployerVisible(verification)}
+                        disabled={busyVerificationId === verification.id}
+                        className="mt-1 flex items-center gap-1.5 text-[12px] font-medium disabled:opacity-50"
+                        style={{ color: verification.employer_visible ? '#0F6E56' : '#8A8373' }}
+                      >
+                        {verification.employer_visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                        {verification.employer_visible ? 'Visible to employers — tap to hide' : 'Hidden from employers — tap to show'}
+                      </button>
+                    )}
                   </div>
                 )
               })}

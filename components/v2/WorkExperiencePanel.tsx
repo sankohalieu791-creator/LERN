@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
 import {
   getOrgStudents, getGroups, getPlacements, createPlacement, setPlacementStatus,
-  getPlacementAttendance, markPlacementAttendance, getPlacementAttendanceForOrg,
+  getPlacementAttendance, markPlacementAttendance, getPlacementAttendanceForOrg, getOrgStaff,
 } from '@/lib/supabase'
 import { ArrowLeft, Briefcase, Download, ChevronRight, Shield, Check, X as XIcon, Search } from 'lucide-react'
 import type { Group } from '@/lib/types'
@@ -245,8 +245,18 @@ function AddPlacementDialog({ studentId, studentName, onClose, onCreated }: {
   const [employerName, setEmployerName] = useState('')
   const [startsOn, setStartsOn] = useState(() => new Date().toISOString().split('T')[0])
   const [endsOn, setEndsOn] = useState('')
+  const [locationMode, setLocationMode] = useState<'in_person' | 'virtual' | null>(null)
+  const [timeCommitment, setTimeCommitment] = useState('')
+  const [leadName, setLeadName] = useState('')
+  const [leadEmail, setLeadEmail] = useState('')
+  const [coordinatorId, setCoordinatorId] = useState('')
+  const [staff, setStaff] = useState<any[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (user?.organisation_id) getOrgStaff(user.organisation_id).then(({ data }) => setStaff(data || []))
+  }, [user?.organisation_id])
 
   const submit = async () => {
     setError('')
@@ -255,8 +265,21 @@ function AddPlacementDialog({ studentId, studentName, onClose, onCreated }: {
     if (new Date(endsOn) < new Date(startsOn)) return setError('End date has to be after the start date.')
     if (!user?.organisation_id) return
     setSaving(true)
+    // Only sent when actually filled in -- these columns are additive
+    // via a migration that may not have landed yet wherever this runs;
+    // omitting unset keys entirely (not sending them as explicit nulls)
+    // means placement creation keeps working exactly as before even
+    // before that migration is applied, not just when these fields are
+    // left blank by choice.
+    const extra: Record<string, any> = {}
+    if (locationMode) extra.location_mode = locationMode
+    if (timeCommitment.trim()) extra.time_commitment = timeCommitment.trim()
+    if (leadName.trim()) extra.employer_lead_name = leadName.trim()
+    if (leadEmail.trim()) extra.employer_lead_email = leadEmail.trim()
+    if (coordinatorId) extra.coordinator_id = coordinatorId
     const { error: err } = await createPlacement(user.organisation_id, user.id, {
       student_id: studentId, employer_name: employerName.trim(), starts_on: startsOn, ends_on: endsOn,
+      ...extra,
     })
     setSaving(false)
     if (err) { setError("Couldn't save that placement — try again."); return }
@@ -286,6 +309,62 @@ function AddPlacementDialog({ studentId, studentName, onClose, onCreated }: {
             <input type="date" value={endsOn} onChange={e => setEndsOn(e.target.value)} className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition" />
           </label>
         </div>
+
+        <div className="mb-3">
+          <span className="block text-[12px] font-semibold text-ink-secondary mb-1.5">In person or virtual (optional)</span>
+          <div className="flex gap-2">
+            {(['in_person', 'virtual'] as const).map(mode => (
+              <button
+                key={mode} type="button"
+                onClick={() => setLocationMode(prev => prev === mode ? null : mode)}
+                className={`flex-1 py-2 rounded-lg text-[13px] font-semibold border transition ${
+                  locationMode === mode ? 'bg-brand text-white border-brand' : 'bg-surface-subtle text-ink-secondary border-edge hover:border-ink-tertiary'
+                }`}
+              >
+                {mode === 'in_person' ? 'In person' : 'Virtual'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <label className="block mb-3">
+          <span className="block text-[12px] font-semibold text-ink-secondary mb-1.5">Time commitment (optional)</span>
+          <input
+            value={timeCommitment} onChange={e => setTimeCommitment(e.target.value)} placeholder="e.g. 2 days/week, or 9am–3pm Mon–Fri"
+            className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+          />
+        </label>
+
+        <div className="flex gap-2 mb-3">
+          <label className="flex-1">
+            <span className="block text-[12px] font-semibold text-ink-secondary mb-1.5">Employer lead's name (optional)</span>
+            <input
+              value={leadName} onChange={e => setLeadName(e.target.value)} placeholder="e.g. Jordan Smith"
+              className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+            />
+          </label>
+          <label className="flex-1">
+            <span className="block text-[12px] font-semibold text-ink-secondary mb-1.5">Their email (optional)</span>
+            <input
+              type="email" value={leadEmail} onChange={e => setLeadEmail(e.target.value)} placeholder="jordan@example.com"
+              className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+            />
+          </label>
+        </div>
+
+        {staff.length > 0 && (
+          <label className="block mb-3">
+            <span className="block text-[12px] font-semibold text-ink-secondary mb-1.5">Placement coordinator (optional)</span>
+            <select
+              value={coordinatorId} onChange={e => setCoordinatorId(e.target.value)}
+              className="w-full bg-surface-subtle border border-edge rounded-lg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+            >
+              <option value="">Not set</option>
+              {staff.map((s: any) => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+            </select>
+          </label>
+        )}
+
         {error && <p className="text-[12px] text-danger-text mb-2">{error}</p>}
         <div className="flex items-center justify-end gap-2 mt-2">
           <button onClick={onClose} className="px-4 py-2.5 rounded-lg text-[13px] font-semibold text-ink-secondary hover:bg-surface-muted transition">Cancel</button>
