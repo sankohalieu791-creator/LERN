@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
 import { Spinner } from '@/components/v2/Field'
 import ScrollTrack from '@/components/v2/ScrollTrack'
+import GradientOrb from '@/components/v2/GradientOrb'
 import { getGroups, createWorkItem } from '@/lib/supabase'
 import type { Group } from '@/lib/types'
 import { searchHelp, starterTopics } from '@/lib/helpDeskSearch'
@@ -27,22 +28,13 @@ type Msg = {
 
 const FALLBACK = "I don't have a clear answer for that yet — try rephrasing, or pick one of the topics below."
 
-// A plain circle with a static two-dot face, not an organic blob with
-// gaze-animated eyes -- simplified per direct feedback ("just keep it
-// like a circle"). Still a stand-in for an "ask an AI" icon without
-// actually being one -- see lib/helpDeskContent.ts and
+// GradientOrb (components/v2/GradientOrb.tsx) -- a real GPU shader, not
+// a CSS shape with a drawn-on face. Per the reference design supplied
+// directly: a glowing, slowly rotating, noise-mixed orb, recoloured
+// there from its original blue/purple/orange to LERN's own cream/
+// orange/terracotta/ink palette. Still a stand-in for an "ask an AI"
+// icon without actually being one -- see lib/helpDeskContent.ts and
 // lib/helpDeskDraft.ts for why nothing behind this is generated.
-// Pending a reference design for the real final look.
-const BLOB_RADIUS = '50%'
-
-function OrbFace({ size = 8 }: { size?: number }) {
-  return (
-    <span className="flex items-center" style={{ gap: Math.max(2, size * 0.3) }}>
-      <span className="rounded-full" style={{ width: Math.max(2, size * 0.3), height: size, backgroundColor: '#2b2622' }} />
-      <span className="rounded-full" style={{ width: Math.max(2, size * 0.3), height: size, backgroundColor: '#2b2622' }} />
-    </span>
-  )
-}
 
 // A quick-start draft, not a finished object -- every field here is
 // editable, nothing is sent to Supabase until "Create" is tapped, and
@@ -264,17 +256,14 @@ export default function HelpDesk() {
         style={{ bottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
       >
         <span
-          className="relative flex items-center justify-center border overflow-hidden w-11 h-11"
+          className="relative flex items-center justify-center rounded-full border overflow-hidden w-11 h-11"
           style={{
-            borderRadius: BLOB_RADIUS,
             background: '#FBF4EA',
-            backdropFilter: 'blur(14px)',
-            WebkitBackdropFilter: 'blur(14px)',
             borderColor: '#E7DCC9',
             boxShadow: '0 6px 20px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.6)',
           }}
         >
-          <OrbFace size={9} />
+          <GradientOrb config={{ rotationSpeed: 0.25 }} />
         </span>
         <span className="text-[10px] font-semibold" style={{ color: '#8A7F6B' }}>Help</span>
       </button>
@@ -318,10 +307,10 @@ export default function HelpDesk() {
       <div className="flex items-center justify-between px-4 pb-3 flex-shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <span
-            className="w-8 h-8 flex items-center justify-center flex-shrink-0 border overflow-hidden"
-            style={{ borderRadius: BLOB_RADIUS, background: '#FBF4EA', borderColor: '#E7DCC9' }}
+            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border overflow-hidden"
+            style={{ background: '#FBF4EA', borderColor: '#E7DCC9' }}
           >
-            <OrbFace size={8} />
+            <GradientOrb config={{ rotationSpeed: 0.25 }} />
           </span>
           <p className="font-bold text-ink text-[14px] leading-tight truncate">LERN Help Desk</p>
         </div>
