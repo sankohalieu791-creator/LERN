@@ -5,7 +5,7 @@ import {
   getPendingEmployerVerifications, approveEmployerVerification, rejectEmployerVerification,
   requestMoreEmployerInfo, setEmployerManualCheck, setEmployerCheck5Notes,
 } from '@/lib/supabase'
-import { Check, X, HelpCircle, Building2, Mail, Globe, UserCheck, MessageCircle, Sparkles } from 'lucide-react'
+import { Check, X, HelpCircle, Building2, Mail, Globe, UserCheck, MessageCircle, CheckCircle2 } from 'lucide-react'
 
 // Loose match, not exact -- Companies House lists officers as "SURNAME,
 // Firstname Middlenames, Title" (e.g. "BREEN, Michael Francis David,
@@ -170,7 +170,7 @@ function EmployerCard({ r, onChanged }: { r: any; onChanged: () => void }) {
         </div>
         {officerMatch && (
           <p className="flex items-center gap-1.5 text-[11.5px] text-[#0F6E56] pl-5">
-            <Sparkles className="w-3 h-3 flex-shrink-0" /> Auto-matched against Companies House: "{officerMatch}"
+            <CheckCircle2 className="w-3 h-3 flex-shrink-0" /> Auto-matched against Companies House: "{officerMatch}"
           </p>
         )}
 

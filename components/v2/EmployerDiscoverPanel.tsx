@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getDiscoverWork, getMyInterest, expressInterest, getTalentPools, createTalentPool, addToTalentPool,
   getVerifiedWorkForProfile, getExperienceEntries, getSelfQualifications, getEmployerVisibleSkills, getDiscoverSkillNames,
-  getEmployerConfirmedSelfReportedSkills,
+  getEmployerSelfReportedSkills,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { LEVEL_INFO } from '@/lib/skillLevels'
@@ -162,8 +162,7 @@ export default function EmployerDiscoverPanel() {
                   {student.bio && <p className="text-[12.5px] text-ink-secondary line-clamp-2 mt-1.5">{student.bio}</p>}
                 </button>
 
-                <div className="mt-auto pt-3 border-t border-edge-subtle flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-ink-tertiary truncate">Tap the card for the full picture</span>
+                <div className="mt-auto pt-3 border-t border-edge-subtle flex items-center justify-end gap-2">
                   {status === 'pending' ? (
                     <span className="flex items-center gap-1 text-[12px] font-semibold text-warning-text flex-shrink-0"><Clock className="w-3.5 h-3.5" /> Pending</span>
                   ) : status === 'accepted' ? (
@@ -370,7 +369,7 @@ function CandidateProfileModal({ student, status, onClose, onExpressInterest }: 
     getExperienceEntries(student.id).then(({ data }) => setExperience(data || []))
     getSelfQualifications(student.id).then(({ data }) => setQuals(data || []))
     getEmployerVisibleSkills(student.id).then(({ data }) => setSkills(data || []))
-    getEmployerConfirmedSelfReportedSkills(student.id).then(({ data }) => setSelfReportedSkills(data || []))
+    getEmployerSelfReportedSkills(student.id).then(({ data }) => setSelfReportedSkills(data || []))
   }, [student.id])
 
   return createPortal((

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { getOrgBilling, setBootcampEvidence, createOrgCheckoutSession, cancelOrgSubscriptionViaStripe } from '@/lib/supabase'
 import { providerBandFor, PROVIDER_BAND_LABEL, BOOTCAMP_EVIDENCE_MONTHLY, INSTITUTION_MAX_PRICE } from '@/lib/billing'
-import { ChevronLeft, TrendingUp, GraduationCap, Receipt, Sparkles } from 'lucide-react'
+import { ChevronLeft, TrendingUp, GraduationCap, Receipt } from 'lucide-react'
 
 // Billing and Subscription — Complete Build Spec, Part 2. Every number
 // shown here comes straight from get_org_billing() (server-computed,
@@ -178,7 +178,7 @@ function BillingContent({ billing, onToggleBootcamp, togglingBootcamp, error, bu
       {isProvider && (
         <div className="bg-surface border border-edge rounded-2xl px-5 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="w-9 h-9 rounded-full bg-accent-bg flex items-center justify-center flex-shrink-0"><Sparkles className="w-4 h-4 text-brand" /></span>
+            <span className="w-9 h-9 rounded-full bg-accent-bg flex items-center justify-center flex-shrink-0"><GraduationCap className="w-4 h-4 text-brand" /></span>
             <div>
               <p className="text-[14px] font-semibold text-ink">Bootcamp Evidence</p>
               <p className="text-[12px] text-ink-tertiary mt-0.5">{money(BOOTCAMP_EVIDENCE_MONTHLY)} per month while active</p>

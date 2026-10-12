@@ -1,4 +1,4 @@
-import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase, Search, Megaphone, HeartHandshake, Inbox, Building2, Bookmark, HardHat, Award, Link as LinkIcon, Sparkles } from 'lucide-react'
+import { Home, ClipboardCheck, Users, FileText, BookOpen, Presentation, LayoutDashboard, Briefcase, Search, Megaphone, HeartHandshake, Inbox, Building2, Bookmark, HardHat, Award, Link as LinkIcon } from 'lucide-react'
 import type { NavItem } from '@/components/v2/OrgShell'
 
 // Institutions and providers are the SAME shell now -- one org layout,
@@ -42,13 +42,10 @@ function buildOrgSections(kind: 'institution' | 'provider'): NavItem[] {
     { key: 'workshops', label: 'Workshops', icon: Presentation,    href: `${base}/workshops` },
     { key: 'interest',  label: 'Interest received', icon: HeartHandshake, href: `${base}/interest` },
     { key: 'jobs',      label: 'Job tracking', icon: Briefcase,    href: `${base}/jobs` },
+    // Last, deliberately -- Settings is pinned separately below this
+    // whole list in OrgShell, so Dashboard ending up last here means
+    // Dashboard sits right above Settings, nothing after it.
     { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: `${base}/dashboard` },
-    // Appended last, deliberately -- institutionPhoneItems/
-    // providerPhoneItems below index into this array by position
-    // (0/5/9), so a new item has to go after everything they already
-    // reference or it silently shifts which section each phone tab
-    // points at.
-    { key: 'skills',    label: 'Skills',    icon: Sparkles,       href: `${base}/skills` },
   ]
 }
 

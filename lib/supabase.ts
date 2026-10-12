@@ -1052,11 +1052,11 @@ export const getDiscoverSkillNames = async () => {
 }
 
 // ── Self-reported skills -- a student declares a skill and attaches
-// evidence with zero institution setup first, no criteria, no 5-level
-// progression (that's the leveled skills system above). Sits as
-// 'self_reported' until a teacher's one-tap confirm, mirroring
-// set_employer_visibility's org-check shape -- see the migration for
-// the actual RLS/RPC.
+// evidence with zero institution setup first and no teacher
+// confirmation step -- being enrolled at a vetted institution is
+// treated as the trust signal, not a second per-skill check. A file
+// is required (enforced both here via the form and at the DB via
+// evidence_file_path NOT NULL) -- without one there's nothing to show.
 export const uploadSelfReportedSkillEvidence = async (studentId: string, file: File) => {
   const path = `${studentId}/self-reported/${Date.now()}_${file.name}`
   const { error } = await supabase.storage.from('submission-files').upload(path, file)
@@ -1084,33 +1084,14 @@ export const getMySelfReportedSkills = async (studentId: string) => {
   return { data, error }
 }
 
-// Institution/provider staff confirm queue -- every self-reported
-// skill in their org still awaiting a tap, across all students at once
-// (not buried one-student-at-a-time).
-export const getOrgPendingSelfReportedSkills = async (organisationId: string) => {
+// Employer-facing -- RLS already restricts this to an already-
+// discoverable student (has_verification()), this query just mirrors
+// that boundary, same convention as getDiscoverWork.
+export const getEmployerSelfReportedSkills = async (studentId: string) => {
   const { data, error } = await supabase
     .from('self_reported_skills')
-    .select('*, student:users!self_reported_skills_student_id_fkey(id, full_name)')
-    .eq('organisation_id', organisationId)
-    .eq('status', 'self_reported')
-    .order('created_at', { ascending: true })
-  return { data, error }
-}
-
-export const confirmSelfReportedSkill = async (skillId: string) => {
-  const { error } = await supabase.rpc('confirm_self_reported_skill', { p_skill_id: skillId })
-  return { error }
-}
-
-// Employer-facing -- RLS already restricts this to confirmed rows for
-// an already-discoverable student (has_verification()), this query
-// just mirrors that boundary, same convention as getDiscoverWork.
-export const getEmployerConfirmedSelfReportedSkills = async (studentId: string) => {
-  const { data, error } = await supabase
-    .from('self_reported_skills')
-    .select('id, name, note, evidence_file_path, confirmed_at')
+    .select('id, name, note, evidence_file_path, created_at')
     .eq('student_id', studentId)
-    .eq('status', 'verified')
   return { data, error }
 }
 
@@ -2729,10 +2710,11 @@ export const getEmployerInboxItems = async (employerId: string) => {
 
 // ── Employer side (Part 3): Dashboard ──────────────────────────────
 export const getEmployerDashboardStats = async (employerId: string) => {
-  const { data, error } = await supabase
-    .from('applications')
-    .select('stage, student_id, created_at, organisation:organisations(name)')
-    .eq('employer_id', employerId)
+  const [{ data, error }, { data: opportunities }, { data: interestRows }] = await Promise.all([
+    supabase.from('applications').select('stage, student_id, opportunity_id, created_at, organisation:organisations(name)').eq('employer_id', employerId),
+    supabase.from('opportunities').select('id, title, type, closed_at').eq('employer_id', employerId).is('closed_at', null).order('created_at', { ascending: false }),
+    supabase.from('interest').select('status').eq('employer_id', employerId),
+  ])
   if (error || !data) return { data: null, error }
   const rows = data as any[]
   const hired = rows.filter(r => r.stage === 'hired').length
@@ -2763,11 +2745,19 @@ export const getEmployerDashboardStats = async (employerId: string) => {
   const lastMonth = months[months.length - 2].count
   const trend: 'up' | 'down' | 'flat' = thisMonth > lastMonth ? 'up' : thisMonth < lastMonth ? 'down' : 'flat'
 
+  // Per-opportunity application counts, for "Your open jobs" below --
+  // reuses the same application rows already fetched, no second query.
+  const appsByOpportunity = new Map<string, number>()
+  for (const r of rows) if (r.opportunity_id) appsByOpportunity.set(r.opportunity_id, (appsByOpportunity.get(r.opportunity_id) || 0) + 1)
+  const openJobs = (opportunities || []).map((o: any) => ({ id: o.id, title: o.title, type: o.type, applicants: appsByOpportunity.get(o.id) || 0 }))
+
+  const pendingReplies = (interestRows || []).filter((i: any) => i.status === 'pending').length
+
   return {
     data: {
       hired, inPipeline, youngPeopleReached, byStage,
       hiresByPartner: Array.from(hiresByPartner.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
-      monthlyActivity: months, trend,
+      monthlyActivity: months, trend, openJobs, pendingReplies,
     },
     error: null,
   }

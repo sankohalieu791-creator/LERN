@@ -1,19 +1,14 @@
 -- ============================================================
--- Self-reported skills: a student can declare a skill and attach
--- evidence with zero institution setup required first -- the real
--- friction point in the existing Skill Wallet (a teacher has to
--- pre-author a whole course + skills + criteria before a student can
--- even start). Deliberately a NEW, separate table, not a repurposing
--- of `skills` (which is always owned by a course_id -> an institution,
--- the wrong shape for "a student invents a name on the spot"): no
--- criteria, no 5-level progression, just a name, one piece of
--- evidence, and a status.
---
--- Trust model, confirmed directly rather than assumed: this is NOT
--- auto-verified on upload. It sits as 'self_reported' until a teacher
--- does one tap to confirm it, becoming 'verified' -- otherwise the
--- word "Verified" stops meaning "a person checked it" anywhere on the
--- platform, which is the actual thing differentiating LERN from a CV.
+-- Self-reported skills: a student declares a skill and attaches
+-- evidence (a file is required -- enforced by evidence_file_path
+-- being NOT NULL, same rule at the client). No institution setup
+-- needed, and no teacher confirmation step either, per direct
+-- instruction: a student already belongs to a vetted institution, so
+-- that membership is treated as the trust signal rather than a
+-- second per-skill check. Simpler than the earlier design this
+-- replaces (no status/confirm RPC/staff queue at all) -- deliberately
+-- NOT a reuse of the institution-authored `skills` table (owned by a
+-- course_id, the wrong shape for a student-invented skill name).
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.self_reported_skills (
@@ -24,9 +19,6 @@ CREATE TABLE IF NOT EXISTS public.self_reported_skills (
   note text,
   evidence_file_path text not null,
   evidence_file_type text,
-  status text not null default 'self_reported' check (status in ('self_reported','verified')),
-  confirmed_by uuid references public.users(id),
-  confirmed_at timestamptz,
   created_at timestamptz not null default now()
 );
 ALTER TABLE public.self_reported_skills ENABLE ROW LEVEL SECURITY;
@@ -46,43 +38,21 @@ CREATE POLICY "self_reported_skills: org staff read" ON public.self_reported_ski
     AND organisation_id = current_user_org()
   );
 
--- Employer-facing: only ever a CONFIRMED row, and only for a student
--- who's already discoverable at all (same has_verification() gate
--- protecting the leveled-skills read and the candidate's profile row
--- itself) -- an unconfirmed self-report is never visible to an employer.
+-- Employer-facing: same has_verification() gate as the leveled skills
+-- and the candidate's profile row itself -- only for a student who's
+-- already discoverable at all. Every row here is already "shown as
+-- verified" (no status column to check), per the instruction above.
 DROP POLICY IF EXISTS "self_reported_skills: employer read confirmed for discoverable students" ON public.self_reported_skills;
-CREATE POLICY "self_reported_skills: employer read confirmed for discoverable students" ON public.self_reported_skills
+DROP POLICY IF EXISTS "self_reported_skills: employer read for discoverable students" ON public.self_reported_skills;
+CREATE POLICY "self_reported_skills: employer read for discoverable students" ON public.self_reported_skills
   FOR SELECT USING (
     current_user_role() = 'employer' AND NOT current_user_is_guest()
-    AND status = 'verified'
     AND has_verification(student_id)
   );
--- Deliberately no UPDATE policy for 'authenticated' at all -- the only
--- write path for status/confirmed_by/confirmed_at is the SECURITY
--- DEFINER function below, same convention as submit_skill_review and
--- set_employer_visibility.
 
-CREATE OR REPLACE FUNCTION public.confirm_self_reported_skill(p_skill_id UUID)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE
-  v_org UUID;
-BEGIN
-  IF current_user_role() NOT IN ('institution_staff','provider_staff') THEN
-    RAISE EXCEPTION 'only staff can confirm a self-reported skill';
-  END IF;
-
-  SELECT organisation_id INTO v_org FROM public.self_reported_skills WHERE id = p_skill_id;
-  IF v_org IS NULL OR v_org != current_user_org() THEN
-    RAISE EXCEPTION 'not authorised for this student''s organisation';
-  END IF;
-
-  UPDATE public.self_reported_skills
-  SET status = 'verified', confirmed_by = auth.uid(), confirmed_at = now()
-  WHERE id = p_skill_id;
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.confirm_self_reported_skill(uuid) TO authenticated;
+-- No UPDATE policy and no confirm RPC -- there's nothing left to
+-- transition between states, a row is complete the moment it's
+-- inserted (and insertion itself requires evidence_file_path).
 
 
 -- ============================================================

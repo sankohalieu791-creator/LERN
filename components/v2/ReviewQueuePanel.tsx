@@ -8,7 +8,7 @@ import {
 } from '@/lib/supabase'
 import type { Submission, Skill, CriterionResult } from '@/lib/types'
 import {
-  CheckCircle2, History, FileText, ExternalLink, ChevronLeft, Sparkles,
+  CheckCircle2, History, FileText, ExternalLink, ChevronLeft,
   Flag, EyeOff, ShieldAlert, Search,
 } from 'lucide-react'
 
@@ -406,7 +406,7 @@ function ReviewPiece({ submission, onBack, onDecided }: { submission: any; onBac
     return (
       <div className="flex flex-col items-center text-center py-20">
         <div className="w-14 h-14 rounded-full flex items-center justify-center mb-3" style={{ backgroundColor: '#E1F5EE' }}>
-          <Sparkles className="w-6 h-6" style={{ color: '#0F6E56' }} />
+          <CheckCircle2 className="w-6 h-6" style={{ color: '#0F6E56' }} />
         </div>
         <p className="font-semibold text-[15px]" style={{ color: '#0F6E56' }}>Verified — on {submission.users?.full_name}'s profile</p>
       </div>

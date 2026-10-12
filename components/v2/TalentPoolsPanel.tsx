@@ -9,7 +9,7 @@ import {
 import { EMPLOYER_TIERS, type EmployerTier } from '@/lib/billing'
 import { cadenceForPool, nextStage, DEFAULT_CADENCE, type CadenceStep } from '@/lib/cadence'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
-import { Bookmark, Plus, X, Trash2, ChevronLeft, UserCheck, Users, CheckCircle2, Clock, Settings2, Sparkles, Search } from 'lucide-react'
+import { Bookmark, Plus, X, Trash2, ChevronLeft, UserCheck, Users, CheckCircle2, Clock, Settings2, Search } from 'lucide-react'
 
 // Talent pools -- Final Build Spec, 23 Sep 2026. "The employer's only
 // two actions are adding a candidate to a pool and removing them, or
@@ -117,8 +117,7 @@ export default function TalentPoolsPanel() {
         </p>
       )}
 
-      <div className="flex items-start gap-2.5 rounded-lg px-3.5 py-3 mb-5" style={{ backgroundColor: '#E6F1FB' }}>
-        <Sparkles className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#0C447C' }} />
+      <div className="rounded-lg px-3.5 py-3 mb-5" style={{ backgroundColor: '#E6F1FB' }}>
         <p className="text-[12px] leading-relaxed" style={{ color: '#0C447C' }}>
           You only ever do two things here: add someone to a pool, or remove them. LERN sends every update automatically.
         </p>

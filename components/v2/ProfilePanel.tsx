@@ -526,11 +526,6 @@ function FolderContent({
 // review_criteria_results nobody's asked for). Cross-org profile views
 // correctly render empty here (courses/skills RLS is org-scoped), same
 // reason getMyOrganisationInfo above is isOwn-gated -- not a bug.
-const SELF_REPORT_STATUS: Record<string, { label: string; bg: string; text: string }> = {
-  self_reported: { label: 'Self-reported', bg: 'var(--status-warn-bg)', text: 'var(--status-warn-text)' },
-  verified: { label: 'Verified', bg: 'var(--status-success-bg)', text: 'var(--status-success-text)' },
-}
-
 function SkillsFolderContent({ profileId, organisationId, isOwn }: { profileId: string; organisationId?: string | null; isOwn: boolean }) {
   const router = useRouter()
   const [courses, setCourses] = useState<any[]>([])
@@ -604,9 +599,9 @@ function SkillsFolderContent({ profileId, organisationId, isOwn }: { profileId: 
       ))}
 
       {/* ── Self-reported -- own view only. No institution setup needed
-          to start; stays "Self-reported" until a teacher taps to
-          confirm it, same word discipline as everything else LERN
-          calls "Verified". ── */}
+          to start, and no teacher confirm step either: being enrolled
+          at a vetted institution is the trust signal, so every entry
+          with real evidence attached is shown as Verified immediately. ── */}
       {isOwn && (
         <div>
           <div className="flex items-center justify-between mb-2">
@@ -628,20 +623,17 @@ function SkillsFolderContent({ profileId, organisationId, isOwn }: { profileId: 
             <p className="text-[13px] text-[var(--app-text-tertiary)]">A skill you've taught yourself — add it with a video, screenshot, or anything that shows the work.</p>
           ) : (
             <div className="space-y-2.5 mt-2">
-              {selfReported.map((s: any) => {
-                const info = SELF_REPORT_STATUS[s.status]
-                return (
-                  <div key={s.id} className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-[14px]">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[14px] font-semibold text-[var(--app-text)] truncate">{s.name}</p>
-                      <span className="text-[11px] font-semibold px-[10px] py-[3px] rounded-full flex-shrink-0" style={{ backgroundColor: info.bg, color: info.text }}>
-                        {info.label}
-                      </span>
-                    </div>
-                    {s.note && <p className="text-[12px] text-[var(--app-text-tertiary)] mt-1">{s.note}</p>}
+              {selfReported.map((s: any) => (
+                <div key={s.id} className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-[14px]">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[14px] font-semibold text-[var(--app-text)] truncate">{s.name}</p>
+                    <span className="flex items-center gap-1 text-[11px] font-semibold px-[10px] py-[3px] rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
+                      <CheckCircle2 className="w-3 h-3" /> Verified
+                    </span>
                   </div>
-                )
-              })}
+                  {s.note && <p className="text-[12px] text-[var(--app-text-tertiary)] mt-1.5 whitespace-pre-wrap">{s.note}</p>}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -680,9 +672,10 @@ function AddSelfReportedSkillForm({ profileId, organisationId, onAdded, onCancel
         value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Adobe Illustrator" autoFocus
         className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition"
       />
-      <input
-        value={note} onChange={e => setNote(e.target.value)} placeholder="A line about it (optional)"
-        className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition"
+      <textarea
+        value={note} onChange={e => setNote(e.target.value)} rows={3}
+        placeholder="Why this skill, and what you're proud of in the work (optional)"
+        className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition resize-none leading-relaxed"
       />
       <button onClick={() => fileRef.current?.click()} className="text-[12px] font-semibold text-[var(--app-text-secondary)] hover:text-brand transition">
         {file ? file.name : 'Attach a video, screenshot, or the work (required)'}
@@ -737,7 +730,7 @@ function VerifiedWorkDetail({ work, onClose }: { work: any; onClose: () => void 
           <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1 rounded-full mb-3" style={{ backgroundColor: '#E1F5EE', color: '#0F6E56' }}>
             <CheckCircle2 className="w-3.5 h-3.5" /> Verified
           </span>
-          <h1 className="text-[20px] font-bold leading-snug mb-2">{wi?.title}</h1>
+          <h1 className="text-[20px] font-bold leading-snug mb-2 text-[var(--app-text)]">{wi?.title}</h1>
           <p className="text-[12.5px] text-[var(--app-text-secondary)] mb-4">
             Verified by {work.verifier?.full_name || wi?.organisations?.name || 'a reviewer'} · {new Date(work.verified_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>

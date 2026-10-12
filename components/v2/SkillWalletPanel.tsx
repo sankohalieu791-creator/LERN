@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { getOrgSkillsForStudent, getStudentSkills, getSkillEvidence } from '@/lib/supabase'
 import type { Skill, StudentSkill } from '@/lib/types'
 import { LEVEL_INFO } from '@/lib/skillLevels'
-import { ArrowLeft, CheckCircle2, Sparkles, FileText, Award } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, FileText, Award } from 'lucide-react'
 
 // LERN Skill Wallet (Phase 1) -- the student's own evidence-backed
 // skill levels, built from work they already submit through My Work.
@@ -180,7 +180,7 @@ function SkillDetail({ skill, studentSkill, studentId, onClose }: {
                       <p className="text-sm font-semibold text-ink truncate">{sub?.work_items?.title || 'Submitted work'}</p>
                       {verifiedReview && (
                         <span className="flex items-center gap-1 text-[11px] font-bold flex-shrink-0" style={{ color: '#0F6E56' }}>
-                          <Sparkles className="w-3 h-3" /> Verified
+                          <CheckCircle2 className="w-3 h-3" /> Verified
                         </span>
                       )}
                     </div>

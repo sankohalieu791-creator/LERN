@@ -413,7 +413,7 @@ function SessionCard({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
             🔴 emoji replaced with a real pulsing dot + icon -- flagged
             alongside Feed's reaction emoji as "confusing, needs to be
             professional". */}
-        <div className={`w-full flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold ${live ? 'bg-red-500 text-white' : 'bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white'}`}>
+        <div className={`w-full flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold ${live ? 'bg-red-500 text-white' : 'bg-brand text-white'}`}>
           {ended ? 'Ended' : inPerson ? (live ? 'Attending now' : 'Attend →') : live ? (
             <><span className="w-2 h-2 rounded-full bg-white animate-pulse" /> Join Now</>
           ) : 'Start Class →'}
@@ -548,13 +548,17 @@ function WorkItemDetail({
         </button>
       </div>
 
-      {/* py-4 only, no horizontal padding here -- the card should
-          touch both edges of the phone screen, not sit inset with
-          side margins. The card's own internal p-5 still gives its
-          CONTENT room to breathe; this is about the box's outer
-          boundary, not what's inside it. */}
-      <div className="py-4">
-        <div className="bg-surface border-y border-edge p-5">
+      {/* py-4 only, no horizontal padding here on phone -- the card
+          should touch both edges of the phone screen, not sit inset
+          with side margins. The card's own internal p-5 still gives
+          its CONTENT room to breathe; this is about the box's outer
+          boundary, not what's inside it. On larger screens this had no
+          width cap at all, so a short brief stretched into absurdly
+          long lines and oversized boxes edge-to-edge on a laptop --
+          lg: caps it to a sane reading width and centers it, same as
+          every other desktop dialog in this app. */}
+      <div className="py-4 lg:max-w-2xl lg:mx-auto lg:px-4">
+        <div className="bg-surface border-y lg:border lg:rounded-2xl border-edge p-5">
           {/* Header row: status pill left, due date right -- Brief-
               Completion Screen spec. Only meaningful for submittable
               types; course/workshop keep their own join-focused header
@@ -754,7 +758,7 @@ function WorkItemDetail({
 
               <button
                 onClick={handleSubmit} disabled={loading || files.length === 0 || !content.trim()}
-                className="w-full bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white font-bold text-sm py-3 rounded-2xl disabled:opacity-60"
+                className="w-full bg-brand text-white font-bold text-sm py-3 rounded-2xl disabled:opacity-60"
               >
                 {loading ? 'Submitting…' : latest?.status === 'returned' ? 'Resubmit for review' : 'Submit for review'}
               </button>

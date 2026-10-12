@@ -684,29 +684,23 @@ function PostCard({ post, verified, onChanged }: { post: any; verified: boolean;
               before -- there was no real photo to render here regardless
               of whether the author had one set, so this always fell
               back to initials. */}
-          <span className="relative flex-shrink-0">
-            {post.author_avatar_path ? (
-              <img src={authorAvatarUrl || ''} alt="" className="w-10 h-10 rounded-full object-cover" />
-            ) : (
-              <span className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-semibold" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
-                {initials(post.author_name)}
-              </span>
-            )}
-            {/* Instagram/TikTok-style "+" badge on the avatar's own
-                corner, not a separate button in the header's right
-                cluster -- FollowButton's icon variant already
-                stopPropagation()s its own click, so this never also
-                triggers the profile navigation underneath it. */}
-            {post.author_id !== user?.id && (
-              <span className="absolute -bottom-0.5 -right-0.5">
-                <FollowButton profileId={post.author_id} variant="icon" />
-              </span>
-            )}
-          </span>
+          {post.author_avatar_path ? (
+            <img src={authorAvatarUrl || ''} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <span className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+              {initials(post.author_name)}
+            </span>
+          )}
           <div className="min-w-0">
             <p className="flex items-center gap-1 text-[14px] font-semibold text-[var(--app-text)] truncate">
               {post.author_name}
               {verified && <BadgeCheck className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#0F6E56' }} />}
+              {/* A bare "+" right next to the name -- Instagram/TikTok's
+                  own follow affordance, not a badge on the avatar.
+                  FollowButton's icon variant already stopPropagation()s
+                  its own click, so this never also triggers the
+                  profile navigation underneath it. */}
+              {post.author_id !== user?.id && <FollowButton profileId={post.author_id} variant="icon" />}
             </p>
             <p className="text-[11px]" style={{ color: '#5A5A5A' }}>{timeAgo(post.created_at)}</p>
           </div>

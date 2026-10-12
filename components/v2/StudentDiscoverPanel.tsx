@@ -285,7 +285,7 @@ export default function StudentDiscoverPanel() {
               {i.status === 'pending' ? (
                 <div>
                   <div className="flex gap-2">
-                    <button onClick={() => respond(i.id, 'accepted')} disabled={respondingId === i.id} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white disabled:opacity-50">
+                    <button onClick={() => respond(i.id, 'accepted')} disabled={respondingId === i.id} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-brand text-white disabled:opacity-50">
                       <Check className="w-4 h-4" /> {respondingId === i.id ? '…' : 'Accept'}
                     </button>
                     <button onClick={() => respond(i.id, 'declined')} disabled={respondingId === i.id} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold bg-[#252525] text-[#ccc] border border-[var(--app-border)] disabled:opacity-50">
@@ -391,7 +391,7 @@ export default function StudentDiscoverPanel() {
                 ) : (
                   <button
                     onClick={() => apply(o.id)} disabled={applying === o.id}
-                    className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-[#FF6B2B] to-[#C026D3] text-white disabled:opacity-50"
+                    className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-full text-sm font-semibold bg-brand text-white disabled:opacity-50"
                   >
                     <Send className="w-3.5 h-3.5" /> {applying === o.id ? 'Applying…' : 'Apply'}
                   </button>

@@ -44,16 +44,17 @@ export default function FollowButton({
   }
 
   if (variant === 'icon') {
+    // A bare "+", not a filled circle badge -- Instagram/TikTok's own
+    // follow affordance next to a name is just the glyph itself, no
+    // background shape around it.
     return (
       <button
         onClick={e => { e.stopPropagation(); toggle() }} disabled={busy}
         aria-label={following ? 'Unfollow' : 'Follow'} title={following ? 'Following' : 'Follow'}
-        className="w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 transition disabled:opacity-60"
-        style={following
-          ? { backgroundColor: 'var(--app-overlay-2)', color: 'var(--app-text-secondary)' }
-          : { backgroundColor: '#F26B21', color: '#fff' }}
+        className="w-5 h-5 flex items-center justify-center flex-shrink-0 transition disabled:opacity-60"
+        style={{ color: following ? 'var(--app-text-tertiary)' : '#F26B21' }}
       >
-        {following ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+        {following ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" strokeWidth={2.5} />}
       </button>
     )
   }

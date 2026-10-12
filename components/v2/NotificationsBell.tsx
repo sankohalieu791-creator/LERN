@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { getMyNotifications, getUnreadNotificationCount, markNotificationRead, markAllNotificationsRead } from '@/lib/supabase'
-import { Bell, CheckCircle2, RotateCcw, ClipboardCheck, Briefcase, Flag, Video, Sparkles } from 'lucide-react'
+import { Bell, CheckCircle2, RotateCcw, ClipboardCheck, Briefcase, Flag, Video } from 'lucide-react'
 
 const TYPE_META: Record<string, { label: string; icon: any }> = {
   submission_received: { label: 'New work submitted for review', icon: ClipboardCheck },
@@ -12,7 +12,7 @@ const TYPE_META: Record<string, { label: string; icon: any }> = {
   employer_interest: { label: 'An employer showed interest', icon: Briefcase },
   report: { label: 'A concern was reported', icon: Flag },
   session_started: { label: 'The session has started — join now', icon: Video },
-  welcome: { label: 'Thank you for choosing LERN', icon: Sparkles },
+  welcome: { label: 'Thank you for choosing LERN', icon: CheckCircle2 },
   application_stage_changed: { label: 'An employer moved a candidate', icon: Briefcase },
 }
 

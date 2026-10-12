@@ -253,26 +253,30 @@ export default function HelpDesk() {
   }
 
   if (!open) {
+    // Smaller than before, with a short caption underneath -- warm
+    // beige/cream tones throughout (the brand's own palette, not a
+    // cool blue), pending a reference design still to come.
     return (
       <button
         onClick={() => setOpen(true)}
         aria-label="LERN Help Desk"
-        className="fixed left-5 z-40 w-14 h-14 active:scale-95 transition"
+        className="fixed left-5 z-40 flex flex-col items-center gap-1 active:scale-95 transition"
         style={{ bottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
       >
         <span
-          className="absolute inset-0 flex items-center justify-center border overflow-hidden"
+          className="relative flex items-center justify-center border overflow-hidden w-11 h-11"
           style={{
             borderRadius: BLOB_RADIUS,
-            background: 'rgba(255,255,255,0.75)',
+            background: '#FBF4EA',
             backdropFilter: 'blur(14px)',
             WebkitBackdropFilter: 'blur(14px)',
-            borderColor: 'rgba(255,255,255,0.9)',
-            boxShadow: '0 6px 20px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6)',
+            borderColor: '#E7DCC9',
+            boxShadow: '0 6px 20px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.6)',
           }}
         >
-          <OrbFace size={10} />
+          <OrbFace size={9} />
         </span>
+        <span className="text-[10px] font-semibold" style={{ color: '#8A7F6B' }}>Help</span>
       </button>
     )
   }
@@ -315,7 +319,7 @@ export default function HelpDesk() {
         <div className="flex items-center gap-2.5 min-w-0">
           <span
             className="w-8 h-8 flex items-center justify-center flex-shrink-0 border overflow-hidden"
-            style={{ borderRadius: BLOB_RADIUS, background: 'rgba(255,255,255,0.75)', borderColor: 'rgba(255,255,255,0.9)' }}
+            style={{ borderRadius: BLOB_RADIUS, background: '#FBF4EA', borderColor: '#E7DCC9' }}
           >
             <OrbFace size={8} />
           </span>

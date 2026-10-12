@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { getEmployerDashboardStats, APPLICATION_STAGES } from '@/lib/supabase'
 import type { ApplicationStage } from '@/lib/supabase'
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, Megaphone, Inbox, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
 
 const STAGE_META: Record<ApplicationStage, { label: string; bg: string; text: string }> = {
   applied: { label: 'Applied', bg: '#E6F1FB', text: '#185FA5' },
@@ -28,6 +29,8 @@ export default function EmployerDashboardPanel() {
     hiresByPartner: { name: string; count: number }[]
     monthlyActivity: { key: string; label: string; count: number }[]
     trend: 'up' | 'down' | 'flat'
+    openJobs: { id: string; title: string; type: string; applicants: number }[]
+    pendingReplies: number
   } | null>(null)
 
   useEffect(() => {
@@ -46,6 +49,39 @@ export default function EmployerDashboardPanel() {
         <MetricTile label="Hired" value={stats?.hired ?? 0} />
         <MetricTile label="In pipeline" value={stats?.inPipeline ?? 0} />
         <MetricTile label="Young people reached" value={stats?.youngPeopleReached ?? 0} />
+      </div>
+
+      {stats && stats.pendingReplies > 0 && (
+        <Link href="/employer/inbox" className="flex items-center justify-between gap-3 rounded-2xl px-5 py-4 mb-4 transition hover:opacity-90" style={{ backgroundColor: '#FAEEDA' }}>
+          <div className="flex items-center gap-3">
+            <Inbox className="w-5 h-5 flex-shrink-0" style={{ color: '#854F0B' }} />
+            <p className="text-[14px] font-medium" style={{ color: '#854F0B' }}>
+              {stats.pendingReplies} conversation{stats.pendingReplies === 1 ? '' : 's'} waiting on a reply
+            </p>
+          </div>
+          <ArrowRight className="w-4 h-4 flex-shrink-0" style={{ color: '#854F0B' }} />
+        </Link>
+      )}
+
+      <div className="bg-surface border border-edge rounded-2xl p-5 mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-[14px] font-medium text-ink flex items-center gap-1.5"><Megaphone className="w-4 h-4 text-ink-tertiary" /> Your open jobs</p>
+          <Link href="/employer/opportunities" className="text-[12.5px] font-semibold text-brand hover:underline">Manage →</Link>
+        </div>
+        {!stats ? (
+          <p className="text-[13px] text-ink-tertiary">Loading…</p>
+        ) : stats.openJobs.length === 0 ? (
+          <p className="text-[13px] text-ink-tertiary">Nothing posted right now — open jobs show up here with how many have applied.</p>
+        ) : (
+          <div className="space-y-2.5">
+            {stats.openJobs.map(j => (
+              <div key={j.id} className="flex items-center justify-between gap-3 py-1.5">
+                <p className="text-[13px] text-ink truncate">{j.title}</p>
+                <span className="text-[12px] font-semibold text-ink-tertiary flex-shrink-0">{j.applicants} applicant{j.applicants === 1 ? '' : 's'}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-surface border border-edge rounded-2xl p-5 mb-4">
