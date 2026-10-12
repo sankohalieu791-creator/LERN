@@ -106,21 +106,36 @@ export default function AuthShell({
     // hand-drawn approximation of it.
     <div
       id="auth-shell-root"
-      className="min-h-[100dvh] flex flex-col relative overflow-hidden bg-[#F3E4DA]"
+      // overflow-hidden here (even though this element never visibly
+      // scrolls itself) still counts as a CSS scroll container, which
+      // hijacks the sticky header below into sticking relative to THIS
+      // box's own (static) position instead of the viewport -- the
+      // actual bug. Dropping it lets the header's sticky resolve against
+      // the real scrolling context (body) as intended.
+      className="min-h-[100dvh] flex flex-col relative bg-[#F3E4DA]"
       style={{
-        paddingTop: 'env(safe-area-inset-top)',
         backgroundImage: 'url(/auth-bg.png)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
       }}
     >
-      <header className="flex-shrink-0 px-10 py-7 flex items-center gap-4 relative z-10">
+      {/* sticky, not just the first flex child -- a normal in-flow header
+          scrolls away with the page (no way back once it's gone), which
+          is exactly what was happening: a long form, a layout shift from
+          the keyboard opening/closing, anything that moves scroll position
+          even slightly took the only way back with it. Its own safe-area
+          padding (not the root's) so it stays correctly offset from a
+          notch/Dynamic Island while pinned. */}
+      <header
+        className="flex-shrink-0 sticky top-0 z-20 px-10 py-7 flex items-center gap-4 bg-[#F3E4DA]/70 backdrop-blur-md"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.75rem)' }}
+      >
         {!hideBack && (
           <button
             onClick={() => (onBack ? onBack() : router.back())}
             aria-label="Back"
-            className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-full bg-white/40 hover:bg-white/60 backdrop-blur-md border border-white/50 shadow-sm text-ink transition flex-shrink-0"
+            className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-full bg-white/70 hover:bg-white/90 backdrop-blur-md border border-white/80 shadow-sm text-ink transition flex-shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
