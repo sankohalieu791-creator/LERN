@@ -273,7 +273,13 @@ export default function HelpDesk() {
         onClick={() => setOpen(true)}
         aria-label="LERN Help Desk"
         className="hidden lg:flex fixed left-5 z-40 flex-col items-center gap-1 active:scale-95 transition"
-        style={{ bottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
+        // 4.5rem, not 0.5rem -- the student desktop sidebar has its own
+        // Sign out row docked to the exact same bottom-left corner
+        // (StudentShell.tsx), which this sat directly on top of. Org/
+        // employer sidebars have nothing there (sign out lives in the
+        // top-right profile menu instead), so lifting this clear of the
+        // corner costs them nothing.
+        style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}
       >
         <span
           className="relative flex items-center justify-center rounded-full border overflow-hidden w-11 h-11"
