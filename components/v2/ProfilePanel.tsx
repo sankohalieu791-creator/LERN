@@ -170,10 +170,14 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
             here now -- there's no separate "inside a folder" screen
             to hide it behind any more. */}
         {isOwn && (
+          // lg:hidden -- desktop has its own dedicated Settings item in
+          // StudentShell's sidebar now ("we already have a setting down
+          // there"), so this gear icon is only still needed on phone,
+          // which has no equivalent nav slot for it.
           <button
             onClick={() => router.push('/student/settings')}
             aria-label="Settings"
-            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition text-[var(--app-text-secondary)]"
+            className="lg:hidden absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-1)] transition text-[var(--app-text-secondary)]"
           >
             <SettingsIcon className="w-5 h-5" />
           </button>
@@ -614,6 +618,8 @@ function ExperienceDetail({ entry, onClose }: { entry: any; onClose: () => void 
   ), document.body)
 }
 
+const LEVEL_ORDER = ['not_started', 'beginner', 'developing', 'secure', 'advanced']
+
 // ── Skills tab -- a compact read of the Skill Wallet, not the full
 // evidence-drilldown experience (that stays at /student/skill-wallet,
 // own view only -- the route re-derives everything from the VIEWER's
@@ -673,20 +679,31 @@ export function SkillsFolderContent({ profileId, organisationId, isOwn }: { prof
               const ss = levelFor(skill.id)
               const level = ss?.level || 'not_started'
               const info = LEVEL_INFO[level as keyof typeof LEVEL_INFO]
+              const levelIndex = LEVEL_ORDER.indexOf(level)
               return (
                 <button
                   key={skill.id}
                   onClick={() => { if (isOwn) router.push('/student/skill-wallet') }}
                   className={`block w-full text-left bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-[14px] transition ${isOwn ? 'hover:border-[var(--app-overlay-3)]' : 'cursor-default'}`}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[14px] font-semibold text-[var(--app-text)] truncate">{skill.name}</p>
-                      {skill.unit_label && <p className="text-[12px] text-[var(--app-text-tertiary)] mt-0.5 truncate">{skill.unit_label}</p>}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: info.bg }}>
+                        <Award className="w-4 h-4" style={{ color: info.text }} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[14px] font-semibold text-[var(--app-text)] truncate">{skill.name}</p>
+                        {skill.unit_label && <p className="text-[11.5px] text-[var(--app-text-tertiary)] truncate">{skill.unit_label}</p>}
+                      </div>
                     </div>
                     <span className="text-[11px] font-semibold px-[10px] py-[3px] rounded-full flex-shrink-0" style={{ backgroundColor: info.bg, color: info.text }}>
                       {info.label}
                     </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {LEVEL_ORDER.slice(1).map((_, i) => (
+                      <span key={i} className="flex-1 h-1 rounded-full" style={{ backgroundColor: i < levelIndex ? info.text : 'var(--app-overlay-2)' }} />
+                    ))}
                   </div>
                 </button>
               )
@@ -723,20 +740,29 @@ export function SkillsFolderContent({ profileId, organisationId, isOwn }: { prof
           {goals.length === 0 && !addingSkill ? (
             <p className="text-[13px] text-[var(--app-text-tertiary)]">A skill you're teaching yourself — set a goal, then check in weekly with what you did and proof of the work.</p>
           ) : (
-            <div className="space-y-2.5 mt-2">
+            <div className="grid sm:grid-cols-2 gap-2.5 mt-2">
               {goals.map((g: any) => {
                 const count = g.skill_checkins?.length || 0
+                const isPublished = !!g.published_at
                 return (
-                  <button key={g.id} onClick={() => setOpenGoal(g)} className="block w-full text-left bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-[14px] hover:border-[var(--app-overlay-3)] transition">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[14px] font-semibold text-[var(--app-text)] truncate">{g.name}</p>
-                      <span className="flex items-center gap-1 text-[11px] font-semibold px-[10px] py-[3px] rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
-                        <CheckCircle2 className="w-3 h-3" /> {count} check-in{count === 1 ? '' : 's'}
+                  <button key={g.id} onClick={() => setOpenGoal(g)} className="text-left bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl p-[14px] hover:border-[var(--app-overlay-3)] transition">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--status-success-bg)' }}>
+                        <Award className="w-4 h-4" style={{ color: 'var(--status-success-text)' }} />
                       </span>
+                      {isPublished ? (
+                        <span className="flex items-center gap-1 text-[10.5px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
+                          <CheckCircle2 className="w-2.5 h-2.5" /> Published
+                        </span>
+                      ) : (
+                        <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 bg-[var(--app-overlay-2)] text-[var(--app-text-tertiary)]">Private</span>
+                      )}
                     </div>
-                    {g.target_date && (
-                      <p className="text-[12px] text-[var(--app-text-tertiary)] mt-1">Target: {new Date(g.target_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                    )}
+                    <p className="text-[14px] font-semibold text-[var(--app-text)] truncate">{g.name}</p>
+                    <p className="text-[12px] text-[var(--app-text-tertiary)] mt-0.5">
+                      {count} check-in{count === 1 ? '' : 's'}
+                      {g.target_date && ` · Target ${new Date(g.target_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+                    </p>
                   </button>
                 )
               })}
@@ -748,7 +774,7 @@ export function SkillsFolderContent({ profileId, organisationId, isOwn }: { prof
       {openGoal && (
         <SkillGoalTimeline
           goal={openGoal} canCheckIn studentId={profileId} variant="app"
-          onClose={() => setOpenGoal(null)} onCheckedIn={load}
+          onClose={() => setOpenGoal(null)} onCheckedIn={load} onPublished={load}
         />
       )}
     </div>

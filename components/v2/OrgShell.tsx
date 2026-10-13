@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
 import { setSidebarCollapsed, setPresenceStatus, signOut, supabase, getPendingReviewCount, getPendingInterestCount } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
-import { ChevronLeft, ChevronRight, Settings, User as UserIcon, Plus, LogOut, Menu, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Settings, User as UserIcon, Plus, LogOut, Menu, X, LifeBuoy } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import HelpDesk from '@/components/v2/HelpDesk'
 import Logo from '@/components/v2/Logo'
@@ -572,6 +572,20 @@ export default function OrgShell({
               >
                 <Settings className="w-[21px] h-[21px] flex-shrink-0" />
                 <span className="flex-1 min-w-0 truncate text-left">Settings</span>
+              </button>
+              {/* Last row, under everything else -- "when you close the
+                  tab [this drawer] the help desk should disappear...
+                  when you open the tab it appears underneath
+                  everything" (direct feedback). A permanently-floating
+                  orb read as clutter on phone; this is the real entry
+                  point there now instead, same panel either way
+                  (HelpDesk.tsx listens for this event). */}
+              <button
+                onClick={() => { setDrawerOpen(false); window.dispatchEvent(new Event('lern:helpdesk-open')) }}
+                className="w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-medium transition text-ink-secondary"
+              >
+                <LifeBuoy className="w-[21px] h-[21px] flex-shrink-0" />
+                <span className="flex-1 min-w-0 truncate text-left">Help</span>
               </button>
             </nav>
           </div>

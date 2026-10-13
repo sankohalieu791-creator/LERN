@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { getSkillGoalCheckins, uploadSkillCheckinEvidence, addSkillCheckin, getSignedFileUrl } from '@/lib/supabase'
-import { ChevronLeft, Plus, FilePlus, Target, CalendarClock } from 'lucide-react'
+import { getSkillGoalCheckins, uploadSkillCheckinEvidence, addSkillCheckin, publishSkillGoal, getSignedFileUrl } from '@/lib/supabase'
+import { ChevronLeft, Plus, FilePlus, Target, CalendarClock, Rocket, BadgeCheck } from 'lucide-react'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -13,6 +13,9 @@ function formatTargetDate(d?: string) {
   const dt = new Date(d)
   if (isNaN(dt.getTime())) return ''
   return dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+function sameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
 
 // This renders inside two genuinely different design systems in this
@@ -37,45 +40,91 @@ const TOKENS: Record<Variant, { surface: string; surfaceSubtle: string; border: 
   },
 }
 
-// Shared by the student's own skill goal view (can check in) and the
-// employer/Discover read-only view of the exact same timeline (can't)
-// -- one real log of dated, evidenced progress is the whole point, so
-// there's only ever one version of it, just with the composer hidden
-// when canCheckIn is false. RLS on skill_checkins decides who can
-// actually read the rows either way; this component doesn't re-decide
-// that, it just renders whatever getSkillGoalCheckins returns.
+// Shared by the student's own skill goal view (can check in, can
+// publish) and the employer/Discover read-only view of the exact same
+// timeline (can't do either) -- one real log of dated, evidenced
+// progress is the whole point, so there's only ever one version of it,
+// just with the composer and publish button hidden when canCheckIn is
+// false. RLS decides who can actually read which rows either way; this
+// component doesn't re-decide that, it just renders whatever
+// getSkillGoalCheckins returns.
 export default function SkillGoalTimeline({
-  goal, canCheckIn, studentId, variant = 'paper', onClose, onCheckedIn,
+  goal, canCheckIn, studentId, variant = 'paper', onClose, onCheckedIn, onPublished,
 }: {
-  goal: { id: string; name: string; target?: string; target_date?: string }
+  goal: { id: string; name: string; target?: string; target_date?: string; published_at?: string | null }
   canCheckIn: boolean
   studentId?: string
   variant?: Variant
   onClose: () => void
   onCheckedIn?: () => void
+  onPublished?: () => void
 }) {
   const t = TOKENS[variant]
   const [checkins, setCheckins] = useState<any[] | null>(null)
   const [composerOpen, setComposerOpen] = useState(false)
+  const [published, setPublished] = useState(!!goal.published_at)
+  const [publishing, setPublishing] = useState(false)
 
   const load = () => { getSkillGoalCheckins(goal.id).then(({ data }) => setCheckins(data || [])) }
   useEffect(load, [goal.id])
 
+  const publish = async () => {
+    setPublishing(true)
+    const { error } = await publishSkillGoal(goal.id)
+    setPublishing(false)
+    if (error) return
+    setPublished(true)
+    onPublished?.()
+  }
+
+  // Last 7 days, oldest first, today last -- a filled dot on any day
+  // with at least one check-in. "Let's say today's the 13 and I check
+  // in... that's 7 days" (direct feedback): a real week-at-a-glance
+  // strip, not just a flat count, so consistency is visible in one
+  // look rather than needing to read every entry's date.
+  const streak = checkins ? Array.from({ length: 7 }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() - (6 - i))
+    const hit = checkins.some(c => sameDay(new Date(c.created_at), d))
+    return { label: d.toLocaleDateString('en-GB', { weekday: 'narrow' }), hit, isToday: i === 6 }
+  }) : null
+
   return createPortal((
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={onClose}>
       <div className={`${t.surface} rounded-2xl shadow-2xl w-full max-w-lg max-h-[85dvh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
-        <div className={`flex items-center gap-2 px-5 py-4 border-b ${t.border} sticky top-0 ${t.surface}`}>
-          <button onClick={onClose} aria-label="Close" className={`w-8 h-8 flex items-center justify-center rounded-lg hover:bg-black/5 ${t.textTertiary} transition flex-shrink-0`}><ChevronLeft className="w-4 h-4" /></button>
-          <div className="min-w-0">
-            <p className={`font-bold ${t.text} text-[15px] truncate`}>{goal.name}</p>
-            <p className={`text-[12px] ${t.textTertiary}`}>
-              {checkins === null ? 'Loading…' : `${checkins.length} check-in${checkins.length === 1 ? '' : 's'}`}
-              {checkins && checkins.length > 0 && ` · since ${formatDate(checkins[checkins.length - 1].created_at)}`}
-            </p>
+        <div className={`flex items-center justify-between gap-2 px-5 py-4 border-b ${t.border} sticky top-0 ${t.surface}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <button onClick={onClose} aria-label="Close" className={`w-8 h-8 flex items-center justify-center rounded-lg hover:bg-black/5 ${t.textTertiary} transition flex-shrink-0`}><ChevronLeft className="w-4 h-4" /></button>
+            <div className="min-w-0">
+              <p className={`font-bold ${t.text} text-[15px] truncate`}>{goal.name}</p>
+              <p className={`text-[12px] ${t.textTertiary}`}>
+                {checkins === null ? 'Loading…' : `${checkins.length} check-in${checkins.length === 1 ? '' : 's'}`}
+                {checkins && checkins.length > 0 && ` · since ${formatDate(checkins[checkins.length - 1].created_at)}`}
+              </p>
+            </div>
           </div>
+          {published && (
+            <span className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
+              <BadgeCheck className="w-3 h-3" /> Published
+            </span>
+          )}
         </div>
 
         <div className="p-5">
+          {streak && (
+            <div className="flex items-center gap-1.5 mb-4">
+              {streak.map((d, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                  <span
+                    className={`w-full h-2 rounded-full ${d.hit ? '' : t.surfaceSubtle}`}
+                    style={d.hit ? { backgroundColor: 'var(--status-success-text)' } : undefined}
+                  />
+                  <span className={`text-[9.5px] ${d.isToday ? `font-bold ${t.text}` : t.textQuaternary}`}>{d.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {(goal.target || goal.target_date) && (
             <div className={`${t.surfaceSubtle} rounded-xl p-3.5 mb-4 space-y-1.5`}>
               {goal.target && (
@@ -88,19 +137,33 @@ export default function SkillGoalTimeline({
           )}
 
           {canCheckIn && (
-            <div className="mb-5">
-              {!composerOpen ? (
+            <div className="flex items-center gap-2 mb-5">
+              {!composerOpen && (
                 <button onClick={() => setComposerOpen(true)} className={`flex items-center gap-1.5 text-[13px] font-semibold ${t.brand}`}>
                   <Plus className="w-3.5 h-3.5" /> Check in
                 </button>
-              ) : (
-                <CheckinComposer
-                  goalId={goal.id} studentId={studentId!} t={t}
-                  onDone={() => { setComposerOpen(false); load(); onCheckedIn?.() }}
-                  onCancel={() => setComposerOpen(false)}
-                />
+              )}
+              {!published && checkins && checkins.length > 0 && !composerOpen && (
+                <button
+                  onClick={publish} disabled={publishing}
+                  className="flex items-center gap-1.5 text-[13px] font-semibold px-3 py-1.5 rounded-lg bg-brand text-white hover:opacity-90 transition disabled:opacity-50 ml-auto"
+                >
+                  <Rocket className="w-3.5 h-3.5" /> {publishing ? 'Publishing…' : 'Publish to profile'}
+                </button>
               )}
             </div>
+          )}
+          {canCheckIn && composerOpen && (
+            <div className="-mt-3 mb-5">
+              <CheckinComposer
+                goalId={goal.id} studentId={studentId!} t={t}
+                onDone={() => { setComposerOpen(false); load(); onCheckedIn?.() }}
+                onCancel={() => setComposerOpen(false)}
+              />
+            </div>
+          )}
+          {canCheckIn && !published && (!checkins || checkins.length === 0) && (
+            <p className={`text-[11.5px] ${t.textQuaternary} -mt-3 mb-5`}>Check in at least once before publishing — employers should see real progress, not an empty goal.</p>
           )}
 
           {checkins === null ? (

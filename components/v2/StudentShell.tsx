@@ -6,6 +6,7 @@ import Link from 'next/link'
 import NotificationsBell from '@/components/v2/NotificationsBell'
 import Logo from '@/components/v2/Logo'
 import ScrollTrack from '@/components/v2/ScrollTrack'
+import HelpDesk from '@/components/v2/HelpDesk'
 import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
 import { signOut, getMyOrgType } from '@/lib/supabase'
@@ -387,6 +388,10 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
         </div>
       </nav>
       </div>
+
+      {/* HelpDesk.tsx gates its own floating launcher to lg: only --
+          laptop gets it, phone never does, per direct request. */}
+      <HelpDesk />
     </div>
   )
 }

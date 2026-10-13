@@ -1105,6 +1105,21 @@ export const getMySkillGoals = async (studentId: string) => {
   return { data, error }
 }
 
+// Private by default, same reasoning as the rest of this feature --
+// nothing about a goal is employer-visible until the student explicitly
+// publishes it. Students can re-publish freely (there's no unpublish --
+// once an employer's seen real progress, pulling it back doesn't undo
+// that, so this is a one-way door on purpose).
+export const publishSkillGoal = async (goalId: string) => {
+  const { data, error } = await supabase
+    .from('skill_goals')
+    .update({ published_at: new Date().toISOString() })
+    .eq('id', goalId)
+    .select()
+    .single()
+  return { data, error }
+}
+
 // Employer-facing -- RLS already restricts this to an already-
 // discoverable student (has_verification()), this query just mirrors
 // that boundary, same convention as getDiscoverWork.

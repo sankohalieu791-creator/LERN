@@ -130,27 +130,34 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
         <p className="text-ink-tertiary text-[14px]">Loading…</p>
       ) : (
         <>
-          <div className="flex items-center gap-4 mb-3">
+          {/* Avatar/name/bio bumped up another step -- "make it a bit
+              bigger, not too big, but just a bit bigger... too much
+              space left" (4th round on this page's sizing). The grid
+              below already fills the full width fine; this header block
+              was the part reading as a small island stuck on the left
+              with dead space around it, so it's the part that needed
+              to visually carry more weight, not a layout rework. */}
+          <div className="flex items-center gap-5 mb-4">
             {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="w-20 h-20 rounded-full object-cover flex-shrink-0" />
+              <img src={avatarUrl} alt="" className="w-28 h-28 rounded-full object-cover flex-shrink-0" />
             ) : (
-              <span className="w-20 h-20 rounded-full flex items-center justify-center text-[22px] font-bold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+              <span className="w-28 h-28 rounded-full flex items-center justify-center text-[30px] font-bold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
                 {(student.full_name || '?').split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase()}
               </span>
             )}
             <div className="min-w-0">
-              <p className="font-bold text-ink text-[26px] truncate">{student.full_name}</p>
+              <p className="font-bold text-ink text-[34px] leading-tight truncate">{student.full_name}</p>
               {work && work.length > 0 && (
-                <p className="flex items-center gap-1.5 text-[14px] font-semibold text-success-text"><BadgeCheck className="w-4 h-4" /> {work.length} verified {work.length === 1 ? 'piece' : 'pieces'} of work</p>
+                <p className="flex items-center gap-1.5 text-[15px] font-semibold text-success-text mt-1"><BadgeCheck className="w-[18px] h-[18px]" /> {work.length} verified {work.length === 1 ? 'piece' : 'pieces'} of work</p>
               )}
             </div>
           </div>
 
-          {student.bio && <p className="text-[14.5px] text-ink-secondary leading-relaxed mb-2.5 max-w-2xl">{student.bio}</p>}
+          {student.bio && <p className="text-[16px] text-ink-secondary leading-relaxed mb-3 max-w-3xl">{student.bio}</p>}
           {student.interest_tags && student.interest_tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-6">
+            <div className="flex flex-wrap gap-2 mb-7">
               {student.interest_tags.map((t: string) => (
-                <span key={t} className="text-[12px] font-semibold px-2.5 py-1 rounded-full bg-accent-bg text-brand">{t}</span>
+                <span key={t} className="text-[13px] font-semibold px-3 py-1.5 rounded-full bg-accent-bg text-brand">{t}</span>
               ))}
             </div>
           )}
@@ -325,11 +332,11 @@ function TabButton({ active, label, icon: Icon, onClick }: { active: boolean; la
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[14px] font-semibold transition ${
+      className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-[15px] font-semibold transition ${
         active ? 'bg-surface text-ink shadow-sm' : 'text-ink-tertiary hover:text-ink'
       }`}
     >
-      <Icon className="w-4 h-4" /> {label}
+      <Icon className="w-[18px] h-[18px]" /> {label}
     </button>
   )
 }

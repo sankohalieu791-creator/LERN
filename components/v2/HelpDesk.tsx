@@ -160,6 +160,19 @@ export default function HelpDesk() {
   const pointerOriginRef = useRef({ x: 0, y: 0 })
   const dragOriginRef = useRef({ x: 0, y: 0 })
 
+  // Phone's org/employer nav drawer has its own "Help" row now (see
+  // OrgShell.tsx) since a permanently-floating orb read as clutter on a
+  // small screen -- "when you close the tab [the drawer]... it should
+  // disappear... when you open the tab, it appears underneath
+  // everything [at the bottom of the drawer's own list]". This is how
+  // that row actually opens the same panel without lifting `open`
+  // state out of this otherwise self-contained component.
+  useEffect(() => {
+    const onExternalOpen = () => setOpen(true)
+    window.addEventListener('lern:helpdesk-open', onExternalOpen)
+    return () => window.removeEventListener('lern:helpdesk-open', onExternalOpen)
+  }, [])
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, open])
@@ -210,8 +223,8 @@ export default function HelpDesk() {
   const onDragEnd = () => { draggingRef.current = false }
 
   const role = user?.role as HelpRole | undefined
-  const isStaff = role === 'institution_staff' || role === 'provider_staff' || role === 'employer'
-  if (!isStaff) return null
+  const canUseHelpDesk = role === 'institution_staff' || role === 'provider_staff' || role === 'employer' || role === 'student'
+  if (!canUseHelpDesk) return null
   const safeRole = role as HelpRole
   const canDraft = safeRole === 'institution_staff' || safeRole === 'provider_staff'
 
@@ -248,11 +261,18 @@ export default function HelpDesk() {
     // Smaller than before, with a short caption underneath -- warm
     // beige/cream tones throughout (the brand's own palette, not a
     // cool blue), pending a reference design still to come.
+    //
+    // hidden lg:flex -- a permanently-floating button read as clutter
+    // on phone (direct feedback), for every role this renders for.
+    // Desktop keeps it exactly as before. Org/employer phone gets an
+    // alternate way in via the nav drawer's own "Help" row (OrgShell.tsx,
+    // dispatches 'lern:helpdesk-open' above); students get laptop-only,
+    // full stop, per direct request -- no phone entry point at all.
     return (
       <button
         onClick={() => setOpen(true)}
         aria-label="LERN Help Desk"
-        className="fixed left-5 z-40 flex flex-col items-center gap-1 active:scale-95 transition"
+        className="hidden lg:flex fixed left-5 z-40 flex-col items-center gap-1 active:scale-95 transition"
         style={{ bottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
       >
         <span

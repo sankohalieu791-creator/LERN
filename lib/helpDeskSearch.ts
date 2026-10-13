@@ -57,7 +57,8 @@ export function starterTopics(role: HelpRole): HelpEntry[] {
   const ids: Record<HelpRole, string[]> = {
     institution_staff: ['briefs-create', 'review-verify', 'guest-invite-create', 'workexp-export', 'students-filter-group'],
     provider_staff: ['courses-create', 'review-verify', 'bootcamp-what', 'guest-invite-create', 'bootcamp-export'],
-    employer: ['discover-express-interest', 'talentpools-what', 'jobs-post', 'candidates-pipeline', 'employer-why-no-direct-contact'],
+    employer: ['discover-express-interest', 'employer-discover-candidate-page', 'employer-skill-evidence', 'talentpools-what', 'jobs-post'],
+    student: ['student-submit-brief', 'student-skill-goal-set', 'student-skill-checkin', 'student-skill-publish', 'student-apply-job'],
   }
   return ids[role].map(id => HELP_ENTRIES.find(e => e.id === id)).filter(Boolean) as HelpEntry[]
 }

@@ -14,7 +14,7 @@
 // someone stopped them in a corridor and asked -- plain, short
 // paragraphs, no jargon that isn't explained, no marketing language.
 
-export type HelpRole = 'institution_staff' | 'provider_staff' | 'employer'
+export type HelpRole = 'institution_staff' | 'provider_staff' | 'employer' | 'student'
 
 export type HelpEntry = {
   id: string
@@ -420,5 +420,128 @@ export const HELP_ENTRIES: HelpEntry[] = [
     question: 'Who can see a student under 18?',
     keywords: ['under 18', 'privacy', 'who can see', 'visibility'],
     answer: "An under-18's profile is never publicly searchable, and no one outside their own organisation can contact them directly. Staff at their own school or provider can see their full profile; an employer only ever sees verified work, routed through staff."
+  },
+
+  // ── Student ──────────────────────────────────────────────────────
+  {
+    id: 'student-briefs-what',
+    roles: ['student'],
+    question: 'What are Briefs?',
+    keywords: ['briefs', 'brief', 'what is briefs'],
+    answer: 'Briefs is where your tutor sets real project work — a business plan, a social media campaign, that kind of thing — with clear criteria for what a good one looks like. Submit your work there and it goes to Review; once a tutor verifies it, it shows up on your profile as real, checked work.',
+  },
+  {
+    id: 'student-submit-brief',
+    roles: ['student'],
+    question: 'How do I submit a brief?',
+    keywords: ['submit', 'submit brief', 'hand in', 'turn in'],
+    answer: 'Open the brief, attach your work, and explain your thinking in a couple of sentences — both are required, since a short written explanation on its own isn\'t something an employer could actually judge. Tap "Submit for review" and it moves into your tutor\'s queue.',
+  },
+  {
+    id: 'student-assignments-what',
+    roles: ['student'],
+    question: 'What are Assignments?',
+    keywords: ['assignments', 'assignment'],
+    answer: 'Assignments work the same way Briefs do — attach your work, explain your thinking, submit for review — just a different category your tutor uses for shorter or more routine tasks.',
+  },
+  {
+    id: 'student-workshops-join',
+    roles: ['student'],
+    question: 'How do I join a workshop?',
+    keywords: ['join workshop', 'workshop', 'live session'],
+    answer: 'Open Workshops and find the session — online ones have a "Join session" button that lights up once it\'s actually started; in-person ones just show you the location. Every live session is recorded automatically, so if you miss it, the recording lands on the workshop\'s own page afterwards.',
+  },
+  {
+    id: 'student-myskill-what',
+    roles: ['student'],
+    question: 'What is My Skill?',
+    keywords: ['my skill', 'skill wallet', 'skills'],
+    answer: 'My Skill has two parts. The top section is skills your tutor has set for a course — those move through five levels as your verified work comes in. Underneath, "Self-reported" is for anything you\'re teaching yourself — set a goal, then check in with real proof as you go.',
+  },
+  {
+    id: 'student-skill-goal-set',
+    roles: ['student'],
+    question: 'How do I set a skill goal?',
+    keywords: ['set a goal', 'skill goal', 'new skill', 'add a skill'],
+    answer: 'On My Skill, tap "Add a skill" under Self-reported. Name the skill, and optionally say what you want to be able to do and by when — that part\'s there to give you something to check in against, not a requirement.',
+  },
+  {
+    id: 'student-skill-checkin',
+    roles: ['student'],
+    question: 'How do I check in on a skill?',
+    keywords: ['check in', 'checkin', 'weekly check in', 'check-in'],
+    answer: 'Open the skill goal and tap "Check in". Write a couple of sentences on what you actually did, and attach a photo, screenshot or the work itself — both are required every time. Do this as often as you like; each one gets its own real date, building a genuine log of progress instead of a single claim.',
+  },
+  {
+    id: 'student-skill-publish',
+    roles: ['student'],
+    question: 'How do I publish a skill to my profile?',
+    keywords: ['publish', 'publish skill', 'show employer', 'proven skill'],
+    answer: 'A self-reported skill goal is private until you publish it — nothing shows to an employer before then. Once you\'ve checked in at least once, open the goal and tap "Publish to profile". There\'s no unpublish, so only do it once you\'re actually happy for an employer to see that history.',
+  },
+  {
+    id: 'student-discover-what',
+    roles: ['student'],
+    question: 'What is Discover?',
+    keywords: ['discover', 'jobs', 'opportunities', 'apprenticeships', 'internships'],
+    answer: 'Discover is where real jobs, apprenticeships and internships from employers show up. Explore has everything together; Jobs, Apprenticeships and Internships each filter down to just that type. If you\'re 18 or over, you\'ll also see Interest received and Job tracking there.',
+  },
+  {
+    id: 'student-apply-job',
+    roles: ['student'],
+    question: 'How do I apply for a job?',
+    keywords: ['apply', 'apply for a job', 'application'],
+    answer: 'Open the listing on Discover and tap "Apply". It joins Job tracking (18+) so you can see exactly where it stands — applied, reviewing, shortlisted, interview, offer or hired — without having to chase anyone for an update.',
+  },
+  {
+    id: 'student-interest-received-what',
+    roles: ['student'],
+    question: 'What is Interest received?',
+    keywords: ['interest received', 'employer interested', 'employer interest'],
+    answer: "If you're 18 or over, Interest received shows you directly when an employer's interested in your verified work — reply or decline right there. If you're under 18, that same interest goes to your school or provider instead, since under-18s are never contacted by an employer directly, by design.",
+  },
+  {
+    id: 'student-verified-what',
+    roles: ['student'],
+    question: "What does 'Verified' mean on my profile?",
+    keywords: ['verified', 'what does verified mean', 'verification'],
+    answer: "Verified means a real tutor checked your submitted work against the brief's criteria and confirmed it's genuinely yours and genuinely good — not a grade, and nothing you wrote about yourself. It's the whole reason an employer can trust what's on your profile without needing a CV.",
+  },
+  {
+    id: 'student-experience-add',
+    roles: ['student'],
+    question: 'How do I add work experience to my profile?',
+    keywords: ['experience', 'add experience', 'work experience'],
+    answer: 'On Profile, open the Experience tab and tap "Add experience". Fill in what it was, who it was with (a business, an organisation, or just a person — it doesn\'t have to be a formal employer), where, when, and a bit about what you actually did. It\'s yours to add — nobody has to verify it the way Briefs are.',
+  },
+  {
+    id: 'student-join-organisation',
+    roles: ['student'],
+    question: 'How do I join my school or college on LERN?',
+    keywords: ['join code', 'join my school', 'join organisation', 'sign up code'],
+    answer: 'You\'ll need a join code from your school, college or training provider — ask a tutor if you don\'t have one. Enter it when you sign up, or from My Work if you joined without one — it\'s what links your account to their organisation.',
+  },
+
+  // ── A few more for staff/employer, covering newer features ───────
+  {
+    id: 'employer-discover-candidate-page',
+    roles: ['employer'],
+    question: "How do I see a candidate's full history?",
+    keywords: ['candidate page', 'full profile', 'candidate history', 'see more'],
+    answer: 'Tap a candidate\'s card on Discover — it opens their own page with Verified, Experience and Skills as separate tabs. Tap any piece of verified work to see the actual file behind it, not just the written description; tap a skill to see the real, dated evidence it\'s backed by.',
+  },
+  {
+    id: 'employer-skill-evidence',
+    roles: ['employer'],
+    question: 'How do I see proof behind a skill?',
+    keywords: ['skill evidence', 'proof', 'skill proof', 'verify skill'],
+    answer: "Tap any skill pill on a candidate's page. A tutor-set skill filters straight to the verified work it was earned from. A self-reported skill opens its full check-in history — real, dated entries with proof each time, not a single unverifiable claim. Only skills the student has chosen to publish show up here at all.",
+  },
+  {
+    id: 'staff-student-self-reported',
+    roles: ['institution_staff', 'provider_staff'],
+    question: "Can I see a student's self-taught skills?",
+    keywords: ['self reported', 'self-reported', 'student skills', 'self taught'],
+    answer: "Yes — a student's self-reported skill goals and check-ins are visible to staff at their own organisation, the same as their other work. There's nothing for you to set up or approve though; a student can start one with zero input from you, and publishing it to employers is entirely their own decision.",
   },
 ]
