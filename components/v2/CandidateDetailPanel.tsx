@@ -14,7 +14,6 @@ import { OfferComposer } from '@/components/v2/EmployerDiscoverPanel'
 import { ChevronLeft, BadgeCheck, Send, Clock, Check, FolderCheck, Briefcase, Award } from 'lucide-react'
 
 type Tab = 'verified' | 'experience' | 'skills'
-type WorkType = 'all' | 'brief' | 'course' | 'workshop'
 const TYPE_LABEL: Record<string, string> = { brief: 'Brief', course: 'Course', workshop: 'Workshop' }
 
 function formatMonthYear(d?: string) {
@@ -50,7 +49,6 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
   const [selfReportedSkills, setSelfReportedSkills] = useState<any[]>([])
   const [status, setStatus] = useState<string | undefined>()
   const [tab, setTab] = useState<Tab>('verified')
-  const [workType, setWorkType] = useState<WorkType>('all')
   const [composerOpen, setComposerOpen] = useState(false)
   const [sending, setSending] = useState(false)
   const [composerError, setComposerError] = useState('')
@@ -81,13 +79,16 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
     setStatus('pending'); setComposerOpen(false)
   }
 
-  const workFiltered = (work || []).filter(v => workType === 'all' || v.submissions?.work_items?.type === workType)
-
   return (
-    <div className="pb-10">
+    // Centred and broad, not hugging the left edge -- "put it in the
+    // middle, make it a bit broad" (direct feedback). max-w-4xl is
+    // deliberately wider than Profile's own lg:max-w-2xl convention,
+    // since this page was asked to read bigger/broader than a typical
+    // profile-style screen, not match it exactly.
+    <div className="max-w-4xl mx-auto pb-10">
       <button
         onClick={() => router.push('/employer/discover')}
-        className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-tertiary hover:text-ink transition mb-4"
+        className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-tertiary hover:text-ink transition mb-5"
       >
         <ChevronLeft className="w-4 h-4" /> Back to Discover
       </button>
@@ -96,89 +97,75 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
         <p className="text-ink-tertiary text-[14px]">Loading…</p>
       ) : (
         <>
-          <div className="flex items-center gap-3.5 mb-2">
+          <div className="flex items-center gap-4 mb-3">
             {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="w-16 h-16 rounded-full object-cover flex-shrink-0" />
+              <img src={avatarUrl} alt="" className="w-20 h-20 rounded-full object-cover flex-shrink-0" />
             ) : (
-              <span className="w-16 h-16 rounded-full flex items-center justify-center text-[18px] font-bold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
+              <span className="w-20 h-20 rounded-full flex items-center justify-center text-[22px] font-bold flex-shrink-0" style={{ backgroundColor: '#E6F1FB', color: '#185FA5' }}>
                 {(student.full_name || '?').split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase()}
               </span>
             )}
             <div className="min-w-0">
-              <p className="font-bold text-ink text-[20px] truncate">{student.full_name}</p>
+              <p className="font-bold text-ink text-[26px] truncate">{student.full_name}</p>
               {work && work.length > 0 && (
-                <p className="flex items-center gap-1 text-[13px] font-semibold text-success-text"><BadgeCheck className="w-3.5 h-3.5" /> {work.length} verified {work.length === 1 ? 'piece' : 'pieces'} of work</p>
+                <p className="flex items-center gap-1.5 text-[14px] font-semibold text-success-text"><BadgeCheck className="w-4 h-4" /> {work.length} verified {work.length === 1 ? 'piece' : 'pieces'} of work</p>
               )}
             </div>
           </div>
 
-          {student.bio && <p className="text-[13.5px] text-ink-secondary leading-relaxed mb-2 max-w-xl">{student.bio}</p>}
+          {student.bio && <p className="text-[14.5px] text-ink-secondary leading-relaxed mb-2.5 max-w-2xl">{student.bio}</p>}
           {student.interest_tags && student.interest_tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-5">
+            <div className="flex flex-wrap gap-1.5 mb-6">
               {student.interest_tags.map((t: string) => (
-                <span key={t} className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-accent-bg text-brand">{t}</span>
+                <span key={t} className="text-[12px] font-semibold px-2.5 py-1 rounded-full bg-accent-bg text-brand">{t}</span>
               ))}
             </div>
           )}
 
-          <div className="flex gap-1 bg-surface-muted rounded-xl p-1 mb-5 w-fit">
+          <div className="flex gap-1 bg-surface-muted rounded-xl p-1 mb-6 w-fit">
             <TabButton active={tab === 'verified'} label="Verified" icon={FolderCheck} onClick={() => setTab('verified')} />
             <TabButton active={tab === 'experience'} label="Experience" icon={Briefcase} onClick={() => setTab('experience')} />
             <TabButton active={tab === 'skills'} label="Skills" icon={Award} onClick={() => setTab('skills')} />
           </div>
 
           {tab === 'verified' && (
-            <div>
-              <div className="flex gap-1 bg-surface-muted rounded-xl p-1 mb-4 w-fit">
-                {(['all', 'brief', 'course', 'workshop'] as WorkType[]).map(t => (
-                  <button
-                    key={t} onClick={() => setWorkType(t)}
-                    className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold capitalize transition ${
-                      workType === t ? 'bg-surface text-ink shadow-sm' : 'text-ink-tertiary hover:text-ink'
-                    }`}
-                  >
-                    {t === 'all' ? 'All' : TYPE_LABEL[t]}
-                  </button>
+            work === null ? (
+              <p className="text-[13px] text-ink-tertiary">Loading…</p>
+            ) : work.length === 0 ? (
+              <p className="text-[13px] text-ink-tertiary">Nothing to show here.</p>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {work.map(v => (
+                  <div key={v.id} className="bg-surface border border-edge rounded-xl p-4">
+                    <span className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-full mb-2 uppercase tracking-wide" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
+                      {TYPE_LABEL[v.submissions?.work_items?.type] || v.submissions?.work_items?.type}
+                    </span>
+                    <p className="text-[15px] font-semibold text-ink">{v.submissions?.work_items?.title}</p>
+                    {v.submissions?.work_items?.organisations?.name && (
+                      <p className="text-[12.5px] text-ink-tertiary mb-1.5">{v.submissions.work_items.organisations.name}</p>
+                    )}
+                    {v.submissions?.content && <p className="text-[13px] text-ink-secondary line-clamp-3">{v.submissions.content}</p>}
+                  </div>
                 ))}
               </div>
-              {work === null ? (
-                <p className="text-[13px] text-ink-tertiary">Loading…</p>
-              ) : workFiltered.length === 0 ? (
-                <p className="text-[13px] text-ink-tertiary">Nothing to show here.</p>
-              ) : (
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {workFiltered.map(v => (
-                    <div key={v.id} className="bg-surface border border-edge rounded-xl p-4">
-                      <span className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-full mb-2 uppercase tracking-wide" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
-                        {TYPE_LABEL[v.submissions?.work_items?.type] || v.submissions?.work_items?.type}
-                      </span>
-                      <p className="text-[14px] font-semibold text-ink">{v.submissions?.work_items?.title}</p>
-                      {v.submissions?.work_items?.organisations?.name && (
-                        <p className="text-[12px] text-ink-tertiary mb-1.5">{v.submissions.work_items.organisations.name}</p>
-                      )}
-                      {v.submissions?.content && <p className="text-[12.5px] text-ink-secondary line-clamp-3">{v.submissions.content}</p>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            )
           )}
 
           {tab === 'experience' && (
             experience.length === 0 ? (
               <p className="text-[13px] text-ink-tertiary">Nothing to show here.</p>
             ) : (
-              <div className="grid sm:grid-cols-2 gap-3">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 {experience.map((e: any) => (
                   <div key={e.id} className="bg-surface border border-edge rounded-xl p-4">
-                    <p className="text-[14px] font-semibold text-ink">{e.title}</p>
-                    {e.organisation && <p className="text-[12.5px] text-ink-secondary mt-0.5">{e.organisation}</p>}
+                    <p className="text-[15px] font-semibold text-ink">{e.title}</p>
+                    {e.organisation && <p className="text-[13px] text-ink-secondary mt-0.5">{e.organisation}</p>}
                     {(e.employment_type || e.start_date || e.location) && (
-                      <p className="text-[11.5px] text-ink-tertiary mt-1">
+                      <p className="text-[12px] text-ink-tertiary mt-1">
                         {[EMPLOYMENT_TYPE_LABEL[e.employment_type] || e.employment_type, formatDateRange(e), e.location].filter(Boolean).join(' · ')}
                       </p>
                     )}
-                    {e.description && <p className="text-[12.5px] text-ink-secondary mt-2 whitespace-pre-wrap line-clamp-4">{e.description}</p>}
+                    {e.description && <p className="text-[13px] text-ink-secondary mt-2 whitespace-pre-wrap line-clamp-4">{e.description}</p>}
                   </div>
                 ))}
               </div>
@@ -186,15 +173,15 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
           )}
 
           {tab === 'skills' && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               {skills.length > 0 && (
                 <div>
-                  <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2">Skills</p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <p className="text-[11.5px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2.5">Skills</p>
+                  <div className="flex flex-wrap gap-2">
                     {skills.map((s: any) => {
                       const info = LEVEL_INFO[s.level as keyof typeof LEVEL_INFO]
                       return (
-                        <span key={s.id} className="text-[12px] font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: info.bg, color: info.text }}>
+                        <span key={s.id} className="text-[13px] font-semibold px-3 py-1.5 rounded-full" style={{ backgroundColor: info.bg, color: info.text }}>
                           {s.skills?.name} · {info.label}
                         </span>
                       )
@@ -204,10 +191,10 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
               )}
               {selfReportedSkills.length > 0 && (
                 <div>
-                  <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2">Self-reported skills</p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <p className="text-[11.5px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2.5">Self-reported skills</p>
+                  <div className="flex flex-wrap gap-2">
                     {selfReportedSkills.map((s: any) => (
-                      <span key={s.id} className="text-[12px] font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
+                      <span key={s.id} className="text-[13px] font-semibold px-3 py-1.5 rounded-full" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
                         {s.name} · Verified
                       </span>
                     ))}
@@ -220,19 +207,19 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
             </div>
           )}
 
-          <div className="mt-8 pt-5 border-t border-edge-subtle">
+          <div className="mt-9 pt-6 border-t border-edge-subtle">
             {status === 'pending' ? (
-              <span className="flex items-center gap-1.5 text-[13px] font-semibold text-warning-text"><Clock className="w-4 h-4" /> Interest pending</span>
+              <span className="flex items-center gap-1.5 text-[14px] font-semibold text-warning-text"><Clock className="w-4 h-4" /> Interest pending</span>
             ) : status === 'accepted' ? (
-              <span className="flex items-center gap-1.5 text-[13px] font-semibold text-success-text"><Check className="w-4 h-4" /> Accepted</span>
+              <span className="flex items-center gap-1.5 text-[14px] font-semibold text-success-text"><Check className="w-4 h-4" /> Accepted</span>
             ) : status === 'declined' ? (
-              <span className="text-[13px] font-semibold text-ink-tertiary">Declined</span>
+              <span className="text-[14px] font-semibold text-ink-tertiary">Declined</span>
             ) : (
               <button
                 onClick={() => setComposerOpen(true)}
-                className="flex items-center justify-center gap-1.5 bg-brand text-white text-[13px] font-semibold px-5 py-2.5 rounded-lg hover:opacity-90 transition"
+                className="flex items-center justify-center gap-1.5 bg-brand text-white text-[14px] font-semibold px-5 py-2.5 rounded-lg hover:opacity-90 transition"
               >
-                <Send className="w-3.5 h-3.5" /> Express interest
+                <Send className="w-4 h-4" /> Express interest
               </button>
             )}
           </div>
@@ -256,11 +243,11 @@ function TabButton({ active, label, icon: Icon, onClick }: { active: boolean; la
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[13px] font-semibold transition ${
+      className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[14px] font-semibold transition ${
         active ? 'bg-surface text-ink shadow-sm' : 'text-ink-tertiary hover:text-ink'
       }`}
     >
-      <Icon className="w-3.5 h-3.5" /> {label}
+      <Icon className="w-4 h-4" /> {label}
     </button>
   )
 }
