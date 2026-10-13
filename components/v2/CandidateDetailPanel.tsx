@@ -6,13 +6,14 @@ import { useAuth } from '@/context/AuthContext'
 import { createPortal } from 'react-dom'
 import {
   getPublicStudentProfile, getVerifiedWorkForProfile, getExperienceEntries,
-  getEmployerVisibleSkills, getEmployerSelfReportedSkills, getSubmissionSkillTags,
+  getEmployerVisibleSkills, getEmployerSkillGoals, getSubmissionSkillTags,
   getMyInterest, expressInterest, getSignedFileUrl,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { LEVEL_INFO } from '@/lib/skillLevels'
 import { EMPLOYMENT_TYPE_LABEL } from '@/components/v2/ProfilePanel'
 import { OfferComposer } from '@/components/v2/EmployerDiscoverPanel'
+import SkillGoalTimeline from '@/components/v2/SkillGoalTimeline'
 import {
   ChevronLeft, BadgeCheck, Send, Clock, Check, FolderCheck, Briefcase, Award,
   Paperclip, X, FilePlus,
@@ -57,13 +58,13 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
   const [work, setWork] = useState<any[] | null>(null)
   const [experience, setExperience] = useState<any[]>([])
   const [skills, setSkills] = useState<any[]>([])
-  const [selfReportedSkills, setSelfReportedSkills] = useState<any[]>([])
+  const [goals, setGoals] = useState<any[]>([])
   const [tagsBySubmission, setTagsBySubmission] = useState<Record<string, string[]>>({})
   const [status, setStatus] = useState<string | undefined>()
   const [tab, setTab] = useState<Tab>('verified')
   const [skillFilter, setSkillFilter] = useState<{ id: string; name: string } | null>(null)
   const [openWork, setOpenWork] = useState<any | null>(null)
-  const [openSelfReported, setOpenSelfReported] = useState<any | null>(null)
+  const [openGoal, setOpenGoal] = useState<any | null>(null)
   const [composerOpen, setComposerOpen] = useState(false)
   const [sending, setSending] = useState(false)
   const [composerError, setComposerError] = useState('')
@@ -73,7 +74,7 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
     getPublicStudentProfile(studentId).then(({ data }) => setStudent(data || null))
     getExperienceEntries(studentId).then(({ data }) => setExperience(data || []))
     getEmployerVisibleSkills(studentId).then(({ data }) => setSkills(data || []))
-    getEmployerSelfReportedSkills(studentId).then(({ data }) => setSelfReportedSkills(data || []))
+    getEmployerSkillGoals(studentId).then(({ data }) => setGoals(data || []))
     getVerifiedWorkForProfile(studentId).then(({ data }) => {
       const visible = (data || []).filter((v: any) => v.visibility === 'public' || v.employer_visible)
       setWork(visible)
@@ -253,24 +254,33 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
                   </div>
                 </div>
               )}
-              {selfReportedSkills.length > 0 && (
+              {goals.length > 0 && (
                 <div>
-                  <p className="text-[11.5px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2.5">Self-reported skills — tap to see the evidence</p>
-                  <div className="flex flex-wrap gap-2">
-                    {selfReportedSkills.map((s: any) => (
-                      <button
-                        key={s.id}
-                        onClick={() => setOpenSelfReported(s)}
-                        className="flex items-center gap-1.5 text-[13px] font-semibold px-3 py-1.5 rounded-full hover:opacity-80 transition"
-                        style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}
-                      >
-                        <Paperclip className="w-3 h-3" /> {s.name} · Verified
-                      </button>
-                    ))}
+                  <p className="text-[11.5px] font-semibold text-ink-tertiary uppercase tracking-wide mb-2.5">Self-reported — tap to see the check-in history</p>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {goals.map((g: any) => {
+                      const count = g.skill_checkins?.length || 0
+                      return (
+                        <button
+                          key={g.id} onClick={() => setOpenGoal(g)}
+                          className="text-left bg-surface border border-edge rounded-xl p-3.5 hover:border-edge-input transition"
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <p className="text-[14px] font-semibold text-ink truncate">{g.name}</p>
+                            <span className="flex items-center gap-1 text-[10.5px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
+                              <Paperclip className="w-2.5 h-2.5" /> {count}
+                            </span>
+                          </div>
+                          {g.target_date && (
+                            <p className="text-[11.5px] text-ink-tertiary">Target: {new Date(g.target_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )}
-              {skills.length === 0 && selfReportedSkills.length === 0 && (
+              {skills.length === 0 && goals.length === 0 && (
                 <p className="text-[13px] text-ink-tertiary">Nothing to show here.</p>
               )}
             </div>
@@ -306,7 +316,7 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
       )}
 
       {openWork && <WorkDetailOverlay work={openWork} onClose={() => setOpenWork(null)} />}
-      {openSelfReported && <SelfReportedDetailOverlay skill={openSelfReported} onClose={() => setOpenSelfReported(null)} />}
+      {openGoal && <SkillGoalTimeline goal={openGoal} canCheckIn={false} variant="paper" onClose={() => setOpenGoal(null)} />}
     </div>
   )
 }
@@ -379,44 +389,3 @@ function WorkDetailOverlay({ work, onClose }: { work: any; onClose: () => void }
   ), document.body)
 }
 
-// A self-reported skill can't even exist without an evidence file (the
-// student-facing form requires one) -- this was always real data, it
-// just wasn't shown. Same file-or-image pattern as WorkDetailOverlay.
-function SelfReportedDetailOverlay({ skill, onClose }: { skill: any; onClose: () => void }) {
-  const [fileUrl, setFileUrl] = useState<string | null>(null)
-  const isImage = skill.evidence_file_type?.startsWith('image/')
-
-  useEffect(() => {
-    if (skill.evidence_file_path) getSignedFileUrl('submission-files', skill.evidence_file_path).then(({ url }) => setFileUrl(url))
-  }, [skill.evidence_file_path])
-
-  return createPortal((
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg max-h-[85dvh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-edge-subtle sticky top-0 bg-surface">
-          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1 rounded-full" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
-            <BadgeCheck className="w-3.5 h-3.5" /> Self-reported, with evidence
-          </span>
-          <button onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-tertiary transition"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="p-5">
-          <h2 className="text-[18px] font-bold text-ink leading-snug mb-3">{skill.name}</h2>
-          {skill.note && <p className="text-[14px] text-ink-secondary whitespace-pre-wrap leading-relaxed mb-4">{skill.note}</p>}
-
-          <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-1.5">Evidence</p>
-          {isImage && fileUrl ? (
-            <img src={fileUrl} alt="" className="w-full rounded-lg border border-edge" />
-          ) : (
-            <a
-              href={fileUrl || '#'} target="_blank" rel="noreferrer"
-              className="flex items-center gap-2 bg-surface-subtle border border-edge rounded-xl px-4 py-3 text-[13px] font-semibold text-ink hover:border-edge-input transition"
-            >
-              <FilePlus className="w-4 h-4 text-ink-tertiary flex-shrink-0" />
-              <span className="truncate">{fileUrl ? (skill.evidence_file_path?.split('/').pop()) : 'Loading…'}</span>
-            </a>
-          )}
-        </div>
-      </div>
-    </div>
-  ), document.body)
-}

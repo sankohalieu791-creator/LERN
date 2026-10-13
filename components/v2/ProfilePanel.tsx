@@ -11,10 +11,11 @@ import {
   getSavedOpportunities, unsaveOpportunity, updateUserProfile, uploadAvatar, removeAvatar,
   isUsernameAvailable, getMyOrganisationInfo, getPublicStudentProfile, blockUser,
   getStudentSkills, getOrgSkillsForStudent,
-  getMySelfReportedSkills, uploadSelfReportedSkillEvidence, createSelfReportedSkill,
+  getMySkillGoals, createSkillGoal,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import FollowButton from '@/components/v2/FollowButton'
+import SkillGoalTimeline from '@/components/v2/SkillGoalTimeline'
 import { STICKER_OPTIONS } from '@/lib/feedConstants'
 import { LEVEL_INFO } from '@/lib/skillLevels'
 import {
@@ -615,9 +616,10 @@ export function SkillsFolderContent({ profileId, organisationId, isOwn }: { prof
   const router = useRouter()
   const [courses, setCourses] = useState<any[]>([])
   const [studentSkills, setStudentSkills] = useState<any[]>([])
-  const [selfReported, setSelfReported] = useState<any[]>([])
+  const [goals, setGoals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [addingSkill, setAddingSkill] = useState(false)
+  const [openGoal, setOpenGoal] = useState<any | null>(null)
 
   const load = () => {
     const calls: Promise<any>[] = [
@@ -625,13 +627,13 @@ export function SkillsFolderContent({ profileId, organisationId, isOwn }: { prof
       getStudentSkills(profileId),
     ]
     // Only fetched for the owner -- RLS has no read path for anyone
-    // else to see a self-reported skill at all (student-own or
-    // org-staff only), so this would just come back empty for a peer.
-    if (isOwn) calls.push(getMySelfReportedSkills(profileId))
-    Promise.all(calls).then(([c, ss, sr]) => {
+    // else to see a skill goal at all (student-own or org-staff only),
+    // so this would just come back empty for a peer.
+    if (isOwn) calls.push(getMySkillGoals(profileId))
+    Promise.all(calls).then(([c, ss, g]) => {
       setCourses((c.data as any) || [])
       setStudentSkills(ss.data || [])
-      if (sr) setSelfReported(sr.data || [])
+      if (g) setGoals(g.data || [])
       setLoading(false)
     })
   }
@@ -641,7 +643,7 @@ export function SkillsFolderContent({ profileId, organisationId, isOwn }: { prof
 
   const levelFor = (skillId: string) => studentSkills.find((ss: any) => ss.skill_id === skillId)
   const coursesWithSkills = courses.filter((c: any) => (c.skills || []).length > 0)
-  const nothingAtAll = coursesWithSkills.length === 0 && selfReported.length === 0 && !isOwn
+  const nothingAtAll = coursesWithSkills.length === 0 && goals.length === 0 && !isOwn
 
   if (nothingAtAll) {
     return <EmptyState icon={Award} title="No skills yet" hint="Nothing to show here yet." />
@@ -649,8 +651,8 @@ export function SkillsFolderContent({ profileId, organisationId, isOwn }: { prof
 
   return (
     <div className="space-y-6">
-      {coursesWithSkills.length === 0 && isOwn && selfReported.length === 0 && !addingSkill && (
-        <p className="text-[13px] text-[var(--app-text-tertiary)]">Your tutor adds skills to a course — they'll show up here once they have. Or add your own below.</p>
+      {coursesWithSkills.length === 0 && isOwn && goals.length === 0 && !addingSkill && (
+        <p className="text-[13px] text-[var(--app-text-tertiary)]">Your tutor adds skills to a course — they'll show up here once they have. Or set your own goal below.</p>
       )}
 
       {coursesWithSkills.map((course: any) => (
@@ -683,10 +685,14 @@ export function SkillsFolderContent({ profileId, organisationId, isOwn }: { prof
         </div>
       ))}
 
-      {/* ── Self-reported -- own view only. No institution setup needed
-          to start, and no teacher confirm step either: being enrolled
-          at a vetted institution is the trust signal, so every entry
-          with real evidence attached is shown as Verified immediately. ── */}
+      {/* ── Self-reported skill goals -- own view only. No institution
+          setup needed to start, and no teacher confirm step either:
+          being enrolled at a vetted institution is the trust signal.
+          Each goal is a real, dated log of check-ins (write-up +
+          required evidence each time), not a single one-shot claim --
+          "I can see they've been progressing weekly" (direct feedback)
+          is exactly what a multi-entry, server-timestamped timeline
+          shows that one upload never could. ── */}
       {isOwn && (
         <div>
           <div className="flex items-center justify-between mb-2">
@@ -698,53 +704,61 @@ export function SkillsFolderContent({ profileId, organisationId, isOwn }: { prof
             )}
           </div>
           {addingSkill && (
-            <AddSelfReportedSkillForm
+            <AddSkillGoalForm
               profileId={profileId} organisationId={organisationId}
               onAdded={() => { setAddingSkill(false); load() }}
               onCancel={() => setAddingSkill(false)}
             />
           )}
-          {selfReported.length === 0 && !addingSkill ? (
-            <p className="text-[13px] text-[var(--app-text-tertiary)]">A skill you've taught yourself — add it with a video, screenshot, or anything that shows the work.</p>
+          {goals.length === 0 && !addingSkill ? (
+            <p className="text-[13px] text-[var(--app-text-tertiary)]">A skill you're teaching yourself — set a goal, then check in weekly with what you did and proof of the work.</p>
           ) : (
             <div className="space-y-2.5 mt-2">
-              {selfReported.map((s: any) => (
-                <div key={s.id} className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-[14px]">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[14px] font-semibold text-[var(--app-text)] truncate">{s.name}</p>
-                    <span className="flex items-center gap-1 text-[11px] font-semibold px-[10px] py-[3px] rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
-                      <CheckCircle2 className="w-3 h-3" /> Verified
-                    </span>
-                  </div>
-                  {s.note && <p className="text-[12px] text-[var(--app-text-tertiary)] mt-1.5 whitespace-pre-wrap">{s.note}</p>}
-                </div>
-              ))}
+              {goals.map((g: any) => {
+                const count = g.skill_checkins?.length || 0
+                return (
+                  <button key={g.id} onClick={() => setOpenGoal(g)} className="block w-full text-left bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl px-4 py-[14px] hover:border-[var(--app-overlay-3)] transition">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[14px] font-semibold text-[var(--app-text)] truncate">{g.name}</p>
+                      <span className="flex items-center gap-1 text-[11px] font-semibold px-[10px] py-[3px] rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
+                        <CheckCircle2 className="w-3 h-3" /> {count} check-in{count === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    {g.target_date && (
+                      <p className="text-[12px] text-[var(--app-text-tertiary)] mt-1">Target: {new Date(g.target_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
+      )}
+
+      {openGoal && (
+        <SkillGoalTimeline
+          goal={openGoal} canCheckIn studentId={profileId} variant="app"
+          onClose={() => setOpenGoal(null)} onCheckedIn={load}
+        />
       )}
     </div>
   )
 }
 
-function AddSelfReportedSkillForm({ profileId, organisationId, onAdded, onCancel }: {
+function AddSkillGoalForm({ profileId, organisationId, onAdded, onCancel }: {
   profileId: string; organisationId?: string | null; onAdded: () => void; onCancel: () => void
 }) {
   const [name, setName] = useState('')
-  const [note, setNote] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [target, setTarget] = useState('')
+  const [targetDate, setTargetDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const fileRef = useRef<HTMLInputElement>(null)
 
   const submit = async () => {
     if (!name.trim()) return setError('Name the skill.')
-    if (!file) return setError('Attach a video, screenshot, or the work itself — that\'s the evidence.')
     setSaving(true); setError('')
-    const { path, error: uploadError } = await uploadSelfReportedSkillEvidence(profileId, file)
-    if (uploadError || !path) { setSaving(false); setError("Couldn't upload that — try again."); return }
-    const { error: err } = await createSelfReportedSkill(profileId, organisationId || undefined, {
-      name: name.trim(), note: note.trim() || undefined, evidence_file_path: path, evidence_file_type: file.type,
+    const { error: err } = await createSkillGoal(profileId, organisationId || undefined, {
+      name: name.trim(), target: target.trim() || undefined, target_date: targetDate || undefined,
     })
     setSaving(false)
     if (err) { setError("Couldn't save — try again."); return }
@@ -758,18 +772,22 @@ function AddSelfReportedSkillForm({ profileId, organisationId, onAdded, onCancel
         className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition"
       />
       <textarea
-        value={note} onChange={e => setNote(e.target.value)} rows={3}
-        placeholder="Why this skill, and what you're proud of in the work (optional)"
+        value={target} onChange={e => setTarget(e.target.value)} rows={2}
+        placeholder="What do you want to be able to do by the deadline? (optional)"
         className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] placeholder-[#555] outline-none focus:border-brand transition resize-none leading-relaxed"
       />
-      <button onClick={() => fileRef.current?.click()} className="text-[12px] font-semibold text-[var(--app-text-secondary)] hover:text-brand transition">
-        {file ? file.name : 'Attach a video, screenshot, or the work (required)'}
-      </button>
-      <input ref={fileRef} type="file" accept="image/*,video/*,application/pdf" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
+      <label className="block">
+        <span className="block text-[11px] text-[var(--app-text-tertiary)] mb-1">Target date (optional)</span>
+        <input
+          type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)}
+          className="w-full bg-[var(--app-surface-2)] border border-[var(--app-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--app-text)] outline-none focus:border-brand transition"
+        />
+      </label>
+      <p className="text-[11.5px] text-[var(--app-text-tertiary)]">You'll check in with what you did and proof of the work as you go — nothing to attach yet.</p>
       {error && <p className="text-[12px] text-danger-text">{error}</p>}
       <div className="flex items-center gap-2">
-        <button onClick={submit} disabled={!name.trim() || !file || saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
-          {saving ? 'Saving…' : 'Save'}
+        <button onClick={submit} disabled={!name.trim() || saving} className="px-3.5 py-2 rounded-lg bg-brand text-white text-[12px] font-semibold disabled:opacity-40">
+          {saving ? 'Saving…' : 'Set goal'}
         </button>
         <button onClick={onCancel} disabled={saving} className="px-3.5 py-2 text-[12px] font-semibold text-[var(--app-text-secondary)]">Cancel</button>
       </div>

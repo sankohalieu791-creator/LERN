@@ -1073,34 +1073,33 @@ export const getDiscoverSkillNames = async () => {
   return { data: Array.from(new Set((data || []).map((s: any) => s.name))), error }
 }
 
-// ── Self-reported skills -- a student declares a skill and attaches
-// evidence with zero institution setup first and no teacher
-// confirmation step -- being enrolled at a vetted institution is
-// treated as the trust signal, not a second per-skill check. A file
-// is required (enforced both here via the form and at the DB via
-// evidence_file_path NOT NULL) -- without one there's nothing to show.
-export const uploadSelfReportedSkillEvidence = async (studentId: string, file: File) => {
-  const path = `${studentId}/self-reported/${Date.now()}_${file.name}`
-  const { error } = await supabase.storage.from('submission-files').upload(path, file)
-  return { path: error ? null : path, error }
-}
-
-export const createSelfReportedSkill = async (
+// ── Skill goals + weekly check-ins -- replaces the old one-shot
+// "self_reported_skills" (name + note + one file, done forever). A
+// student sets a goal (what they're learning, optionally a target
+// date), then checks in as often as they like -- each check-in is its
+// own write-up + its own required evidence file, building a real,
+// dated timeline instead of a single unverifiable snapshot. Still zero
+// institution setup and no teacher confirmation step anywhere in this
+// -- same reasoning as before, a vetted institution's own membership
+// is the trust signal, not a per-entry check. What makes this harder
+// to fake than the old single upload is the real server-timestamped
+// spread across actual weeks, not scrutiny of any one entry.
+export const createSkillGoal = async (
   studentId: string, organisationId: string | undefined,
-  fields: { name: string; note?: string; evidence_file_path: string; evidence_file_type?: string },
+  fields: { name: string; target?: string; target_date?: string },
 ) => {
   const { data, error } = await supabase
-    .from('self_reported_skills')
+    .from('skill_goals')
     .insert([{ student_id: studentId, organisation_id: organisationId, ...fields }])
     .select()
     .single()
   return { data, error }
 }
 
-export const getMySelfReportedSkills = async (studentId: string) => {
+export const getMySkillGoals = async (studentId: string) => {
   const { data, error } = await supabase
-    .from('self_reported_skills')
-    .select('*')
+    .from('skill_goals')
+    .select('*, skill_checkins(id, created_at)')
     .eq('student_id', studentId)
     .order('created_at', { ascending: false })
   return { data, error }
@@ -1109,11 +1108,40 @@ export const getMySelfReportedSkills = async (studentId: string) => {
 // Employer-facing -- RLS already restricts this to an already-
 // discoverable student (has_verification()), this query just mirrors
 // that boundary, same convention as getDiscoverWork.
-export const getEmployerSelfReportedSkills = async (studentId: string) => {
+export const getEmployerSkillGoals = async (studentId: string) => {
   const { data, error } = await supabase
-    .from('self_reported_skills')
-    .select('id, name, note, evidence_file_path, created_at')
+    .from('skill_goals')
+    .select('id, name, target, target_date, created_at, skill_checkins(id, created_at)')
     .eq('student_id', studentId)
+  return { data, error }
+}
+
+// Shared by both the student's own view and the employer/peer read-only
+// view -- RLS on skill_checkins (keyed through the parent goal) decides
+// who can actually see the rows, this is just one query either way.
+export const getSkillGoalCheckins = async (goalId: string) => {
+  const { data, error } = await supabase
+    .from('skill_checkins')
+    .select('*')
+    .eq('goal_id', goalId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const uploadSkillCheckinEvidence = async (studentId: string, file: File) => {
+  const path = `${studentId}/skill-checkins/${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from('submission-files').upload(path, file)
+  return { path: error ? null : path, error }
+}
+
+export const addSkillCheckin = async (
+  goalId: string, fields: { content: string; evidence_file_path: string; evidence_file_type?: string },
+) => {
+  const { data, error } = await supabase
+    .from('skill_checkins')
+    .insert([{ goal_id: goalId, ...fields }])
+    .select()
+    .single()
   return { data, error }
 }
 
