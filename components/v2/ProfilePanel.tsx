@@ -1062,7 +1062,7 @@ function AddExperienceForm({ profileId, onAdded }: { profileId: string; onAdded:
   return (
     <div className="bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl p-3.5 space-y-2">
       <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Saturday job at a local print shop" className={inputCls} />
-      <input value={organisation} onChange={e => setOrganisation(e.target.value)} placeholder="Where (optional)" className={inputCls} />
+      <input value={organisation} onChange={e => setOrganisation(e.target.value)} placeholder="Who with — a business, or a person (optional)" className={inputCls} />
       <select value={employmentType} onChange={e => setEmploymentType(e.target.value)} className={inputCls} style={{ color: employmentType ? undefined : '#555' }}>
         <option value="">Type (optional)</option>
         {Object.entries(EMPLOYMENT_TYPE_LABEL).map(([k, label]) => <option key={k} value={k}>{label}</option>)}

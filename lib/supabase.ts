@@ -1037,10 +1037,32 @@ export const getSkillEvidence = async (studentId: string, skillId: string) => {
 export const getEmployerVisibleSkills = async (studentId: string) => {
   const { data, error } = await supabase
     .from('student_skills')
-    .select('id, level, verified_count, skills(name, unit_label)')
+    // skill_id added -- the employer-facing candidate page uses it to
+    // find which of a student's verified pieces a skill pill is
+    // actually backed by, via submission_skills (getSubmissionSkillTags
+    // below). A level badge alone, with nothing to click through to,
+    // reveals nothing about whether the claim is real.
+    .select('id, skill_id, level, verified_count, skills(name, unit_label)')
     .eq('student_id', studentId)
     .neq('level', 'not_started')
   return { data, error }
+}
+
+// Which skill_ids a set of (already fetched, already verified/employer-
+// visible) submissions are tagged with -- lets the candidate page turn
+// "Copywriting for Social · Advanced" into something you can click and
+// actually see the verified work behind, instead of a bare claim.
+// Deliberately scoped to submission ids the caller already has from a
+// prior getVerifiedWorkForProfile call (not a fresh student-wide query),
+// so this only ever needs a simple submission_skills RLS policy keyed
+// on has_verification(), not a second parallel RLS surface.
+export const getSubmissionSkillTags = async (submissionIds: string[]) => {
+  if (submissionIds.length === 0) return { data: [], error: null }
+  const { data, error } = await supabase
+    .from('submission_skills')
+    .select('skill_id, submission_id')
+    .in('submission_id', submissionIds)
+  return { data: data || [], error }
 }
 
 // Populates the Discover skills-filter control. Distinct names only --
@@ -2911,7 +2933,7 @@ export const getVerifiedWorkForProfile = async (studentId: string) => {
     .select(`
       id, verified_at, visibility, employer_visible,
       verifier:users!verifications_verified_by_fkey(full_name),
-      submissions!inner(student_id, content, file_path, file_type, work_items(title, type, criteria, organisation_id, organisations(name)))
+      submissions!inner(id, student_id, content, file_path, file_type, work_items(title, type, criteria, organisation_id, organisations(name)))
     `)
     .eq('submissions.student_id', studentId)
     .is('revoked_at', null)
