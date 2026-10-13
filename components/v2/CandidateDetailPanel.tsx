@@ -81,11 +81,14 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
 
   return (
     // Centred and broad, not hugging the left edge -- "put it in the
-    // middle, make it a bit broad" (direct feedback). max-w-4xl is
-    // deliberately wider than Profile's own lg:max-w-2xl convention,
-    // since this page was asked to read bigger/broader than a typical
-    // profile-style screen, not match it exactly.
-    <div className="max-w-4xl mx-auto pb-10">
+    // middle, make it a bit broad" -- a max-w-4xl cap here (the first
+    // attempt at this) still left a visible gap on a normal laptop
+    // window, read as "stuck at the left" rather than broad. No cap at
+    // all now, same as Discover's own list page right next to it in
+    // the nav (EmployerDiscoverPanel has never had one) -- this page
+    // fills the same width that one already does, nothing competing
+    // with it for space.
+    <div className="pb-10">
       <button
         onClick={() => router.push('/employer/discover')}
         className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-tertiary hover:text-ink transition mb-5"
@@ -134,7 +137,7 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
             ) : work.length === 0 ? (
               <p className="text-[13px] text-ink-tertiary">Nothing to show here.</p>
             ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
                 {work.map(v => (
                   <div key={v.id} className="bg-surface border border-edge rounded-xl p-4">
                     <span className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-full mb-2 uppercase tracking-wide" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
@@ -155,7 +158,7 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
             experience.length === 0 ? (
               <p className="text-[13px] text-ink-tertiary">Nothing to show here.</p>
             ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
                 {experience.map((e: any) => (
                   <div key={e.id} className="bg-surface border border-edge rounded-xl p-4">
                     <p className="text-[15px] font-semibold text-ink">{e.title}</p>

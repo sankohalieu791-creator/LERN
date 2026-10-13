@@ -225,8 +225,16 @@ function EmployerThread({ item, onBack }: { item: any; onBack: () => void }) {
     // scrolling messages, composer as the last child) so the composer
     // sits at the true bottom of the screen regardless of how short
     // the conversation is -- fixed full-screen on phone, the plain
-    // in-page card on desktop.
-    <div className="fixed inset-0 z-40 flex flex-col bg-paper lg:static lg:z-auto lg:flex lg:flex-col lg:bg-transparent">
+    // in-page card on desktop. The lg:h-[calc(100dvh-11rem)]
+    // lg:min-h-[460px] below is load-bearing, not decorative -- without
+    // an explicit bounded height on desktop, this column was only ever
+    // as tall as its own content (header + messages + composer
+    // stacked), so the composer landed directly under a short
+    // conversation instead of anchored at the panel's true bottom --
+    // "bring the messaging down" (direct feedback), comparing directly
+    // against InterestReceivedPanel's RequestThread, which already had
+    // this exact height set.
+    <div className="fixed inset-0 z-40 flex flex-col bg-paper lg:static lg:h-[calc(100dvh-11rem)] lg:min-h-[460px] lg:z-auto lg:flex lg:flex-col lg:bg-transparent">
       <div className="flex-shrink-0 flex items-center gap-3 bg-paper border-b border-edge px-4 py-3 lg:hidden" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}>
         <button onClick={onBack} className="text-ink-secondary flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
         <div className="min-w-0">
@@ -239,7 +247,7 @@ function EmployerThread({ item, onBack }: { item: any; onBack: () => void }) {
         <ArrowLeft className="w-3.5 h-3.5" /> Back to inbox
       </button>
 
-      <div className="flex-1 overflow-y-auto px-4 pt-4 lg:flex-none lg:overflow-visible lg:px-0 lg:pt-0">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4 lg:px-0 lg:pt-0">
         <div className="flex items-start gap-2.5 rounded-xl px-4 py-3.5 mb-4" style={{ backgroundColor: '#E1F5EE' }}>
           <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#0F6E56' }} />
           <p className="text-[13px] leading-relaxed" style={{ color: '#0F6E56' }}>
