@@ -319,7 +319,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
         // gives the header the same real isolation explicitly, since
         // static elements don't get it for free.
         <header
-          className="lg:hidden flex-shrink-0 bg-[var(--app-bg)] border-b border-[var(--app-border)] z-20 will-change-transform"
+          className="lg:hidden flex-shrink-0 bg-[var(--app-bg)] z-20 will-change-transform"
           style={{ transform: 'translateZ(0)' }}
         >
           {/* Build Spec: Feed and My Work (student) v1.0, Part 1 --
@@ -348,7 +348,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
           Feed, unlike the phone header above), same search + bell pair
           just relocated up here alongside the sidebar instead of
           living inside a phone-style header. */}
-      <header className="hidden lg:flex items-center justify-end gap-1 h-16 px-6 border-b border-[var(--app-border)] flex-shrink-0">
+      <header className="hidden lg:flex items-center justify-end gap-1 h-16 px-6 flex-shrink-0">
         <button onClick={() => router.push('/student/search')} aria-label="Search" className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[var(--app-overlay-2)] transition" style={{ color: '#404040' }}>
           <Search className="w-[22px] h-[22px]" />
         </button>
