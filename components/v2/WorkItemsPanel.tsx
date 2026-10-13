@@ -1129,16 +1129,25 @@ function NewBriefForm({ onCreated, onClose }: { onCreated: () => void; onClose: 
 // brief is, via Create, so this tab can show a real list first.
 function UploadExistingWorkDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const theme = useResolvedTheme()
+  const bodyRef = useRef<HTMLDivElement>(null)
+  // Same modal chrome as the Course/Workshop dialog above -- h-[640px],
+  // not just a max-h, so the scrollable body has a definite height for
+  // ScrollTrack's side scrollbar to size itself against.
   return createPortal((
     <div data-theme={theme} className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 sm:p-8">
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg max-h-[88dvh] overflow-y-auto p-5">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg h-[640px] max-h-[88dvh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-edge-subtle flex-shrink-0">
           <p className="font-bold text-ink text-[16px]">Upload work students already do</p>
           <button onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-tertiary transition">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <UploadExistingWorkForm onCreated={onCreated} />
+        <div className="relative flex-1 min-h-0">
+          <div ref={bodyRef} className="h-full overflow-y-auto p-5">
+            <UploadExistingWorkForm onCreated={onCreated} />
+          </div>
+          <ScrollTrack containerRef={bodyRef} />
+        </div>
       </div>
     </div>
   ), document.body)
@@ -1189,7 +1198,7 @@ function UploadExistingWorkForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="bg-surface-subtle border border-edge-subtle rounded-xl p-5">
+    <>
       <ErrorBanner message={error} />
       <TextField label="Title" value={title} onChange={setTitle} placeholder="Year 11 Coursework — Unit 3" autoFocus />
       <TextField label="Topic / subject" value={topic} onChange={setTopic} placeholder="e.g. GCSE Photography" />
@@ -1205,6 +1214,6 @@ function UploadExistingWorkForm({ onCreated }: { onCreated: () => void }) {
       <GroupPicker organisationId={user?.organisation_id} value={groupId} onChange={setGroupId} required />
       <p className="text-[12px] text-ink-tertiary mb-4">This already happened outside LERN — no new marking, just verification. Every student currently in the group gets this marked as their submission, ready to review.</p>
       <PrimaryButton onClick={handleSubmit} loading={loading}>Create and send to review</PrimaryButton>
-    </div>
+    </>
   )
 }
