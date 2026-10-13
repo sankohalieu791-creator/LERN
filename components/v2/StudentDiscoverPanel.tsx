@@ -44,7 +44,15 @@ const STAGE_ORDER: ApplicationStage[] = ['applied', 'reviewing', 'shortlisted', 
 // interest in them directly) -- for under-18s that same interest is
 // visible only to their organisation's staff, never here.
 
-type Tab = 'explore' | 'job' | 'apprenticeship' | 'internship' | 'received' | 'tracking'
+type Tab = 'explore' | 'job' | 'apprenticeship' | 'internship' | 'work_experience' | 'traineeship' | 'received' | 'tracking'
+
+// Plural, for the "no X posted yet" empty state -- was a hand-rolled
+// ternary chain that stopped being readable the moment a 4th/5th
+// opportunity type joined job/apprenticeship/internship.
+const OPP_PLURAL: Record<'job' | 'apprenticeship' | 'internship' | 'work_experience' | 'traineeship', string> = {
+  job: 'jobs', apprenticeship: 'apprenticeships', internship: 'internships',
+  work_experience: 'work experience placements', traineeship: 'traineeships',
+}
 
 function isAdult(dob?: string) {
   if (!dob) return false
@@ -198,6 +206,8 @@ export default function StudentDiscoverPanel({ lockTab }: { lockTab?: Tab } = {}
     { id: 'job', label: '💼 Jobs' },
     { id: 'apprenticeship', label: '🎓 Apprenticeships' },
     { id: 'internship', label: '📋 Internships' },
+    { id: 'work_experience', label: '🧰 Work experience' },
+    { id: 'traineeship', label: '🚀 Traineeships' },
     // Job tracking (own applications, real pipeline stage) is 18+
     // only, same rule as Interest received -- under-18s' interest with
     // an employer is always mediated through their org, never surfaced
@@ -327,7 +337,7 @@ export default function StudentDiscoverPanel({ lockTab }: { lockTab?: Tab } = {}
         ) : (
           opportunities.length === 0 ? (
             <EmptyState
-              label={tab === 'explore' ? 'No jobs, apprenticeships or internships posted yet.' : `No ${tab === 'job' ? 'jobs' : tab === 'apprenticeship' ? 'apprenticeships' : 'internships'} posted yet.`}
+              label={tab === 'explore' ? 'No roles posted yet.' : `No ${OPP_PLURAL[tab as keyof typeof OPP_PLURAL]} posted yet.`}
               icon={<Briefcase className="w-8 h-8 text-[var(--app-text-quaternary)] mx-auto mb-2" />}
             />
           ) : opportunities.map(o => {

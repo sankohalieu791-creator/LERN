@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import {
   getFeed, setPostReaction, getSignedFileUrl,
   reportPost, deletePost, updatePostVisibility, getVerifiedAuthorIds,
-  getWins, createWin, reportWin, deleteWin, uploadPostImage, uploadPostVideo,
+  getWins, createWin, reportWin, deleteWin, updateWinVisibility, uploadPostImage, uploadPostVideo,
   recordWinView, getWinViewers,
 } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
@@ -207,6 +207,7 @@ function WinsStrip({ userId, organisationId }: { userId: string; organisationId:
           wins={wins} startIndex={viewingIndex} userId={userId} organisationId={organisationId}
           onClose={() => setViewingIndex(null)}
           onDeleted={() => { setViewingIndex(null); load() }}
+          onChanged={load}
         />
       )}
     </div>
@@ -385,13 +386,19 @@ function AddWinSheet({ userId, organisationId, onClose, onAdded }: {
 // navigation between them -- "I tap on a win and I swipe" -- instead of
 // the old single-win overlay where the only way out was closing it
 // entirely.
-function WinViewer({ wins, startIndex, organisationId, userId, onClose, onDeleted }: {
-  wins: any[]; startIndex: number; organisationId: string; userId: string; onClose: () => void; onDeleted: () => void
+function WinViewer({ wins, startIndex, organisationId, userId, onClose, onDeleted, onChanged }: {
+  wins: any[]; startIndex: number; organisationId: string; userId: string; onClose: () => void; onDeleted: () => void; onChanged: () => void
 }) {
   const [index, setIndex] = useState(startIndex)
   const [reportOpen, setReportOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [changingVisibility, setChangingVisibility] = useState(false)
+  // Optimistic override for the currently-shown win's visibility --
+  // wins itself is parent state (the Feed's own `load()`-fetched list),
+  // so toggling can't just mutate win.visibility directly. Reset
+  // whenever the viewer moves to a different win.
+  const [visibilityOverride, setVisibilityOverride] = useState<'organisation' | 'public' | null>(null)
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
   const touchStartX = useRef<number | null>(null)
   const { user } = useAuth()
@@ -399,6 +406,7 @@ function WinViewer({ wins, startIndex, organisationId, userId, onClose, onDelete
   const win = wins[index]
   const isOwn = win.author_id === user?.id
   const meta = MILESTONE_BY_KEY[win.milestone_type as MilestoneType]
+  const visibility = visibilityOverride ?? win.visibility
 
   const goNext = () => { if (index < wins.length - 1) setIndex(index + 1); else onClose() }
   const goPrev = () => { if (index > 0) setIndex(index - 1) }
@@ -408,6 +416,22 @@ function WinViewer({ wins, startIndex, organisationId, userId, onClose, onDelete
     const { error } = await deleteWin(win.id)
     if (error) { setDeleting(false); return }
     onDeleted()
+  }
+
+  // Same rule the composer/post menu use -- under-18s never get a
+  // public choice (the DB trigger blocks it outright either way).
+  const isAdult = user?.date_of_birth
+    ? (Date.now() - new Date(user.date_of_birth).getTime()) / (1000 * 60 * 60 * 24 * 365.25) >= 18
+    : false
+  const canChooseVisibility = isAdult || (!!user?.role && user.role !== 'student')
+  const toggleVisibility = async () => {
+    setChangingVisibility(true)
+    const { error } = await updateWinVisibility(win.id, visibility === 'public' ? 'organisation' : 'public')
+    setChangingVisibility(false)
+    if (error) return
+    setVisibilityOverride(visibility === 'public' ? 'organisation' : 'public')
+    setMenuOpen(false)
+    onChanged()
   }
 
   // Viewers: the author sees who viewed their win (and the count). Everyone
@@ -425,6 +449,7 @@ function WinViewer({ wins, startIndex, organisationId, userId, onClose, onDelete
   useEffect(() => {
     setMediaUrl(null)
     setMenuOpen(false)
+    setVisibilityOverride(null)
     if (win.video_path) getSignedFileUrl('post-videos', win.video_path).then(({ url }) => setMediaUrl(url))
     else if (win.image_path) getSignedFileUrl('post-images', win.image_path).then(({ url }) => setMediaUrl(url))
   }, [win.id, win.image_path, win.video_path])
@@ -525,7 +550,23 @@ function WinViewer({ wins, startIndex, organisationId, userId, onClose, onDelete
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-11 bg-white rounded-xl shadow-lg py-1.5 w-40 z-20">
+              <div className="absolute right-0 top-11 bg-white rounded-xl shadow-lg py-1.5 w-52 z-20">
+                {canChooseVisibility ? (
+                  <button
+                    onClick={toggleVisibility} disabled={changingVisibility}
+                    className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold text-black hover:bg-black/5 transition disabled:opacity-50"
+                  >
+                    {visibility === 'public' ? <Users className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
+                    {changingVisibility ? 'Updating…' : visibility === 'public' ? 'Make organisation-only' : 'Make public'}
+                  </button>
+                ) : (
+                  <div
+                    title="Under-18 posts always stay organisation-only"
+                    className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold text-black/40 cursor-default"
+                  >
+                    <Users className="w-3.5 h-3.5" /> Organisation only (under 18)
+                  </div>
+                )}
                 <button
                   onClick={handleDelete} disabled={deleting}
                   className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold text-[#C4314B] hover:bg-black/5 transition disabled:opacity-50"

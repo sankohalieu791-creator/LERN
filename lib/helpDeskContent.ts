@@ -438,13 +438,6 @@ export const HELP_ENTRIES: HelpEntry[] = [
     answer: 'Open the brief, attach your work, and explain your thinking in a couple of sentences — both are required, since a short written explanation on its own isn\'t something an employer could actually judge. Tap "Submit for review" and it moves into your tutor\'s queue.',
   },
   {
-    id: 'student-assignments-what',
-    roles: ['student'],
-    question: 'What are Assignments?',
-    keywords: ['assignments', 'assignment'],
-    answer: 'Assignments work the same way Briefs do — attach your work, explain your thinking, submit for review — just a different category your tutor uses for shorter or more routine tasks.',
-  },
-  {
     id: 'student-workshops-join',
     roles: ['student'],
     question: 'How do I join a workshop?',

@@ -3,11 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { getMyOpportunities, createOpportunity, updateOpportunity, closeOpportunity, reopenOpportunity, deleteOpportunity } from '@/lib/supabase'
+import type { OpportunityType } from '@/lib/supabase'
 import { useAvatarUrl } from '@/lib/useAvatarUrl'
 import { Plus, Trash2, Megaphone, Pencil, Lock, RotateCcw } from 'lucide-react'
 
-type OppType = 'job' | 'apprenticeship' | 'internship'
-const TYPE_LABEL: Record<OppType, string> = { job: 'Job', apprenticeship: 'Apprenticeship', internship: 'Internship' }
+type OppType = OpportunityType
+const TYPE_LABEL: Record<OppType, string> = {
+  job: 'Job', apprenticeship: 'Apprenticeship', internship: 'Internship',
+  work_experience: 'Work experience', traineeship: 'Traineeship',
+}
 
 export default function EmployerOpportunitiesPanel() {
   const { user } = useAuth()
@@ -80,7 +84,7 @@ export default function EmployerOpportunitiesPanel() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink mb-1">Jobs</h1>
-          <p className="text-ink-tertiary text-[14px]">Post jobs, apprenticeships and internships. Responses come in through Candidates.</p>
+          <p className="text-ink-tertiary text-[14px]">Post jobs, apprenticeships, internships, work experience and traineeships. Responses come in through Candidates.</p>
         </div>
         {!showForm && (
           <button
@@ -100,11 +104,11 @@ export default function EmployerOpportunitiesPanel() {
             className="w-full bg-surface border border-edge rounded-lg px-3.5 py-2.5 text-[14px] text-ink placeholder-ink-quaternary outline-none focus:border-brand transition"
           />
 
-          <div className="flex gap-2">
-            {(['job', 'apprenticeship', 'internship'] as OppType[]).map(t => (
+          <div className="grid grid-cols-3 gap-2">
+            {(['job', 'apprenticeship', 'internship', 'work_experience', 'traineeship'] as OppType[]).map(t => (
               <button
                 key={t} onClick={() => setType(t)}
-                className={`flex-1 py-2 rounded-lg text-[13px] font-semibold transition ${type === t ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'}`}
+                className={`py-2 rounded-lg text-[13px] font-semibold transition ${type === t ? 'bg-brand text-white' : 'bg-surface border border-edge text-ink-secondary'}`}
               >
                 {TYPE_LABEL[t]}
               </button>

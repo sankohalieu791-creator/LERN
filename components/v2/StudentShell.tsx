@@ -12,7 +12,7 @@ import { useResolvedTheme } from '@/context/ThemeProvider'
 import { signOut, getMyOrgType } from '@/lib/supabase'
 import {
   Home, ClipboardList, Plus, Compass, User as UserIcon, Search, ChevronLeft, ChevronRight,
-  LogOut, Settings, Award, FileText, CheckSquare, Video, Inbox,
+  LogOut, Settings, Award, FileText, Video, Inbox,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -51,10 +51,14 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
 
   // "My work, it has briefs, assignments and workshops inside. Bring
   // out assignments, bring out workshop, make them its own buttons" --
-  // each of the three used to be an internal tab inside one "My Work"
-  // destination; on laptop they're now full pages of their own
-  // (StudentMyWorkPanel's fixedTab prop), same reasoning as why Skill
-  // Wallet got pulled out of a tab into its own destination earlier.
+  // each used to be an internal tab inside one "My Work" destination;
+  // on laptop Briefs/Courses and Workshops are now full pages of their
+  // own (StudentMyWorkPanel's fixedTab prop), same reasoning as why
+  // Skill Wallet got pulled out of a tab into its own destination
+  // earlier. Assignments isn't one of them -- no org-facing flow
+  // anywhere in the product ever creates a work_item of that type, so
+  // there was never anything for this destination to show; removed
+  // along with the dead type checks in StudentMyWorkPanel.tsx.
   // Interest received is 18+ only, same rule as StudentDiscoverPanel's
   // own tab list -- under-18s' interest is never surfaced to them
   // directly, so there's nothing here for them to have a button for.
@@ -62,7 +66,6 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   const desktopNav: { href: string; label: string; icon: LucideIcon }[] = [
     { href: '/student/feed', label: 'Feed', icon: Home },
     { href: '/student/briefs', label: primaryLabel, icon: FileText },
-    { href: '/student/assignments', label: 'Assignments', icon: CheckSquare },
     { href: '/student/workshops', label: 'Workshops', icon: Video },
     { href: '/student/skills', label: 'My Skill', icon: Award },
     { href: '/student/discover', label: 'Discover', icon: Compass },

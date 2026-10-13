@@ -19,21 +19,24 @@ import WorkshopSession from '@/components/v2/WorkshopSession'
 import Logo from '@/components/v2/Logo'
 import { SkillsFolderContent } from '@/components/v2/ProfilePanel'
 
-// Student My Work — three tabs, learner-type dependent. Sizes/structure
+// Student My Work — two tabs, learner-type dependent. Sizes/structure
 // pulled directly from the actual deleted v1 app/courses/page.tsx (git
 // show a07a8c2~1), not eyeballed: no header above the tabs at all (that
 // lives on Feed only), text-sm tabs, fixed 200/190px image blocks (not
 // aspect-ratio), 10px pills, 15px titles, text-sm/text-xs body copy.
-// Held to three tabs on purpose (a phone tab bar gets cluttered past
-// that): institution students get Briefs/Assignments/Workshops,
-// provider students get Courses/Assignments/Workshops. No "Enrol" tab —
+// institution students get Briefs/Workshops, provider students get
+// Courses/Workshops. "Assignment" used to be a third tab/type here, but
+// no org-facing flow anywhere in the product ever creates a work_item
+// with that type (WorkItemsPanel.tsx only ever creates brief/course/
+// workshop) -- it was a permanently-empty tab for every student, so it's
+// gone along with the type checks that referenced it. No "Enrol" tab —
 // every item visible here is already the student's own org's, linked
 // automatically through their join code, nothing to browse/opt into.
 //
 // Tapping a card opens a full-screen detail view (like tapping a
 // YouTube thumbnail opens the player) rather than expanding in place.
 
-type Tab = 'primary' | 'assignment' | 'workshop'
+type Tab = 'primary' | 'workshop'
 
 const GRADIENTS = [
   'from-[#2E6F9E] to-[#173C57]',
@@ -93,16 +96,16 @@ const SPEC_STATUS: Record<string, { label: string; bg: string; text: string }> =
   returned: { label: 'Returned', bg: 'var(--status-warn-bg)', text: 'var(--status-warn-text)' },
   verified: { label: 'Verified', bg: 'var(--status-success-bg)', text: 'var(--status-success-text)' },
 }
-const TYPE_LABEL: Record<string, string> = { brief: 'Design brief', assignment: 'Assignment', course: 'Course' }
+const TYPE_LABEL: Record<string, string> = { brief: 'Design brief', course: 'Course' }
 
-// fixedTab -- used by the desktop-only /student/briefs (or /courses),
-// /student/assignments and /student/workshops destinations: each is
-// this exact same component locked to one of the three types that used
-// to be an internal tab switcher, no way to switch away, no "My Skill"
-// toggle (that's desktop sidebar's own destination already). Phone
-// keeps the single /student/work route with the real tab switcher --
-// "it's not looking good... bring out assignments, bring out workshop,
-// make them its own buttons" was specifically about the laptop layout.
+// fixedTab -- used by the desktop-only /student/briefs (or /courses)
+// and /student/workshops destinations: each is this exact same
+// component locked to one of the two types that used to be an internal
+// tab switcher, no way to switch away, no "My Skill" toggle (that's
+// desktop sidebar's own destination already). Phone keeps the single
+// /student/work route with the real tab switcher -- "it's not looking
+// good... bring out assignments, bring out workshop, make them its own
+// buttons" was specifically about the laptop layout.
 export default function StudentMyWorkPanel({ fixedTab }: { fixedTab?: Tab } = {}) {
   const { user, refreshUser } = useAuth()
   const [orgType, setOrgType] = useState<'institution' | 'provider' | null>(null)
@@ -115,8 +118,12 @@ export default function StudentMyWorkPanel({ fixedTab }: { fixedTab?: Tab } = {}
   // Phone-only: "My Skill" and "My Work" as two top-level tabs on this
   // same screen -- laptop reaches skills through its own sidebar
   // destination instead (StudentShell's "My Skill"), so this toggle is
-  // lg:hidden below and never shows there. My Skill first/leftmost per
-  // direct request ("at the top").
+  // lg:hidden below and never shows there. My Work first/leftmost per
+  // direct request -- the default view is 'work' (below), so landing
+  // here from the bottom nav previously showed the active tab on the
+  // RIGHT with an inactive "My Skill" sitting first on the left, which
+  // read as backwards. My Work leftmost now matches which one's
+  // actually selected on arrival.
   const [view, setView] = useState<'skill' | 'work'>('work')
 
   const load = () => {
@@ -157,19 +164,18 @@ export default function StudentMyWorkPanel({ fixedTab }: { fixedTab?: Tab } = {}
   const primaryLabel = orgType === 'institution' ? 'Briefs' : 'Courses'
   const items = workItems.filter(w => {
     if (tab === 'primary') return w.type === primaryType
-    if (tab === 'assignment') return w.type === 'assignment'
     return w.type === 'workshop'
   })
   const selectedSubs = selected ? submissions.filter((s: any) => s.work_item_id === selected.id) : []
 
-  const fixedTabLabel = fixedTab === 'primary' ? primaryLabel : fixedTab === 'assignment' ? 'Assignments' : fixedTab === 'workshop' ? 'Workshops' : null
+  const fixedTabLabel = fixedTab === 'primary' ? primaryLabel : fixedTab === 'workshop' ? 'Workshops' : null
 
   return (
     <div>
       {!fixedTab && (
         <div className="lg:hidden sticky top-0 z-10 flex items-stretch border-b border-[var(--app-border-subtle)] bg-[var(--app-bg)]">
-          <TabButton active={view === 'skill'} label="My Skill" onClick={() => setView('skill')} />
           <TabButton active={view === 'work'} label="My Work" onClick={() => setView('work')} />
+          <TabButton active={view === 'skill'} label="My Skill" onClick={() => setView('skill')} />
         </div>
       )}
 
@@ -197,7 +203,6 @@ export default function StudentMyWorkPanel({ fixedTab }: { fixedTab?: Tab } = {}
           {!fixedTab && (
             <div className="sticky top-0 z-10 flex items-stretch border-b border-[var(--app-border-subtle)] bg-[var(--app-bg)]">
               <TabButton active={tab === 'primary'} label={primaryLabel} onClick={() => setTab('primary')} />
-              <TabButton active={tab === 'assignment'} label="Assignments" onClick={() => setTab('assignment')} />
               <TabButton active={tab === 'workshop'} label="Workshops" onClick={() => setTab('workshop')} />
             </div>
           )}
@@ -262,7 +267,7 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
 function WorkCard({ item, latest, started, onOpen, onStart }: {
   item: WorkItem; latest: any; started: boolean; onOpen: () => void; onStart: () => void
 }) {
-  const isSubmittable = item.type === 'brief' || item.type === 'assignment'
+  const isSubmittable = item.type === 'brief'
   if (isSubmittable) return <SubmittableCard item={item} latest={latest} started={started} onOpen={onOpen} onStart={onStart} />
   return <SessionCard item={item} onOpen={onOpen} />
 }
@@ -496,7 +501,7 @@ function WorkItemDetail({
   useEffect(() => {
     return () => { document.body.classList.remove('keyboard-open') }
   }, [])
-  const canSubmit = (item.type === 'brief' || item.type === 'assignment') && (!latest || latest.status === 'returned')
+  const canSubmit = item.type === 'brief' && (!latest || latest.status === 'returned')
   // My Work: Brief-Completion Screen spec -- "WHAT GOOD LOOKS LIKE...
   // the same underlying data as the brief's verification criteria",
   // one tickable line per line of text (the Create-brief form's own
@@ -678,9 +683,7 @@ function WorkItemDetail({
           ) : (
             <>
               <label className="block mb-1.5">
-                <span className="block text-[13px] font-semibold text-ink">
-                  {item.type === 'assignment' ? 'Assignment' : 'Criteria'}
-                </span>
+                <span className="block text-[13px] font-semibold text-ink">Criteria</span>
               </label>
               <div className="bg-surface-subtle border border-edge rounded-xl px-4 py-3 mb-4">
                 <p className="text-sm text-ink-body leading-relaxed">{item.assignment || item.criteria}</p>

@@ -1624,6 +1624,15 @@ export const deleteWin = async (winId: string) => {
   return { error }
 }
 
+// Same org-or-public toggle posts already have (updatePostVisibility)
+// -- wins had the visibility COLUMN from the start (createWin above)
+// but no way to change it after posting, so the win viewer's own "..."
+// menu only ever had Delete in it, unlike a regular post's menu.
+export const updateWinVisibility = async (winId: string, visibility: 'organisation' | 'public') => {
+  const { data, error } = await supabase.from('wins').update({ visibility }).eq('id', winId).select().single()
+  return { data, error }
+}
+
 export const reportWin = async (winId: string, organisationId: string | null, reporterId: string, reasonKey: string, note: string) => {
   const reasonLabel = REPORT_REASONS.find(r => r.key === reasonKey)?.label || 'Something else'
   const reason = note.trim() ? `${reasonLabel} — ${note.trim()}` : reasonLabel
@@ -2310,8 +2319,22 @@ export const getMyOpportunities = async (employerId: string) => {
   return { data, error }
 }
 
+// The real-world role categories an employer can post and a student can
+// filter Discover by -- job/apprenticeship/internship were the original
+// three; work_experience and traineeship added per direct request
+// ("what type of role are there out there... add them on employer and
+// on discover for student"), picked because they're the two other
+// pathways that actually fit this platform's own under-18/school-and-
+// college-age audience (work_experience in particular already has
+// matching language all over the product -- institutions' own "Work
+// Experience" placement tracker, seeded demo posts referencing
+// students "on placement"). opportunities.type is a plain TEXT column
+// with no DB check constraint (2026-08-31-discover-interest-received.sql),
+// so adding new values here needed no migration.
+export type OpportunityType = 'job' | 'apprenticeship' | 'internship' | 'work_experience' | 'traineeship'
+
 export const createOpportunity = async (employerId: string, fields: {
-  title: string; description?: string; type?: 'job' | 'apprenticeship' | 'internship'
+  title: string; description?: string; type?: OpportunityType
   salary?: string; requirements?: string; location?: string; logo_path?: string
 }) => {
   const { data, error } = await supabase
@@ -2339,7 +2362,7 @@ export const deleteOpportunity = async (id: string) => {
 // close it (filled/withdrawn) without destroying it or orphaning any
 // application's opportunity_id -- a delete did both of those.
 export const updateOpportunity = async (id: string, fields: {
-  title?: string; description?: string; type?: 'job' | 'apprenticeship' | 'internship'
+  title?: string; description?: string; type?: OpportunityType
   salary?: string; requirements?: string; location?: string
 }) => {
   const { data, error } = await supabase.from('opportunities').update(fields).eq('id', id).select().single()
@@ -2369,7 +2392,7 @@ export const getAllOpportunities = async () => {
 
 // Discover's Jobs/Apprenticeships/Internships tabs — same table,
 // filtered by type.
-export const getOpportunities = async (type?: 'job' | 'apprenticeship' | 'internship') => {
+export const getOpportunities = async (type?: OpportunityType) => {
   let query = supabase
     .from('opportunities')
     .select('*, employer:users!opportunities_employer_id_fkey(full_name, avatar_path, employer_verified)')
