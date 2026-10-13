@@ -64,15 +64,19 @@ export default function SkillGoalTimeline({
   const [composerOpen, setComposerOpen] = useState(false)
   const [published, setPublished] = useState(!!goal.published_at)
   const [publishing, setPublishing] = useState(false)
+  const [publishError, setPublishError] = useState('')
 
   const load = () => { getSkillGoalCheckins(goal.id).then(({ data }) => setCheckins(data || [])) }
   useEffect(load, [goal.id])
 
   const publish = async () => {
-    setPublishing(true)
+    setPublishing(true); setPublishError('')
     const { error } = await publishSkillGoal(goal.id)
     setPublishing(false)
-    if (error) return
+    // Was failing silently before -- the button would just reset with
+    // no feedback at all, reading as if nothing happened rather than
+    // as a real failure.
+    if (error) { setPublishError("Couldn't publish — try again."); return }
     setPublished(true)
     onPublished?.()
   }
@@ -165,6 +169,7 @@ export default function SkillGoalTimeline({
           {canCheckIn && !published && (!checkins || checkins.length === 0) && (
             <p className={`text-[11.5px] ${t.textQuaternary} -mt-3 mb-5`}>Check in at least once before publishing — employers should see real progress, not an empty goal.</p>
           )}
+          {publishError && <p className={`text-[12px] ${t.danger} -mt-3 mb-5`}>{publishError}</p>}
 
           {checkins === null ? (
             <p className={`text-[13px] ${t.textTertiary}`}>Loading…</p>
