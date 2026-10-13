@@ -95,14 +95,22 @@ const SPEC_STATUS: Record<string, { label: string; bg: string; text: string }> =
 }
 const TYPE_LABEL: Record<string, string> = { brief: 'Design brief', assignment: 'Assignment', course: 'Course' }
 
-export default function StudentMyWorkPanel() {
+// fixedTab -- used by the desktop-only /student/briefs (or /courses),
+// /student/assignments and /student/workshops destinations: each is
+// this exact same component locked to one of the three types that used
+// to be an internal tab switcher, no way to switch away, no "My Skill"
+// toggle (that's desktop sidebar's own destination already). Phone
+// keeps the single /student/work route with the real tab switcher --
+// "it's not looking good... bring out assignments, bring out workshop,
+// make them its own buttons" was specifically about the laptop layout.
+export default function StudentMyWorkPanel({ fixedTab }: { fixedTab?: Tab } = {}) {
   const { user, refreshUser } = useAuth()
   const [orgType, setOrgType] = useState<'institution' | 'provider' | null>(null)
   const [workItems, setWorkItems] = useState<WorkItem[]>([])
   const [submissions, setSubmissions] = useState<any[]>([])
   const [startedIds, setStartedIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<Tab>('primary')
+  const [tab, setTab] = useState<Tab>(fixedTab || 'primary')
   const [selected, setSelected] = useState<WorkItem | null>(null)
   // Phone-only: "My Skill" and "My Work" as two top-level tabs on this
   // same screen -- laptop reaches skills through its own sidebar
@@ -154,36 +162,45 @@ export default function StudentMyWorkPanel() {
   })
   const selectedSubs = selected ? submissions.filter((s: any) => s.work_item_id === selected.id) : []
 
+  const fixedTabLabel = fixedTab === 'primary' ? primaryLabel : fixedTab === 'assignment' ? 'Assignments' : fixedTab === 'workshop' ? 'Workshops' : null
+
   return (
     <div>
-      <div className="lg:hidden sticky top-0 z-10 flex items-stretch border-b border-[var(--app-border-subtle)] bg-[var(--app-bg)]">
-        <TabButton active={view === 'skill'} label="My Skill" onClick={() => setView('skill')} />
-        <TabButton active={view === 'work'} label="My Work" onClick={() => setView('work')} />
-      </div>
+      {!fixedTab && (
+        <div className="lg:hidden sticky top-0 z-10 flex items-stretch border-b border-[var(--app-border-subtle)] bg-[var(--app-bg)]">
+          <TabButton active={view === 'skill'} label="My Skill" onClick={() => setView('skill')} />
+          <TabButton active={view === 'work'} label="My Work" onClick={() => setView('work')} />
+        </div>
+      )}
 
-      {view === 'skill' && (
+      {!fixedTab && view === 'skill' && (
         <div className="px-4 pt-4 pb-10">
           <SkillsFolderContent profileId={user.id} organisationId={user.organisation_id} isOwn={true} />
         </div>
       )}
 
-      {view === 'work' && (
+      {(fixedTab || view === 'work') && (
         <>
           {/* Build Spec: Feed and My Work (student) v1.0, Part 2 --
               "Title 'My Work' at 20px weight 600. Sub-line 'Everything set
               for you, in one place'." Missing entirely before -- the
               screen went straight from the shell's own top padding into
-              the tab row with no identity of its own. */}
+              the tab row with no identity of its own. A fixedTab page
+              (laptop) gets its own real type name as the title instead
+              of the generic "My Work" -- it's not a tab inside
+              something else there, it's the whole page. */}
           <div className="px-4 pt-4 pb-3">
-            <h1 className="text-[var(--app-text)] text-[20px] font-semibold">My Work</h1>
+            <h1 className="text-[var(--app-text)] text-[20px] font-semibold">{fixedTabLabel || 'My Work'}</h1>
             <p className="text-[13px] mt-0.5" style={{ color: 'var(--app-text-secondary)' }}>Everything set for you, in one place</p>
           </div>
 
-          <div className="sticky top-0 z-10 flex items-stretch border-b border-[var(--app-border-subtle)] bg-[var(--app-bg)]">
-            <TabButton active={tab === 'primary'} label={primaryLabel} onClick={() => setTab('primary')} />
-            <TabButton active={tab === 'assignment'} label="Assignments" onClick={() => setTab('assignment')} />
-            <TabButton active={tab === 'workshop'} label="Workshops" onClick={() => setTab('workshop')} />
-          </div>
+          {!fixedTab && (
+            <div className="sticky top-0 z-10 flex items-stretch border-b border-[var(--app-border-subtle)] bg-[var(--app-bg)]">
+              <TabButton active={tab === 'primary'} label={primaryLabel} onClick={() => setTab('primary')} />
+              <TabButton active={tab === 'assignment'} label="Assignments" onClick={() => setTab('assignment')} />
+              <TabButton active={tab === 'workshop'} label="Workshops" onClick={() => setTab('workshop')} />
+            </div>
+          )}
 
           <div className="px-4 pt-3 pb-1">
             <span className="text-[13px] font-semibold text-[var(--app-text-tertiary)]">{items.length} {items.length === 1 ? tab === 'primary' ? primaryLabel.slice(0, -1).toLowerCase() : tab : tab === 'primary' ? primaryLabel.toLowerCase() : `${tab}s`}</span>

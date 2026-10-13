@@ -75,10 +75,17 @@ function OpportunityLogo({ path, name }: { path?: string; name?: string }) {
   )
 }
 
-export default function StudentDiscoverPanel() {
+// lockTab -- used by the dedicated /student/interest page (desktop
+// sidebar's own "Interest" destination, 18+ only): renders just that
+// one tab's content, no tab bar, no way to switch away. Discover
+// itself still carries the "received" tab too (lg:hidden on just that
+// button below) -- on phone there's no separate nav slot for it, so it
+// stays reachable the one way it always was; on desktop it's hidden
+// there since it now has its own sidebar destination.
+export default function StudentDiscoverPanel({ lockTab }: { lockTab?: Tab } = {}) {
   const { user } = useAuth()
   const adult = isAdult(user?.date_of_birth)
-  const [tab, setTab] = useState<Tab>('explore')
+  const [tab, setTab] = useState<Tab>(lockTab || 'explore')
   const [search, setSearch] = useState('')
   const [opportunities, setOpportunities] = useState<any[]>([])
   const [applicationByOpp, setApplicationByOpp] = useState<Record<string, string>>({})
@@ -216,7 +223,9 @@ export default function StudentDiscoverPanel() {
           organisation"), so it isn't lost, just not duplicated up here
           at the cost of a layout shift between tabs. */}
       <div className="px-4 pt-4 pb-3">
-        <h1 className="text-[var(--app-text)] text-2xl font-bold">Discover</h1>
+        <h1 className="text-[var(--app-text)] text-2xl font-bold">
+          {lockTab === 'received' ? 'Interest received' : lockTab === 'tracking' ? 'Job tracking' : 'Discover'}
+        </h1>
         {tab === 'tracking' && <p className="text-[var(--app-text-tertiary)] text-sm mt-0.5">Where each application actually stands</p>}
       </div>
 
@@ -238,19 +247,26 @@ export default function StudentDiscoverPanel() {
         </div>
       </div>
 
-      <div className="px-4 flex gap-2 pb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-        {tabs.map(t => (
-          <button
-            key={t.id} onClick={() => setTab(t.id)}
-            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition ${
-              tab === t.id ? '' : 'bg-[var(--app-surface)] text-[var(--app-text-secondary)] border border-[var(--app-border-subtle)]'
-            }`}
-            style={tab === t.id ? { backgroundColor: 'var(--app-invert-bg)', color: 'var(--app-invert-text)' } : undefined}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {!lockTab && (
+        <div className="px-4 flex gap-2 pb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+          {tabs.map(t => (
+            <button
+              key={t.id} onClick={() => setTab(t.id)}
+              // Interest received gets its own desktop sidebar destination
+              // now -- lg:hidden here keeps it out of Discover's own tab
+              // row on a laptop, where showing it in two places at once
+              // would just be confusing. Phone has no extra nav slot for
+              // it, so it stays exactly where it's always been there.
+              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition ${t.id === 'received' ? 'lg:hidden' : ''} ${
+                tab === t.id ? '' : 'bg-[var(--app-surface)] text-[var(--app-text-secondary)] border border-[var(--app-border-subtle)]'
+              }`}
+              style={tab === t.id ? { backgroundColor: 'var(--app-invert-bg)', color: 'var(--app-invert-text)' } : undefined}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="px-4 space-y-3 pb-6">
         {loading ? (

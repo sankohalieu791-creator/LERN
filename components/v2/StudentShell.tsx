@@ -8,32 +8,17 @@ import Logo from '@/components/v2/Logo'
 import ScrollTrack from '@/components/v2/ScrollTrack'
 import { useAuth } from '@/context/AuthContext'
 import { useResolvedTheme } from '@/context/ThemeProvider'
-import { signOut } from '@/lib/supabase'
-import { Home, ClipboardList, Plus, Compass, User as UserIcon, Search, ChevronLeft, ChevronRight, LogOut, Settings, Award } from 'lucide-react'
+import { signOut, getMyOrgType } from '@/lib/supabase'
+import {
+  Home, ClipboardList, Plus, Compass, User as UserIcon, Search, ChevronLeft, ChevronRight,
+  LogOut, Settings, Award, FileText, CheckSquare, Video, Inbox,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-// Skill Wallet used to get its own standalone button here (and its own
-// tab on phone, inside StudentWorkContainer) -- both consolidated onto
-// the Profile screen's 'skills' tab instead, one entry point rather
-// than three. Settings gets its own button here for the first time;
-// it was previously reachable only via a small gear icon buried inside
-// ProfilePanel (which still exists too, for phone -- this nav is
-// desktop-only).
-//
-// "My Skill" is new -- per direct request, self-reported skills get
-// their own laptop destination rather than living inside Profile's
-// folder tabs (which still hosts Skills for viewing someone ELSE's
-// profile; see ProfilePanel.tsx). Phone doesn't get a 6th bottom-nav
-// icon for it -- there's no room in the fixed 5-button row -- it's a
-// tab inside My Work there instead (StudentMyWorkPanel.tsx).
-const DESKTOP_NAV: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: '/student/feed', label: 'Feed', icon: Home },
-  { href: '/student/work', label: 'My Work', icon: ClipboardList },
-  { href: '/student/skills', label: 'My Skill', icon: Award },
-  { href: '/student/discover', label: 'Discover', icon: Compass },
-  { href: '/student/profile', label: 'Profile', icon: UserIcon },
-  { href: '/student/settings', label: 'Settings', icon: Settings },
-]
+function isAdult(dob?: string) {
+  if (!dob) return false
+  return (Date.now() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25) >= 18
+}
 
 // theme_preference now actually drives what renders here: 'light' or
 // 'dark' set data-theme explicitly; 'system' (or unset) sets nothing
@@ -60,6 +45,30 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
   const { user } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
+  const [orgType, setOrgType] = useState<'institution' | 'provider' | null>(null)
+  useEffect(() => { getMyOrgType().then(setOrgType) }, [])
+
+  // "My work, it has briefs, assignments and workshops inside. Bring
+  // out assignments, bring out workshop, make them its own buttons" --
+  // each of the three used to be an internal tab inside one "My Work"
+  // destination; on laptop they're now full pages of their own
+  // (StudentMyWorkPanel's fixedTab prop), same reasoning as why Skill
+  // Wallet got pulled out of a tab into its own destination earlier.
+  // Interest received is 18+ only, same rule as StudentDiscoverPanel's
+  // own tab list -- under-18s' interest is never surfaced to them
+  // directly, so there's nothing here for them to have a button for.
+  const primaryLabel = orgType === 'provider' ? 'Courses' : 'Briefs'
+  const desktopNav: { href: string; label: string; icon: LucideIcon }[] = [
+    { href: '/student/feed', label: 'Feed', icon: Home },
+    { href: '/student/briefs', label: primaryLabel, icon: FileText },
+    { href: '/student/assignments', label: 'Assignments', icon: CheckSquare },
+    { href: '/student/workshops', label: 'Workshops', icon: Video },
+    { href: '/student/skills', label: 'My Skill', icon: Award },
+    { href: '/student/discover', label: 'Discover', icon: Compass },
+    ...(isAdult(user?.date_of_birth) ? [{ href: '/student/interest', label: 'Interest', icon: Inbox }] : []),
+    { href: '/student/profile', label: 'Profile', icon: UserIcon },
+    { href: '/student/settings', label: 'Settings', icon: Settings },
+  ]
   // Feed is deliberately edge-to-edge (Instagram-style cards, full-
   // bleed media) -- everything else on a wide laptop screen was just
   // stretching to fill whatever width was available, which reads as
@@ -258,7 +267,7 @@ export default function StudentShell({ children, onPlus }: { children: React.Rea
           </button>
         </div>
         <nav className={`flex-1 space-y-1 pt-3 ${collapsed ? 'px-2.5' : 'px-3'}`}>
-          {DESKTOP_NAV.map(item => {
+          {desktopNav.map(item => {
             const active = isActive(item.href)
             return (
               <Link

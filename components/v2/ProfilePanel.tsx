@@ -229,37 +229,45 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
           />
         )}
 
-        {/* ── 1. Top block: avatar/name/username/bio, stat numbers
-            (with thin "|" dividers between them, TikTok-style), tags,
-            Edit profile. ── */}
-        <div className="flex flex-col items-center text-center pt-1">
-          <Avatar path={profile.avatar_path} name={profile.full_name} size={88} textSize={30} variant="solid" />
-          {/* The Feed's own post card already shows this exact tick next
-              to a verified author's name (same "at least one live
-              verified piece of work" rule, via getVerifiedAuthorIds) --
-              it was never carried over to the profile's own header, so
-              seeing yourself verified on Feed but not on your own
-              profile read as a contradiction. */}
-          <p className="flex items-center justify-center gap-1 text-[19px] font-bold mt-3.5 tracking-tight">
-            {profile.full_name}
-            {verified.length > 0 && <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#0F6E56' }} />}
-          </p>
-          {profile.username && <p className="text-[13px] text-[var(--app-text-secondary)] mt-0.5">@{profile.username}</p>}
-          {title && <p className="text-[12.5px] font-medium mt-1" style={{ color: '#D4551A' }}>{title}</p>}
-          {profile.bio && (
-            <p className="text-[13.5px] text-[var(--app-text-body)] leading-[1.5] mt-2.5" style={{ maxWidth: 300 }}>{profile.bio}</p>
-          )}
-
-          <div className="flex items-center gap-3.5 mt-4">
-            <Stat n={folderCount.verified} label="work" />
-            <StatDivider />
-            <Stat n={counts.followers} label="followers" />
-            <StatDivider />
-            <Stat n={counts.following} label="following" />
+        {/* ── 1. Top block -- avatar and name on the left, not centred.
+            "It kind of looks similar to TikTok profiles... just make it
+            simple, like the way you just made employees [employers] --
+            profile is on the left hand side" (direct feedback,
+            comparing directly against CandidateDetailPanel's own header,
+            same avatar size, same name size, same left alignment). ── */}
+        <div className="pt-1">
+          <div className="flex items-start gap-4 mb-3">
+            <Avatar path={profile.avatar_path} name={profile.full_name} size={80} textSize={26} variant="solid" />
+            <div className="min-w-0 flex-1">
+              {/* The Feed's own post card already shows this exact tick
+                  next to a verified author's name (same "at least one
+                  live verified piece of work" rule, via
+                  getVerifiedAuthorIds) -- it was never carried over to
+                  the profile's own header, so seeing yourself verified
+                  on Feed but not on your own profile read as a
+                  contradiction. */}
+              <p className="flex items-center gap-1.5 text-[22px] font-bold tracking-tight truncate">
+                {profile.full_name}
+                {verified.length > 0 && <CheckCircle2 className="w-[18px] h-[18px] flex-shrink-0" style={{ color: '#0F6E56' }} />}
+              </p>
+              {profile.username && <p className="text-[13px] text-[var(--app-text-secondary)] mt-0.5">@{profile.username}</p>}
+              {title && <p className="text-[12.5px] font-medium mt-1" style={{ color: '#D4551A' }}>{title}</p>}
+              <div className="flex items-center gap-3.5 mt-2.5">
+                <Stat n={folderCount.verified} label="work" />
+                <StatDivider />
+                <Stat n={counts.followers} label="followers" />
+                <StatDivider />
+                <Stat n={counts.following} label="following" />
+              </div>
+            </div>
           </div>
 
+          {profile.bio && (
+            <p className="text-[13.5px] text-[var(--app-text-body)] leading-[1.5] max-w-xl">{profile.bio}</p>
+          )}
+
           {(profile.interest_tags || []).length > 0 && (
-            <div className="flex flex-wrap justify-center gap-1.5 mt-3.5">
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
               {profile.interest_tags.slice(0, 3).map((t: string) => (
                 <span key={t} className="text-[11.5px] font-medium px-3 py-[5px] rounded-full" style={{ backgroundColor: '#E6F1FB', color: '#0C447C' }}>{t}</span>
               ))}
@@ -268,15 +276,17 @@ export default function ProfilePanel({ userId, ownView = true }: { userId?: stri
           {isOwn ? (
             <button
               onClick={() => setEditingBio(true)}
-              className="mt-4 px-6 py-2 rounded-full border border-[var(--app-overlay-3)] text-[13px] font-semibold hover:bg-[var(--app-overlay-2)] active:scale-[0.98] transition"
+              className="mt-3.5 px-6 py-2 rounded-full border border-[var(--app-overlay-3)] text-[13px] font-semibold hover:bg-[var(--app-overlay-2)] active:scale-[0.98] transition"
             >
               Edit profile
             </button>
           ) : (
-            <FollowButton
-              profileId={profileId!}
-              onChange={isNowFollowing => setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers + (isNowFollowing ? 1 : -1)) }))}
-            />
+            <div className="mt-3.5">
+              <FollowButton
+                profileId={profileId!}
+                onChange={isNowFollowing => setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers + (isNowFollowing ? 1 : -1)) }))}
+              />
+            </div>
           )}
         </div>
 
