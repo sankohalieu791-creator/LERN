@@ -138,7 +138,7 @@ export default function JobTrackerBoard({ viewer, employerId, organisationId }: 
               <div className="space-y-2 min-h-[40px]">
                 {byStage(stage).length === 0 ? (
                   <p className="text-[11px] text-ink-quaternary px-1">—</p>
-                ) : byStage(stage).map(a => <AppCard key={a.id} app={a} onClick={() => setOpenApp(a)} />)}
+                ) : byStage(stage).map(a => <AppCard key={a.id} app={a} viewer={viewer} onClick={() => setOpenApp(a)} />)}
               </div>
             </div>
           ))}
@@ -169,7 +169,18 @@ export default function JobTrackerBoard({ viewer, employerId, organisationId }: 
   )
 }
 
-function AppCard({ app, onClick }: { app: any; onClick: () => void }) {
+// Age shown only to org (own students, own safeguarding data) -- an
+// employer previously saw the exact age ("17 yrs") printed next to a
+// named minor's card for no functional reason (nothing in the app
+// reads it), which is exactly the kind of exposure a school's
+// safeguarding lead flags on sight. The isMinor banner below already
+// says enough without the number attached. The label text itself was
+// also backwards for an employer: "You arrange contact" is correct
+// when the ORG is reading it (the school/provider is who arranges it),
+// but told an EMPLOYER the opposite of the real rule -- contact for a
+// minor is routed through their organisation, never direct with the
+// employer.
+function AppCard({ app, viewer, onClick }: { app: any; viewer: 'org' | 'employer'; onClick: () => void }) {
   const a = age(app.student?.date_of_birth)
   const isMinor = a !== null && a < 18
   const hired = app.stage === 'hired'
@@ -189,11 +200,15 @@ function AppCard({ app, onClick }: { app: any; onClick: () => void }) {
         {app.private_note && <PenLine className="w-3 h-3 text-ink-quaternary flex-shrink-0" />}
       </div>
       <p className="text-[12px] text-ink-tertiary truncate">{app.opportunity?.title || 'Direct interest'}</p>
-      <p className="text-[12px] truncate" style={{ color: '#8A8A8A' }}>{app.employer?.full_name || ''}{app.employer?.full_name && a !== null ? ' · ' : ''}{a !== null ? `${a} yrs` : ''}</p>
+      {(app.employer?.full_name || (viewer === 'org' && a !== null)) && (
+        <p className="text-[12px] truncate" style={{ color: '#8A8A8A' }}>
+          {app.employer?.full_name || ''}{app.employer?.full_name && viewer === 'org' && a !== null ? ' · ' : ''}{viewer === 'org' && a !== null ? `${a} yrs` : ''}
+        </p>
+      )}
       {isMinor && (
         <div className="border-t border-edge-subtle mt-2 pt-2 flex items-center gap-1" style={{ color: '#854F0B' }}>
           <Shield className="w-3 h-3 flex-shrink-0" />
-          <span className="text-[11px]">You arrange contact</span>
+          <span className="text-[11px]">{viewer === 'org' ? 'You arrange contact' : "Routed through their school or provider"}</span>
         </div>
       )}
     </button>
@@ -302,8 +317,18 @@ function ApplicationDetail({ app, viewer, actorId, onClose, onChanged, onNoteSav
           {isMinor && (
             <div className="rounded-lg px-[12px] py-[10px] flex items-start gap-2" style={{ backgroundColor: '#E1F5EE' }}>
               <Shield className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#0F6E56' }} />
+              {/* viewer-aware, not one static sentence -- this dialog is
+                  shared between org staff and the employer, and "the
+                  interview is arranged through you" is only true for
+                  whichever one of them is actually reading it. Said
+                  unconditionally before, it told an employer the exact
+                  opposite of the real safeguarding rule. Age number
+                  dropped for the employer view -- see AppCard's comment
+                  above, same reasoning. */}
               <p className="text-[12px]" style={{ color: '#0F6E56' }}>
-                {app.student?.full_name} is {a}. The interview is arranged through you, not directly with them.
+                {viewer === 'org'
+                  ? `${app.student?.full_name} is ${a}. The interview is arranged through you, not directly with them.`
+                  : `${app.student?.full_name} is under 18. The interview is arranged through their school or training provider, not directly with you.`}
               </p>
             </div>
           )}

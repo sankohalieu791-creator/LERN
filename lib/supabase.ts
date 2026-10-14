@@ -2998,7 +2998,7 @@ export const getVerifiedWorkForProfile = async (studentId: string) => {
     .from('verifications')
     .select(`
       id, verified_at, visibility, employer_visible,
-      verifier:users!verifications_verified_by_fkey(full_name),
+      verifier:users!verifications_verified_by_fkey(full_name, role),
       submissions!inner(id, student_id, content, file_path, file_type, work_items(title, type, criteria, organisation_id, organisations(name)))
     `)
     .eq('submissions.student_id', studentId)

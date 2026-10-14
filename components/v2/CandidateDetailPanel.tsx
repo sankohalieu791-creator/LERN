@@ -21,6 +21,16 @@ import {
 
 type Tab = 'verified' | 'experience' | 'skills'
 const TYPE_LABEL: Record<string, string> = { brief: 'Brief', course: 'Course', workshop: 'Workshop' }
+// "No verified item shows a reviewer, an institution, or a date. The
+// verification is the product; it has to be visible." -- institution
+// was already on the card, reviewer and date weren't shown anywhere at
+// all, on the card or in the detail overlay.
+const STAFF_ROLE_LABEL: Record<string, string> = { institution_staff: 'School/college staff', provider_staff: 'Training provider staff' }
+function formatVerifiedDate(d?: string) {
+  if (!d) return ''
+  const dt = new Date(d)
+  return isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 function formatMonthYear(d?: string) {
   if (!d) return ''
@@ -198,7 +208,16 @@ export default function CandidateDetailPanel({ studentId }: { studentId: string 
                       </span>
                       <p className="text-[15px] font-semibold text-ink">{v.submissions?.work_items?.title}</p>
                       {v.submissions?.work_items?.organisations?.name && (
-                        <p className="text-[12.5px] text-ink-tertiary mb-1.5">{v.submissions.work_items.organisations.name}</p>
+                        <p className="text-[12.5px] text-ink-tertiary mb-1">{v.submissions.work_items.organisations.name}</p>
+                      )}
+                      {/* Who checked it and when -- "the verification is
+                          the product; it has to be visible," not just
+                          implied by a green Verified pill. */}
+                      {(v.verifier?.full_name || v.verified_at) && (
+                        <p className="text-[11.5px] text-ink-quaternary mb-1.5">
+                          {v.verifier?.full_name ? `Verified by ${v.verifier.full_name}` : 'Verified'}
+                          {v.verified_at ? ` · ${formatVerifiedDate(v.verified_at)}` : ''}
+                        </p>
                       )}
                       {v.submissions?.content && <p className="text-[13px] text-ink-secondary line-clamp-3">{v.submissions.content}</p>}
                       {/* The actual attached file -- a short written
@@ -348,12 +367,27 @@ function TabButton({ active, label, icon: Icon, onClick }: { active: boolean; la
 // anything else is a real link that opens it.
 function WorkDetailOverlay({ work, onClose }: { work: any; onClose: () => void }) {
   const [fileUrl, setFileUrl] = useState<string | null>(null)
+  // Was only ever reading `url` off this call and discarding `error`
+  // entirely -- a genuine failure (bad path, missing storage object,
+  // an expired/revoked signed-URL request) left fileUrl null forever
+  // with nothing distinguishing "still fetching" from "never going to
+  // load," so the UI just sat on "Loading…" with no way out. This is
+  // the exact bug behind "THE ACTUAL WORK showed Loading... for the
+  // whole shot" -- a real failure with zero feedback, not a slow
+  // network.
+  const [fileError, setFileError] = useState(false)
   const sub = work.submissions
   const wi = sub?.work_items
   const isImage = sub?.file_type && ['image/png', 'image/jpeg', 'image/webp'].includes(sub.file_type)
 
   useEffect(() => {
-    if (sub?.file_path) getSignedFileUrl('submission-files', sub.file_path).then(({ url }) => setFileUrl(url))
+    setFileUrl(null)
+    setFileError(false)
+    if (!sub?.file_path) return
+    getSignedFileUrl('submission-files', sub.file_path).then(({ url, error }) => {
+      if (error || !url) { setFileError(true); return }
+      setFileUrl(url)
+    })
   }, [sub?.file_path])
 
   return createPortal((
@@ -367,7 +401,17 @@ function WorkDetailOverlay({ work, onClose }: { work: any; onClose: () => void }
         </div>
         <div className="p-5">
           <h2 className="text-[18px] font-bold text-ink leading-snug mb-1">{wi?.title}</h2>
-          {wi?.organisations?.name && <p className="text-[13px] text-ink-tertiary mb-4">{wi.organisations.name}</p>}
+          {wi?.organisations?.name && <p className="text-[13px] text-ink-tertiary mb-1">{wi.organisations.name}</p>}
+          {/* Reviewer, their role, and the date -- "the verification is
+              the product; it has to be visible," not buried behind a
+              click or left off entirely. */}
+          {(work.verifier?.full_name || work.verified_at) && (
+            <p className="text-[12.5px] text-ink-tertiary mb-4">
+              {work.verifier?.full_name ? `Verified by ${work.verifier.full_name}` : 'Verified'}
+              {work.verifier?.role && STAFF_ROLE_LABEL[work.verifier.role] ? `, ${STAFF_ROLE_LABEL[work.verifier.role]}` : ''}
+              {work.verified_at ? ` · ${formatVerifiedDate(work.verified_at)}` : ''}
+            </p>
+          )}
 
           {sub?.content && (
             <div className="mb-4">
@@ -379,16 +423,24 @@ function WorkDetailOverlay({ work, onClose }: { work: any; onClose: () => void }
           <p className="text-[11px] font-semibold text-ink-tertiary uppercase tracking-wide mb-1.5">The actual work</p>
           {!sub?.file_path ? (
             <p className="text-[13px] text-ink-tertiary">No file was attached to this submission.</p>
+          ) : fileError ? (
+            <p className="text-[13px] text-danger-text bg-danger-bg rounded-xl px-4 py-3">
+              Couldn't load this file — it may have been moved or removed. Try again, or ask the institution to re-check the submission.
+            </p>
           ) : isImage && fileUrl ? (
             <img src={fileUrl} alt="" className="w-full rounded-lg border border-edge" />
-          ) : (
+          ) : fileUrl ? (
             <a
-              href={fileUrl || '#'} target="_blank" rel="noreferrer"
+              href={fileUrl} target="_blank" rel="noreferrer"
               className="flex items-center gap-2 bg-surface-subtle border border-edge rounded-xl px-4 py-3 text-[13px] font-semibold text-ink hover:border-edge-input transition"
             >
               <FilePlus className="w-4 h-4 text-ink-tertiary flex-shrink-0" />
-              <span className="truncate">{fileUrl ? (sub.file_path.split('/').pop()) : 'Loading…'}</span>
+              <span className="truncate">{sub.file_path.split('/').pop()}</span>
             </a>
+          ) : (
+            <div className="flex items-center gap-2 bg-surface-subtle border border-edge rounded-xl px-4 py-3 text-[13px] font-semibold text-ink-tertiary">
+              <span className="w-3.5 h-3.5 border-2 border-ink-quaternary border-t-ink-tertiary rounded-full animate-spin flex-shrink-0" /> Loading…
+            </div>
           )}
         </div>
       </div>
