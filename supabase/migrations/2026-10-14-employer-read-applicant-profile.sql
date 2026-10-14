@@ -34,3 +34,28 @@ CREATE POLICY "users: employer read linked candidates" ON public.users
       )
     )
   );
+
+-- Same gap, one level up: "No verified item shows a reviewer... put
+-- the verifier's role, institution and date on every verified item" --
+-- the client code to show the reviewer's name now exists
+-- (CandidateDetailPanel.tsx), but the verifier:users!...(full_name,
+-- role) join it reads from still hits this same users RLS wall, so it
+-- silently comes back null and every card falls back to a bare
+-- "Verified · [date]" with no name attached (confirmed live, 14 Oct
+-- 2026). Grants an employer read access to a staff member's basic
+-- profile only when that staff member verified a piece of work the
+-- employer is already otherwise entitled to see (same employer_visible/
+-- public gate getVerifiedWorkForProfile already enforces) -- not a
+-- blanket "employers can read all staff" grant.
+CREATE POLICY "users: employer read verifiers of visible work" ON public.users
+  FOR SELECT
+  USING (
+    current_user_role() = 'employer'
+    AND NOT current_user_is_guest()
+    AND EXISTS (
+      SELECT 1 FROM public.verifications
+      WHERE verifications.verified_by = users.id
+        AND verifications.revoked_at IS NULL
+        AND (verifications.visibility = 'public' OR verifications.employer_visible = true)
+    )
+  );
