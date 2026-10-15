@@ -2702,6 +2702,19 @@ export const removeFromTalentPool = async (memberRowId: string) => {
   return { error }
 }
 
+// Which of the CURRENT employer's own pools each student in a results
+// list is already saved into -- RLS on talent_pool_members already
+// scopes this to pools owned by auth.uid(), so a bare student_id filter
+// is sufficient. One query for the whole list (e.g. Discover) rather
+// than one per card. Used by the Save-to-pool picker to show each pool
+// as already ticked or not, and to know the member row id to remove on
+// un-toggle.
+export const getPoolMembershipsForStudents = async (studentIds: string[]) => {
+  if (studentIds.length === 0) return { data: [] as { id: string; pool_id: string; student_id: string }[], error: null }
+  const { data, error } = await supabase.from('talent_pool_members').select('id, pool_id, student_id').in('student_id', studentIds)
+  return { data: data || [], error }
+}
+
 // "The employer's only two actions are adding a candidate to a pool and
 // removing them, or marking a role filled" -- filling stops the
 // automatic cadence for every member of this pool (checked by the cron

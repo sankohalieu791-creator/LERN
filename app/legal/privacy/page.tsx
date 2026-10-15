@@ -29,7 +29,8 @@ export default function PrivacyPage() {
       <p>
         How LERN meets its duties under UK GDPR and the Data Protection Act 2018. LERN is run by IRL Connect Ltd,
         trading as LERN (company number 17200180, registered office 93a Cobbold Road, London, NW10 9SU). Data is
-        held in the European Economic Area (Supabase, eu-west-1, Ireland).
+        held in the United Kingdom (Supabase, eu-west-2, London, on AWS infrastructure). Our application servers
+        (Vercel) run in the United States and process requests in transit, but do not store personal data.
       </p>
 
       <h2 className="text-[15px] font-bold text-ink mt-6 mb-2">Who is responsible for what</h2>
@@ -40,7 +41,7 @@ export default function PrivacyPage() {
 
       <h2 className="text-[15px] font-bold text-ink mt-6 mb-2">How data is protected</h2>
       <ul>
-        <li>Held in the EEA (Ireland).</li>
+        <li>Held in the UK (London).</li>
         <li>Access limited to named, authorised people.</li>
         <li>Under-18s are not publicly searchable or identifiable as people.</li>
         <li>Security measures suited to holding young people's data, backed by insurance cover.</li>

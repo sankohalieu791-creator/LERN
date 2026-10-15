@@ -4,8 +4,12 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getDiscoverWork, getMyInterest, expressInterest, getDiscoverSkillNames } from '@/lib/supabase'
-import { BadgeCheck, Search, Send, Check, Clock, Shield } from 'lucide-react'
+import {
+  getDiscoverWork, getMyInterest, expressInterest, getDiscoverSkillNames,
+  getTalentPools, createTalentPool, addToTalentPool, removeFromTalentPool, getPoolMembershipsForStudents, getEmployerBilling,
+} from '@/lib/supabase'
+import { EMPLOYER_TIERS, type EmployerTier } from '@/lib/billing'
+import { BadgeCheck, Search, Send, Check, Clock, Shield, Bookmark, Plus, X } from 'lucide-react'
 
 type WorkType = 'all' | 'brief' | 'course' | 'workshop'
 
@@ -53,12 +57,31 @@ export default function EmployerDiscoverPanel() {
   const [interestByStudent, setInterestByStudent] = useState<Record<string, string>>({})
   const [sending, setSending] = useState<string | null>(null)
   const [composer, setComposer] = useState<{ studentId: string; studentName: string; label?: string } | null>(null)
+  const [pools, setPools] = useState<any[]>([])
+  const [tier, setTier] = useState<EmployerTier>('micro')
+  const [savePopoverFor, setSavePopoverFor] = useState<{ id: string; name: string } | null>(null)
+  const [membershipsByStudent, setMembershipsByStudent] = useState<Record<string, { id: string; pool_id: string }[]>>({})
+
+  const loadPools = () => {
+    if (!user) return
+    Promise.all([getTalentPools(user.id), getEmployerBilling(user.id)]).then(([poolsRes, billingRes]) => {
+      setPools(poolsRes.data || [])
+      if (billingRes.data?.tier) setTier(billingRes.data.tier)
+    })
+  }
+  useEffect(loadPools, [user?.id])
 
   const load = () => {
     setLoading(true)
     getDiscoverWork({ type: type === 'all' ? undefined : type, q: q.trim() || undefined, skill: skill || undefined }).then(({ data }) => {
       setItems(data || [])
       setLoading(false)
+      const studentIds = Array.from(new Set((data || []).map((v: any) => v.submissions?.student?.id).filter(Boolean)))
+      getPoolMembershipsForStudents(studentIds).then(({ data: rows }) => {
+        const map: Record<string, { id: string; pool_id: string }[]> = {}
+        for (const r of rows) (map[r.student_id] ??= []).push({ id: r.id, pool_id: r.pool_id })
+        setMembershipsByStudent(map)
+      })
     })
   }
   useEffect(load, [type, skill])
@@ -156,7 +179,18 @@ export default function EmployerDiscoverPanel() {
                   {student.bio && <p className="text-[12.5px] text-ink-secondary line-clamp-2 mt-1.5">{student.bio}</p>}
                 </button>
 
-                <div className="mt-auto pt-3 border-t border-edge-subtle flex items-center justify-end gap-2">
+                <div className="mt-auto pt-3 border-t border-edge-subtle flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => setSavePopoverFor({ id: student.id, name: student.full_name || 'this student' })}
+                    aria-label="Save to a talent pool"
+                    className={`w-8 h-8 flex items-center justify-center rounded-lg transition flex-shrink-0 ${
+                      (membershipsByStudent[student.id]?.length ?? 0) > 0
+                        ? 'text-brand bg-brand/10 hover:bg-brand/15'
+                        : 'text-ink-tertiary hover:text-ink hover:bg-surface-muted'
+                    }`}
+                  >
+                    <Bookmark className="w-4 h-4" fill={(membershipsByStudent[student.id]?.length ?? 0) > 0 ? 'currentColor' : 'none'} />
+                  </button>
                   {status === 'pending' ? (
                     <span className="flex items-center gap-1 text-[12px] font-semibold text-warning-text flex-shrink-0"><Clock className="w-3.5 h-3.5" /> Pending</span>
                   ) : status === 'accepted' ? (
@@ -198,8 +232,118 @@ export default function EmployerDiscoverPanel() {
         />
       )}
 
+      {savePopoverFor && (
+        <SaveToPoolPopover
+          studentName={savePopoverFor.name}
+          pools={pools}
+          tier={tier}
+          memberships={membershipsByStudent[savePopoverFor.id] || []}
+          onToggle={async (pool, membership) => {
+            if (membership) {
+              await removeFromTalentPool(membership.id)
+              setMembershipsByStudent(prev => ({ ...prev, [savePopoverFor.id]: (prev[savePopoverFor.id] || []).filter(m => m.id !== membership.id) }))
+            } else {
+              const { error } = await addToTalentPool(pool.id, savePopoverFor.id)
+              if (error) return
+              setMembershipsByStudent(prev => ({ ...prev, [savePopoverFor.id]: [...(prev[savePopoverFor.id] || []), { id: `${pool.id}-${savePopoverFor.id}`, pool_id: pool.id }] }))
+              loadPools() // refresh member counts shown elsewhere
+            }
+          }}
+          onCreatePool={async (name) => {
+            if (!user) return
+            const { data, error } = await createTalentPool(user.id, name)
+            if (error || !data) return
+            setPools(prev => [...prev, data])
+            await addToTalentPool(data.id, savePopoverFor.id)
+            setMembershipsByStudent(prev => ({ ...prev, [savePopoverFor.id]: [...(prev[savePopoverFor.id] || []), { id: `${data.id}-${savePopoverFor.id}`, pool_id: data.id }] }))
+          }}
+          onClose={() => setSavePopoverFor(null)}
+        />
+      )}
+
     </div>
   )
+}
+
+// Reuses the same add/remove/create primitives TalentPoolsPanel is
+// built on -- this is just the other entry point into the same data
+// ("save candidates into it from Discover", per that screen's own empty
+// state copy, which is exactly the action that had gone missing here).
+function SaveToPoolPopover({ studentName, pools, tier, memberships, onToggle, onCreatePool, onClose }: {
+  studentName: string
+  pools: any[]
+  tier: EmployerTier
+  memberships: { id: string; pool_id: string }[]
+  onToggle: (pool: any, membership: { id: string; pool_id: string } | undefined) => void
+  onCreatePool: (name: string) => void
+  onClose: () => void
+}) {
+  const [creating, setCreating] = useState(false)
+  const [name, setName] = useState('')
+  const limit = EMPLOYER_TIERS[tier].talentPools
+  const atLimit = limit !== null && pools.length >= limit
+  const memberPoolIds = new Set(memberships.map(m => m.pool_id))
+
+  return createPortal((
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <p className="font-bold text-ink text-[15px]">Save {studentName}</p>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-muted text-ink-tertiary transition"><X className="w-4 h-4" /></button>
+        </div>
+        <p className="text-[13px] text-ink-tertiary mb-4">Add them to a talent pool — LERN keeps them warm automatically from there.</p>
+
+        {pools.length === 0 && !creating ? (
+          <p className="text-[13px] text-ink-tertiary mb-4">No pools yet — create one below to save your first candidate.</p>
+        ) : (
+          <div className="space-y-1.5 mb-4 max-h-56 overflow-y-auto">
+            {pools.map(pool => {
+              const membership = memberships.find(m => m.pool_id === pool.id)
+              const saved = memberPoolIds.has(pool.id)
+              return (
+                <button
+                  key={pool.id}
+                  onClick={() => onToggle(pool, membership)}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border border-edge-subtle hover:border-brand transition text-left"
+                >
+                  <span className="text-[13.5px] font-semibold text-ink truncate">{pool.name}</span>
+                  {saved ? <Check className="w-4 h-4 text-brand flex-shrink-0" /> : <Plus className="w-4 h-4 text-ink-quaternary flex-shrink-0" />}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {creating ? (
+          <div>
+            <div className="flex items-center gap-2">
+              <input
+                value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="e.g. Design 2026"
+                onKeyDown={e => { if (e.key === 'Enter' && name.trim()) { onCreatePool(name.trim()); setName(''); setCreating(false) } }}
+                className="flex-1 bg-surface border border-edge rounded-lg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-brand transition"
+              />
+              <button
+                onClick={() => { if (name.trim()) { onCreatePool(name.trim()); setName(''); setCreating(false) } }}
+                disabled={!name.trim()}
+                className="bg-brand text-white text-[13px] font-semibold px-4 py-2.5 rounded-lg disabled:opacity-40"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        ) : atLimit ? (
+          <p className="text-[12px] text-ink-tertiary">At your {EMPLOYER_TIERS[tier].label} limit of {limit} pools — remove one, or upgrade in Settings, to create another.</p>
+        ) : (
+          <button
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-1.5 text-[13px] font-semibold text-brand hover:opacity-80 transition"
+          >
+            <Plus className="w-3.5 h-3.5" /> New pool
+          </button>
+        )}
+      </div>
+    </div>
+  ), document.body)
 }
 
 // The org sees this message verbatim on their side (Interest received)
