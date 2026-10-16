@@ -17,27 +17,55 @@ import { createClient } from '@supabase/supabase-js'
 // here since experience has no such policy to lean on.
 // guest_invite_shares itself remains the one place this scoping is
 // defined — nothing here widens it.
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+// Lazy, not eager -- a module-scope createClient() with a non-null-
+// asserted env var throws the instant this file is imported, which
+// crashes Next.js's build-time page-data collection for the WHOLE
+// deployment if that var is missing in ANY environment (e.g. Preview),
+// not just a runtime error for this one route. Same fix as
+// app/api/employer/verify-submit/route.ts.
+// Lazy, not eager -- a module-scope createClient() with a non-null-
+// asserted env var throws the instant this file is imported, which
+// crashes Next.js's build-time page-data collection for the WHOLE
+// deployment if that var is missing in ANY environment (e.g. Preview),
+// not just a runtime error for this one route. Same fix as
+// app/api/employer/verify-submit/route.ts.
+//
+// createSupabaseAdmin() is a plain (non-generic) function wrapping the
+// actual createClient(url, key) call -- ReturnType<typeof createClient>
+// directly on the generic createClient would resolve its Database type
+// parameter with no call-site context, which silently widened every
+// .update()/.insert() argument below to `never`. Wrapping it in an
+// ordinary function first gives TypeScript a concrete call to infer
+// from, exactly like the original eager `const getSupabaseAdmin() =
+// createClient(...)` did.
+function createSupabaseAdmin() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Not configured yet.')
+  }
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+}
+let _supabaseAdmin: ReturnType<typeof createSupabaseAdmin> | null = null
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) _supabaseAdmin = createSupabaseAdmin()
+  return _supabaseAdmin
+}
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization') || ''
   const accessToken = auth.startsWith('Bearer ') ? auth.slice(7) : ''
   if (!accessToken) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 })
 
-  const { data: callerData, error: callerError } = await supabaseAdmin.auth.getUser(accessToken)
+  const { data: callerData, error: callerError } = await getSupabaseAdmin().auth.getUser(accessToken)
   if (callerError || !callerData?.user) return NextResponse.json({ error: 'Session expired — sign in again.' }, { status: 401 })
 
-  const { data: profile } = await supabaseAdmin
+  const { data: profile } = await getSupabaseAdmin()
     .from('users').select('is_guest, guest_invite_id').eq('id', callerData.user.id).single()
   if (!profile?.is_guest && !profile?.guest_invite_id) {
     return NextResponse.json({ error: 'This account is not a guest invite.' }, { status: 403 })
   }
   if (!profile.guest_invite_id) return NextResponse.json({ students: [] })
 
-  const { data: shares } = await supabaseAdmin
+  const { data: shares } = await getSupabaseAdmin()
     .from('guest_invite_shares')
     .select('student_id, users:student_id(id, full_name, avatar_path)')
     .eq('invite_id', profile.guest_invite_id)
@@ -46,7 +74,7 @@ export async function GET(req: NextRequest) {
   if (studentIds.length === 0) return NextResponse.json({ students: [] })
 
   const [{ data: verifications }, { data: experience }] = await Promise.all([
-    supabaseAdmin
+    getSupabaseAdmin()
       .from('verifications')
       .select(`
         id, verified_at, visibility,
@@ -56,7 +84,7 @@ export async function GET(req: NextRequest) {
       .in('submissions.student_id', studentIds)
       .is('revoked_at', null)
       .order('verified_at', { ascending: false }),
-    supabaseAdmin.from('experience_entries').select('*').in('student_id', studentIds).order('created_at', { ascending: false }),
+    getSupabaseAdmin().from('experience_entries').select('*').in('student_id', studentIds).order('created_at', { ascending: false }),
   ])
 
   const students = ((shares || []) as any[]).map(s => {

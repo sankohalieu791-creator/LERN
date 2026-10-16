@@ -13,17 +13,45 @@ import { createClient } from '@supabase/supabase-js'
 // back in, but resets 2FA rather than quietly bypassing it, so the
 // account isn't left protected by a single code that could be reused
 // or intercepted.
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+// Lazy, not eager -- a module-scope createClient() with a non-null-
+// asserted env var throws the instant this file is imported, which
+// crashes Next.js's build-time page-data collection for the WHOLE
+// deployment if that var is missing in ANY environment (e.g. Preview),
+// not just a runtime error for this one route. Same fix as
+// app/api/employer/verify-submit/route.ts.
+// Lazy, not eager -- a module-scope createClient() with a non-null-
+// asserted env var throws the instant this file is imported, which
+// crashes Next.js's build-time page-data collection for the WHOLE
+// deployment if that var is missing in ANY environment (e.g. Preview),
+// not just a runtime error for this one route. Same fix as
+// app/api/employer/verify-submit/route.ts.
+//
+// createSupabaseAdmin() is a plain (non-generic) function wrapping the
+// actual createClient(url, key) call -- ReturnType<typeof createClient>
+// directly on the generic createClient would resolve its Database type
+// parameter with no call-site context, which silently widened every
+// .update()/.insert() argument below to `never`. Wrapping it in an
+// ordinary function first gives TypeScript a concrete call to infer
+// from, exactly like the original eager `const getSupabaseAdmin() =
+// createClient(...)` did.
+function createSupabaseAdmin() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Not configured yet.')
+  }
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+}
+let _supabaseAdmin: ReturnType<typeof createSupabaseAdmin> | null = null
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) _supabaseAdmin = createSupabaseAdmin()
+  return _supabaseAdmin
+}
 
 export async function POST(req: NextRequest) {
   const auth = req.headers.get('authorization') || ''
   const accessToken = auth.startsWith('Bearer ') ? auth.slice(7) : ''
   if (!accessToken) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 })
 
-  const { data: callerData, error: callerError } = await supabaseAdmin.auth.getUser(accessToken)
+  const { data: callerData, error: callerError } = await getSupabaseAdmin().auth.getUser(accessToken)
   if (callerError || !callerData?.user) return NextResponse.json({ error: 'Session expired — sign in again.' }, { status: 401 })
 
   const { code } = await req.json().catch(() => ({}))
@@ -41,12 +69,12 @@ export async function POST(req: NextRequest) {
   if (rpcError) return NextResponse.json({ error: 'Could not verify that code.' }, { status: 500 })
   if (!valid) return NextResponse.json({ error: 'That recovery code is invalid or has already been used.' }, { status: 400 })
 
-  const { data: factors, error: listError } = await supabaseAdmin.auth.admin.mfa.listFactors({ userId: callerData.user.id })
+  const { data: factors, error: listError } = await getSupabaseAdmin().auth.admin.mfa.listFactors({ userId: callerData.user.id })
   if (listError) return NextResponse.json({ error: 'Recovery code accepted, but could not reset your 2FA — contact support.' }, { status: 500 })
   for (const factor of factors?.factors || []) {
-    await supabaseAdmin.auth.admin.mfa.deleteFactor({ id: factor.id, userId: callerData.user.id })
+    await getSupabaseAdmin().auth.admin.mfa.deleteFactor({ id: factor.id, userId: callerData.user.id })
   }
-  await supabaseAdmin.from('users').update({ two_step_enabled: false }).eq('id', callerData.user.id)
+  await getSupabaseAdmin().from('users').update({ two_step_enabled: false }).eq('id', callerData.user.id)
 
   return NextResponse.json({ ok: true })
 }

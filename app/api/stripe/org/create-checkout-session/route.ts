@@ -9,12 +9,40 @@ import { stripe } from '@/lib/stripe'
 // correct by the existing get_org_billing() display). So this builds
 // the Checkout Session's price inline (price_data) for the organisation's
 // current computed total instead of referencing a catalog price.
-const APP_URL = 'https://lernapp.uk'
+const APP_URL = 'https://www.getlern.com'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+// Lazy, not eager -- a module-scope createClient() with a non-null-
+// asserted env var throws the instant this file is imported, which
+// crashes Next.js's build-time page-data collection for the WHOLE
+// deployment if that var is missing in ANY environment (e.g. Preview),
+// not just a runtime error for this one route. Same fix as
+// app/api/employer/verify-submit/route.ts.
+// Lazy, not eager -- a module-scope createClient() with a non-null-
+// asserted env var throws the instant this file is imported, which
+// crashes Next.js's build-time page-data collection for the WHOLE
+// deployment if that var is missing in ANY environment (e.g. Preview),
+// not just a runtime error for this one route. Same fix as
+// app/api/employer/verify-submit/route.ts.
+//
+// createSupabaseAdmin() is a plain (non-generic) function wrapping the
+// actual createClient(url, key) call -- ReturnType<typeof createClient>
+// directly on the generic createClient would resolve its Database type
+// parameter with no call-site context, which silently widened every
+// .update()/.insert() argument below to `never`. Wrapping it in an
+// ordinary function first gives TypeScript a concrete call to infer
+// from, exactly like the original eager `const getSupabaseAdmin() =
+// createClient(...)` did.
+function createSupabaseAdmin() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Not configured yet.')
+  }
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+}
+let _supabaseAdmin: ReturnType<typeof createSupabaseAdmin> | null = null
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) _supabaseAdmin = createSupabaseAdmin()
+  return _supabaseAdmin
+}
 
 export async function POST(req: NextRequest) {
   if (!stripe) return NextResponse.json({ error: 'Payments are not configured yet.' }, { status: 503 })
@@ -23,10 +51,10 @@ export async function POST(req: NextRequest) {
   const accessToken = auth.startsWith('Bearer ') ? auth.slice(7) : ''
   if (!accessToken) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 })
 
-  const { data: callerData, error: callerError } = await supabaseAdmin.auth.getUser(accessToken)
+  const { data: callerData, error: callerError } = await getSupabaseAdmin().auth.getUser(accessToken)
   if (callerError || !callerData?.user) return NextResponse.json({ error: 'Session expired — sign in again.' }, { status: 401 })
 
-  const { data: profile } = await supabaseAdmin
+  const { data: profile } = await getSupabaseAdmin()
     .from('users')
     .select('id, email, role, organisation_id')
     .eq('id', callerData.user.id)
@@ -35,7 +63,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'This account is not an institution or training provider.' }, { status: 403 })
   }
 
-  const { data: org } = await supabaseAdmin
+  const { data: org } = await getSupabaseAdmin()
     .from('organisations')
     .select('id, name, type, stripe_customer_id, subscription_status')
     .eq('id', profile.organisation_id)
@@ -43,7 +71,7 @@ export async function POST(req: NextRequest) {
   if (!org) return NextResponse.json({ error: 'Organisation not found.' }, { status: 404 })
   if (org.subscription_status === 'active') return NextResponse.json({ error: 'Already subscribed.' }, { status: 400 })
 
-  const { data: computed, error: computeError } = await supabaseAdmin.rpc('get_org_billing_for_checkout', { p_org_id: org.id })
+  const { data: computed, error: computeError } = await getSupabaseAdmin().rpc('get_org_billing_for_checkout', { p_org_id: org.id })
   if (computeError || !computed) return NextResponse.json({ error: 'Could not compute your plan price — try again.' }, { status: 500 })
   if (computed.is_custom_pricing || !computed.annual_price) {
     return NextResponse.json({ error: 'At 600+ learners, pricing is arranged directly — contact LERN.' }, { status: 400 })
@@ -53,7 +81,7 @@ export async function POST(req: NextRequest) {
   if (!customerId) {
     const customer = await stripe.customers.create({ email: profile.email, name: org.name, metadata: { organisation_id: org.id } })
     customerId = customer.id
-    await supabaseAdmin.from('organisations').update({ stripe_customer_id: customerId }).eq('id', org.id)
+    await getSupabaseAdmin().from('organisations').update({ stripe_customer_id: customerId }).eq('id', org.id)
   }
 
   const orgTypeLabel = org.type === 'provider' ? 'Training provider' : 'Institution'

@@ -8,10 +8,38 @@ import { stripe, STRIPE_PRICE_ID, type PayableEmployerTier } from '@/lib/stripe'
 // current_user_employer_verified() and EmployerSubscriptionPanel) in
 // sync with what actually happened in Stripe -- this is the one place
 // that model stops being self-declared and starts being real.
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+// Lazy, not eager -- a module-scope createClient() with a non-null-
+// asserted env var throws the instant this file is imported, which
+// crashes Next.js's build-time page-data collection for the WHOLE
+// deployment if that var is missing in ANY environment (e.g. Preview),
+// not just a runtime error for this one route. Same fix as
+// app/api/employer/verify-submit/route.ts.
+// Lazy, not eager -- a module-scope createClient() with a non-null-
+// asserted env var throws the instant this file is imported, which
+// crashes Next.js's build-time page-data collection for the WHOLE
+// deployment if that var is missing in ANY environment (e.g. Preview),
+// not just a runtime error for this one route. Same fix as
+// app/api/employer/verify-submit/route.ts.
+//
+// createSupabaseAdmin() is a plain (non-generic) function wrapping the
+// actual createClient(url, key) call -- ReturnType<typeof createClient>
+// directly on the generic createClient would resolve its Database type
+// parameter with no call-site context, which silently widened every
+// .update()/.insert() argument below to `never`. Wrapping it in an
+// ordinary function first gives TypeScript a concrete call to infer
+// from, exactly like the original eager `const getSupabaseAdmin() =
+// createClient(...)` did.
+function createSupabaseAdmin() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Not configured yet.')
+  }
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+}
+let _supabaseAdmin: ReturnType<typeof createSupabaseAdmin> | null = null
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) _supabaseAdmin = createSupabaseAdmin()
+  return _supabaseAdmin
+}
 
 function tierFromPriceId(priceId: string | undefined): PayableEmployerTier | null {
   if (!priceId) return null
@@ -22,7 +50,7 @@ function tierFromPriceId(priceId: string | undefined): PayableEmployerTier | nul
 
 async function findEmployerId(customerId: string, metadataEmployerId?: string): Promise<string | null> {
   if (metadataEmployerId) return metadataEmployerId
-  const { data } = await supabaseAdmin.from('users').select('id').eq('employer_stripe_customer_id', customerId).single()
+  const { data } = await getSupabaseAdmin().from('users').select('id').eq('employer_stripe_customer_id', customerId).single()
   return data?.id || null
 }
 
@@ -30,7 +58,7 @@ async function findEmployerId(customerId: string, metadataEmployerId?: string): 
 // a users row -- same lookup shape as findEmployerId, different table.
 async function findOrganisationId(customerId: string, metadataOrgId?: string): Promise<string | null> {
   if (metadataOrgId) return metadataOrgId
-  const { data } = await supabaseAdmin.from('organisations').select('id').eq('stripe_customer_id', customerId).single()
+  const { data } = await getSupabaseAdmin().from('organisations').select('id').eq('stripe_customer_id', customerId).single()
   return data?.id || null
 }
 
@@ -60,7 +88,7 @@ export async function POST(req: NextRequest) {
         const organisationId = session.metadata?.organisation_id
         if (organisationId && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
-          await supabaseAdmin.from('organisations').update({
+          await getSupabaseAdmin().from('organisations').update({
             subscription_status: 'active',
             subscription_period_end: null,
             stripe_customer_id: session.customer as string,
@@ -70,7 +98,7 @@ export async function POST(req: NextRequest) {
         }
         if (!employerId || !tier || !session.subscription) break
         const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
-        await supabaseAdmin.from('users').update({
+        await getSupabaseAdmin().from('users').update({
           employer_tier: tier,
           employer_tier_set_at: new Date().toISOString(),
           employer_subscription_status: 'active',
@@ -96,7 +124,7 @@ export async function POST(req: NextRequest) {
 
         const organisationId = await findOrganisationId(subscription.customer as string, subscription.metadata?.organisation_id)
         if (organisationId) {
-          await supabaseAdmin.from('organisations').update({
+          await getSupabaseAdmin().from('organisations').update({
             subscription_status: status,
             subscription_period_end: periodEndIso,
             stripe_subscription_id: subscription.id,
@@ -108,7 +136,7 @@ export async function POST(req: NextRequest) {
         if (!employerId) break
         const priceId = subscription.items.data[0]?.price?.id
         const tier = tierFromPriceId(priceId)
-        await supabaseAdmin.from('users').update({
+        await getSupabaseAdmin().from('users').update({
           ...(tier ? { employer_tier: tier } : {}),
           employer_subscription_status: status,
           employer_subscription_period_end: periodEndIso,
@@ -125,12 +153,12 @@ export async function POST(req: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription
         const organisationId = await findOrganisationId(subscription.customer as string, subscription.metadata?.organisation_id)
         if (organisationId) {
-          await supabaseAdmin.from('organisations').update({ subscription_status: 'restricted' }).eq('id', organisationId)
+          await getSupabaseAdmin().from('organisations').update({ subscription_status: 'restricted' }).eq('id', organisationId)
           break
         }
         const employerId = await findEmployerId(subscription.customer as string, subscription.metadata?.employer_id)
         if (!employerId) break
-        await supabaseAdmin.from('users').update({
+        await getSupabaseAdmin().from('users').update({
           employer_subscription_status: 'restricted',
         }).eq('id', employerId)
         break
