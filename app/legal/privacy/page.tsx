@@ -24,7 +24,7 @@ export default function PrivacyPage() {
 
   return (
     <LegalShell title="Data Protection">
-      <p className="text-[13px] text-ink-tertiary">Version 1.0, 1 September 2026</p>
+      <p className="text-[13px] text-ink-tertiary">Version 1.1, 16 October 2026</p>
 
       <p>
         How LERN meets its duties under UK GDPR and the Data Protection Act 2018. LERN is run by IRL Connect Ltd,
@@ -44,7 +44,7 @@ export default function PrivacyPage() {
         <li>Held in the UK (London).</li>
         <li>Access limited to named, authorised people.</li>
         <li>Under-18s are not publicly searchable or identifiable as people.</li>
-        <li>Security measures suited to holding young people's data, backed by insurance cover.</li>
+        <li>Security measures suited to holding young people's data.</li>
         <li>Kept only as long as needed to provide the service or meet a legal duty.</li>
         <li>Never sold, and shared only where needed to run the service.</li>
       </ul>
@@ -56,6 +56,7 @@ export default function PrivacyPage() {
         <li>Vercel — hosts the website.</li>
         <li>Stripe — handles payment for organisation and employer subscriptions. LERN does not see or store card details.</li>
         <li>Resend — sends account and notification emails.</li>
+        <li>Agora — carries the audio and video for live workshops and, where a workshop is recorded, writes the recording to storage LERN controls.</li>
         <li>Google — only if you choose to sign in with Google.</li>
         <li>Companies House — checked automatically to verify an employer's registered business.</li>
       </ul>
