@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { getOrgBilling, setBootcampEvidence, createOrgCheckoutSession, cancelOrgSubscriptionViaStripe } from '@/lib/supabase'
-import { providerBandFor, PROVIDER_BAND_LABEL, BOOTCAMP_EVIDENCE_MONTHLY, INSTITUTION_MAX_PRICE } from '@/lib/billing'
+import { providerBandFor, PROVIDER_BAND_LABEL, BOOTCAMP_EVIDENCE_MONTHLY, institutionBandFor, INSTITUTION_BAND_LABEL } from '@/lib/billing'
 import { ChevronLeft, TrendingUp, GraduationCap, Receipt } from 'lucide-react'
 
 // Billing and Subscription — Complete Build Spec, Part 2. Every number
@@ -85,7 +85,8 @@ function BillingContent({ billing, onToggleBootcamp, togglingBootcamp, error, bu
   busy: boolean; onSubscribe: () => void; onCancel: () => void
 }) {
   const isProvider = billing.org_type === 'provider'
-  const band = isProvider ? providerBandFor(billing.headcount) : null
+  const providerBand = isProvider ? providerBandFor(billing.headcount) : null
+  const institutionBand = !isProvider ? institutionBandFor(billing.headcount) : null
   const hasAdjustments = billing.adjustments?.length > 0
 
   return (
@@ -110,15 +111,10 @@ function BillingContent({ billing, onToggleBootcamp, togglingBootcamp, error, bu
           billing.is_custom_pricing ? (
             <p className="text-[13px] text-ink-tertiary">600+ learners — priced on application</p>
           ) : (
-            <p className="text-[13px] text-ink-tertiary">Band: {PROVIDER_BAND_LABEL[band!]}</p>
+            <p className="text-[13px] text-ink-tertiary">Band: {PROVIDER_BAND_LABEL[providerBand!]}</p>
           )
         ) : (
-          <div>
-            <div className="h-1.5 bg-surface-muted rounded-full overflow-hidden mb-1.5">
-              <div className="h-full bg-brand rounded-full" style={{ width: `${Math.min((billing.headcount / 4750) * 100, 100)}%` }} />
-            </div>
-            <p className="text-[12px] text-ink-tertiary">of 4,750 maximum (pricing is capped at {money(INSTITUTION_MAX_PRICE)}/year beyond this)</p>
-          </div>
+          <p className="text-[13px] text-ink-tertiary">Band: {INSTITUTION_BAND_LABEL[institutionBand!]}</p>
         )}
       </div>
 
@@ -126,7 +122,9 @@ function BillingContent({ billing, onToggleBootcamp, togglingBootcamp, error, bu
       {billing.is_custom_pricing ? (
         <div className="bg-surface border border-edge rounded-2xl p-5">
           <p className="text-[14px] text-ink leading-relaxed">
-            At 600 or more learners, pricing is arranged directly rather than calculated automatically. Contact LERN to set up your plan.
+            {isProvider
+              ? 'At 600 or more learners, pricing is arranged directly rather than calculated automatically. Contact LERN to set up your plan.'
+              : 'At 6,000 or more students, pricing is arranged directly rather than calculated automatically. Contact LERN to set up your plan.'}
           </p>
         </div>
       ) : (

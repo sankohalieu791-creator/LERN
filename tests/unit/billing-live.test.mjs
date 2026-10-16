@@ -69,10 +69,10 @@ const moreIds = await addLoggedInStudents(95) // 10 + 95 = 105, crosses into 100
 await markLoggedIn(moreIds)
 billing = (await asStaff.rpc('get_org_billing', { p_org_id: org.id })).data
 eq('headcount now 105', billing.headcount, 105)
-eq('crossed into 100-299 -> base price updates to the flat 6500', billing.base_annual_price, 6500)
+eq('crossed into 100-299 -> base price updates to the flat 4000', billing.base_annual_price, 4000)
 eq('exactly one adjustment logged for the crossing', billing.adjustments.length, 1)
-console.log('  adjustment:', billing.adjustments[0], '(amount = (6500-0)/12*12 = 6500, since this is still month 1 of the cycle)')
-eq('adjustment amount matches (6500-0)/12*12', billing.adjustments[0]?.amount, 6500)
+console.log('  adjustment:', billing.adjustments[0], '(amount = (4000-0)/12*12 = 4000, since this is still month 1 of the cycle)')
+eq('adjustment amount matches (4000-0)/12*12', billing.adjustments[0]?.amount, 4000)
 
 // ── Re-sync with no further change: must not duplicate. ──
 billing = (await asStaff.rpc('get_org_billing', { p_org_id: org.id })).data
@@ -83,14 +83,14 @@ const withinBandIds = await addLoggedInStudents(50) // 105+50=155, still 100-299
 await markLoggedIn(withinBandIds)
 billing = (await asStaff.rpc('get_org_billing', { p_org_id: org.id })).data
 eq('headcount now 155, still 100-299 band', billing.headcount, 155)
-eq('same band -> base price still 6500, no new adjustment', billing.adjustments.length, 1)
+eq('same band -> base price still 4000, no new adjustment', billing.adjustments.length, 1)
 
 // ── Bootcamp Evidence toggle. ──
 let err = (await asStaff.rpc('set_bootcamp_evidence', { p_org_id: org.id, p_enabled: true })).error
 eq('enable bootcamp evidence: no error', err, null)
 billing = (await asStaff.rpc('get_org_billing', { p_org_id: org.id })).data
-eq('bootcamp evidence annual = 1800', billing.bootcamp_evidence_annual, 1800)
-eq('total = 6500 + 6500(adj) + 1800', billing.total, 6500 + 6500 + 1800)
+eq('bootcamp evidence annual = 1200', billing.bootcamp_evidence_annual, 1200)
+eq('total = 4000 + 4000(adj) + 1200', billing.total, 4000 + 4000 + 1200)
 
 err = (await asStaff.rpc('set_bootcamp_evidence', { p_org_id: org.id, p_enabled: false })).error
 eq('disable bootcamp evidence: no error', err, null)
@@ -101,13 +101,13 @@ eq('bootcamp evidence annual back to 0', billing.bootcamp_evidence_annual, 0)
 await admin.from('organisations').update({ billing_cycle_start: '2020-01-01' }).eq('id', org.id)
 billing = (await asStaff.rpc('get_org_billing', { p_org_id: org.id })).data
 eq('after simulated year rollover: adjustments reset to none', billing.adjustments.length, 0)
-eq('base price re-locked at current live price (155 -> still 6500)', billing.base_annual_price, 6500)
+eq('base price re-locked at current live price (155 -> still 4000)', billing.base_annual_price, 4000)
 
 // ── A DROP in headcount/band mid-cycle must never create a rebate. ──
 for (const id of [...moreIds, ...withinBandIds].slice(0, 100)) await admin.auth.admin.deleteUser(id)
 billing = (await asStaff.rpc('get_org_billing', { p_org_id: org.id })).data
 console.log('  headcount after big removal:', billing.headcount)
-eq('dropped back toward 1-99 band -> base price UNCHANGED (no rebate)', billing.base_annual_price, 6500)
+eq('dropped back toward 1-99 band -> base price UNCHANGED (no rebate)', billing.base_annual_price, 4000)
 eq('drop -> no new adjustment either', billing.adjustments.length, 0)
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)

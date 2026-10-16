@@ -276,10 +276,14 @@ export default function HelpDesk() {
         // 4.5rem, not 0.5rem -- the student desktop sidebar has its own
         // Sign out row docked to the exact same bottom-left corner
         // (StudentShell.tsx), which this sat directly on top of. Org/
-        // employer sidebars have nothing there (sign out lives in the
-        // top-right profile menu instead), so lifting this clear of the
-        // corner costs them nothing.
-        style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}
+        // provider/employer sidebars have nothing docked at the true
+        // bottom edge (sign out lives in the top-right profile menu
+        // instead), but OrgShell's Settings nav button (inline, right
+        // under Dashboard) can still land close to this corner on a
+        // shorter nav list -- reported directly as the orb sitting on
+        // top of it. Dropping those three roles back near the true
+        // edge clears it.
+        style={{ bottom: role === 'student' ? 'calc(4.5rem + env(safe-area-inset-bottom))' : 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
         <span
           className="relative flex items-center justify-center rounded-full border overflow-hidden w-11 h-11"

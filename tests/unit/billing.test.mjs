@@ -19,20 +19,26 @@ function providerBandFor(learners) {
 }
 function providerAnnualPrice(learners) {
   const band = providerBandFor(learners)
-  if (band === '1-99') return Math.min(learners * 70, 6500)
-  if (band === '100-299') return 6500
-  if (band === '300-599') return 8500
+  if (band === '1-99') return Math.min(learners * 50, 4000)
+  if (band === '100-299') return 4000
+  if (band === '300-599') return 6000
   return null
 }
 
-const INSTITUTION_BASE_PRICE = 2000
-const INSTITUTION_BASE_INCLUDED = 750
-const INSTITUTION_PER_EXTRA_STUDENT = 2.5
-const INSTITUTION_MAX_PRICE = 12000
+function institutionBandFor(students) {
+  if (students < 750) return 'under-750'
+  if (students < 1500) return '750-1499'
+  if (students < 2500) return '1500-2499'
+  if (students < 4000) return '2500-3999'
+  if (students < 6000) return '4000-5999'
+  return '6000+'
+}
+const INSTITUTION_BAND_PRICE = {
+  'under-750': 1500, '750-1499': 2000, '1500-2499': 2500,
+  '2500-3999': 3000, '4000-5999': 4500, '6000+': null,
+}
 function institutionAnnualPrice(students) {
-  if (students <= INSTITUTION_BASE_INCLUDED) return INSTITUTION_BASE_PRICE
-  const extra = students - INSTITUTION_BASE_INCLUDED
-  return Math.min(INSTITUTION_BASE_PRICE + extra * INSTITUTION_PER_EXTRA_STUDENT, INSTITUTION_MAX_PRICE)
+  return INSTITUTION_BAND_PRICE[institutionBandFor(students)]
 }
 
 function monthsRemainingInCycle(anchor, now) {
@@ -63,37 +69,38 @@ eq('499 employees (top of scale)', employerTierForEmployeeCount(499), 'scale')
 eq('500 employees (bottom of enterprise)', employerTierForEmployeeCount(500), 'enterprise')
 eq('50000 employees', employerTierForEmployeeCount(50000), 'enterprise')
 
-console.log('\n--- Provider band boundaries + prices ---')
-eq('1 learner price', providerAnnualPrice(1), 70)
-eq('50 learners price', providerAnnualPrice(50), 3500)
-eq('92 learners price (just under cap)', providerAnnualPrice(92), 6440)
-eq('93 learners price (cap kicks in, 93*70=6510>6500)', providerAnnualPrice(93), 6500)
+console.log('\n--- Provider band boundaries + prices (August list) ---')
+eq('1 learner price', providerAnnualPrice(1), 50)
+eq('50 learners price', providerAnnualPrice(50), 2500)
+eq('79 learners price (just under cap)', providerAnnualPrice(79), 3950)
+eq('80 learners price (cap kicks in, 80*50=4000)', providerAnnualPrice(80), 4000)
 eq('99 learners band', providerBandFor(99), '1-99')
-eq('99 learners price (capped)', providerAnnualPrice(99), 6500)
+eq('99 learners price (capped)', providerAnnualPrice(99), 4000)
 eq('100 learners band', providerBandFor(100), '100-299')
-eq('100 learners price', providerAnnualPrice(100), 6500)
+eq('100 learners price', providerAnnualPrice(100), 4000)
 eq('299 learners band', providerBandFor(299), '100-299')
-eq('299 learners price', providerAnnualPrice(299), 6500)
+eq('299 learners price', providerAnnualPrice(299), 4000)
 eq('300 learners band', providerBandFor(300), '300-599')
-eq('300 learners price', providerAnnualPrice(300), 8500)
+eq('300 learners price', providerAnnualPrice(300), 6000)
 eq('599 learners band', providerBandFor(599), '300-599')
-eq('599 learners price', providerAnnualPrice(599), 8500)
+eq('599 learners price', providerAnnualPrice(599), 6000)
 eq('600 learners band', providerBandFor(600), '600+')
 eq('600 learners price (on application)', providerAnnualPrice(600), null)
-eq('184 learners price (screenshot case)', providerAnnualPrice(184), 6500)
-eq('184 learners band (screenshot case)', providerBandFor(184), '100-299')
-eq('312 learners price (screenshot case)', providerAnnualPrice(312), 8500)
 
-console.log('\n--- Institution price boundaries ---')
-eq('1 student', institutionAnnualPrice(1), 2000)
-eq('750 students (exactly included)', institutionAnnualPrice(750), 2000)
-eq('751 students (1 over)', institutionAnnualPrice(751), 2002.5)
-eq('1240 students (screenshot case)', institutionAnnualPrice(1240), 2000 + 490 * 2.5)
-eq('1240 students = 1225 extra charge', institutionAnnualPrice(1240) - 2000, 1225)
-// Cap: base(2000) + (students-750)*2.5 = 12000 => students-750 = 4000 => students = 4750
-eq('4750 students (exactly at cap)', institutionAnnualPrice(4750), 12000)
-eq('4751 students (1 over cap boundary)', institutionAnnualPrice(4751), 12000)
-eq('100000 students (nowhere near, still capped)', institutionAnnualPrice(100000), 12000)
+console.log('\n--- Institution band boundaries + prices (16 Oct 2026 flat bands) ---')
+eq('1 student', institutionAnnualPrice(1), 1500)
+eq('749 students (top of under-750)', institutionAnnualPrice(749), 1500)
+eq('750 students (bottom of next band)', institutionAnnualPrice(750), 2000)
+eq('1499 students (top of 750-1499)', institutionAnnualPrice(1499), 2000)
+eq('1500 students (bottom of 1500-2499)', institutionAnnualPrice(1500), 2500)
+eq('2000 students (screenshot case, was £5,125 under the old formula)', institutionAnnualPrice(2000), 2500)
+eq('2499 students (top of 1500-2499)', institutionAnnualPrice(2499), 2500)
+eq('2500 students (bottom of 2500-3999)', institutionAnnualPrice(2500), 3000)
+eq('3999 students (top of 2500-3999)', institutionAnnualPrice(3999), 3000)
+eq('4000 students (bottom of 4000-5999)', institutionAnnualPrice(4000), 4500)
+eq('5999 students (top of 4000-5999)', institutionAnnualPrice(5999), 4500)
+eq('6000 students (on request)', institutionAnnualPrice(6000), null)
+eq('100000 students (on request)', institutionAnnualPrice(100000), null)
 
 console.log('\n--- Proration: spec\'s own worked example ---')
 // "4 whole months left", (8500-6500)/12*4 = 666.67 -> rounds to 667

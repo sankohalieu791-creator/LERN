@@ -51,8 +51,9 @@ export function isDowngradeBlocked(
 }
 
 // ── Part 2: Training providers ─────────────────────────────────────
-// 1–99: £70/learner, capped at £6,500. 100–299: £6,500 flat.
-// 300–599: £8,500 flat. 600+: priced on application (not automatic).
+// August list, held until the product-matches-deck trigger is met:
+// 1–99: £50/learner, capped at £4,000. 100–299: £4,000 flat.
+// 300–599: £6,000 flat. 600+: priced on application (not automatic).
 
 export type ProviderBand = '1-99' | '100-299' | '300-599' | '600+'
 
@@ -65,9 +66,9 @@ export function providerBandFor(learners: number): ProviderBand {
 
 export function providerAnnualPrice(learners: number): number | null {
   const band = providerBandFor(learners)
-  if (band === '1-99') return Math.min(learners * 70, 6500)
-  if (band === '100-299') return 6500
-  if (band === '300-599') return 8500
+  if (band === '1-99') return Math.min(learners * 50, 4000)
+  if (band === '100-299') return 4000
+  if (band === '300-599') return 6000
   return null // 600+ is priced on application
 }
 
@@ -78,21 +79,44 @@ export const PROVIDER_BAND_LABEL: Record<ProviderBand, string> = {
   '600+': '600+ learners (priced on application)',
 }
 
-export const BOOTCAMP_EVIDENCE_MONTHLY = 150
+export const BOOTCAMP_EVIDENCE_MONTHLY = 100
 
 // ── Institutions ────────────────────────────────────────────────────
-// Base £2,000/yr covers up to and including 750 students. Above that,
-// +£2.50 per additional student. Capped at £12,000/yr regardless of count.
+// Flat annual bands by roll size (16 Oct 2026 decision), replacing the
+// old £2,000 + £2.50/student formula. 6,000+ is priced on request, not
+// automatic -- same pattern as providers' 600+.
 
-export const INSTITUTION_BASE_PRICE = 2000
-export const INSTITUTION_BASE_INCLUDED = 750
-export const INSTITUTION_PER_EXTRA_STUDENT = 2.5
-export const INSTITUTION_MAX_PRICE = 12000
+export type InstitutionBand = 'under-750' | '750-1499' | '1500-2499' | '2500-3999' | '4000-5999' | '6000+'
 
-export function institutionAnnualPrice(students: number): number {
-  if (students <= INSTITUTION_BASE_INCLUDED) return INSTITUTION_BASE_PRICE
-  const extra = students - INSTITUTION_BASE_INCLUDED
-  return Math.min(INSTITUTION_BASE_PRICE + extra * INSTITUTION_PER_EXTRA_STUDENT, INSTITUTION_MAX_PRICE)
+export function institutionBandFor(students: number): InstitutionBand {
+  if (students < 750) return 'under-750'
+  if (students < 1500) return '750-1499'
+  if (students < 2500) return '1500-2499'
+  if (students < 4000) return '2500-3999'
+  if (students < 6000) return '4000-5999'
+  return '6000+'
+}
+
+const INSTITUTION_BAND_PRICE: Record<InstitutionBand, number | null> = {
+  'under-750': 1500,
+  '750-1499': 2000,
+  '1500-2499': 2500,
+  '2500-3999': 3000,
+  '4000-5999': 4500,
+  '6000+': null, // priced on request
+}
+
+export function institutionAnnualPrice(students: number): number | null {
+  return INSTITUTION_BAND_PRICE[institutionBandFor(students)]
+}
+
+export const INSTITUTION_BAND_LABEL: Record<InstitutionBand, string> = {
+  'under-750': 'Under 750 students',
+  '750-1499': '750 to 1,499 students',
+  '1500-2499': '1,500 to 2,499 students',
+  '2500-3999': '2,500 to 3,999 students',
+  '4000-5999': '4,000 to 5,999 students',
+  '6000+': '6,000+ students (priced on request)',
 }
 
 // ── Shared: mid-cycle proration (whole months, rounded to the nearest

@@ -8,10 +8,16 @@ import { createClient } from '@supabase/supabase-js'
 // to the Companies House API, which a plain SQL function can't do
 // synchronously. Uses the service role to write the results since this
 // runs the instant the applicant submits, before an admin is involved.
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+// Same "safe no-op until configured" pattern as lib/stripe.ts -- a
+// module-scope createClient() with a non-null-asserted env var throws
+// the instant this file is imported, which crashes Next.js's build-time
+// page-data collection for the WHOLE deployment the moment any
+// environment (e.g. Preview, which doesn't carry the same env vars as
+// Production) is missing this var -- not just a runtime 500 for this
+// one route, an unbuildable app.
+const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  : null
 
 const CH_API_KEY = process.env.COMPANIES_HOUSE_API_KEY
 
@@ -80,6 +86,8 @@ async function checkCompaniesHouse(companyNumber: string): Promise<{ result: 'pa
 }
 
 export async function POST(req: NextRequest) {
+  if (!supabaseAdmin) return NextResponse.json({ error: 'Not configured yet.' }, { status: 503 })
+
   const auth = req.headers.get('authorization') || ''
   const accessToken = auth.startsWith('Bearer ') ? auth.slice(7) : ''
   if (!accessToken) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 })
